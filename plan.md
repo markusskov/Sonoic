@@ -16,6 +16,7 @@ Implemented so far:
 - real mini-player and draggable player sheet
 - real local Sonos `play/pause`, `next`, `previous`, `mute`, and seek
 - real now-playing title, artist, album, source, artwork, duration, and progress reads
+- manual-host based real room naming and bonded home theater member details
 - shared external-control snapshot for widgets
 - App Group-backed artwork cache and shared state store
 - manual-host based local Sonos configuration through `Settings`
@@ -83,8 +84,8 @@ The app can already control one manually configured local Sonos player.
 
 The next meaningful expansion is:
 
-- real target naming
-- real room or group identity
+- discovery-backed target lists instead of manual-host placeholders
+- real room or group identity beyond the configured manual player
 - eventually discovery, once the added complexity is justified
 
 ### 3. Build the actual Sonos control flows

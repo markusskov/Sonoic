@@ -175,6 +175,9 @@ extension SonoicModel {
                 nowPlaying = nextNowPlaying
             }
 
+            await refreshManualHostIdentityIfNeeded()
+            await refreshManualHostTopologyIfNeeded()
+
             if wasAwaitingConfirmation != isManualPlayTransitionAwaitingConfirmation,
                nowPlaying == nextNowPlaying
             {

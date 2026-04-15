@@ -3,6 +3,7 @@ import Foundation
 struct SonosNowPlayingClient {
     private let transport: SonosControlTransport
     private let sourceNameResolver = SonosSourceNameResolver()
+    private let titleResolver = SonosNowPlayingTitleResolver()
 
     private struct PositionInfo {
         var trackMetadata: String?
@@ -59,7 +60,7 @@ struct SonosNowPlayingClient {
         )
 
         return SonosNowPlayingSnapshot(
-            title: resolveTitle(
+            title: titleResolver.resolveTitle(
                 trackMetadata: trackMetadata,
                 sourceMetadata: sourceMetadata,
                 sourceName: sourceName,
@@ -141,34 +142,6 @@ struct SonosNowPlayingClient {
         }
 
         return TimeInterval(hours * 3600 + minutes * 60 + seconds)
-    }
-
-    private func resolveTitle(
-        trackMetadata: SonosDIDLMetadata?,
-        sourceMetadata: SonosDIDLMetadata?,
-        sourceName: String,
-        playbackState: SonosNowPlayingSnapshot.PlaybackState
-    ) -> String {
-        if let title = nonEmpty(trackMetadata?.title) {
-            return title
-        }
-
-        if let sourceTitle = nonEmpty(sourceMetadata?.title), sourceTitle != sourceName {
-            return sourceTitle
-        }
-
-        if sourceName != "Sonos" {
-            return sourceName
-        }
-
-        switch playbackState {
-        case .playing:
-            return "Audio Playing"
-        case .paused:
-            return "Nothing Playing"
-        case .buffering:
-            return "Loading Audio"
-        }
     }
 
     private func resolveSourceName(

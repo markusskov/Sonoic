@@ -13,6 +13,7 @@ What works today:
 - iPhone app shell with `Home`, `Rooms`, `Queue`, and `Settings`
 - real bottom mini-player and expandable player sheet
 - manual Sonos host configuration for one local player
+- real room naming and bonded home theater member details for the configured manual player
 - real local `play/pause`, `next`, `previous`, `mute`, and seek commands
 - real now-playing metadata, artwork, source attribution, and progress reads
 - widget backed by shared app state
@@ -99,6 +100,7 @@ Before running on your own Apple developer account:
 Notes:
 
 - The current real Sonos path is manual-host based. Discovery is not implemented yet.
+- The configured manual player can already resolve its real room name and bonded home theater setup, but it does not yet expose household-wide discovery or grouping.
 - The app requests local-network access because Sonos control currently happens over the LAN.
 - Some now-playing behavior on the Lock Screen is still experimental and under active refinement.
 
