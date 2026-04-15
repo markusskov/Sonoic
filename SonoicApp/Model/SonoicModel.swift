@@ -7,6 +7,8 @@ import UIKit
 final class SonoicModel {
     @ObservationIgnored static let manualPlayTransitionGraceInterval: TimeInterval = 3
     @ObservationIgnored var isSceneActive = false
+    @ObservationIgnored var resolvedManualHostIdentityHost: String?
+    @ObservationIgnored var resolvedManualHostTopologyHost: String?
     @ObservationIgnored var manualHostRefreshTask: Task<Void, Never>?
     @ObservationIgnored var manualHostDeferredSyncTask: Task<Void, Never>?
     @ObservationIgnored var manualPlayConfirmationRetryTask: Task<Void, Never>?
@@ -16,6 +18,8 @@ final class SonoicModel {
     @ObservationIgnored var backgroundExecutionIdentifier: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored let sharedStore: SonoicSharedStore?
     @ObservationIgnored let settingsStore: SonoicSettingsStore
+    @ObservationIgnored let deviceInfoClient: SonosDeviceInfoClient
+    @ObservationIgnored let zoneGroupTopologyClient: SonosZoneGroupTopologyClient
     @ObservationIgnored let renderingControlClient: SonosRenderingControlClient
     @ObservationIgnored let avTransportClient: SonosAVTransportClient
     @ObservationIgnored let nowPlayingClient: SonosNowPlayingClient
@@ -26,6 +30,7 @@ final class SonoicModel {
         didSet {
             settingsStore.saveManualSonosHost(manualSonosHost)
             manualHostRefreshStatus = .idle
+            resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
             persistSharedExternalControlState()
@@ -75,6 +80,8 @@ final class SonoicModel {
     init() {
         settingsStore = SonoicSettingsStore()
         let sonosControlTransport = SonosControlTransport()
+        deviceInfoClient = SonosDeviceInfoClient(transport: sonosControlTransport)
+        zoneGroupTopologyClient = SonosZoneGroupTopologyClient(transport: sonosControlTransport)
         renderingControlClient = SonosRenderingControlClient(transport: sonosControlTransport)
         avTransportClient = SonosAVTransportClient(transport: sonosControlTransport)
         nowPlayingClient = SonosNowPlayingClient(transport: sonosControlTransport)
@@ -88,6 +95,7 @@ final class SonoicModel {
             assertionFailure("Unable to create the shared App Group store: \(error)")
         }
 
+        resetManualHostIdentity()
         persistSharedExternalControlState()
         configureNowPlayableSessionController()
     }
