@@ -6,14 +6,81 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		509374212F8903DC0029EF88 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 509374202F8903DC0029EF88 /* WidgetKit.framework */; };
+		509374232F8903DC0029EF88 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 509374222F8903DC0029EF88 /* SwiftUI.framework */; };
+		509374342F8903DE0029EF88 /* SonoicWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5093741E2F8903DC0029EF88 /* SonoicWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		509374322F8903DE0029EF88 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 509373FE2F8902BC0029EF88 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5093741D2F8903DC0029EF88;
+			remoteInfo = SonoicWidgetsExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		509374392F8903DE0029EF88 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				509374342F8903DE0029EF88 /* SonoicWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		509374062F8902BC0029EF88 /* Sonoic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sonoic.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5093741E2F8903DC0029EF88 /* SonoicWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SonoicWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		509374202F8903DC0029EF88 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		509374222F8903DC0029EF88 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		5093743C2F89055E0029EF88 /* SonoicWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SonoicWidgetsExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		509374352F8903DE0029EF88 /* Exceptions for "SonoicWidgets" folder in "SonoicWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5093741D2F8903DC0029EF88 /* SonoicWidgetsExtension */;
+		};
+		60AF4D372F8D6CB000C3E321 /* Exceptions for "SonoicApp" folder in "Sonoic" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 509374052F8902BC0029EF88 /* Sonoic */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		509374082F8902BC0029EF88 /* Sonoic */ = {
+		509374082F8902BC0029EF88 /* SonoicApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Sonoic;
+			exceptions = (
+				60AF4D372F8D6CB000C3E321 /* Exceptions for "SonoicApp" folder in "Sonoic" target */,
+			);
+			path = SonoicApp;
+			sourceTree = "<group>";
+		};
+		509374242F8903DC0029EF88 /* SonoicWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				509374352F8903DE0029EF88 /* Exceptions for "SonoicWidgets" folder in "SonoicWidgetsExtension" target */,
+			);
+			path = SonoicWidgets;
+			sourceTree = "<group>";
+		};
+		60AF4D362F8D6CB000C3E321 /* SonoicShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SonoicShared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -26,13 +93,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5093741B2F8903DC0029EF88 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				509374232F8903DC0029EF88 /* SwiftUI.framework in Frameworks */,
+				509374212F8903DC0029EF88 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		509373FD2F8902BC0029EF88 = {
 			isa = PBXGroup;
 			children = (
-				509374082F8902BC0029EF88 /* Sonoic */,
+				5093743C2F89055E0029EF88 /* SonoicWidgetsExtension.entitlements */,
+				509374082F8902BC0029EF88 /* SonoicApp */,
+				60AF4D362F8D6CB000C3E321 /* SonoicShared */,
+				509374242F8903DC0029EF88 /* SonoicWidgets */,
+				5093741F2F8903DC0029EF88 /* Frameworks */,
 				509374072F8902BC0029EF88 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,8 +121,18 @@
 			isa = PBXGroup;
 			children = (
 				509374062F8902BC0029EF88 /* Sonoic.app */,
+				5093741E2F8903DC0029EF88 /* SonoicWidgetsExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		5093741F2F8903DC0029EF88 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				509374202F8903DC0029EF88 /* WidgetKit.framework */,
+				509374222F8903DC0029EF88 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -55,13 +145,16 @@
 				509374022F8902BC0029EF88 /* Sources */,
 				509374032F8902BC0029EF88 /* Frameworks */,
 				509374042F8902BC0029EF88 /* Resources */,
+				509374392F8903DE0029EF88 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				509374332F8903DE0029EF88 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				509374082F8902BC0029EF88 /* Sonoic */,
+				509374082F8902BC0029EF88 /* SonoicApp */,
+				60AF4D362F8D6CB000C3E321 /* SonoicShared */,
 			);
 			name = Sonoic;
 			packageProductDependencies = (
@@ -69,6 +162,29 @@
 			productName = Sonoic;
 			productReference = 509374062F8902BC0029EF88 /* Sonoic.app */;
 			productType = "com.apple.product-type.application";
+		};
+		5093741D2F8903DC0029EF88 /* SonoicWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 509374362F8903DE0029EF88 /* Build configuration list for PBXNativeTarget "SonoicWidgetsExtension" */;
+			buildPhases = (
+				5093741A2F8903DC0029EF88 /* Sources */,
+				5093741B2F8903DC0029EF88 /* Frameworks */,
+				5093741C2F8903DC0029EF88 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				509374242F8903DC0029EF88 /* SonoicWidgets */,
+				60AF4D362F8D6CB000C3E321 /* SonoicShared */,
+			);
+			name = SonoicWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = SonoicWidgetsExtension;
+			productReference = 5093741E2F8903DC0029EF88 /* SonoicWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -81,6 +197,9 @@
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					509374052F8902BC0029EF88 = {
+						CreatedOnToolsVersion = 26.4;
+					};
+					5093741D2F8903DC0029EF88 = {
 						CreatedOnToolsVersion = 26.4;
 					};
 				};
@@ -100,12 +219,20 @@
 			projectRoot = "";
 			targets = (
 				509374052F8902BC0029EF88 /* Sonoic */,
+				5093741D2F8903DC0029EF88 /* SonoicWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		509374042F8902BC0029EF88 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5093741C2F8903DC0029EF88 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +249,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5093741A2F8903DC0029EF88 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		509374332F8903DE0029EF88 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5093741D2F8903DC0029EF88 /* SonoicWidgetsExtension */;
+			targetProxy = 509374322F8903DE0029EF88 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5093740F2F8902BE0029EF88 /* Debug */ = {
@@ -251,29 +393,26 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SonoicApp/Sonoic.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = N2M33U7L7U;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SonoicApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markus.Sonoic;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markusskov.Sonoic;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -283,29 +422,88 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SonoicApp/Sonoic.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = N2M33U7L7U;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SonoicApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markus.Sonoic;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markusskov.Sonoic;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		509374372F8903DE0029EF88 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SonoicWidgetsExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N2M33U7L7U;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SonoicWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SonoicWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markusskov.Sonoic.SonoicWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		509374382F8903DE0029EF88 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SonoicWidgetsExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N2M33U7L7U;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SonoicWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SonoicWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markusskov.Sonoic.SonoicWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -327,6 +525,15 @@
 			buildConfigurations = (
 				509374122F8902BE0029EF88 /* Debug */,
 				509374132F8902BE0029EF88 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		509374362F8903DE0029EF88 /* Build configuration list for PBXNativeTarget "SonoicWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				509374372F8903DE0029EF88 /* Debug */,
+				509374382F8903DE0029EF88 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
