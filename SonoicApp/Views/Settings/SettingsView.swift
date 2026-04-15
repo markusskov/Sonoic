@@ -6,7 +6,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Manual Sonos Player") {
+            Section("Connection") {
                 TextField("192.168.1.42 or sonos.local", text: $manualSonosHostDraft)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -17,19 +17,6 @@ struct SettingsView: View {
                 Text("Sonoic uses this player to read real now-playing, volume, mute, and playback over your local network. While the app stays open, it refreshes automatically, and iOS may refresh it again in the background when allowed.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-            }
-
-            Section("Player Snapshot") {
-                LabeledContent("Title", value: model.nowPlaying.title)
-
-                if let artistName = model.nowPlaying.artistName {
-                    LabeledContent("Artist", value: artistName)
-                }
-
-                LabeledContent("Source", value: model.nowPlaying.sourceName)
-                LabeledContent("Playback", value: model.nowPlaying.playbackState.title)
-                LabeledContent("Current volume", value: model.externalVolume.labelText)
-                LabeledContent("Mute", value: model.externalVolume.isMuted ? "On" : "Off")
 
                 Button {
                     commitManualSonosHostIfNeeded()
@@ -50,6 +37,21 @@ struct SettingsView: View {
                 .disabled(!hasManualSonosHostDraft || model.manualHostRefreshStatus.isRefreshing)
 
                 statusContent
+            }
+
+            if model.hasManualSonosHost {
+                Section("Player Snapshot") {
+                    LabeledContent("Title", value: model.nowPlaying.title)
+
+                    if let artistName = model.nowPlaying.artistName {
+                        LabeledContent("Artist", value: artistName)
+                    }
+
+                    LabeledContent("Source", value: model.nowPlaying.sourceName)
+                    LabeledContent("Playback", value: model.nowPlaying.playbackState.title)
+                    LabeledContent("Current Volume", value: model.externalVolume.labelText)
+                    LabeledContent("Mute", value: model.externalVolume.isMuted ? "On" : "Off")
+                }
             }
         }
         .navigationTitle("Settings")
