@@ -30,12 +30,16 @@ extension SonoicModel {
 
         let normalizedHost = normalizedManualSonosHost(manualSonosHost)
         let hasResolvedCurrentHost = resolvedManualHostIdentityHost == normalizedHost
-        guard force || !hasResolvedCurrentHost || isManualHostIdentityRefreshDue(referenceDate: .now) else {
+        let canUseCachedIdentity = hasResolvedCurrentHost
+            && manualHostIdentityStatus.isResolved
+            && !isManualHostIdentityRefreshDue(referenceDate: .now)
+
+        guard force || !canUseCachedIdentity else {
             manualHostIdentityStatus = .resolved
             return
         }
 
-        let shouldSurfaceLoading = force || !hasResolvedCurrentHost || !manualHostIdentityStatus.isResolved
+        let shouldSurfaceLoading = force || !hasResolvedCurrentHost || manualHostIdentityStatus == .idle
         if shouldSurfaceLoading {
             manualHostIdentityStatus = .loading
         }

@@ -9,12 +9,16 @@ extension SonoicModel {
 
         let normalizedHost = normalizedManualSonosHost(manualSonosHost)
         let hasResolvedCurrentHost = resolvedManualHostTopologyHost == normalizedHost
-        guard force || !hasResolvedCurrentHost || isManualHostTopologyRefreshDue(referenceDate: .now) else {
+        let canUseCachedTopology = hasResolvedCurrentHost
+            && manualHostTopologyStatus.isResolved
+            && !isManualHostTopologyRefreshDue(referenceDate: .now)
+
+        guard force || !canUseCachedTopology else {
             manualHostTopologyStatus = .resolved
             return
         }
 
-        let shouldSurfaceLoading = force || !hasResolvedCurrentHost || !manualHostTopologyStatus.isResolved
+        let shouldSurfaceLoading = force || !hasResolvedCurrentHost || manualHostTopologyStatus == .idle
         if shouldSurfaceLoading {
             manualHostTopologyStatus = .loading
         }
