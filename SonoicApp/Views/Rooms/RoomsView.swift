@@ -3,6 +3,10 @@ import SwiftUI
 struct RoomsView: View {
     @Environment(SonoicModel.self) private var model
 
+    private var isRefreshingRoomState: Bool {
+        model.manualHostRefreshStatus.isRefreshing
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
@@ -20,7 +24,10 @@ struct RoomsView: View {
                         RoomsCurrentRoomCard(
                             roomName: model.activeTarget.name,
                             roomSummary: model.activeTarget.summary,
-                            setupProducts: model.activeTarget.setupProducts
+                            setupProducts: model.activeTarget.setupProducts,
+                            isRefreshing: isRefreshingRoomState,
+                            lastUpdatedAt: model.manualHostRefreshStatus.updatedAt,
+                            refreshAction: refreshRoomState
                         )
                     }
                     .buttonStyle(.plain)
@@ -60,7 +67,14 @@ struct RoomsView: View {
             .padding(20)
         }
         .scrollIndicators(.hidden)
+        .refreshable {
+            await refreshRoomState()
+        }
         .navigationTitle("Rooms")
+    }
+
+    private func refreshRoomState() async {
+        await model.refreshManualSonosPlayerState()
     }
 }
 
@@ -68,6 +82,21 @@ private struct RoomsCurrentRoomCard: View {
     let roomName: String
     let roomSummary: String
     let setupProducts: [SonosActiveTarget.SetupProduct]
+    let isRefreshing: Bool
+    let lastUpdatedAt: Date?
+    let refreshAction: () async -> Void
+
+    private var refreshStatusText: String {
+        if isRefreshing {
+            return "Refreshing room details..."
+        }
+
+        if let lastUpdatedAt {
+            return "Updated \(lastUpdatedAt.formatted(.dateTime.hour().minute()))"
+        }
+
+        return "Pull down or tap refresh to reload this room."
+    }
 
     var body: some View {
         RoomSurfaceCard {
@@ -115,6 +144,36 @@ private struct RoomsCurrentRoomCard: View {
                         }
                     }
                 }
+            }
+
+            Divider()
+
+            HStack(spacing: 12) {
+                if isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(refreshStatusText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    Task {
+                        await refreshAction()
+                    }
+                } label: {
+                    Text(isRefreshing ? "Refreshing" : "Refresh")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isRefreshing)
             }
         }
     }
