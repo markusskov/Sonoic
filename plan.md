@@ -20,6 +20,8 @@ Implemented so far:
 - shared external-control snapshot for widgets
 - App Group-backed artwork cache and shared state store
 - manual-host based local Sonos configuration through `Settings`
+- `Rooms` surface for the resolved active room, bonded setup, and manual refresh state
+- `Settings` focused on manual player setup and diagnostics
 - lightweight foreground polling for playback, metadata, volume, and mute
 - stale-state handling for outside-app state
 - first native Apple now-playing integration work
@@ -118,7 +120,7 @@ These are real project decisions, but they do not all need to be answered right 
 - How far should the project go with background refresh before the complexity stops being worth it?
 - When is multicast discovery worth the added entitlement and networking complexity?
 - How much of the Apple native now-playing experience can be supported reliably for a remote-control app?
-- When should the placeholder `Rooms` tab start consuming real data?
+- How far should the `Rooms` tab go before full discovery and grouping make sense?
 
 ## Working Style
 

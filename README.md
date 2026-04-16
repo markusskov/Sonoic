@@ -14,6 +14,8 @@ What works today:
 - real bottom mini-player and expandable player sheet
 - manual Sonos host configuration for one local player
 - real room naming and bonded home theater member details for the configured manual player
+- `Rooms` tab showing the resolved current room, bonded setup, and lightweight refresh state
+- `Settings` focused on manual player configuration and diagnostics
 - real local `play/pause`, `next`, `previous`, `mute`, and seek commands
 - real now-playing metadata, artwork, source attribution, and progress reads
 - widget backed by shared app state
@@ -80,7 +82,7 @@ SonoicApp/
 
 Requirements:
 
-- latest Xcode with Swift 6 support
+- latest Xcode with Swift 6.3 support
 - an iPhone or simulator build environment
 - a Sonos player reachable on the same local network for the real control path
 
@@ -100,7 +102,8 @@ Before running on your own Apple developer account:
 Notes:
 
 - The current real Sonos path is manual-host based. Discovery is not implemented yet.
-- The configured manual player can already resolve its real room name and bonded home theater setup, but it does not yet expose household-wide discovery or grouping.
+- The configured manual player can already resolve its real room name and bonded home theater setup in `Rooms`, but it does not yet expose household-wide discovery or grouping.
+- `Settings` is currently the manual connection and diagnostics surface rather than the place to browse rooms.
 - The app requests local-network access because Sonos control currently happens over the LAN.
 - Some now-playing behavior on the Lock Screen is still experimental and under active refinement.
 
