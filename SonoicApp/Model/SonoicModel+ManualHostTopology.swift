@@ -3,24 +3,36 @@ import Foundation
 extension SonoicModel {
     func refreshManualHostTopologyIfNeeded() async {
         guard hasManualSonosHost else {
+            manualHostTopologyStatus = .idle
             return
         }
 
         let normalizedHost = normalizedManualSonosHost(manualSonosHost)
         guard resolvedManualHostTopologyHost != normalizedHost else {
+            manualHostTopologyStatus = .resolved
             return
         }
 
-        guard let topology = try? await zoneGroupTopologyClient.fetchTopology(host: manualSonosHost) else {
-            return
-        }
+        manualHostTopologyStatus = .loading
 
-        applyManualHostTopologyIfNeeded(topology, host: normalizedHost)
+        do {
+            let topology = try await zoneGroupTopologyClient.fetchTopology(host: manualSonosHost)
+            let didApplyTopology = applyManualHostTopologyIfNeeded(topology, host: normalizedHost)
+
+            if didApplyTopology {
+                manualHostTopologyStatus = .resolved
+            } else {
+                manualHostTopologyStatus = .failed("Couldn't match the configured player to a room setup.")
+            }
+        } catch {
+            manualHostTopologyStatus = .failed(error.localizedDescription)
+        }
     }
 
-    private func applyManualHostTopologyIfNeeded(_ topology: SonosZoneGroupTopology, host: String) {
+    @discardableResult
+    private func applyManualHostTopologyIfNeeded(_ topology: SonosZoneGroupTopology, host: String) -> Bool {
         guard let matchedMember = topology.member(matchingTargetID: activeTarget.id, host: host) else {
-            return
+            return false
         }
 
         resolvedManualHostTopologyHost = host
@@ -36,11 +48,11 @@ extension SonoicModel {
         nextTarget.memberNames = setupMemberNames
         nextTarget.bondedAccessories = bondedAccessories
 
-        guard nextTarget != activeTarget else {
-            return
+        if nextTarget != activeTarget {
+            activeTarget = nextTarget
         }
 
-        activeTarget = nextTarget
+        return true
     }
 
     private func setupMemberNames(

@@ -6,6 +6,8 @@ extension SonoicModel {
     func resetManualHostIdentity() {
         resolvedManualHostIdentityHost = nil
         resolvedManualHostTopologyHost = nil
+        manualHostIdentityStatus = .idle
+        manualHostTopologyStatus = .idle
 
         let nextTarget = hasManualSonosHost
             ? manualHostPlaceholderTarget(for: manualSonosHost)
@@ -20,19 +22,25 @@ extension SonoicModel {
 
     func refreshManualHostIdentityIfNeeded() async {
         guard hasManualSonosHost else {
+            manualHostIdentityStatus = .idle
             return
         }
 
         let normalizedHost = normalizedManualSonosHost(manualSonosHost)
         guard resolvedManualHostIdentityHost != normalizedHost else {
+            manualHostIdentityStatus = .resolved
             return
         }
 
-        guard let deviceInfo = try? await deviceInfoClient.fetchDeviceInfo(host: manualSonosHost) else {
-            return
-        }
+        manualHostIdentityStatus = .loading
 
-        applyManualHostDeviceInfo(deviceInfo, host: normalizedHost)
+        do {
+            let deviceInfo = try await deviceInfoClient.fetchDeviceInfo(host: manualSonosHost)
+            applyManualHostDeviceInfo(deviceInfo, host: normalizedHost)
+            manualHostIdentityStatus = .resolved
+        } catch {
+            manualHostIdentityStatus = .failed(error.localizedDescription)
+        }
     }
 
     private func applyManualHostDeviceInfo(_ deviceInfo: SonosDeviceInfo, host: String) {

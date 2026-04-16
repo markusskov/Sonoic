@@ -191,6 +191,12 @@ extension SonoicModel {
         } catch {
             manualPlayTransitionGraceDeadline = nil
             setManualPlayTransitionAwaitingConfirmation(false)
+            if !manualHostIdentityStatus.isResolved {
+                manualHostIdentityStatus = .failed(error.localizedDescription)
+            }
+            if !manualHostTopologyStatus.isResolved {
+                manualHostTopologyStatus = .failed(error.localizedDescription)
+            }
             manualHostRefreshStatus = .failed(error.localizedDescription)
             return false
         }

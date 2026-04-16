@@ -37,6 +37,8 @@ final class SonoicModel {
         didSet {
             settingsStore.saveManualSonosHost(manualSonosHost)
             manualHostRefreshStatus = .idle
+            manualHostIdentityStatus = .idle
+            manualHostTopologyStatus = .idle
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
@@ -44,6 +46,8 @@ final class SonoicModel {
         }
     }
     var manualHostRefreshStatus: SonosManualHostRefreshStatus = .idle
+    var manualHostIdentityStatus: SonosRoomDataStatus = .idle
+    var manualHostTopologyStatus: SonosRoomDataStatus = .idle
 
     var activeTarget = SonoicModel.defaultTarget {
         didSet {

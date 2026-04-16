@@ -18,19 +18,42 @@ struct RoomsView: View {
                 )
 
                 if model.hasManualSonosHost {
-                    NavigationLink {
-                        RoomDetailView(activeTarget: model.activeTarget)
-                    } label: {
-                        RoomsCurrentRoomCard(
-                            roomName: model.activeTarget.name,
-                            roomSummary: model.activeTarget.summary,
-                            setupProducts: model.activeTarget.setupProducts,
-                            isRefreshing: isRefreshingRoomState,
-                            lastUpdatedAt: model.manualHostRefreshStatus.updatedAt,
-                            refreshAction: refreshRoomState
+                    if model.manualHostIdentityStatus.isResolved {
+                        NavigationLink {
+                            RoomDetailView(activeTarget: model.activeTarget)
+                        } label: {
+                            RoomsCurrentRoomCard(
+                                roomName: model.activeTarget.name,
+                                roomSummary: model.activeTarget.summary,
+                                setupProducts: model.activeTarget.setupProducts,
+                                topologyStatus: model.manualHostTopologyStatus,
+                                isRefreshing: isRefreshingRoomState,
+                                lastUpdatedAt: model.manualHostRefreshStatus.updatedAt,
+                                refreshAction: refreshRoomState
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else if let failureDetail = model.manualHostIdentityStatus.failureDetail {
+                        RoomResolutionStateCard(
+                            title: "Couldn't Load Room",
+                            detail: failureDetail,
+                            systemImage: "exclamationmark.triangle.fill",
+                            tint: .orange,
+                            isLoading: false,
+                            actionTitle: "Try Again",
+                            action: refreshRoomState
+                        )
+                    } else {
+                        RoomResolutionStateCard(
+                            title: "Resolving Room",
+                            detail: "Sonoic is loading the current room name and bonded setup from the configured player.",
+                            systemImage: "arrow.clockwise",
+                            tint: .secondary,
+                            isLoading: true,
+                            actionTitle: nil,
+                            action: nil
                         )
                     }
-                    .buttonStyle(.plain)
                 } else {
                     RoomsEmptyStateCard {
                         model.selectedTab = .settings
@@ -70,11 +93,30 @@ struct RoomsView: View {
         .refreshable {
             await refreshRoomState()
         }
+        .task(id: model.manualSonosHost) {
+            await loadRoomStateIfNeeded()
+        }
         .navigationTitle("Rooms")
     }
 
     private func refreshRoomState() async {
         await model.refreshManualSonosPlayerState()
+    }
+
+    private func loadRoomStateIfNeeded() async {
+        guard model.hasManualSonosHost else {
+            return
+        }
+
+        guard !model.manualHostRefreshStatus.isRefreshing else {
+            return
+        }
+
+        guard !model.manualHostIdentityStatus.isResolved || !model.manualHostTopologyStatus.isResolved else {
+            return
+        }
+
+        await refreshRoomState()
     }
 }
 
@@ -82,6 +124,7 @@ private struct RoomsCurrentRoomCard: View {
     let roomName: String
     let roomSummary: String
     let setupProducts: [SonosActiveTarget.SetupProduct]
+    let topologyStatus: SonosRoomDataStatus
     let isRefreshing: Bool
     let lastUpdatedAt: Date?
     let refreshAction: () async -> Void
@@ -91,11 +134,24 @@ private struct RoomsCurrentRoomCard: View {
             return "Refreshing room details..."
         }
 
+        switch topologyStatus {
+        case .idle, .loading:
+            return "Loading bonded setup..."
+        case .failed:
+            return "Setup details unavailable right now."
+        case .resolved:
+            break
+        }
+
         if let lastUpdatedAt {
             return "Updated \(lastUpdatedAt.formatted(.dateTime.hour().minute()))"
         }
 
         return "Pull down or tap refresh to reload this room."
+    }
+
+    private var refreshStatusDetail: String? {
+        topologyStatus.failureDetail
     }
 
     var body: some View {
@@ -155,12 +211,21 @@ private struct RoomsCurrentRoomCard: View {
                 } else {
                     Image(systemName: "arrow.clockwise")
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(topologyStatus.failureDetail == nil ? Color.secondary : .orange)
                 }
 
-                Text(refreshStatusText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(refreshStatusText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    if let refreshStatusDetail {
+                        Text(refreshStatusDetail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
 
                 Spacer(minLength: 0)
 
