@@ -6,7 +6,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Connection") {
+            Section {
                 TextField("192.168.1.42 or sonos.local", text: $manualSonosHostDraft)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -35,12 +35,42 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(!hasManualSonosHostDraft || model.manualHostRefreshStatus.isRefreshing)
-
-                statusContent
+            } header: {
+                Text("Manual Player")
+            } footer: {
+                Text("Rooms handles the active room and setup. Settings is reserved for manual player configuration, refresh control, and diagnostics.")
             }
 
             if model.hasManualSonosHost {
-                Section("Player Snapshot") {
+                Section("Status") {
+                    SettingsStatusRow(
+                        title: "Player Refresh",
+                        statusTitle: model.manualHostRefreshStatus.title,
+                        detail: playerRefreshDetail,
+                        systemImage: model.manualHostRefreshStatus.systemImage,
+                        tint: playerRefreshTint
+                    )
+
+                    SettingsStatusRow(
+                        title: "Room Name",
+                        statusTitle: model.manualHostIdentityStatus.title,
+                        detail: identityStatusDetail,
+                        systemImage: model.manualHostIdentityStatus.systemImage,
+                        tint: tint(for: model.manualHostIdentityStatus)
+                    )
+
+                    SettingsStatusRow(
+                        title: "Bonded Setup",
+                        statusTitle: model.manualHostTopologyStatus.title,
+                        detail: topologyStatusDetail,
+                        systemImage: model.manualHostTopologyStatus.systemImage,
+                        tint: tint(for: model.manualHostTopologyStatus)
+                    )
+                }
+
+                Section("Diagnostics") {
+                    LabeledContent("Configured Host", value: model.manualSonosHost)
+                    LabeledContent("Current Room", value: model.activeTarget.name)
                     LabeledContent("Title", value: model.nowPlaying.title)
 
                     if let artistName = model.nowPlaying.artistName {
@@ -52,6 +82,12 @@ struct SettingsView: View {
                     LabeledContent("Current Volume", value: model.externalVolume.labelText)
                     LabeledContent("Mute", value: model.externalVolume.isMuted ? "On" : "Off")
                 }
+            } else {
+                Section("Manual Mode") {
+                    Label("Enter a player host to start manual setup and diagnostics.", systemImage: "info.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .navigationTitle("Settings")
@@ -61,45 +97,60 @@ struct SettingsView: View {
         .onDisappear(perform: commitManualSonosHostIfNeeded)
     }
 
-    @ViewBuilder
-    private var statusContent: some View {
-        if model.hasManualSonosHost {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: model.manualHostRefreshStatus.systemImage)
-                    .foregroundStyle(statusTint)
-                    .padding(.top, 2)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(model.manualHostRefreshStatus.title)
-                        .font(.subheadline.weight(.medium))
-
-                    if let updatedAt = model.manualHostRefreshStatus.updatedAt {
-                        Text("Last updated \(updatedAt, format: .dateTime.hour().minute())")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let detail = model.manualHostRefreshStatus.detail {
-                        Text(detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        } else {
-            Label("Enter a player host to replace the sample volume with a real reading.", systemImage: "info.circle")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+    private var playerRefreshDetail: String? {
+        if let updatedAt = model.manualHostRefreshStatus.updatedAt {
+            return "Last updated \(updatedAt.formatted(.dateTime.hour().minute()))"
         }
+
+        return model.manualHostRefreshStatus.detail
     }
 
-    private var statusTint: Color {
+    private var playerRefreshTint: Color {
         switch model.manualHostRefreshStatus {
         case .idle:
             .secondary
         case .refreshing:
             .orange
         case .updated:
+            .green
+        case .failed:
+            .red
+        }
+    }
+
+    private var identityStatusDetail: String? {
+        switch model.manualHostIdentityStatus {
+        case .idle:
+            "Waiting for a manual refresh to resolve the current room."
+        case .loading:
+            "Reading the active room name from the configured player."
+        case .resolved:
+            "The current room is available in the Rooms tab."
+        case .failed(let detail):
+            detail
+        }
+    }
+
+    private var topologyStatusDetail: String? {
+        switch model.manualHostTopologyStatus {
+        case .idle:
+            "Waiting for a manual refresh to load bonded setup details."
+        case .loading:
+            "Reading Sonos topology to resolve bonded products."
+        case .resolved:
+            "Bonded setup details are available in the Rooms tab."
+        case .failed(let detail):
+            detail
+        }
+    }
+
+    private func tint(for status: SonosRoomDataStatus) -> Color {
+        switch status {
+        case .idle:
+            .secondary
+        case .loading:
+            .orange
+        case .resolved:
             .green
         case .failed:
             .red
@@ -126,6 +177,37 @@ struct SettingsView: View {
         }
 
         model.manualSonosHost = committedHost
+    }
+}
+
+private struct SettingsStatusRow: View {
+    let title: String
+    let statusTitle: String
+    let detail: String?
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .foregroundStyle(tint)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(statusTitle)
+                    .font(.subheadline.weight(.medium))
+
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }
 
