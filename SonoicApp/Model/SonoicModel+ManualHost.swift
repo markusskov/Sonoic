@@ -7,14 +7,17 @@ extension SonoicModel {
         !manualSonosHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    func refreshManualSonosPlayerState() async {
+    func refreshManualSonosPlayerState(forceRoomRefresh: Bool = true) async {
         guard hasManualSonosHost else {
             manualHostRefreshStatus = .idle
             stopManualHostRefreshLoop()
             return
         }
 
-        let didRefresh = await syncManualSonosState(showProgress: true)
+        let didRefresh = await syncManualSonosState(
+            showProgress: true,
+            forceRoomRefresh: forceRoomRefresh
+        )
 
         if didRefresh {
             startManualHostRefreshLoopIfPossible()
@@ -61,7 +64,7 @@ extension SonoicModel {
         }
     }
 
-    func syncManualSonosState(showProgress: Bool) async -> Bool {
+    func syncManualSonosState(showProgress: Bool, forceRoomRefresh: Bool = false) async -> Bool {
         if showProgress {
             manualHostRefreshStatus = .refreshing
         }
@@ -93,8 +96,8 @@ extension SonoicModel {
                 nowPlaying = nextNowPlaying
             }
 
-            await refreshManualHostIdentityIfNeeded()
-            await refreshManualHostTopologyIfNeeded()
+            await refreshManualHostIdentityIfNeeded(force: forceRoomRefresh)
+            await refreshManualHostTopologyIfNeeded(force: forceRoomRefresh)
 
             if wasAwaitingConfirmation != isManualPlayTransitionAwaitingConfirmation,
                nowPlaying == nextNowPlaying

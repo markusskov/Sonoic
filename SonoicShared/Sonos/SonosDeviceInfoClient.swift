@@ -44,17 +44,7 @@ struct SonosDeviceInfoClient {
     }
 
     func fetchDeviceInfo(host: String) async throws -> SonosDeviceInfo {
-        let url = try transport.url(for: "/xml/device_description.xml", host: host)
-        let (data, response) = try await URLSession.shared.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SonosControlTransport.TransportError.invalidResponse
-        }
-
-        guard (200 ..< 300).contains(httpResponse.statusCode) else {
-            throw SonosControlTransport.TransportError.httpStatus(httpResponse.statusCode)
-        }
-
+        let data = try await transport.performGET(resource: "/xml/device_description.xml", host: host)
         return try SonosDeviceDescriptionParser().parse(data)
     }
 }

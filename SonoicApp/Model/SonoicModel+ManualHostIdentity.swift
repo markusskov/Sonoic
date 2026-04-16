@@ -6,6 +6,8 @@ extension SonoicModel {
     func resetManualHostIdentity() {
         resolvedManualHostIdentityHost = nil
         resolvedManualHostTopologyHost = nil
+        manualHostIdentityLastRefreshAt = nil
+        manualHostTopologyLastRefreshAt = nil
         manualHostIdentityStatus = .idle
         manualHostTopologyStatus = .idle
 
@@ -20,26 +22,34 @@ extension SonoicModel {
         activeTarget = nextTarget
     }
 
-    func refreshManualHostIdentityIfNeeded() async {
+    func refreshManualHostIdentityIfNeeded(force: Bool = false) async {
         guard hasManualSonosHost else {
             manualHostIdentityStatus = .idle
             return
         }
 
         let normalizedHost = normalizedManualSonosHost(manualSonosHost)
-        guard resolvedManualHostIdentityHost != normalizedHost else {
+        let hasResolvedCurrentHost = resolvedManualHostIdentityHost == normalizedHost
+        guard force || !hasResolvedCurrentHost || isManualHostIdentityRefreshDue(referenceDate: .now) else {
             manualHostIdentityStatus = .resolved
             return
         }
 
-        manualHostIdentityStatus = .loading
+        let shouldSurfaceLoading = force || !hasResolvedCurrentHost || !manualHostIdentityStatus.isResolved
+        if shouldSurfaceLoading {
+            manualHostIdentityStatus = .loading
+        }
+
+        manualHostIdentityLastRefreshAt = .now
 
         do {
             let deviceInfo = try await deviceInfoClient.fetchDeviceInfo(host: manualSonosHost)
             applyManualHostDeviceInfo(deviceInfo, host: normalizedHost)
             manualHostIdentityStatus = .resolved
         } catch {
-            manualHostIdentityStatus = .failed(error.localizedDescription)
+            if shouldSurfaceLoading {
+                manualHostIdentityStatus = .failed(error.localizedDescription)
+            }
         }
     }
 
@@ -76,6 +86,14 @@ extension SonoicModel {
 
     private func manualHostTargetID(for host: String) -> String {
         "\(Self.manualHostTargetIDPrefix)\(host)"
+    }
+
+    private func isManualHostIdentityRefreshDue(referenceDate: Date) -> Bool {
+        guard let manualHostIdentityLastRefreshAt else {
+            return true
+        }
+
+        return referenceDate.timeIntervalSince(manualHostIdentityLastRefreshAt) >= Self.manualHostIdentityRefreshInterval
     }
 
     func normalizedManualSonosHost(_ host: String) -> String {

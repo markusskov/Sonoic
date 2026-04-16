@@ -13,9 +13,13 @@ final class SonoicModel {
         kind: .room,
         memberNames: ["Living Room"]
     )
+    @ObservationIgnored static let manualHostIdentityRefreshInterval: TimeInterval = 60
+    @ObservationIgnored static let manualHostTopologyRefreshInterval: TimeInterval = 60
     @ObservationIgnored var isSceneActive = false
     @ObservationIgnored var resolvedManualHostIdentityHost: String?
     @ObservationIgnored var resolvedManualHostTopologyHost: String?
+    @ObservationIgnored var manualHostIdentityLastRefreshAt: Date?
+    @ObservationIgnored var manualHostTopologyLastRefreshAt: Date?
     @ObservationIgnored var manualHostRefreshTask: Task<Void, Never>?
     @ObservationIgnored var manualHostDeferredSyncTask: Task<Void, Never>?
     @ObservationIgnored var manualPlayConfirmationRetryTask: Task<Void, Never>?

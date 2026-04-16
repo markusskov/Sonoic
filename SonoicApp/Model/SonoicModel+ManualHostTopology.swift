@@ -1,19 +1,25 @@
 import Foundation
 
 extension SonoicModel {
-    func refreshManualHostTopologyIfNeeded() async {
+    func refreshManualHostTopologyIfNeeded(force: Bool = false) async {
         guard hasManualSonosHost else {
             manualHostTopologyStatus = .idle
             return
         }
 
         let normalizedHost = normalizedManualSonosHost(manualSonosHost)
-        guard resolvedManualHostTopologyHost != normalizedHost else {
+        let hasResolvedCurrentHost = resolvedManualHostTopologyHost == normalizedHost
+        guard force || !hasResolvedCurrentHost || isManualHostTopologyRefreshDue(referenceDate: .now) else {
             manualHostTopologyStatus = .resolved
             return
         }
 
-        manualHostTopologyStatus = .loading
+        let shouldSurfaceLoading = force || !hasResolvedCurrentHost || !manualHostTopologyStatus.isResolved
+        if shouldSurfaceLoading {
+            manualHostTopologyStatus = .loading
+        }
+
+        manualHostTopologyLastRefreshAt = .now
 
         do {
             let topology = try await zoneGroupTopologyClient.fetchTopology(host: manualSonosHost)
@@ -25,7 +31,9 @@ extension SonoicModel {
                 manualHostTopologyStatus = .failed("Couldn't match the configured player to a room setup.")
             }
         } catch {
-            manualHostTopologyStatus = .failed(error.localizedDescription)
+            if shouldSurfaceLoading {
+                manualHostTopologyStatus = .failed(error.localizedDescription)
+            }
         }
     }
 
@@ -124,5 +132,13 @@ extension SonoicModel {
         }
 
         return .bondedProduct
+    }
+
+    private func isManualHostTopologyRefreshDue(referenceDate: Date) -> Bool {
+        guard let manualHostTopologyLastRefreshAt else {
+            return true
+        }
+
+        return referenceDate.timeIntervalSince(manualHostTopologyLastRefreshAt) >= Self.manualHostTopologyRefreshInterval
     }
 }
