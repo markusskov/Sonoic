@@ -6,9 +6,20 @@ import UIKit
 @MainActor
 final class SonoicModel {
     @ObservationIgnored static let manualPlayTransitionGraceInterval: TimeInterval = 3
+    @ObservationIgnored static let defaultTarget = SonosActiveTarget(
+        id: "living-room",
+        name: "Living Room",
+        householdName: "Markus's Sonos",
+        kind: .room,
+        memberNames: ["Living Room"]
+    )
+    @ObservationIgnored static let manualHostIdentityRefreshInterval: TimeInterval = 60
+    @ObservationIgnored static let manualHostTopologyRefreshInterval: TimeInterval = 60
     @ObservationIgnored var isSceneActive = false
     @ObservationIgnored var resolvedManualHostIdentityHost: String?
     @ObservationIgnored var resolvedManualHostTopologyHost: String?
+    @ObservationIgnored var manualHostIdentityLastRefreshAt: Date?
+    @ObservationIgnored var manualHostTopologyLastRefreshAt: Date?
     @ObservationIgnored var manualHostRefreshTask: Task<Void, Never>?
     @ObservationIgnored var manualHostDeferredSyncTask: Task<Void, Never>?
     @ObservationIgnored var manualPlayConfirmationRetryTask: Task<Void, Never>?
@@ -30,6 +41,8 @@ final class SonoicModel {
         didSet {
             settingsStore.saveManualSonosHost(manualSonosHost)
             manualHostRefreshStatus = .idle
+            manualHostIdentityStatus = .idle
+            manualHostTopologyStatus = .idle
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
@@ -37,14 +50,10 @@ final class SonoicModel {
         }
     }
     var manualHostRefreshStatus: SonosManualHostRefreshStatus = .idle
+    var manualHostIdentityStatus: SonosRoomDataStatus = .idle
+    var manualHostTopologyStatus: SonosRoomDataStatus = .idle
 
-    var activeTarget = SonosActiveTarget(
-        id: "living-room",
-        name: "Living Room",
-        householdName: "Markus's Sonos",
-        kind: .room,
-        memberNames: ["Living Room"]
-    ) {
+    var activeTarget = SonoicModel.defaultTarget {
         didSet {
             persistSharedExternalControlState()
         }

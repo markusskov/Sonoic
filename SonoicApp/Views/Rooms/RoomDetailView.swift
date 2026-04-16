@@ -2,14 +2,14 @@ import SwiftUI
 
 struct RoomDetailView: View {
     let activeTarget: SonosActiveTarget
-    let setupNames: [String]
 
-    private var productNames: [String] {
-        guard !setupNames.isEmpty else {
-            return [activeTarget.householdName].filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var setupSummary: String {
+        let count = activeTarget.setupProducts.count
+        guard count != 1 else {
+            return "1 product linked to this room."
         }
 
-        return setupNames
+        return "\(count) products linked to this room."
     }
 
     var body: some View {
@@ -26,18 +26,15 @@ struct RoomDetailView: View {
 
                 RoomsSectionHeader(
                     title: "Products",
-                    subtitle: "Resolved from the configured player and bonded setup."
+                    subtitle: setupSummary
                 )
 
                 RoomSurfaceCard {
                     VStack(spacing: 0) {
-                        ForEach(Array(productNames.enumerated()), id: \.offset) { index, productName in
-                            RoomProductRow(
-                                name: productName,
-                                detail: index == 0 ? "Primary player" : "Bonded product"
-                            )
+                        ForEach(Array(activeTarget.setupProducts.enumerated()), id: \.element.id) { index, product in
+                            RoomProductRow(product: product)
 
-                            if index < productNames.count - 1 {
+                            if index < activeTarget.setupProducts.count - 1 {
                                 Divider()
                                     .padding(.leading, 56)
                             }
@@ -71,26 +68,72 @@ private struct RoomFactRow: View {
 }
 
 private struct RoomProductRow: View {
-    let name: String
-    let detail: String
+    let product: SonosActiveTarget.SetupProduct
+
+    private var productCategory: String {
+        let normalizedName = product.name.lowercased()
+
+        switch product.role {
+        case .subwoofer:
+            return "Subwoofer"
+        case .surroundSpeaker:
+            return "Surround speaker"
+        case .primaryPlayer:
+            if normalizedName.contains("arc") || normalizedName.contains("beam") || normalizedName.contains("ray") {
+                return "Soundbar"
+            }
+
+            if normalizedName.contains("amp") {
+                return "Amplifier"
+            }
+
+            return "Speaker"
+        case .bondedProduct:
+            if normalizedName.contains("sub") {
+                return "Subwoofer"
+            }
+
+            return "Speaker"
+        }
+    }
+
+    private var roleBadgeTitle: String {
+        switch product.role {
+        case .primaryPlayer:
+            return "Main"
+        case .subwoofer:
+            return "Sub"
+        case .surroundSpeaker:
+            return "Rear"
+        case .bondedProduct:
+            return "Bonded"
+        }
+    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            RoomProductIconView(name: name)
+        HStack(spacing: 14) {
+            RoomProductIconView(name: product.name)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(name)
+                Text(product.name)
                     .font(.body.weight(.medium))
                     .foregroundStyle(.primary)
 
-                Text(detail)
+                Text(productCategory)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 0)
+
+            Text(roleBadgeTitle)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.thinMaterial, in: Capsule())
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
     }
 }
 
@@ -102,9 +145,15 @@ private struct RoomProductRow: View {
                 name: "Living Room",
                 householdName: "Sonos Arc Ultra",
                 kind: .room,
-                memberNames: ["Living Room", "Sub Mini"]
-            ),
-            setupNames: ["Sonos Arc Ultra", "Sub Mini"]
+                memberNames: ["Living Room", "Sub Mini"],
+                bondedAccessories: [
+                    .init(
+                        id: "living-room:satellite:sub-mini",
+                        name: "Sub Mini",
+                        role: .subwoofer
+                    )
+                ]
+            )
         )
     }
 }

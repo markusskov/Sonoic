@@ -3,24 +3,8 @@ import SwiftUI
 struct RoomsView: View {
     @Environment(SonoicModel.self) private var model
 
-    private var setupNames: [String] {
-        let primaryName = model.activeTarget.householdName.trimmingCharacters(in: .whitespacesAndNewlines)
-        var names: [String] = []
-
-        if !primaryName.isEmpty {
-            names.append(primaryName)
-        }
-
-        for accessoryName in model.activeTarget.accessoryNames {
-            let normalizedAccessoryName = accessoryName.lowercased()
-            guard !names.contains(where: { $0.lowercased() == normalizedAccessoryName }) else {
-                continue
-            }
-
-            names.append(accessoryName)
-        }
-
-        return names
+    private var isRefreshingRoomState: Bool {
+        model.manualHostRefreshStatus.isRefreshing
     }
 
     var body: some View {
@@ -34,19 +18,42 @@ struct RoomsView: View {
                 )
 
                 if model.hasManualSonosHost {
-                    NavigationLink {
-                        RoomDetailView(
-                            activeTarget: model.activeTarget,
-                            setupNames: setupNames
+                    if model.manualHostIdentityStatus.isResolved {
+                        NavigationLink {
+                            RoomDetailView(activeTarget: model.activeTarget)
+                        } label: {
+                            RoomsCurrentRoomCard(
+                                roomName: model.activeTarget.name,
+                                roomSummary: model.activeTarget.summary,
+                                setupProducts: model.activeTarget.setupProducts,
+                                topologyStatus: model.manualHostTopologyStatus,
+                                isRefreshing: isRefreshingRoomState,
+                                lastUpdatedAt: model.manualHostRefreshStatus.updatedAt,
+                                refreshAction: refreshRoomState
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else if let failureDetail = model.manualHostIdentityStatus.failureDetail {
+                        RoomResolutionStateCard(
+                            title: "Couldn't Load Room",
+                            detail: failureDetail,
+                            systemImage: "exclamationmark.triangle.fill",
+                            tint: .orange,
+                            isLoading: false,
+                            actionTitle: "Try Again",
+                            action: refreshRoomState
                         )
-                    } label: {
-                        RoomsCurrentRoomCard(
-                            roomName: model.activeTarget.name,
-                            roomSummary: model.activeTarget.summary,
-                            setupNames: setupNames
+                    } else {
+                        RoomResolutionStateCard(
+                            title: "Resolving Room",
+                            detail: "Sonoic is loading the current room name and bonded setup from the configured player.",
+                            systemImage: "arrow.clockwise",
+                            tint: .secondary,
+                            isLoading: true,
+                            actionTitle: nil,
+                            action: nil
                         )
                     }
-                    .buttonStyle(.plain)
                 } else {
                     RoomsEmptyStateCard {
                         model.selectedTab = .settings
@@ -83,107 +90,33 @@ struct RoomsView: View {
             .padding(20)
         }
         .scrollIndicators(.hidden)
+        .refreshable {
+            await refreshRoomState()
+        }
+        .task(id: model.manualSonosHost) {
+            await loadRoomStateIfNeeded()
+        }
         .navigationTitle("Rooms")
     }
-}
 
-private struct RoomsCurrentRoomCard: View {
-    let roomName: String
-    let roomSummary: String
-    let setupNames: [String]
-
-    var body: some View {
-        RoomSurfaceCard {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "speaker.wave.3.fill")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 52, height: 52)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(roomName)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Text(roomSummary)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .padding(.top, 6)
-            }
-
-            if !setupNames.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Setup")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(setupNames, id: \.self) { productName in
-                            HStack(spacing: 12) {
-                                RoomProductIconView(name: productName)
-
-                                Text(productName)
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    private func refreshRoomState() async {
+        await model.refreshManualSonosPlayerState()
     }
-}
 
-private struct RoomsEmptyStateCard: View {
-    let openSettings: () -> Void
-
-    var body: some View {
-        RoomSurfaceCard {
-            VStack(alignment: .leading, spacing: 14) {
-                Label("No Room Loaded", systemImage: "speaker.slash.fill")
-                    .font(.headline)
-
-                Text("Sonoic needs a manual player in Settings before it can show your current room and setup.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                Button("Open Settings", systemImage: "slider.horizontal.3", action: openSettings)
-                    .buttonStyle(.borderedProminent)
-            }
+    private func loadRoomStateIfNeeded() async {
+        guard model.hasManualSonosHost else {
+            return
         }
-    }
-}
 
-private struct RoomsUpcomingRow: View {
-    let title: String
-    let detail: String
-    let systemImage: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 20)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+        guard !model.manualHostRefreshStatus.isRefreshing else {
+            return
         }
+
+        guard !model.manualHostIdentityStatus.isResolved || !model.manualHostTopologyStatus.isResolved else {
+            return
+        }
+
+        await refreshRoomState()
     }
 }
 

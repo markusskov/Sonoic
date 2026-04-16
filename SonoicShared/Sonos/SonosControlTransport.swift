@@ -49,6 +49,17 @@ struct SonosControlTransport {
         }
     }
 
+    func performGET(resource: String, host: String) async throws -> Data {
+        let resourceURL = try url(for: resource, host: host)
+        var request = URLRequest(url: resourceURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 5
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response)
+        return data
+    }
+
     func performAction(service: Service, named actionName: String, body: String, host: String) async throws -> Data {
         let controlURL = try controlURL(for: host, service: service)
         var request = URLRequest(url: controlURL)
@@ -62,14 +73,7 @@ struct SonosControlTransport {
         )
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw TransportError.invalidResponse
-        }
-
-        guard (200 ..< 300).contains(httpResponse.statusCode) else {
-            throw TransportError.httpStatus(httpResponse.statusCode)
-        }
-
+        try validate(response)
         return data
     }
 
@@ -102,6 +106,16 @@ struct SonosControlTransport {
         }
 
         return controlURL
+    }
+
+    private func validate(_ response: URLResponse) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TransportError.invalidResponse
+        }
+
+        guard (200 ..< 300).contains(httpResponse.statusCode) else {
+            throw TransportError.httpStatus(httpResponse.statusCode)
+        }
     }
 
     private func baseURL(for host: String) throws -> URL {
