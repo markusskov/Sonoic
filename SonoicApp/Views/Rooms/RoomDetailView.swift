@@ -93,7 +93,14 @@ private struct RoomProductRow: View {
                 name: "Living Room",
                 householdName: "Sonos Arc Ultra",
                 kind: .room,
-                memberNames: ["Living Room", "Sub Mini"]
+                memberNames: ["Living Room", "Sub Mini"],
+                bondedAccessories: [
+                    .init(
+                        id: "living-room:satellite:sub-mini",
+                        name: "Sub Mini",
+                        role: .subwoofer
+                    )
+                ]
             )
         )
     }

@@ -25,14 +25,16 @@ extension SonoicModel {
 
         resolvedManualHostTopologyHost = host
 
-        let setupMemberNames = deduplicatedSetupMemberNames(
+        let setupMemberNames = setupMemberNames(
             primaryMemberName: matchedMember.name,
-            satelliteNames: matchedMember.satellites.map(\.name)
+            satellites: matchedMember.satellites
         )
+        let bondedAccessories = bondedAccessories(from: matchedMember.satellites)
 
         var nextTarget = activeTarget
         nextTarget.name = matchedMember.name
         nextTarget.memberNames = setupMemberNames
+        nextTarget.bondedAccessories = bondedAccessories
 
         guard nextTarget != activeTarget else {
             return
@@ -41,25 +43,74 @@ extension SonoicModel {
         activeTarget = nextTarget
     }
 
-    private func deduplicatedSetupMemberNames(primaryMemberName: String, satelliteNames: [String]) -> [String] {
-        var seenNames: Set<String> = []
+    private func setupMemberNames(
+        primaryMemberName: String,
+        satellites: [SonosZoneGroupTopology.Satellite]
+    ) -> [String] {
         var orderedNames: [String] = []
 
-        for name in [primaryMemberName] + satelliteNames {
+        for name in [primaryMemberName] + satellites.map(\.name) {
             let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedName.isEmpty else {
                 continue
             }
 
-            let normalizedName = trimmedName.lowercased()
-            guard !seenNames.contains(normalizedName) else {
-                continue
-            }
-
-            seenNames.insert(normalizedName)
             orderedNames.append(trimmedName)
         }
 
         return orderedNames.isEmpty ? [primaryMemberName] : orderedNames
+    }
+
+    private func bondedAccessories(
+        from satellites: [SonosZoneGroupTopology.Satellite]
+    ) -> [SonosActiveTarget.BondedAccessory] {
+        let nonSubwooferCount = satellites.reduce(into: 0) { count, satellite in
+            if !satellite.name.localizedCaseInsensitiveContains("sub") {
+                count += 1
+            }
+        }
+
+        var seenSatelliteIDs: Set<String> = []
+        var accessories: [SonosActiveTarget.BondedAccessory] = []
+
+        for satellite in satellites {
+            let trimmedName = satellite.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedName.isEmpty else {
+                continue
+            }
+
+            guard !seenSatelliteIDs.contains(satellite.id) else {
+                continue
+            }
+
+            seenSatelliteIDs.insert(satellite.id)
+            accessories.append(
+                SonosActiveTarget.BondedAccessory(
+                    id: "\(activeTarget.id):satellite:\(satellite.id)",
+                    name: trimmedName,
+                    role: bondedAccessoryRole(
+                        for: satellite,
+                        nonSubwooferCount: nonSubwooferCount
+                    )
+                )
+            )
+        }
+
+        return accessories
+    }
+
+    private func bondedAccessoryRole(
+        for satellite: SonosZoneGroupTopology.Satellite,
+        nonSubwooferCount: Int
+    ) -> SonosActiveTarget.SetupRole {
+        if satellite.name.localizedCaseInsensitiveContains("sub") {
+            return .subwoofer
+        }
+
+        if nonSubwooferCount >= 2 {
+            return .surroundSpeaker
+        }
+
+        return .bondedProduct
     }
 }

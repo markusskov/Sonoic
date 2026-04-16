@@ -1,24 +1,36 @@
 import Foundation
 
 struct SonosActiveTarget: Identifiable, Equatable {
-    struct SetupProduct: Identifiable, Equatable {
-        enum Role: Equatable {
-            case primaryPlayer
-            case bondedProduct
+    enum SetupRole: Equatable {
+        case primaryPlayer
+        case subwoofer
+        case surroundSpeaker
+        case bondedProduct
 
-            var detail: String {
-                switch self {
-                case .primaryPlayer:
-                    "Primary player"
-                case .bondedProduct:
-                    "Bonded product"
-                }
+        var detail: String {
+            switch self {
+            case .primaryPlayer:
+                "Primary player"
+            case .subwoofer:
+                "Subwoofer"
+            case .surroundSpeaker:
+                "Surround speaker"
+            case .bondedProduct:
+                "Bonded product"
             }
         }
+    }
 
+    struct SetupProduct: Identifiable, Equatable {
         let id: String
         let name: String
-        let role: Role
+        let role: SetupRole
+    }
+
+    struct BondedAccessory: Identifiable, Equatable {
+        let id: String
+        let name: String
+        let role: SetupRole
     }
 
     enum Kind: String, Equatable {
@@ -49,6 +61,7 @@ struct SonosActiveTarget: Identifiable, Equatable {
     var householdName: String
     var kind: Kind
     var memberNames: [String]
+    var bondedAccessories: [BondedAccessory] = []
 
     var summary: String {
         switch kind {
@@ -64,6 +77,10 @@ struct SonosActiveTarget: Identifiable, Equatable {
     }
 
     var accessoryNames: [String] {
+        if !bondedAccessories.isEmpty {
+            return bondedAccessories.map(\.name)
+        }
+
         guard kind == .room, memberNames.count > 1 else {
             return []
         }
@@ -85,34 +102,43 @@ struct SonosActiveTarget: Identifiable, Equatable {
         return trimmedName.isEmpty ? nil : trimmedName
     }
 
-    var setupProductNames: [String] {
-        var seenNames: Set<String> = []
-        var orderedNames: [String] = []
-
-        for name in [primaryProductName] + accessoryNames.map(Optional.some) {
-            guard let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedName.isEmpty else {
-                continue
-            }
-
-            let normalizedName = trimmedName.lowercased()
-            guard !seenNames.contains(normalizedName) else {
-                continue
-            }
-
-            seenNames.insert(normalizedName)
-            orderedNames.append(trimmedName)
-        }
-
-        return orderedNames
-    }
-
     var setupProducts: [SetupProduct] {
-        setupProductNames.enumerated().map { index, name in
-            SetupProduct(
-                id: "\(id):setup:\(index)",
-                name: name,
-                role: index == 0 ? .primaryPlayer : .bondedProduct
+        var products: [SetupProduct] = []
+
+        if let primaryProductName {
+            products.append(
+                SetupProduct(
+                    id: "\(id):setup:primary",
+                    name: primaryProductName,
+                    role: .primaryPlayer
+                )
             )
         }
+
+        if !bondedAccessories.isEmpty {
+            products.append(
+                contentsOf: bondedAccessories.map { accessory in
+                    SetupProduct(
+                        id: accessory.id,
+                        name: accessory.name,
+                        role: accessory.role
+                    )
+                }
+            )
+
+            return products
+        }
+
+        products.append(
+            contentsOf: accessoryNames.enumerated().map { index, name in
+                SetupProduct(
+                    id: "\(id):setup:bonded:\(index)",
+                    name: name,
+                    role: .bondedProduct
+                )
+            }
+        )
+
+        return products
     }
 }
