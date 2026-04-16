@@ -1,4 +1,26 @@
+import Foundation
+
 struct SonosActiveTarget: Identifiable, Equatable {
+    struct SetupProduct: Identifiable, Equatable {
+        enum Role: Equatable {
+            case primaryPlayer
+            case bondedProduct
+
+            var detail: String {
+                switch self {
+                case .primaryPlayer:
+                    "Primary player"
+                case .bondedProduct:
+                    "Bonded product"
+                }
+            }
+        }
+
+        let id: String
+        let name: String
+        let role: Role
+    }
+
     enum Kind: String, Equatable {
         case room
         case group
@@ -56,5 +78,41 @@ struct SonosActiveTarget: Identifiable, Equatable {
 
     var accessoryDescription: String {
         accessoryNames.joined(separator: ", ")
+    }
+
+    var primaryProductName: String? {
+        let trimmedName = householdName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedName.isEmpty ? nil : trimmedName
+    }
+
+    var setupProductNames: [String] {
+        var seenNames: Set<String> = []
+        var orderedNames: [String] = []
+
+        for name in [primaryProductName] + accessoryNames.map(Optional.some) {
+            guard let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedName.isEmpty else {
+                continue
+            }
+
+            let normalizedName = trimmedName.lowercased()
+            guard !seenNames.contains(normalizedName) else {
+                continue
+            }
+
+            seenNames.insert(normalizedName)
+            orderedNames.append(trimmedName)
+        }
+
+        return orderedNames
+    }
+
+    var setupProducts: [SetupProduct] {
+        setupProductNames.enumerated().map { index, name in
+            SetupProduct(
+                id: "\(id):setup:\(index)",
+                name: name,
+                role: index == 0 ? .primaryPlayer : .bondedProduct
+            )
+        }
     }
 }

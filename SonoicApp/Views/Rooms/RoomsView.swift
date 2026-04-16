@@ -3,26 +3,6 @@ import SwiftUI
 struct RoomsView: View {
     @Environment(SonoicModel.self) private var model
 
-    private var setupNames: [String] {
-        let primaryName = model.activeTarget.householdName.trimmingCharacters(in: .whitespacesAndNewlines)
-        var names: [String] = []
-
-        if !primaryName.isEmpty {
-            names.append(primaryName)
-        }
-
-        for accessoryName in model.activeTarget.accessoryNames {
-            let normalizedAccessoryName = accessoryName.lowercased()
-            guard !names.contains(where: { $0.lowercased() == normalizedAccessoryName }) else {
-                continue
-            }
-
-            names.append(accessoryName)
-        }
-
-        return names
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
@@ -35,15 +15,12 @@ struct RoomsView: View {
 
                 if model.hasManualSonosHost {
                     NavigationLink {
-                        RoomDetailView(
-                            activeTarget: model.activeTarget,
-                            setupNames: setupNames
-                        )
+                        RoomDetailView(activeTarget: model.activeTarget)
                     } label: {
                         RoomsCurrentRoomCard(
                             roomName: model.activeTarget.name,
                             roomSummary: model.activeTarget.summary,
-                            setupNames: setupNames
+                            setupProducts: model.activeTarget.setupProducts
                         )
                     }
                     .buttonStyle(.plain)
@@ -90,7 +67,7 @@ struct RoomsView: View {
 private struct RoomsCurrentRoomCard: View {
     let roomName: String
     let roomSummary: String
-    let setupNames: [String]
+    let setupProducts: [SonosActiveTarget.SetupProduct]
 
     var body: some View {
         RoomSurfaceCard {
@@ -119,18 +96,18 @@ private struct RoomsCurrentRoomCard: View {
                     .padding(.top, 6)
             }
 
-            if !setupNames.isEmpty {
+            if !setupProducts.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Setup")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
                     VStack(alignment: .leading, spacing: 10) {
-                        ForEach(setupNames, id: \.self) { productName in
+                        ForEach(setupProducts) { product in
                             HStack(spacing: 12) {
-                                RoomProductIconView(name: productName)
+                                RoomProductIconView(name: product.name)
 
-                                Text(productName)
+                                Text(product.name)
                                     .font(.subheadline.weight(.medium))
                                     .foregroundStyle(.primary)
                                     .lineLimit(1)

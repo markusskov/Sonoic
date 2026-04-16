@@ -2,15 +2,6 @@ import SwiftUI
 
 struct RoomDetailView: View {
     let activeTarget: SonosActiveTarget
-    let setupNames: [String]
-
-    private var productNames: [String] {
-        guard !setupNames.isEmpty else {
-            return [activeTarget.householdName].filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        }
-
-        return setupNames
-    }
 
     var body: some View {
         ScrollView {
@@ -31,13 +22,13 @@ struct RoomDetailView: View {
 
                 RoomSurfaceCard {
                     VStack(spacing: 0) {
-                        ForEach(Array(productNames.enumerated()), id: \.offset) { index, productName in
+                        ForEach(Array(activeTarget.setupProducts.enumerated()), id: \.element.id) { index, product in
                             RoomProductRow(
-                                name: productName,
-                                detail: index == 0 ? "Primary player" : "Bonded product"
+                                name: product.name,
+                                detail: product.role.detail
                             )
 
-                            if index < productNames.count - 1 {
+                            if index < activeTarget.setupProducts.count - 1 {
                                 Divider()
                                     .padding(.leading, 56)
                             }
@@ -103,8 +94,7 @@ private struct RoomProductRow: View {
                 householdName: "Sonos Arc Ultra",
                 kind: .room,
                 memberNames: ["Living Room", "Sub Mini"]
-            ),
-            setupNames: ["Sonos Arc Ultra", "Sub Mini"]
+            )
         )
     }
 }

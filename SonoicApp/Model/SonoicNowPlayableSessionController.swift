@@ -338,9 +338,14 @@ final class SonoicNowPlayableSessionController: NSObject {
             return nil
         }
 
-        // `boundsSize:requestHandler:` is currently unstable for our lock-screen path.
-        // Use the simpler image initializer until the richer artwork API is reliable here.
-        return MPMediaItemArtwork(image: image)
+        let artworkSize = CGSize(
+            width: max(image.size.width, 1),
+            height: max(image.size.height, 1)
+        )
+
+        return MPMediaItemArtwork(boundsSize: artworkSize) { _ in
+            image
+        }
     }
 
     private func downsampledArtworkImage(from data: Data, maxDimension: CGFloat = 512) -> UIImage? {

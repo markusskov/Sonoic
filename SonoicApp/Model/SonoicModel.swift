@@ -6,6 +6,13 @@ import UIKit
 @MainActor
 final class SonoicModel {
     @ObservationIgnored static let manualPlayTransitionGraceInterval: TimeInterval = 3
+    @ObservationIgnored static let defaultTarget = SonosActiveTarget(
+        id: "living-room",
+        name: "Living Room",
+        householdName: "Markus's Sonos",
+        kind: .room,
+        memberNames: ["Living Room"]
+    )
     @ObservationIgnored var isSceneActive = false
     @ObservationIgnored var resolvedManualHostIdentityHost: String?
     @ObservationIgnored var resolvedManualHostTopologyHost: String?
@@ -38,13 +45,7 @@ final class SonoicModel {
     }
     var manualHostRefreshStatus: SonosManualHostRefreshStatus = .idle
 
-    var activeTarget = SonosActiveTarget(
-        id: "living-room",
-        name: "Living Room",
-        householdName: "Markus's Sonos",
-        kind: .room,
-        memberNames: ["Living Room"]
-    ) {
+    var activeTarget = SonoicModel.defaultTarget {
         didSet {
             persistSharedExternalControlState()
         }
