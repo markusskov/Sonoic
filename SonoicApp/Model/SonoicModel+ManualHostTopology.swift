@@ -19,13 +19,12 @@ extension SonoicModel {
             manualHostTopologyStatus = .loading
         }
 
-        manualHostTopologyLastRefreshAt = .now
-
         do {
             let topology = try await zoneGroupTopologyClient.fetchTopology(host: manualSonosHost)
             let didApplyTopology = applyManualHostTopologyIfNeeded(topology, host: normalizedHost)
 
             if didApplyTopology {
+                manualHostTopologyLastRefreshAt = .now
                 manualHostTopologyStatus = .resolved
             } else {
                 manualHostTopologyStatus = .failed("Couldn't match the configured player to a room setup.")

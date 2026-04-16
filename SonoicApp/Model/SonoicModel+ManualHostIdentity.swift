@@ -40,11 +40,10 @@ extension SonoicModel {
             manualHostIdentityStatus = .loading
         }
 
-        manualHostIdentityLastRefreshAt = .now
-
         do {
             let deviceInfo = try await deviceInfoClient.fetchDeviceInfo(host: manualSonosHost)
             applyManualHostDeviceInfo(deviceInfo, host: normalizedHost)
+            manualHostIdentityLastRefreshAt = .now
             manualHostIdentityStatus = .resolved
         } catch {
             if shouldSurfaceLoading {
