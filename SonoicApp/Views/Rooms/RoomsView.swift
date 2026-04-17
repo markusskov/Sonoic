@@ -65,7 +65,10 @@ struct RoomsView: View {
                     subtitle: "Groundwork for real room lists and grouping."
                 )
 
-                RoomsDiscoveryStatusCard(status: model.roomDiscoveryStatus)
+                RoomsDiscoveryStatusCard(
+                    status: model.roomDiscoveryStatus,
+                    roomCount: model.roomListItems.count
+                )
 
                 RoomSurfaceCard {
                     VStack(alignment: .leading, spacing: 12) {

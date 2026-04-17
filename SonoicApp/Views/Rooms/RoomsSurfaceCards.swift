@@ -170,6 +170,19 @@ struct RoomsUpcomingRow: View {
 
 struct RoomsDiscoveryStatusCard: View {
     let status: SonosRoomDiscoveryStatus
+    let roomCount: Int
+
+    private var roomCountText: String? {
+        guard roomCount > 0 else {
+            return nil
+        }
+
+        if roomCount == 1 {
+            return "1 room is available through the current fallback path."
+        }
+
+        return "\(roomCount) rooms are available through the current fallback path."
+    }
 
     var body: some View {
         RoomSurfaceCard {
@@ -188,6 +201,12 @@ struct RoomsDiscoveryStatusCard: View {
                     Text(status.detail)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+
+                    if let roomCountText {
+                        Text(roomCountText)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }

@@ -82,6 +82,20 @@ final class SonoicModel {
         hasManualSonosHost ? .manualFallback : .setupRequired
     }
 
+    var roomListItems: [SonosRoomListItem] {
+        guard hasManualSonosHost else {
+            return []
+        }
+
+        return [
+            SonosRoomListItem(
+                activeTarget: activeTarget,
+                source: .manualFallback,
+                isActive: true
+            )
+        ]
+    }
+
     init() {
         settingsStore = SonoicSettingsStore()
         let sonosControlTransport = SonosControlTransport()
