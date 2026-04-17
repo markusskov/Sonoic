@@ -62,6 +62,19 @@ extension SonoicModel {
         }
     }
 
+    func playManualSonosQueueItem(at position: Int) async -> Bool {
+        guard position > 0 else {
+            return false
+        }
+
+        beginManualPlayTransitionGrace()
+        markLocalPlaybackState(.playing)
+        return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
+            try await avTransportClient.seekToTrack(host: manualSonosHost, trackNumber: position)
+            try await avTransportClient.play(host: manualSonosHost)
+        }
+    }
+
     func toggleManualSonosMute() async {
         guard hasManualSonosHost else {
             return

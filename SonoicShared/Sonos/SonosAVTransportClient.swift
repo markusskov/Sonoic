@@ -112,6 +112,21 @@ struct SonosAVTransportClient {
         )
     }
 
+    func seekToTrack(host: String, trackNumber: Int) async throws {
+        _ = try await transport.performAction(
+            service: .avTransport,
+            named: "Seek",
+            body: """
+            <u:Seek xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+              <Unit>TRACK_NR</Unit>
+              <Target>\(trackNumber)</Target>
+            </u:Seek>
+            """,
+            host: host
+        )
+    }
+
     private func formattedSeekTarget(for timeInterval: TimeInterval) -> String {
         let totalSeconds = max(0, Int(timeInterval.rounded()))
         let hours = totalSeconds / 3600

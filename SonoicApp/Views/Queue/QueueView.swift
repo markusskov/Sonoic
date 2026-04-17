@@ -77,7 +77,8 @@ struct QueueView: View {
                 } else {
                     QueueSnapshotList(
                         snapshot: snapshot,
-                        nowPlaying: model.nowPlaying
+                        nowPlaying: model.nowPlaying,
+                        playQueueItem: playQueueItem
                     ) {
                         await model.refreshQueue(showLoading: false)
                     }
@@ -92,6 +93,14 @@ struct QueueView: View {
         }
 
         await model.refreshQueue(showLoading: model.queueState.snapshot == nil)
+    }
+
+    private func playQueueItem(at position: Int) async {
+        guard await model.playManualSonosQueueItem(at: position) else {
+            return
+        }
+
+        await model.refreshQueue(showLoading: false)
     }
 }
 
