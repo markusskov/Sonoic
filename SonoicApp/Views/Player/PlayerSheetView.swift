@@ -47,7 +47,7 @@ struct PlayerSheetView: View {
                     .disabled(!supportsTrackNavigation)
                     .buttonStyle(PlayerTransportButtonStyle())
 
-                    Button(playbackButtonTitle, systemImage: playbackButtonSystemImage) {
+                    Button(model.nowPlaying.playbackState.controlTitle, systemImage: model.nowPlaying.playbackState.controlSystemImage) {
                         Task {
                             await model.toggleManualSonosPlayback()
                         }
@@ -94,25 +94,7 @@ struct PlayerSheetView: View {
     }
 
     private var supportsTrackNavigation: Bool {
-        model.nowPlaying.sourceName != "TV Audio"
-    }
-
-    private var playbackButtonTitle: String {
-        switch model.nowPlaying.playbackState {
-        case .playing:
-            "Pause"
-        case .paused, .buffering:
-            "Play"
-        }
-    }
-
-    private var playbackButtonSystemImage: String {
-        switch model.nowPlaying.playbackState {
-        case .playing:
-            "pause.fill"
-        case .paused, .buffering:
-            "play.fill"
-        }
+        model.nowPlaying.supportsTrackNavigation
     }
 
     private var muteButtonTitle: String {

@@ -3,7 +3,11 @@ import WidgetKit
 
 extension SonoicModel {
     var externalControlState: SonoicExternalControlState {
-        SonoicExternalControlState(
+        guard hasManualSonosHost else {
+            return .unconfigured
+        }
+
+        return SonoicExternalControlState(
             activeTarget: .init(
                 id: activeTarget.id,
                 name: activeTarget.name,
@@ -39,15 +43,17 @@ extension SonoicModel {
     }
 
     private var externalAvailability: SonoicExternalControlState.Availability {
-        switch connectionState {
-        case .ready:
-            .ready
-        case .connecting:
-            .connecting
-        case .stale:
-            .stale
-        case .unavailable:
-            .unavailable
+        guard hasManualSonosHost else {
+            return .unavailable
+        }
+
+        switch manualHostRefreshStatus {
+        case .idle, .refreshing:
+            return availabilityFromLastSuccessfulRefresh() ?? .connecting
+        case .updated(let updatedAt):
+            return availability(for: updatedAt)
+        case .failed:
+            return availabilityFromLastSuccessfulRefresh() ?? .unavailable
         }
     }
 
@@ -58,7 +64,9 @@ extension SonoicModel {
         if let sharedStore {
             do {
                 try sharedStore.saveExternalControlState(state)
-                WidgetCenter.shared.reloadAllTimelines()
+                if shouldReloadWidgetTimelines(for: state) {
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
             } catch {
                 assertionFailure("Failed to save shared external control state: \(error)")
             }
@@ -80,6 +88,28 @@ extension SonoicModel {
         case .group:
             .group
         }
+    }
+
+    private func availabilityFromLastSuccessfulRefresh() -> SonoicExternalControlState.Availability? {
+        guard let manualHostLastSuccessfulRefreshAt else {
+            return nil
+        }
+
+        return availability(for: manualHostLastSuccessfulRefreshAt)
+    }
+
+    private func availability(for updatedAt: Date) -> SonoicExternalControlState.Availability {
+        let isStale = Date().timeIntervalSince(updatedAt) >= SonoicExternalControlState.staleInterval
+        return isStale ? .stale : .ready
+    }
+
+    private func shouldReloadWidgetTimelines(for state: SonoicExternalControlState) -> Bool {
+        let widgetPresentation = state.widgetPresentation
+        defer {
+            lastReloadedWidgetPresentation = widgetPresentation
+        }
+
+        return lastReloadedWidgetPresentation != widgetPresentation
     }
 
     func configureNowPlayableSessionController() {

@@ -42,20 +42,22 @@ struct RootView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            PlayerMiniBar(
-                nowPlaying: model.nowPlaying,
-                openPlayer: {
-                    isPlayerPresented = true
-                },
-                togglePlayback: {
-                    Task {
-                        await model.toggleManualSonosPlayback()
+            if model.hasManualSonosHost {
+                PlayerMiniBar(
+                    nowPlaying: model.nowPlaying,
+                    openPlayer: {
+                        isPlayerPresented = true
+                    },
+                    togglePlayback: {
+                        Task {
+                            await model.toggleManualSonosPlayback()
+                        }
                     }
-                }
-            )
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .padding(.bottom, 55)
+                )
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 55)
+            }
         }
         .sheet(isPresented: $isPlayerPresented) {
             PlayerSheetView()

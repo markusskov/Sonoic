@@ -5,7 +5,6 @@ extension SonoicModel {
 
     func toggleManualSonosPlayback() async {
         guard hasManualSonosHost else {
-            toggleDebugPlayback()
             return
         }
 
@@ -65,7 +64,6 @@ extension SonoicModel {
 
     func toggleManualSonosMute() async {
         guard hasManualSonosHost else {
-            toggleDebugMute()
             return
         }
 

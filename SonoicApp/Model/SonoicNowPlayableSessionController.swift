@@ -1,6 +1,5 @@
 import AVFoundation
 import AVFAudio
-import ImageIO
 import MediaPlayer
 import UIKit
 
@@ -168,7 +167,7 @@ final class SonoicNowPlayableSessionController: NSObject {
             nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
         }
 
-        if let artwork = artwork(for: nowPlaying.artworkIdentifier) {
+        if let artwork = SonoicNowPlayableArtworkProvider.artwork(for: nowPlaying.artworkIdentifier) {
             nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
         }
 
@@ -273,13 +272,12 @@ final class SonoicNowPlayableSessionController: NSObject {
     }
 
     private func updateCommandAvailability(for nowPlaying: SonosNowPlayingSnapshot) {
-        let supportsTrackNavigation = nowPlaying.sourceName != "TV Audio"
         let commandCenter = nowPlayingSession.remoteCommandCenter
         commandCenter.playCommand.isEnabled = true
         commandCenter.pauseCommand.isEnabled = true
         commandCenter.togglePlayPauseCommand.isEnabled = true
-        commandCenter.nextTrackCommand.isEnabled = supportsTrackNavigation
-        commandCenter.previousTrackCommand.isEnabled = supportsTrackNavigation
+        commandCenter.nextTrackCommand.isEnabled = nowPlaying.supportsTrackNavigation
+        commandCenter.previousTrackCommand.isEnabled = nowPlaying.supportsTrackNavigation
         commandCenter.changePlaybackPositionCommand.isEnabled = false
     }
 
@@ -327,52 +325,6 @@ final class SonoicNowPlayableSessionController: NSObject {
         } catch {
             assertionFailure("Unable to configure the audio session for the now playable session: \(error)")
         }
-    }
-
-    private func artwork(for identifier: String?) -> MPMediaItemArtwork? {
-        guard let identifier,
-              let artworkStore = try? SonoicSharedArtworkStore(),
-              let data = artworkStore.loadArtworkData(named: identifier)
-        else {
-            return nil
-        }
-
-        let previewSize = Self.downsampledArtworkImage(from: data)?.size ?? CGSize(width: 512, height: 512)
-        let artworkSize = CGSize(
-            width: max(previewSize.width, 1),
-            height: max(previewSize.height, 1)
-        )
-
-        return MPMediaItemArtwork(boundsSize: artworkSize) { @Sendable requestedSize in
-            let requestedMaxDimension = max(requestedSize.width, requestedSize.height, 1)
-            return Self.downsampledArtworkImage(from: data, maxDimension: requestedMaxDimension) ?? UIImage()
-        }
-    }
-
-    private nonisolated static func downsampledArtworkImage(
-        from data: Data,
-        maxDimension: CGFloat = 512
-    ) -> UIImage? {
-        let options: CFDictionary = [
-            kCGImageSourceShouldCache: false,
-        ] as CFDictionary
-
-        guard let source = CGImageSourceCreateWithData(data as CFData, options) else {
-            return nil
-        }
-
-        let thumbnailOptions: CFDictionary = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxDimension,
-            kCGImageSourceShouldCacheImmediately: true,
-        ] as CFDictionary
-
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
-            return nil
-        }
-
-        return UIImage(cgImage: cgImage)
     }
 
     private func effectivePlaybackRate(for playbackState: SonosNowPlayingSnapshot.PlaybackState) -> Double {

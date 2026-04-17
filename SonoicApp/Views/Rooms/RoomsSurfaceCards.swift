@@ -70,7 +70,7 @@ struct RoomsCurrentRoomCard: View {
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(setupProducts) { product in
                             HStack(spacing: 12) {
-                                RoomProductIconView(name: product.name)
+                                RoomProductIconView(product: product)
 
                                 Text(product.name)
                                     .font(.subheadline.weight(.medium))

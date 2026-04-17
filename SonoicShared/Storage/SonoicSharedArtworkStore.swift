@@ -54,12 +54,9 @@ struct SonoicSharedArtworkStore {
 
         let remoteURL = try transport.url(for: trimmedRemotePath, host: host)
         let fileURL = artworkDirectoryURL.appending(path: fileName(for: preferredIdentifier, remoteURL: remoteURL))
-        let (data, response) = try await URLSession.shared.data(from: remoteURL)
+        let data = try await transport.performGET(resource: trimmedRemotePath, host: host)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200 ..< 300).contains(httpResponse.statusCode),
-              !data.isEmpty
-        else {
+        guard !data.isEmpty else {
             throw StoreError.invalidResponse
         }
 

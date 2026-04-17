@@ -13,7 +13,7 @@ extension SonoicModel {
 
         let nextTarget = hasManualSonosHost
             ? manualHostPlaceholderTarget(for: manualSonosHost)
-            : Self.defaultTarget
+            : Self.unconfiguredTarget
 
         guard activeTarget != nextTarget else {
             return

@@ -25,6 +25,63 @@ struct SonosActiveTarget: Identifiable, Equatable {
         let id: String
         let name: String
         let role: SetupRole
+
+        var categoryTitle: String {
+            switch role {
+            case .subwoofer:
+                return "Subwoofer"
+            case .surroundSpeaker:
+                return "Surround speaker"
+            case .primaryPlayer:
+                if normalizedName.contains("arc") || normalizedName.contains("beam") || normalizedName.contains("ray") {
+                    return "Soundbar"
+                }
+
+                if normalizedName.contains("amp") {
+                    return "Amplifier"
+                }
+
+                return "Speaker"
+            case .bondedProduct:
+                if normalizedName.contains("sub") {
+                    return "Subwoofer"
+                }
+
+                return "Speaker"
+            }
+        }
+
+        var badgeTitle: String {
+            switch role {
+            case .primaryPlayer:
+                "Main"
+            case .subwoofer:
+                "Sub"
+            case .surroundSpeaker:
+                "Rear"
+            case .bondedProduct:
+                "Bonded"
+            }
+        }
+
+        var systemImage: String {
+            switch role {
+            case .subwoofer:
+                return "speaker.fill"
+            case .primaryPlayer:
+                if normalizedName.contains("arc") || normalizedName.contains("beam") || normalizedName.contains("ray") {
+                    return "speaker.wave.3.fill"
+                }
+
+                return "speaker.wave.2.fill"
+            case .surroundSpeaker, .bondedProduct:
+                return "speaker.wave.2.fill"
+            }
+        }
+
+        private var normalizedName: String {
+            name.lowercased()
+        }
     }
 
     struct BondedAccessory: Identifiable, Equatable {

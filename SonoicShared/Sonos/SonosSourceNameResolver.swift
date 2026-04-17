@@ -14,7 +14,9 @@ struct SonosSourceNameResolver {
             return inferredSourceName
         }
 
-        if let sourceMetadataTitle = normalizedSourceMetadataTitle, !isGenericQueueTitle(sourceMetadataTitle) {
+        if let sourceMetadataTitle = normalizedSourceMetadataTitle,
+           !SonosMetadataHeuristics.isGenericQueueTitle(sourceMetadataTitle)
+        {
             return sourceMetadataTitle
         }
 
@@ -113,16 +115,6 @@ struct SonosSourceNameResolver {
         let normalizedURI = uri.lowercased()
         return normalizedURI.hasPrefix("x-rincon-queue:") || normalizedURI.hasPrefix("x-rincon-cpcontainer:")
     }
-
-    private func isGenericQueueTitle(_ title: String) -> Bool {
-        switch title.lowercased() {
-        case "queue", "sonos queue", "playback queue":
-            return true
-        default:
-            return false
-        }
-    }
-
     private func nonEmpty(_ value: String?) -> String? {
         guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
             return nil
