@@ -2,6 +2,7 @@ import SwiftUI
 
 struct QueueView: View {
     @Environment(SonoicModel.self) private var model
+    private static let autoRefreshInterval: Duration = .seconds(8)
 
     var body: some View {
         content
@@ -26,6 +27,9 @@ struct QueueView: View {
         }
         .task(id: model.queueRefreshContext) {
             await loadQueueForCurrentContext()
+        }
+        .task(id: queueAutoRefreshLoopKey) {
+            await autoRefreshQueueWhileVisible()
         }
     }
 
@@ -101,6 +105,34 @@ struct QueueView: View {
         }
 
         await model.refreshQueue(showLoading: false)
+    }
+
+    private var queueAutoRefreshLoopKey: String {
+        "\(model.selectedTab.rawValue)|\(model.manualSonosHost)"
+    }
+
+    private func autoRefreshQueueWhileVisible() async {
+        guard model.selectedTab == .queue, model.hasManualSonosHost else {
+            return
+        }
+
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(for: Self.autoRefreshInterval)
+            } catch {
+                return
+            }
+
+            guard model.selectedTab == .queue, model.hasManualSonosHost else {
+                return
+            }
+
+            guard model.queueState.snapshot != nil else {
+                continue
+            }
+
+            await model.refreshQueue(showLoading: false)
+        }
     }
 }
 

@@ -4,12 +4,15 @@ struct RootView: View {
     @Environment(SonoicModel.self) private var model
     @State private var isPlayerPresented = false
 
+    private static let miniPlayerBottomSpacing: CGFloat = 55
+    private static let miniPlayerReservedHeight: CGFloat = 136
+
     var body: some View {
         @Bindable var model = model
 
         TabView(selection: $model.selectedTab) {
             Tab(value: RootTab.home) {
-                NavigationStack {
+                rootNavigationView {
                     HomeView()
                 }
             } label: {
@@ -17,7 +20,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.rooms) {
-                NavigationStack {
+                rootNavigationView {
                     RoomsView()
                 }
             } label: {
@@ -25,7 +28,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.queue) {
-                NavigationStack {
+                rootNavigationView {
                     QueueView()
                 }
             } label: {
@@ -33,7 +36,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.settings) {
-                NavigationStack {
+                rootNavigationView {
                     SettingsView()
                 }
             } label: {
@@ -41,7 +44,7 @@ struct RootView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .overlay(alignment: .bottom) {
             if model.hasManualSonosHost {
                 PlayerMiniBar(
                     nowPlaying: model.nowPlaying,
@@ -55,8 +58,7 @@ struct RootView: View {
                     }
                 )
                 .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 55)
+                .padding(.bottom, Self.miniPlayerBottomSpacing)
             }
         }
         .sheet(isPresented: $isPlayerPresented) {
@@ -65,6 +67,13 @@ struct RootView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    private func rootNavigationView<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        NavigationStack {
+            content()
+        }
+        .safeAreaPadding(.bottom, model.hasManualSonosHost ? Self.miniPlayerReservedHeight : 0)
     }
 }
 
