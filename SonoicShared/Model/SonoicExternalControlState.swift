@@ -139,9 +139,9 @@ struct SonoicExternalControlState: Codable, Equatable, Hashable {
         var systemImage: String {
             switch self {
             case .playing:
-                "play.fill"
-            case .paused:
                 "pause.fill"
+            case .paused:
+                "play.fill"
             case .buffering:
                 "arrow.trianglehead.2.clockwise.rotate.90"
             }

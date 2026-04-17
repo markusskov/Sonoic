@@ -332,23 +332,27 @@ final class SonoicNowPlayableSessionController: NSObject {
     private func artwork(for identifier: String?) -> MPMediaItemArtwork? {
         guard let identifier,
               let artworkStore = try? SonoicSharedArtworkStore(),
-              let data = artworkStore.loadArtworkData(named: identifier),
-              let image = downsampledArtworkImage(from: data)
+              let data = artworkStore.loadArtworkData(named: identifier)
         else {
             return nil
         }
 
+        let previewSize = Self.downsampledArtworkImage(from: data)?.size ?? CGSize(width: 512, height: 512)
         let artworkSize = CGSize(
-            width: max(image.size.width, 1),
-            height: max(image.size.height, 1)
+            width: max(previewSize.width, 1),
+            height: max(previewSize.height, 1)
         )
 
-        return MPMediaItemArtwork(boundsSize: artworkSize) { _ in
-            image
+        return MPMediaItemArtwork(boundsSize: artworkSize) { @Sendable requestedSize in
+            let requestedMaxDimension = max(requestedSize.width, requestedSize.height, 1)
+            return Self.downsampledArtworkImage(from: data, maxDimension: requestedMaxDimension) ?? UIImage()
         }
     }
 
-    private func downsampledArtworkImage(from data: Data, maxDimension: CGFloat = 512) -> UIImage? {
+    private nonisolated static func downsampledArtworkImage(
+        from data: Data,
+        maxDimension: CGFloat = 512
+    ) -> UIImage? {
         let options: CFDictionary = [
             kCGImageSourceShouldCache: false,
         ] as CFDictionary
