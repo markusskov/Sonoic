@@ -61,16 +61,18 @@ struct RoomsView: View {
                 }
 
                 RoomsSectionHeader(
-                    title: "Coming Next",
-                    subtitle: "Discovery and grouping will expand this tab."
+                    title: "Discovery",
+                    subtitle: "Groundwork for real room lists and grouping."
                 )
+
+                RoomsDiscoveryStatusCard(status: model.roomDiscoveryStatus)
 
                 RoomSurfaceCard {
                     VStack(alignment: .leading, spacing: 12) {
                         RoomsUpcomingRow(
-                            title: "Room discovery",
-                            detail: "Find nearby Sonos rooms instead of relying on one manual host.",
-                            systemImage: "dot.radiowaves.left.and.right"
+                            title: "Room list",
+                            detail: "Show nearby Sonos rooms instead of only the active manual-host room.",
+                            systemImage: "list.bullet"
                         )
 
                         RoomsUpcomingRow(

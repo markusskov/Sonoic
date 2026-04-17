@@ -78,6 +78,10 @@ final class SonoicModel {
         }
     }
 
+    var roomDiscoveryStatus: SonosRoomDiscoveryStatus {
+        hasManualSonosHost ? .manualFallback : .setupRequired
+    }
+
     init() {
         settingsStore = SonoicSettingsStore()
         let sonosControlTransport = SonosControlTransport()

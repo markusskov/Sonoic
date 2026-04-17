@@ -167,3 +167,29 @@ struct RoomsUpcomingRow: View {
         }
     }
 }
+
+struct RoomsDiscoveryStatusCard: View {
+    let status: SonosRoomDiscoveryStatus
+
+    var body: some View {
+        RoomSurfaceCard {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: status.systemImage)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 52, height: 52)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(status.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Text(status.detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
