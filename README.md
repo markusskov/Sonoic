@@ -15,6 +15,7 @@ What works today:
 - manual Sonos host configuration for one local player
 - real room naming and bonded home theater member details for the configured manual player
 - `Rooms` tab showing the resolved current room, bonded setup, and lightweight refresh state
+- `Queue` tab showing the active Sonos queue with current-item highlighting
 - `Settings` focused on manual player configuration and diagnostics
 - real local `play/pause`, `next`, `previous`, `mute`, and seek commands
 - real now-playing metadata, artwork, source attribution, and progress reads
@@ -25,7 +26,8 @@ What is still in progress:
 
 - stable Lock Screen / Control Center ownership through Apple’s native now-playing surfaces
 - real target and room discovery
-- queue, grouping, favorites, and playlist flows
+- queue editing, grouping, favorites, and playlist flows
+- source entry from `Home`, including future music-service integrations
 - home theater controls and diagnostics
 
 ## Product Direction
@@ -103,6 +105,7 @@ Notes:
 
 - The current real Sonos path is manual-host based. Discovery is not implemented yet.
 - The configured manual player can already resolve its real room name and bonded home theater setup in `Rooms`, but it does not yet expose household-wide discovery or grouping.
+- `Queue` currently reads and highlights the active Sonos queue, but it does not yet offer reordering or add-to-queue flows from inside Sonoic.
 - `Settings` is currently the manual connection and diagnostics surface rather than the place to browse rooms.
 - The app requests local-network access because Sonos control currently happens over the LAN.
 - Some now-playing behavior on the Lock Screen is still experimental and under active refinement.
@@ -115,7 +118,7 @@ The short version:
 
 1. finish the native now-playing path cleanly
 2. make room and target handling real instead of sample-backed
-3. add queue, grouping, and favorites
+3. expand queue and add first source-entry flows from `Home`
 4. expand into home theater controls and diagnostics
 
 ## Open Source Notes
