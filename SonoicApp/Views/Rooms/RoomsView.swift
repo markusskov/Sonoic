@@ -61,6 +61,23 @@ struct RoomsView: View {
                 }
 
                 RoomsSectionHeader(
+                    title: "Room List",
+                    subtitle: model.roomListItems.isEmpty
+                        ? "Discovery will populate this when real room scanning arrives."
+                        : "The current fallback room list will grow into real discovered rooms."
+                )
+
+                if model.roomListItems.isEmpty {
+                    RoomSurfaceCard {
+                        Text("No rooms are available yet.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    RoomsListCard(items: model.roomListItems)
+                }
+
+                RoomsSectionHeader(
                     title: "Discovery",
                     subtitle: "Groundwork for real room lists and grouping."
                 )

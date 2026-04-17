@@ -212,3 +212,64 @@ struct RoomsDiscoveryStatusCard: View {
         }
     }
 }
+
+struct RoomsListCard: View {
+    let items: [SonosRoomListItem]
+
+    var body: some View {
+        RoomSurfaceCard {
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    RoomsListRow(item: item)
+
+                    if index < items.count - 1 {
+                        Divider()
+                            .padding(.leading, 56)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct RoomsListRow: View {
+    let item: SonosRoomListItem
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: item.kind.systemImage)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(item.name)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+
+                    if item.isActive {
+                        Text("Active")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.thinMaterial, in: Capsule())
+                    }
+                }
+
+                Text(item.summary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+
+            Text(item.source.title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 12)
+    }
+}
