@@ -31,7 +31,10 @@ struct SonosSourceNameResolver {
         let normalizedCurrentURI = nonEmpty(currentURI)
         let normalizedTrackURI = nonEmpty(trackURI)
 
-        if let normalizedCurrentURI, isQueueContainerURI(normalizedCurrentURI), normalizedTrackURI != nil {
+        if let normalizedCurrentURI,
+           SonosMetadataHeuristics.isQueueContainerURI(normalizedCurrentURI),
+           normalizedTrackURI != nil
+        {
             return normalizedTrackURI
         }
 
@@ -111,10 +114,6 @@ struct SonosSourceNameResolver {
         }
     }
 
-    private func isQueueContainerURI(_ uri: String) -> Bool {
-        let normalizedURI = uri.lowercased()
-        return normalizedURI.hasPrefix("x-rincon-queue:") || normalizedURI.hasPrefix("x-rincon-cpcontainer:")
-    }
     private func nonEmpty(_ value: String?) -> String? {
         guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
             return nil

@@ -9,4 +9,13 @@ enum SonosMetadataHeuristics {
             false
         }
     }
+
+    static func isQueueContainerURI(_ uri: String?) -> Bool {
+        guard let normalizedURI = uri?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
+            return false
+        }
+
+        return normalizedURI.hasPrefix("x-rincon-queue:")
+            || normalizedURI.hasPrefix("x-rincon-cpcontainer:")
+    }
 }

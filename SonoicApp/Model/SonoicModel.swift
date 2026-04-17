@@ -37,6 +37,7 @@ final class SonoicModel {
     @ObservationIgnored let renderingControlClient: SonosRenderingControlClient
     @ObservationIgnored let avTransportClient: SonosAVTransportClient
     @ObservationIgnored let nowPlayingClient: SonosNowPlayingClient
+    @ObservationIgnored let queueClient: SonosQueueClient
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
 
     var selectedTab: RootTab = .home
@@ -47,6 +48,8 @@ final class SonoicModel {
             manualHostIdentityStatus = .idle
             manualHostTopologyStatus = .idle
             manualHostLastSuccessfulRefreshAt = nil
+            queueState = .idle
+            isQueueRefreshing = false
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
@@ -56,6 +59,8 @@ final class SonoicModel {
     var manualHostRefreshStatus: SonosManualHostRefreshStatus = .idle
     var manualHostIdentityStatus: SonosRoomDataStatus = .idle
     var manualHostTopologyStatus: SonosRoomDataStatus = .idle
+    var queueState: SonosQueueState = .idle
+    var isQueueRefreshing = false
 
     var activeTarget = SonoicModel.unconfiguredTarget {
         didSet {
@@ -104,6 +109,7 @@ final class SonoicModel {
         renderingControlClient = SonosRenderingControlClient(transport: sonosControlTransport)
         avTransportClient = SonosAVTransportClient(transport: sonosControlTransport)
         nowPlayingClient = SonosNowPlayingClient(transport: sonosControlTransport)
+        queueClient = SonosQueueClient(transport: sonosControlTransport)
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         manualSonosHost = settingsStore.loadManualSonosHost()
 
