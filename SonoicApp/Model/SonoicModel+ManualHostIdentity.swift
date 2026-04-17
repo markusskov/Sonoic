@@ -96,7 +96,7 @@ extension SonoicModel {
             return true
         }
 
-        return referenceDate.timeIntervalSince(manualHostIdentityLastRefreshAt) >= Self.manualHostIdentityRefreshInterval
+        return referenceDate.timeIntervalSince(manualHostIdentityLastRefreshAt) >= Self.manualHostRoomMetadataRefreshInterval
     }
 
     func normalizedManualSonosHost(_ host: String) -> String {

@@ -13,8 +13,9 @@ final class SonoicModel {
         kind: .room,
         memberNames: []
     )
-    @ObservationIgnored static let manualHostIdentityRefreshInterval: TimeInterval = 60
-    @ObservationIgnored static let manualHostTopologyRefreshInterval: TimeInterval = 60
+    // Room identity and bonded topology are low-churn metadata. Keep them on the
+    // same lightweight cadence and rely on explicit refreshes for immediate updates.
+    @ObservationIgnored static let manualHostRoomMetadataRefreshInterval: TimeInterval = 60
     @ObservationIgnored var isSceneActive = false
     @ObservationIgnored var resolvedManualHostIdentityHost: String?
     @ObservationIgnored var resolvedManualHostTopologyHost: String?
