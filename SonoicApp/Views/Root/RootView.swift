@@ -5,7 +5,7 @@ struct RootView: View {
     @State private var isPlayerPresented = false
 
     private static let miniPlayerBottomSpacing: CGFloat = 55
-    private static let miniPlayerReservedHeight: CGFloat = 136
+    private static let miniPlayerContentInset: CGFloat = 156
 
     var body: some View {
         @Bindable var model = model
@@ -73,7 +73,12 @@ struct RootView: View {
         NavigationStack {
             content()
         }
-        .safeAreaPadding(.bottom, model.hasManualSonosHost ? Self.miniPlayerReservedHeight : 0)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if model.hasManualSonosHost {
+                Color.clear
+                    .frame(height: Self.miniPlayerContentInset)
+            }
+        }
     }
 }
 
