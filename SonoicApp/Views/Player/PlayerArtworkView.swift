@@ -36,19 +36,23 @@ struct PlayerArtworkView: View {
                 .strokeBorder(.white.opacity(0.08))
         }
         .task(id: reloadKey) {
-            artworkImage = loadArtworkImage()
+            artworkImage = await loadArtworkImage()
         }
     }
 
-    private func loadArtworkImage() -> UIImage? {
-        guard let artworkIdentifier,
-              let artworkStore = try? SonoicSharedArtworkStore(),
-              let data = artworkStore.loadArtworkData(named: artworkIdentifier)
-        else {
-            return nil
-        }
+    private func loadArtworkImage() async -> UIImage? {
+        let artworkIdentifier = artworkIdentifier
 
-        return UIImage(data: data)
+        return await Task.detached(priority: .utility) {
+            guard let artworkIdentifier,
+                  let artworkStore = try? SonoicSharedArtworkStore(),
+                  let data = artworkStore.loadArtworkData(named: artworkIdentifier)
+            else {
+                return nil
+            }
+
+            return UIImage(data: data)
+        }.value
     }
 }
 

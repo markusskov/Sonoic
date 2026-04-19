@@ -2,6 +2,9 @@ import SwiftUI
 import WidgetKit
 
 extension SonoicModel {
+    private static let sharedStorePersistDebounceDelay: Duration = .milliseconds(300)
+    private static let sharedStoreKeepAliveInterval: TimeInterval = 45
+
     var externalControlState: SonoicExternalControlState {
         guard hasManualSonosHost else {
             return .unconfigured
@@ -57,20 +60,11 @@ extension SonoicModel {
         }
     }
 
-    func persistSharedExternalControlState() {
+    func persistSharedExternalControlState(forceImmediate: Bool = false) {
         let state = externalControlState
         let canAdvanceProgress = !isManualPlayTransitionAwaitingConfirmation
 
-        if let sharedStore {
-            do {
-                try sharedStore.saveExternalControlState(state)
-                if shouldReloadWidgetTimelines(for: state) {
-                    WidgetCenter.shared.reloadAllTimelines()
-                }
-            } catch {
-                assertionFailure("Failed to save shared external control state: \(error)")
-            }
-        }
+        scheduleSharedExternalControlStatePersistence(state, forceImmediate: forceImmediate)
 
         nowPlayableSessionController.update(
             nowPlaying: nowPlaying,
@@ -79,6 +73,86 @@ extension SonoicModel {
             canControlPlayback: hasManualSonosHost,
             canAdvanceProgress: canAdvanceProgress
         )
+    }
+
+    private func scheduleSharedExternalControlStatePersistence(
+        _ state: SonoicExternalControlState,
+        forceImmediate: Bool
+    ) {
+        pendingSharedExternalControlState = state
+
+        guard sharedStore != nil else {
+            return
+        }
+
+        if forceImmediate {
+            sharedStorePersistTask?.cancel()
+            sharedStorePersistTask = nil
+            persistPendingSharedExternalControlStateIfNeeded(forceWrite: true)
+            return
+        }
+
+        guard sharedStorePersistTask == nil else {
+            return
+        }
+
+        sharedStorePersistTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: Self.sharedStorePersistDebounceDelay)
+            } catch {
+                return
+            }
+
+            guard let self else {
+                return
+            }
+
+            await self.persistPendingSharedExternalControlStateIfNeeded()
+        }
+    }
+
+    private func persistPendingSharedExternalControlStateIfNeeded(forceWrite: Bool = false) {
+        defer {
+            sharedStorePersistTask = nil
+        }
+
+        guard let sharedStore,
+              let state = pendingSharedExternalControlState
+        else {
+            pendingSharedExternalControlState = nil
+            return
+        }
+
+        pendingSharedExternalControlState = nil
+
+        guard forceWrite || shouldPersistSharedExternalControlState(state) else {
+            return
+        }
+
+        do {
+            try sharedStore.saveExternalControlState(state)
+            lastPersistedSharedWidgetPresentation = state.widgetPresentation
+            lastSharedStorePersistAt = .now
+            if shouldReloadWidgetTimelines(for: state) {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+        } catch {
+            assertionFailure("Failed to save shared external control state: \(error)")
+        }
+    }
+
+    private func shouldPersistSharedExternalControlState(_ state: SonoicExternalControlState) -> Bool {
+        let widgetPresentation = state.widgetPresentation
+
+        if lastPersistedSharedWidgetPresentation != widgetPresentation {
+            return true
+        }
+
+        guard let lastSharedStorePersistAt else {
+            return true
+        }
+
+        return Date().timeIntervalSince(lastSharedStorePersistAt) >= Self.sharedStoreKeepAliveInterval
     }
 
     private var externalTargetKind: SonoicExternalControlState.ActiveTarget.Kind {

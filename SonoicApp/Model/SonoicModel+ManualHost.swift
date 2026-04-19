@@ -138,11 +138,17 @@ extension SonoicModel {
             }
         }
 
-        let artworkStore = try SonoicSharedArtworkStore()
-        return try await artworkStore.syncArtwork(
-            from: snapshot.artworkURL,
-            host: manualSonosHost,
-            preferredIdentifier: "\(activeTarget.id)-now-playing-artwork"
-        )
+        let artworkURL = snapshot.artworkURL
+        let host = manualSonosHost
+        let preferredIdentifier = "\(activeTarget.id)-now-playing-artwork"
+
+        return try await Task.detached(priority: .utility) {
+            let artworkStore = try SonoicSharedArtworkStore()
+            return try await artworkStore.syncArtwork(
+                from: artworkURL,
+                host: host,
+                preferredIdentifier: preferredIdentifier
+            )
+        }.value
     }
 }
