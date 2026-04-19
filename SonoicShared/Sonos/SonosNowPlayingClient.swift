@@ -73,8 +73,8 @@ struct SonosNowPlayingClient {
             playbackState: playbackState,
             artworkURL: trackMetadata?.albumArtURI ?? sourceMetadata?.albumArtURI,
             artworkIdentifier: fallback.artworkIdentifier,
-            elapsedTime: parseDuration(from: resolvedPositionInfo?.relativeTime),
-            duration: parseDuration(from: resolvedPositionInfo?.trackDuration)
+            elapsedTime: SonosDurationParser.parseTimeInterval(from: resolvedPositionInfo?.relativeTime),
+            duration: SonosDurationParser.parseTimeInterval(from: resolvedPositionInfo?.trackDuration)
         )
     }
 
@@ -126,23 +126,6 @@ struct SonosNowPlayingClient {
         }
 
         return try? SonosDIDLMetadataParser().parse(xmlString)
-    }
-
-    private func parseDuration(from value: String?) -> TimeInterval? {
-        guard let value = value.sonoicNonEmptyTrimmed, value != "NOT_IMPLEMENTED" else {
-            return nil
-        }
-
-        let components = value.split(separator: ":")
-        guard components.count == 3,
-              let hours = Int(components[0]),
-              let minutes = Int(components[1]),
-              let seconds = Int(components[2])
-        else {
-            return nil
-        }
-
-        return TimeInterval(hours * 3600 + minutes * 60 + seconds)
     }
 
     private func resolveSourceName(

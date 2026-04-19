@@ -59,7 +59,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         capturedValue = ""
 
         if fieldName == "res" {
-            currentItem?.duration = parseDuration(from: attributeDict["duration"])
+            currentItem?.duration = SonosDurationParser.parseTimeInterval(from: attributeDict["duration"])
         }
     }
 
@@ -143,22 +143,5 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         default:
             break
         }
-    }
-
-    private func parseDuration(from value: String?) -> TimeInterval? {
-        guard let value = value.sonoicNonEmptyTrimmed, value != "NOT_IMPLEMENTED" else {
-            return nil
-        }
-
-        let components = value.split(separator: ":")
-        guard components.count == 3,
-              let hours = Int(components[0]),
-              let minutes = Int(components[1]),
-              let seconds = Int(components[2])
-        else {
-            return nil
-        }
-
-        return TimeInterval(hours * 3600 + minutes * 60 + seconds)
     }
 }
