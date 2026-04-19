@@ -66,9 +66,9 @@ final class SonosSOAPValuesParser: NSObject, XMLParserDelegate {
             return
         }
 
-        if let parsedValue = capturedValue.sonoicNonEmptyTrimmed {
-            parsedValues[capturingElementName] = parsedValue
-        }
+        // Preserve empty-but-present values so callers can distinguish an empty
+        // Sonos payload (for example an empty queue Result) from a missing field.
+        parsedValues[capturingElementName] = capturedValue.sonoicTrimmed
 
         self.capturingElementName = nil
     }
