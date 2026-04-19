@@ -86,16 +86,23 @@ struct SonosQueueClient {
             host: host
         )
 
-        let result = try SonosSOAPValueParser(expectedElement: "Result").parse(data)
+        let values = try SonosSOAPValuesParser(
+            expectedElements: [
+                "Result",
+                "NumberReturned",
+                "TotalMatches",
+            ]
+        ).parse(data)
+        let result = try requiredValue(named: "Result", in: values)
         let items = try didlParser.parse(result)
 
         return BrowsePage(
             items: items,
             numberReturned: try parseCount(
-                SonosSOAPValueParser(expectedElement: "NumberReturned").parse(data)
+                try requiredValue(named: "NumberReturned", in: values)
             ),
             totalMatches: try parseCount(
-                SonosSOAPValueParser(expectedElement: "TotalMatches").parse(data)
+                try requiredValue(named: "TotalMatches", in: values)
             )
         )
     }
@@ -112,7 +119,8 @@ struct SonosQueueClient {
             host: host
         )
 
-        return extractOptionalSOAPValue(named: "CurrentURI", from: data)
+        let values = try SonosSOAPValuesParser(expectedElements: ["CurrentURI"]).parse(data)
+        return values["CurrentURI"]
     }
 
     private func fetchCurrentTrackNumber(host: String) async -> Int? {
@@ -125,8 +133,12 @@ struct SonosQueueClient {
             </u:GetPositionInfo>
             """,
             host: host
-        ),
-        let trackValue = extractOptionalSOAPValue(named: "Track", from: data)
+        ) else {
+            return nil
+        }
+
+        guard let values = try? SonosSOAPValuesParser(expectedElements: ["Track"]).parse(data),
+              let trackValue = values["Track"]
         else {
             return nil
         }
@@ -148,14 +160,20 @@ struct SonosQueueClient {
     }
 
     private func parseCount(_ value: String) throws -> Int {
-        guard let count = Int(value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+        guard let trimmedValue = value.sonoicNonEmptyTrimmed,
+              let count = Int(trimmedValue)
+        else {
             throw SonosControlTransport.TransportError.invalidResponse
         }
 
         return count
     }
 
-    private func extractOptionalSOAPValue(named elementName: String, from data: Data) -> String? {
-        try? SonosSOAPValueParser(expectedElement: elementName).parse(data)
+    private func requiredValue(named elementName: String, in values: [String: String]) throws -> String {
+        guard let value = values[elementName] else {
+            throw SonosControlTransport.TransportError.missingValue(elementName)
+        }
+
+        return value
     }
 }

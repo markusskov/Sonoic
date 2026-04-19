@@ -90,11 +90,20 @@ struct SonosNowPlayingClient {
             host: host
         )
 
+        let values = try SonosSOAPValuesParser(
+            expectedElements: [
+                "TrackMetaData",
+                "TrackURI",
+                "TrackDuration",
+                "RelTime",
+            ]
+        ).parse(data)
+
         return PositionInfo(
-            trackMetadata: extractOptionalSOAPValue(named: "TrackMetaData", from: data),
-            trackURI: extractOptionalSOAPValue(named: "TrackURI", from: data),
-            trackDuration: extractOptionalSOAPValue(named: "TrackDuration", from: data),
-            relativeTime: extractOptionalSOAPValue(named: "RelTime", from: data)
+            trackMetadata: values["TrackMetaData"],
+            trackURI: values["TrackURI"],
+            trackDuration: values["TrackDuration"],
+            relativeTime: values["RelTime"]
         )
     }
 
@@ -110,14 +119,17 @@ struct SonosNowPlayingClient {
             host: host
         )
 
-        return MediaInfo(
-            currentURIMetadata: extractOptionalSOAPValue(named: "CurrentURIMetaData", from: data),
-            currentURI: extractOptionalSOAPValue(named: "CurrentURI", from: data)
-        )
-    }
+        let values = try SonosSOAPValuesParser(
+            expectedElements: [
+                "CurrentURIMetaData",
+                "CurrentURI",
+            ]
+        ).parse(data)
 
-    private func extractOptionalSOAPValue(named elementName: String, from data: Data) -> String? {
-        try? SonosSOAPValueParser(expectedElement: elementName).parse(data)
+        return MediaInfo(
+            currentURIMetadata: values["CurrentURIMetaData"],
+            currentURI: values["CurrentURI"]
+        )
     }
 
     private func parseMetadata(from xmlString: String?) -> SonosDIDLMetadata? {
