@@ -67,6 +67,6 @@ final class SonosSOAPValueParser: NSObject, XMLParserDelegate {
             return false
         }
 
-        return elementName == expectedElement || elementName.hasSuffix(":\(expectedElement)")
+        return elementName.sonosXMLLocalName == expectedElement
     }
 }

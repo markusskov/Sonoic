@@ -119,7 +119,7 @@ private final class SonosDeviceDescriptionParser: NSObject, XMLParserDelegate {
     }
 
     private func normalizedFieldName(for elementName: String) -> String? {
-        let localName = elementName.split(separator: ":").last.map(String.init) ?? elementName
+        let localName = elementName.sonosXMLLocalName
 
         switch localName {
         case "roomName", "modelName", "friendlyName", "serialNum", "UDN":

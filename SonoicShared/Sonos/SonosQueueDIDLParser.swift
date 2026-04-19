@@ -106,7 +106,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
     }
 
     private func localName(for elementName: String) -> String {
-        elementName.split(separator: ":").last.map(String.init) ?? elementName
+        elementName.sonosXMLLocalName
     }
 
     private func normalizedFieldName(for elementName: String) -> String? {

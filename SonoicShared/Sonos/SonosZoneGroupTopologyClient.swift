@@ -214,6 +214,6 @@ private final class SonosZoneGroupTopologyParser: NSObject, XMLParserDelegate {
     }
 
     private func normalizedElementName(_ elementName: String) -> String {
-        elementName.split(separator: ":").last.map(String.init) ?? elementName
+        elementName.sonosXMLLocalName
     }
 }
