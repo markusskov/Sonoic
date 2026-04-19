@@ -44,6 +44,7 @@ struct RoomDetailView: View {
             }
             .padding(20)
         }
+        .miniPlayerContentInset()
         .scrollIndicators(.hidden)
         .navigationTitle(activeTarget.name)
     }

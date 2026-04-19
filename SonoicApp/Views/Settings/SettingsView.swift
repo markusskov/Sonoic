@@ -100,6 +100,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .miniPlayerContentInset()
         .navigationTitle("Settings")
         .onAppear {
             manualSonosHostDraft = model.manualSonosHost

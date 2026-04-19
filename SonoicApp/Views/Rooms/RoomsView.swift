@@ -111,6 +111,7 @@ struct RoomsView: View {
             }
             .padding(20)
         }
+        .miniPlayerContentInset()
         .scrollIndicators(.hidden)
         .refreshable {
             await refreshRoomState()

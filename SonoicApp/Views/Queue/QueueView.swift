@@ -6,6 +6,7 @@ struct QueueView: View {
 
     var body: some View {
         content
+        .miniPlayerContentInset()
         .navigationTitle("Queue")
         .toolbar {
             if model.hasManualSonosHost {

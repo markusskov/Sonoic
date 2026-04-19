@@ -16,6 +16,7 @@ struct HomeView: View {
             }
             .padding(20)
         }
+        .miniPlayerContentInset()
         .navigationTitle("Sonoic")
     }
 }

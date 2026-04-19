@@ -4,9 +4,6 @@ struct RootView: View {
     @Environment(SonoicModel.self) private var model
     @State private var isPlayerPresented = false
 
-    private static let miniPlayerBottomSpacing: CGFloat = 55
-    private static let miniPlayerContentInset: CGFloat = 156
-
     var body: some View {
         @Bindable var model = model
 
@@ -58,7 +55,7 @@ struct RootView: View {
                     }
                 )
                 .padding(.horizontal, 12)
-                .padding(.bottom, Self.miniPlayerBottomSpacing)
+                .padding(.bottom, MiniPlayerLayout.bottomSpacing)
             }
         }
         .sheet(isPresented: $isPlayerPresented) {
@@ -72,12 +69,6 @@ struct RootView: View {
     private func rootNavigationView<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         NavigationStack {
             content()
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if model.hasManualSonosHost {
-                Color.clear
-                    .frame(height: Self.miniPlayerContentInset)
-            }
         }
     }
 }
