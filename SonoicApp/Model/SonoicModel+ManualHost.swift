@@ -107,6 +107,7 @@ extension SonoicModel {
 
             scheduleManualPlayConfirmationRetryIfNeeded(for: rawPlaybackState)
 
+            manualHostLastSuccessfulRefreshAt = .now
             manualHostRefreshStatus = .updated(.now)
             return true
         } catch {
@@ -124,6 +125,19 @@ extension SonoicModel {
     }
 
     private func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {
+        let normalizedIncomingArtworkURL = snapshot.artworkURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedCurrentArtworkURL = nowPlaying.artworkURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if normalizedIncomingArtworkURL == normalizedCurrentArtworkURL {
+            if normalizedIncomingArtworkURL == nil {
+                return nil
+            }
+
+            if let artworkIdentifier = snapshot.artworkIdentifier {
+                return artworkIdentifier
+            }
+        }
+
         let artworkStore = try SonoicSharedArtworkStore()
         return try await artworkStore.syncArtwork(
             from: snapshot.artworkURL,

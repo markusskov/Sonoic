@@ -46,7 +46,7 @@ struct SonosNowPlayingTitleResolver {
             return nil
         }
 
-        guard !isGenericQueueTitle(title) else {
+        guard !SonosMetadataHeuristics.isGenericQueueTitle(title) else {
             return nil
         }
 
@@ -74,16 +74,6 @@ struct SonosNowPlayingTitleResolver {
 
         return false
     }
-
-    private func isGenericQueueTitle(_ title: String) -> Bool {
-        switch title.lowercased() {
-        case "queue", "sonos queue", "playback queue":
-            return true
-        default:
-            return false
-        }
-    }
-
     private func normalizedTitle(_ value: String?) -> String? {
         guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
             return nil

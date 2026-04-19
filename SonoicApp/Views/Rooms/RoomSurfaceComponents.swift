@@ -35,24 +35,10 @@ struct RoomSurfaceCard<Content: View>: View {
 }
 
 struct RoomProductIconView: View {
-    let name: String
-
-    private var systemImage: String {
-        let normalizedName = name.lowercased()
-
-        if normalizedName.contains("sub") {
-            return "speaker.fill"
-        }
-
-        if normalizedName.contains("arc") || normalizedName.contains("beam") || normalizedName.contains("ray") {
-            return "speaker.wave.3.fill"
-        }
-
-        return "speaker.wave.2.fill"
-    }
+    let product: SonosActiveTarget.SetupProduct
 
     var body: some View {
-        Image(systemName: systemImage)
+        Image(systemName: product.systemImage)
             .font(.body.weight(.semibold))
             .foregroundStyle(.primary)
             .frame(width: 44, height: 44)

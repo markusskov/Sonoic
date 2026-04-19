@@ -142,6 +142,6 @@ extension SonoicModel {
             return true
         }
 
-        return referenceDate.timeIntervalSince(manualHostTopologyLastRefreshAt) >= Self.manualHostTopologyRefreshInterval
+        return referenceDate.timeIntervalSince(manualHostTopologyLastRefreshAt) >= Self.manualHostRoomMetadataRefreshInterval
     }
 }

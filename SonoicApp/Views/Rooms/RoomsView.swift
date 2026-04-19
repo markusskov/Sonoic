@@ -61,16 +61,38 @@ struct RoomsView: View {
                 }
 
                 RoomsSectionHeader(
-                    title: "Coming Next",
-                    subtitle: "Discovery and grouping will expand this tab."
+                    title: "Room List",
+                    subtitle: model.roomListItems.isEmpty
+                        ? "Discovery will populate this when real room scanning arrives."
+                        : "The current fallback room list will grow into real discovered rooms."
+                )
+
+                if model.roomListItems.isEmpty {
+                    RoomSurfaceCard {
+                        Text("No rooms are available yet.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    RoomsListCard(items: model.roomListItems)
+                }
+
+                RoomsSectionHeader(
+                    title: "Discovery",
+                    subtitle: "Groundwork for real room lists and grouping."
+                )
+
+                RoomsDiscoveryStatusCard(
+                    status: model.roomDiscoveryStatus,
+                    roomCount: model.roomListItems.count
                 )
 
                 RoomSurfaceCard {
                     VStack(alignment: .leading, spacing: 12) {
                         RoomsUpcomingRow(
-                            title: "Room discovery",
-                            detail: "Find nearby Sonos rooms instead of relying on one manual host.",
-                            systemImage: "dot.radiowaves.left.and.right"
+                            title: "Room list",
+                            detail: "Show nearby Sonos rooms instead of only the active manual-host room.",
+                            systemImage: "list.bullet"
                         )
 
                         RoomsUpcomingRow(
@@ -89,6 +111,7 @@ struct RoomsView: View {
             }
             .padding(20)
         }
+        .miniPlayerContentInset()
         .scrollIndicators(.hidden)
         .refreshable {
             await refreshRoomState()

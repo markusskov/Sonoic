@@ -6,15 +6,16 @@ import UIKit
 @MainActor
 final class SonoicModel {
     @ObservationIgnored static let manualPlayTransitionGraceInterval: TimeInterval = 3
-    @ObservationIgnored static let defaultTarget = SonosActiveTarget(
-        id: "living-room",
-        name: "Living Room",
-        householdName: "Markus's Sonos",
+    @ObservationIgnored static let unconfiguredTarget = SonosActiveTarget(
+        id: "unconfigured-room",
+        name: "No Room Loaded",
+        householdName: "",
         kind: .room,
-        memberNames: ["Living Room"]
+        memberNames: []
     )
-    @ObservationIgnored static let manualHostIdentityRefreshInterval: TimeInterval = 60
-    @ObservationIgnored static let manualHostTopologyRefreshInterval: TimeInterval = 60
+    // Room identity and bonded topology are low-churn metadata. Keep them on the
+    // same lightweight cadence and rely on explicit refreshes for immediate updates.
+    @ObservationIgnored static let manualHostRoomMetadataRefreshInterval: TimeInterval = 60
     @ObservationIgnored var isSceneActive = false
     @ObservationIgnored var resolvedManualHostIdentityHost: String?
     @ObservationIgnored var resolvedManualHostTopologyHost: String?
@@ -23,6 +24,8 @@ final class SonoicModel {
     @ObservationIgnored var manualHostRefreshTask: Task<Void, Never>?
     @ObservationIgnored var manualHostDeferredSyncTask: Task<Void, Never>?
     @ObservationIgnored var manualPlayConfirmationRetryTask: Task<Void, Never>?
+    @ObservationIgnored var manualHostLastSuccessfulRefreshAt: Date?
+    @ObservationIgnored var lastReloadedWidgetPresentation: SonoicExternalControlState.WidgetPresentation?
     @ObservationIgnored var isManualTransportCommandInFlight = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
     @ObservationIgnored var isManualPlayTransitionAwaitingConfirmation = false
@@ -34,6 +37,7 @@ final class SonoicModel {
     @ObservationIgnored let renderingControlClient: SonosRenderingControlClient
     @ObservationIgnored let avTransportClient: SonosAVTransportClient
     @ObservationIgnored let nowPlayingClient: SonosNowPlayingClient
+    @ObservationIgnored let queueClient: SonosQueueClient
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
 
     var selectedTab: RootTab = .home
@@ -43,6 +47,9 @@ final class SonoicModel {
             manualHostRefreshStatus = .idle
             manualHostIdentityStatus = .idle
             manualHostTopologyStatus = .idle
+            manualHostLastSuccessfulRefreshAt = nil
+            queueState = .idle
+            isQueueRefreshing = false
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
@@ -52,14 +59,10 @@ final class SonoicModel {
     var manualHostRefreshStatus: SonosManualHostRefreshStatus = .idle
     var manualHostIdentityStatus: SonosRoomDataStatus = .idle
     var manualHostTopologyStatus: SonosRoomDataStatus = .idle
+    var queueState: SonosQueueState = .idle
+    var isQueueRefreshing = false
 
-    var activeTarget = SonoicModel.defaultTarget {
-        didSet {
-            persistSharedExternalControlState()
-        }
-    }
-
-    var connectionState: SonosConnectionState = .ready(.localNetwork) {
+    var activeTarget = SonoicModel.unconfiguredTarget {
         didSet {
             persistSharedExternalControlState()
         }
@@ -67,13 +70,7 @@ final class SonoicModel {
 
     var nowPlayingObservedAt = Date()
 
-    var nowPlaying = SonosNowPlayingSnapshot(
-        title: "Unwritten",
-        artistName: "Natasha Bedingfield",
-        albumTitle: "Unwritten",
-        sourceName: "Apple Music",
-        playbackState: .playing
-    ) {
+    var nowPlaying = SonosNowPlayingSnapshot.unconfigured {
         didSet {
             nowPlayingObservedAt = .now
             persistSharedExternalControlState()
@@ -86,6 +83,24 @@ final class SonoicModel {
         }
     }
 
+    var roomDiscoveryStatus: SonosRoomDiscoveryStatus {
+        hasManualSonosHost ? .manualFallback : .setupRequired
+    }
+
+    var roomListItems: [SonosRoomListItem] {
+        guard hasManualSonosHost else {
+            return []
+        }
+
+        return [
+            SonosRoomListItem(
+                activeTarget: activeTarget,
+                source: .manualFallback,
+                isActive: true
+            )
+        ]
+    }
+
     init() {
         settingsStore = SonoicSettingsStore()
         let sonosControlTransport = SonosControlTransport()
@@ -94,6 +109,7 @@ final class SonoicModel {
         renderingControlClient = SonosRenderingControlClient(transport: sonosControlTransport)
         avTransportClient = SonosAVTransportClient(transport: sonosControlTransport)
         nowPlayingClient = SonosNowPlayingClient(transport: sonosControlTransport)
+        queueClient = SonosQueueClient(transport: sonosControlTransport)
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         manualSonosHost = settingsStore.loadManualSonosHost()
 

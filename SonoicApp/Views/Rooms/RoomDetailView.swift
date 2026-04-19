@@ -44,6 +44,7 @@ struct RoomDetailView: View {
             }
             .padding(20)
         }
+        .miniPlayerContentInset()
         .scrollIndicators(.hidden)
         .navigationTitle(activeTarget.name)
     }
@@ -70,63 +71,23 @@ private struct RoomFactRow: View {
 private struct RoomProductRow: View {
     let product: SonosActiveTarget.SetupProduct
 
-    private var productCategory: String {
-        let normalizedName = product.name.lowercased()
-
-        switch product.role {
-        case .subwoofer:
-            return "Subwoofer"
-        case .surroundSpeaker:
-            return "Surround speaker"
-        case .primaryPlayer:
-            if normalizedName.contains("arc") || normalizedName.contains("beam") || normalizedName.contains("ray") {
-                return "Soundbar"
-            }
-
-            if normalizedName.contains("amp") {
-                return "Amplifier"
-            }
-
-            return "Speaker"
-        case .bondedProduct:
-            if normalizedName.contains("sub") {
-                return "Subwoofer"
-            }
-
-            return "Speaker"
-        }
-    }
-
-    private var roleBadgeTitle: String {
-        switch product.role {
-        case .primaryPlayer:
-            return "Main"
-        case .subwoofer:
-            return "Sub"
-        case .surroundSpeaker:
-            return "Rear"
-        case .bondedProduct:
-            return "Bonded"
-        }
-    }
-
     var body: some View {
         HStack(spacing: 14) {
-            RoomProductIconView(name: product.name)
+            RoomProductIconView(product: product)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(product.name)
                     .font(.body.weight(.medium))
                     .foregroundStyle(.primary)
 
-                Text(productCategory)
+                Text(product.categoryTitle)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 0)
 
-            Text(roleBadgeTitle)
+            Text(product.badgeTitle)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)

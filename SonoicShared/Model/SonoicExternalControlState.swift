@@ -1,6 +1,14 @@
 import Foundation
 
 struct SonoicExternalControlState: Codable, Equatable, Hashable {
+    struct WidgetPresentation: Equatable, Hashable {
+        var activeTarget: ActiveTarget
+        var nowPlaying: NowPlaying
+        var playbackState: SonosNowPlayingSnapshot.PlaybackState
+        var volume: Volume
+        var availability: Availability
+    }
+
     struct Freshness: Equatable, Hashable {
         var isStale: Bool
 
@@ -120,46 +128,9 @@ struct SonoicExternalControlState: Codable, Equatable, Hashable {
         }
     }
 
-    enum PlaybackState: String, Codable, Equatable, Hashable {
-        case playing
-        case paused
-        case buffering
-
-        var title: String {
-            switch self {
-            case .playing:
-                "Playing"
-            case .paused:
-                "Paused"
-            case .buffering:
-                "Buffering"
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .playing:
-                "pause.fill"
-            case .paused:
-                "play.fill"
-            case .buffering:
-                "arrow.trianglehead.2.clockwise.rotate.90"
-            }
-        }
-
-        var controlSystemImage: String {
-            switch self {
-            case .playing:
-                "pause.fill"
-            case .paused, .buffering:
-                "play.fill"
-            }
-        }
-    }
-
     var activeTarget: ActiveTarget
     var nowPlaying: NowPlaying
-    var playbackState: PlaybackState
+    var playbackState: SonosNowPlayingSnapshot.PlaybackState
     var progress: Progress?
     var volume: Volume
     var availability: Availability
@@ -183,7 +154,7 @@ extension SonoicExternalControlState {
                 sourceName: nowPlayingSnapshot.sourceName,
                 artworkIdentifier: nowPlayingSnapshot.artworkIdentifier
             ),
-            playbackState: .init(snapshotPlaybackState: nowPlayingSnapshot.playbackState),
+            playbackState: nowPlayingSnapshot.playbackState,
             progress: .init(nowPlayingSnapshot: nowPlayingSnapshot),
             volume: volume,
             availability: availability,
@@ -192,6 +163,26 @@ extension SonoicExternalControlState {
     }
 
     static let staleInterval: TimeInterval = 2 * 60
+
+    static let unconfigured = SonoicExternalControlState(
+        activeTarget: .init(
+            id: "unconfigured-room",
+            name: "No Room Loaded",
+            kind: .room
+        ),
+        nowPlaying: .init(
+            title: "No Player Connected",
+            artistName: nil,
+            subtitle: nil,
+            sourceName: "Open Settings to connect a player",
+            artworkIdentifier: nil
+        ),
+        playbackState: .paused,
+        progress: nil,
+        volume: .init(level: 0, isMuted: false),
+        availability: .unavailable,
+        updatedAt: .now
+    )
 
     static let preview = SonoicExternalControlState(
         activeTarget: .init(
@@ -228,18 +219,15 @@ extension SonoicExternalControlState {
     func freshness(isStale: Bool) -> Freshness {
         Freshness(isStale: isStale)
     }
-}
-
-private extension SonoicExternalControlState.PlaybackState {
-    init(snapshotPlaybackState: SonosNowPlayingSnapshot.PlaybackState) {
-        switch snapshotPlaybackState {
-        case .playing:
-            self = .playing
-        case .paused:
-            self = .paused
-        case .buffering:
-            self = .buffering
-        }
+    
+    var widgetPresentation: WidgetPresentation {
+        WidgetPresentation(
+            activeTarget: activeTarget,
+            nowPlaying: nowPlaying,
+            playbackState: playbackState,
+            volume: volume,
+            availability: availability
+        )
     }
 }
 

@@ -9,7 +9,7 @@ struct RootView: View {
 
         TabView(selection: $model.selectedTab) {
             Tab(value: RootTab.home) {
-                NavigationStack {
+                rootNavigationView {
                     HomeView()
                 }
             } label: {
@@ -17,7 +17,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.rooms) {
-                NavigationStack {
+                rootNavigationView {
                     RoomsView()
                 }
             } label: {
@@ -25,7 +25,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.queue) {
-                NavigationStack {
+                rootNavigationView {
                     QueueView()
                 }
             } label: {
@@ -33,7 +33,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.settings) {
-                NavigationStack {
+                rootNavigationView {
                     SettingsView()
                 }
             } label: {
@@ -41,27 +41,34 @@ struct RootView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            PlayerMiniBar(
-                nowPlaying: model.nowPlaying,
-                openPlayer: {
-                    isPlayerPresented = true
-                },
-                togglePlayback: {
-                    Task {
-                        await model.toggleManualSonosPlayback()
+        .overlay(alignment: .bottom) {
+            if model.hasManualSonosHost {
+                PlayerMiniBar(
+                    nowPlaying: model.nowPlaying,
+                    openPlayer: {
+                        isPlayerPresented = true
+                    },
+                    togglePlayback: {
+                        Task {
+                            await model.toggleManualSonosPlayback()
+                        }
                     }
-                }
-            )
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .padding(.bottom, 55)
+                )
+                .padding(.horizontal, 12)
+                .padding(.bottom, MiniPlayerLayout.bottomSpacing)
+            }
         }
         .sheet(isPresented: $isPlayerPresented) {
             PlayerSheetView()
                 .environment(model)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func rootNavigationView<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        NavigationStack {
+            content()
         }
     }
 }

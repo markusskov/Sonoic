@@ -13,7 +13,7 @@ extension SonoicModel {
 
         let nextTarget = hasManualSonosHost
             ? manualHostPlaceholderTarget(for: manualSonosHost)
-            : Self.defaultTarget
+            : Self.unconfiguredTarget
 
         guard activeTarget != nextTarget else {
             return
@@ -96,7 +96,7 @@ extension SonoicModel {
             return true
         }
 
-        return referenceDate.timeIntervalSince(manualHostIdentityLastRefreshAt) >= Self.manualHostIdentityRefreshInterval
+        return referenceDate.timeIntervalSince(manualHostIdentityLastRefreshAt) >= Self.manualHostRoomMetadataRefreshInterval
     }
 
     func normalizedManualSonosHost(_ host: String) -> String {

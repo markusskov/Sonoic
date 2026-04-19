@@ -68,6 +68,16 @@ struct SettingsView: View {
                     )
                 }
 
+                Section {
+                    LabeledContent("Player State", value: refreshTimingText(for: model.manualHostLastSuccessfulRefreshAt))
+                    LabeledContent("Room Name", value: refreshTimingText(for: model.manualHostIdentityLastRefreshAt))
+                    LabeledContent("Bonded Setup", value: refreshTimingText(for: model.manualHostTopologyLastRefreshAt))
+                } header: {
+                    Text("Refresh Timing")
+                } footer: {
+                    Text("Tiny timing surface for manual verification of refresh, failure, and retry behavior.")
+                }
+
                 Section("Diagnostics") {
                     LabeledContent("Configured Host", value: model.manualSonosHost)
                     LabeledContent("Current Room", value: model.activeTarget.name)
@@ -90,6 +100,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .miniPlayerContentInset()
         .navigationTitle("Settings")
         .onAppear {
             manualSonosHostDraft = model.manualSonosHost
@@ -155,6 +166,14 @@ struct SettingsView: View {
         case .failed:
             .red
         }
+    }
+
+    private func refreshTimingText(for date: Date?) -> String {
+        guard let date else {
+            return "Never"
+        }
+
+        return date.formatted(.dateTime.hour().minute().second())
     }
 
     private var hasManualSonosHostDraft: Bool {

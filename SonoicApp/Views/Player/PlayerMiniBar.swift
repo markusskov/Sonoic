@@ -32,7 +32,7 @@ struct PlayerMiniBar: View {
             }
             .buttonStyle(.plain)
 
-            Button(playbackButtonTitle, systemImage: playbackButtonSystemImage, action: togglePlayback)
+            Button(nowPlaying.playbackState.controlTitle, systemImage: nowPlaying.playbackState.controlSystemImage, action: togglePlayback)
                 .labelStyle(.iconOnly)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
@@ -43,24 +43,6 @@ struct PlayerMiniBar: View {
         .padding(.vertical, 10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: .black.opacity(0.08), radius: 14, y: 8)
-    }
-
-    private var playbackButtonTitle: String {
-        switch nowPlaying.playbackState {
-        case .playing:
-            "Pause"
-        case .paused, .buffering:
-            "Play"
-        }
-    }
-
-    private var playbackButtonSystemImage: String {
-        switch nowPlaying.playbackState {
-        case .playing:
-            "pause.fill"
-        case .paused, .buffering:
-            "play.fill"
-        }
     }
 
     private var artworkReloadKey: String {

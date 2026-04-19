@@ -14,7 +14,9 @@ struct SonosSourceNameResolver {
             return inferredSourceName
         }
 
-        if let sourceMetadataTitle = normalizedSourceMetadataTitle, !isGenericQueueTitle(sourceMetadataTitle) {
+        if let sourceMetadataTitle = normalizedSourceMetadataTitle,
+           !SonosMetadataHeuristics.isGenericQueueTitle(sourceMetadataTitle)
+        {
             return sourceMetadataTitle
         }
 
@@ -29,7 +31,10 @@ struct SonosSourceNameResolver {
         let normalizedCurrentURI = nonEmpty(currentURI)
         let normalizedTrackURI = nonEmpty(trackURI)
 
-        if let normalizedCurrentURI, isQueueContainerURI(normalizedCurrentURI), normalizedTrackURI != nil {
+        if let normalizedCurrentURI,
+           SonosMetadataHeuristics.isQueueContainerURI(normalizedCurrentURI),
+           normalizedTrackURI != nil
+        {
             return normalizedTrackURI
         }
 
@@ -106,20 +111,6 @@ struct SonosSourceNameResolver {
             return "Apple Music"
         default:
             return nil
-        }
-    }
-
-    private func isQueueContainerURI(_ uri: String) -> Bool {
-        let normalizedURI = uri.lowercased()
-        return normalizedURI.hasPrefix("x-rincon-queue:") || normalizedURI.hasPrefix("x-rincon-cpcontainer:")
-    }
-
-    private func isGenericQueueTitle(_ title: String) -> Bool {
-        switch title.lowercased() {
-        case "queue", "sonos queue", "playback queue":
-            return true
-        default:
-            return false
         }
     }
 

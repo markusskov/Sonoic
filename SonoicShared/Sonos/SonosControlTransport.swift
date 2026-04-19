@@ -4,6 +4,7 @@ struct SonosControlTransport {
     enum Service {
         case renderingControl
         case avTransport
+        case contentDirectory
         case zoneGroupTopology
 
         var soapNamespace: String {
@@ -12,6 +13,8 @@ struct SonosControlTransport {
                 "urn:schemas-upnp-org:service:RenderingControl:1"
             case .avTransport:
                 "urn:schemas-upnp-org:service:AVTransport:1"
+            case .contentDirectory:
+                "urn:schemas-upnp-org:service:ContentDirectory:1"
             case .zoneGroupTopology:
                 "urn:schemas-upnp-org:service:ZoneGroupTopology:1"
             }
@@ -23,6 +26,8 @@ struct SonosControlTransport {
                 "/MediaRenderer/RenderingControl/Control"
             case .avTransport:
                 "/MediaRenderer/AVTransport/Control"
+            case .contentDirectory:
+                "/MediaServer/ContentDirectory/Control"
             case .zoneGroupTopology:
                 "/ZoneGroupTopology/Control"
             }

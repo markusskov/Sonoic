@@ -4,9 +4,9 @@ enum SonoicExternalStateLoader {
     static func load() -> SonoicExternalControlState {
         do {
             let sharedStore = try SonoicSharedStore()
-            return sharedStore.loadExternalControlState() ?? .preview
+            return sharedStore.loadExternalControlState() ?? .unconfigured
         } catch {
-            return .preview
+            return .unconfigured
         }
     }
 }
