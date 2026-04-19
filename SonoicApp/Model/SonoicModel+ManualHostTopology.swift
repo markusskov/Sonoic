@@ -73,8 +73,7 @@ extension SonoicModel {
         var orderedNames: [String] = []
 
         for name in [primaryMemberName] + satellites.map(\.name) {
-            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmedName.isEmpty else {
+            guard let trimmedName = name.sonoicNonEmptyTrimmed else {
                 continue
             }
 
@@ -97,8 +96,7 @@ extension SonoicModel {
         var accessories: [SonosActiveTarget.BondedAccessory] = []
 
         for satellite in satellites {
-            let trimmedName = satellite.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmedName.isEmpty else {
+            guard let trimmedName = satellite.name.sonoicNonEmptyTrimmed else {
                 continue
             }
 

@@ -93,7 +93,7 @@ struct SonosControlTransport {
     }
 
     nonisolated func url(for resource: String, host: String) throws -> URL {
-        let trimmedResource = resource.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedResource = resource.sonoicTrimmed
 
         if let absoluteURL = URL(string: trimmedResource), absoluteURL.scheme != nil {
             return absoluteURL
@@ -136,7 +136,7 @@ struct SonosControlTransport {
     }
 
     nonisolated private func baseURL(for host: String) throws -> URL {
-        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedHost = host.sonoicTrimmed
         guard !trimmedHost.isEmpty else {
             throw TransportError.invalidHost
         }

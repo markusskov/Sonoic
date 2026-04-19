@@ -22,7 +22,7 @@ final class SonosSOAPValueParser: NSObject, XMLParserDelegate {
             throw SonosControlTransport.TransportError.missingValue(expectedElement)
         }
 
-        return parsedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return parsedValue.sonoicTrimmed
     }
 
     func parser(

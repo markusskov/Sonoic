@@ -181,7 +181,7 @@ struct SettingsView: View {
     }
 
     private var trimmedManualSonosHostDraft: String {
-        manualSonosHostDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        manualSonosHostDraft.sonoicTrimmed
     }
 
     private func commitManualSonosHostIfNeeded() {

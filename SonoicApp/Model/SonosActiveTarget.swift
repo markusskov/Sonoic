@@ -155,8 +155,7 @@ struct SonosActiveTarget: Identifiable, Equatable {
     }
 
     var primaryProductName: String? {
-        let trimmedName = householdName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedName.isEmpty ? nil : trimmedName
+        householdName.sonoicNonEmptyTrimmed
     }
 
     var setupProducts: [SetupProduct] {

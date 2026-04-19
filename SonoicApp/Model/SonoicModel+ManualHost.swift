@@ -4,7 +4,7 @@ extension SonoicModel {
     private static let manualHostRefreshInterval: Duration = .seconds(2)
 
     var hasManualSonosHost: Bool {
-        !manualSonosHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        manualSonosHost.sonoicNonEmptyTrimmed != nil
     }
 
     func refreshManualSonosPlayerState(forceRoomRefresh: Bool = true) async {
@@ -125,8 +125,8 @@ extension SonoicModel {
     }
 
     private func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {
-        let normalizedIncomingArtworkURL = snapshot.artworkURL?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedCurrentArtworkURL = nowPlaying.artworkURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedIncomingArtworkURL = snapshot.artworkURL.sonoicNonEmptyTrimmed
+        let normalizedCurrentArtworkURL = nowPlaying.artworkURL.sonoicNonEmptyTrimmed
 
         if normalizedIncomingArtworkURL == normalizedCurrentArtworkURL {
             if normalizedIncomingArtworkURL == nil {

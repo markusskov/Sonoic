@@ -82,8 +82,7 @@ final class SonosDIDLMetadataParser: NSObject, XMLParserDelegate {
     }
 
     private func assign(_ value: String, to fieldName: String) {
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedValue.isEmpty else {
+        guard let trimmedValue = value.sonoicNonEmptyTrimmed else {
             return
         }
 
