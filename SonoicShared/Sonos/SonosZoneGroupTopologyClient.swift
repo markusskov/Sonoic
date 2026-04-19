@@ -41,7 +41,7 @@ struct SonosZoneGroupTopology: Equatable {
     }
 
     private func normalizedHost(_ host: String?) -> String? {
-        host?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        host.sonoicNonEmptyTrimmed?.lowercased()
     }
 }
 
@@ -105,8 +105,8 @@ private final class SonosZoneGroupTopologyParser: NSObject, XMLParserDelegate {
 
         switch localName {
         case "ZoneGroup":
-            guard let id = trimmed(attributeDict["ID"]),
-                  let coordinatorID = trimmed(attributeDict["Coordinator"])
+            guard let id = attributeDict["ID"].sonoicNonEmptyTrimmed,
+                  let coordinatorID = attributeDict["Coordinator"].sonoicNonEmptyTrimmed
             else {
                 return
             }
@@ -174,8 +174,8 @@ private final class SonosZoneGroupTopologyParser: NSObject, XMLParserDelegate {
     }
 
     private func member(from attributes: [String: String]) -> SonosZoneGroupTopology.Member? {
-        guard let id = trimmed(attributes["UUID"]),
-              let name = trimmed(attributes["ZoneName"])
+        guard let id = attributes["UUID"].sonoicNonEmptyTrimmed,
+              let name = attributes["ZoneName"].sonoicNonEmptyTrimmed
         else {
             return nil
         }
@@ -189,8 +189,8 @@ private final class SonosZoneGroupTopologyParser: NSObject, XMLParserDelegate {
     }
 
     private func satellite(from attributes: [String: String]) -> SonosZoneGroupTopology.Satellite? {
-        guard let id = trimmed(attributes["UUID"]),
-              let name = trimmed(attributes["ZoneName"])
+        guard let id = attributes["UUID"].sonoicNonEmptyTrimmed,
+              let name = attributes["ZoneName"].sonoicNonEmptyTrimmed
         else {
             return nil
         }
@@ -203,7 +203,7 @@ private final class SonosZoneGroupTopologyParser: NSObject, XMLParserDelegate {
     }
 
     private func host(from location: String?) -> String? {
-        guard let location = trimmed(location),
+        guard let location = location.sonoicNonEmptyTrimmed,
               let url = URL(string: location),
               let host = url.host
         else {
@@ -215,13 +215,5 @@ private final class SonosZoneGroupTopologyParser: NSObject, XMLParserDelegate {
 
     private func normalizedElementName(_ elementName: String) -> String {
         elementName.split(separator: ":").last.map(String.init) ?? elementName
-    }
-
-    private func trimmed(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
     }
 }

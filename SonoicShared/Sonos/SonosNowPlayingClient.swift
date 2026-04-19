@@ -33,7 +33,8 @@ struct SonosNowPlayingClient {
         let resolvedMediaInfo = try? await mediaInfo
         let trackMetadata = parseMetadata(from: resolvedPositionInfo?.trackMetadata)
         let sourceMetadata = parseMetadata(from: resolvedMediaInfo?.currentURIMetadata)
-        let currentURI = nonEmpty(resolvedMediaInfo?.currentURI) ?? nonEmpty(resolvedPositionInfo?.trackURI)
+        let currentURI = resolvedMediaInfo?.currentURI.sonoicNonEmptyTrimmed
+            ?? resolvedPositionInfo?.trackURI.sonoicNonEmptyTrimmed
         let hasRealMetadataContext = trackMetadata?.isEmpty == false
             || sourceMetadata?.isEmpty == false
             || currentURI != nil
@@ -120,7 +121,7 @@ struct SonosNowPlayingClient {
     }
 
     private func parseMetadata(from xmlString: String?) -> SonosDIDLMetadata? {
-        guard let xmlString = nonEmpty(xmlString) else {
+        guard let xmlString = xmlString.sonoicNonEmptyTrimmed else {
             return nil
         }
 
@@ -128,7 +129,7 @@ struct SonosNowPlayingClient {
     }
 
     private func parseDuration(from value: String?) -> TimeInterval? {
-        guard let value = nonEmpty(value), value != "NOT_IMPLEMENTED" else {
+        guard let value = value.sonoicNonEmptyTrimmed, value != "NOT_IMPLEMENTED" else {
             return nil
         }
 
@@ -156,13 +157,5 @@ struct SonosNowPlayingClient {
             currentURI: currentURI,
             trackURI: trackURI
         )
-    }
-
-    private func nonEmpty(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
     }
 }

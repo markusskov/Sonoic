@@ -21,7 +21,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         currentFieldName = nil
         capturedValue = ""
 
-        guard !xmlString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard xmlString.sonoicNonEmptyTrimmed != nil else {
             return []
         }
 
@@ -45,7 +45,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         let localName = localName(for: qName ?? elementName)
 
         if localName == "item" {
-            currentItem = PartialItem(id: nonEmpty(attributeDict["id"]))
+            currentItem = PartialItem(id: attributeDict["id"].sonoicNonEmptyTrimmed)
             return
         }
 
@@ -119,7 +119,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
     }
 
     private func assign(_ value: String, to fieldName: String) {
-        guard let value = nonEmpty(value) else {
+        guard let value = value.sonoicNonEmptyTrimmed else {
             return
         }
 
@@ -146,7 +146,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
     }
 
     private func parseDuration(from value: String?) -> TimeInterval? {
-        guard let value = nonEmpty(value), value != "NOT_IMPLEMENTED" else {
+        guard let value = value.sonoicNonEmptyTrimmed, value != "NOT_IMPLEMENTED" else {
             return nil
         }
 
@@ -160,13 +160,5 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         }
 
         return TimeInterval(hours * 3600 + minutes * 60 + seconds)
-    }
-
-    private func nonEmpty(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
     }
 }

@@ -63,7 +63,7 @@ struct SonoicSharedArtworkStore {
         host: String,
         preferredIdentifier: String
     ) async throws -> String? {
-        guard let trimmedRemotePath = trimmed(remotePath) else {
+        guard let trimmedRemotePath = remotePath.sonoicNonEmptyTrimmed else {
             try removeArtworkVariants(for: preferredIdentifier)
             return nil
         }
@@ -114,7 +114,7 @@ struct SonoicSharedArtworkStore {
             return mappedExtension
         }
 
-        if let pathExtension = trimmed(remoteURL.pathExtension) {
+        if let pathExtension = remoteURL.pathExtension.sonoicNonEmptyTrimmed {
             return pathExtension.lowercased()
         }
 
@@ -122,7 +122,7 @@ struct SonoicSharedArtworkStore {
     }
 
     nonisolated private func fileExtension(for contentType: String?) -> String? {
-        guard let contentType = trimmed(contentType)?.lowercased() else {
+        guard let contentType = contentType.sonoicNonEmptyTrimmed?.lowercased() else {
             return nil
         }
 
@@ -176,7 +176,7 @@ struct SonoicSharedArtworkStore {
             throw StoreError.artworkTooLarge(payload.data.count)
         }
 
-        if let mimeType = trimmed(payload.response.mimeType)?.lowercased(),
+        if let mimeType = payload.response.mimeType.sonoicNonEmptyTrimmed?.lowercased(),
            mimeType.hasPrefix("image/")
         {
             return
@@ -194,13 +194,5 @@ struct SonoicSharedArtworkStore {
         }
 
         return CGImageSourceGetCount(source) > 0
-    }
-
-    nonisolated private func trimmed(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
     }
 }

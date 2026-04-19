@@ -8,11 +8,11 @@ struct SonosDeviceInfo: Equatable {
     var udn: String?
 
     var playerDetail: String? {
-        if let modelName = trimmed(modelName) {
+        if let modelName = modelName.sonoicNonEmptyTrimmed {
             return modelName
         }
 
-        guard let friendlyName = trimmed(friendlyName), friendlyName != roomName else {
+        guard let friendlyName = friendlyName.sonoicNonEmptyTrimmed, friendlyName != roomName else {
             return nil
         }
 
@@ -20,19 +20,11 @@ struct SonosDeviceInfo: Equatable {
     }
 
     var preferredTargetID: String? {
-        if let udn = trimmed(udn) {
+        if let udn = udn.sonoicNonEmptyTrimmed {
             return udn.replacingOccurrences(of: "uuid:", with: "")
         }
 
-        return trimmed(serialNumber)
-    }
-
-    private func trimmed(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
+        return serialNumber.sonoicNonEmptyTrimmed
     }
 }
 
@@ -74,16 +66,16 @@ private final class SonosDeviceDescriptionParser: NSObject, XMLParserDelegate {
             throw parser.parserError ?? SonosControlTransport.TransportError.invalidResponse
         }
 
-        guard let resolvedRoomName = trimmed(roomName) ?? trimmed(friendlyName) else {
+        guard let resolvedRoomName = roomName.sonoicNonEmptyTrimmed ?? friendlyName.sonoicNonEmptyTrimmed else {
             throw SonosControlTransport.TransportError.missingValue("roomName")
         }
 
         return SonosDeviceInfo(
             roomName: resolvedRoomName,
-            modelName: trimmed(modelName),
-            friendlyName: trimmed(friendlyName),
-            serialNumber: trimmed(serialNumber),
-            udn: trimmed(udn)
+            modelName: modelName.sonoicNonEmptyTrimmed,
+            friendlyName: friendlyName.sonoicNonEmptyTrimmed,
+            serialNumber: serialNumber.sonoicNonEmptyTrimmed,
+            udn: udn.sonoicNonEmptyTrimmed
         )
     }
 
@@ -138,7 +130,7 @@ private final class SonosDeviceDescriptionParser: NSObject, XMLParserDelegate {
     }
 
     private func assign(_ value: String, to fieldName: String) {
-        let trimmedValue = trimmed(value)
+        let trimmedValue = value.sonoicNonEmptyTrimmed
         guard let trimmedValue else {
             return
         }
@@ -169,11 +161,4 @@ private final class SonosDeviceDescriptionParser: NSObject, XMLParserDelegate {
         }
     }
 
-    private func trimmed(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
-    }
 }

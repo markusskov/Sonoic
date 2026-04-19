@@ -75,10 +75,6 @@ struct SonosNowPlayingTitleResolver {
         return false
     }
     private func normalizedTitle(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
+        value.sonoicNonEmptyTrimmed
     }
 }
