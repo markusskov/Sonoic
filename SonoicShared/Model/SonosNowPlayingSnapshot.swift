@@ -87,3 +87,24 @@ struct SonosNowPlayingSnapshot: Equatable {
         sourceName != "TV Audio"
     }
 }
+
+extension String {
+    nonisolated var sonoicTrimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated var sonoicNonEmptyTrimmed: String? {
+        let trimmedValue = sonoicTrimmed
+        guard !trimmedValue.isEmpty else {
+            return nil
+        }
+
+        return trimmedValue
+    }
+}
+
+extension Optional where Wrapped == String {
+    nonisolated var sonoicNonEmptyTrimmed: String? {
+        self?.sonoicNonEmptyTrimmed
+    }
+}

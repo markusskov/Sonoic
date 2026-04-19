@@ -4,7 +4,7 @@ extension SonoicModel {
     private static let manualHostRefreshInterval: Duration = .seconds(2)
 
     var hasManualSonosHost: Bool {
-        !manualSonosHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        manualSonosHost.sonoicNonEmptyTrimmed != nil
     }
 
     func refreshManualSonosPlayerState(forceRoomRefresh: Bool = true) async {
@@ -125,8 +125,8 @@ extension SonoicModel {
     }
 
     private func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {
-        let normalizedIncomingArtworkURL = snapshot.artworkURL?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedCurrentArtworkURL = nowPlaying.artworkURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedIncomingArtworkURL = snapshot.artworkURL.sonoicNonEmptyTrimmed
+        let normalizedCurrentArtworkURL = nowPlaying.artworkURL.sonoicNonEmptyTrimmed
 
         if normalizedIncomingArtworkURL == normalizedCurrentArtworkURL {
             if normalizedIncomingArtworkURL == nil {
@@ -138,11 +138,17 @@ extension SonoicModel {
             }
         }
 
-        let artworkStore = try SonoicSharedArtworkStore()
-        return try await artworkStore.syncArtwork(
-            from: snapshot.artworkURL,
-            host: manualSonosHost,
-            preferredIdentifier: "\(activeTarget.id)-now-playing-artwork"
-        )
+        let artworkURL = snapshot.artworkURL
+        let host = manualSonosHost
+        let preferredIdentifier = "\(activeTarget.id)-now-playing-artwork"
+
+        return try await Task.detached(priority: .utility) {
+            let artworkStore = try SonoicSharedArtworkStore()
+            return try await artworkStore.syncArtwork(
+                from: artworkURL,
+                host: host,
+                preferredIdentifier: preferredIdentifier
+            )
+        }.value
     }
 }

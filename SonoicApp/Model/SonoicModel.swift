@@ -26,6 +26,10 @@ final class SonoicModel {
     @ObservationIgnored var manualPlayConfirmationRetryTask: Task<Void, Never>?
     @ObservationIgnored var manualHostLastSuccessfulRefreshAt: Date?
     @ObservationIgnored var lastReloadedWidgetPresentation: SonoicExternalControlState.WidgetPresentation?
+    @ObservationIgnored var sharedStorePersistTask: Task<Void, Never>?
+    @ObservationIgnored var pendingSharedExternalControlState: SonoicExternalControlState?
+    @ObservationIgnored var lastPersistedSharedWidgetPresentation: SonoicExternalControlState.WidgetPresentation?
+    @ObservationIgnored var lastSharedStorePersistAt: Date?
     @ObservationIgnored var isManualTransportCommandInFlight = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
     @ObservationIgnored var isManualPlayTransitionAwaitingConfirmation = false
@@ -53,7 +57,7 @@ final class SonoicModel {
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
-            persistSharedExternalControlState()
+            persistSharedExternalControlState(forceImmediate: true)
         }
     }
     var manualHostRefreshStatus: SonosManualHostRefreshStatus = .idle

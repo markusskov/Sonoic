@@ -149,11 +149,11 @@ final class SonoicNowPlayableSessionController: NSObject {
             MPNowPlayingInfoPropertyCurrentPlaybackDate: publishedAt,
         ]
 
-        if let artistName = nonEmpty(nowPlaying.artistName) {
+        if let artistName = nowPlaying.artistName.sonoicNonEmptyTrimmed {
             nowPlayingInfo[MPMediaItemPropertyArtist] = artistName
         }
 
-        if let albumTitle = nonEmpty(nowPlaying.albumTitle) {
+        if let albumTitle = nowPlaying.albumTitle.sonoicNonEmptyTrimmed {
             nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = albumTitle
         } else {
             nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = activeTargetName
@@ -364,13 +364,5 @@ final class SonoicNowPlayableSessionController: NSObject {
         }
 
         return advancedElapsedTime
-    }
-
-    private func nonEmpty(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
     }
 }

@@ -1,13 +1,18 @@
 import Foundation
 
 struct SonosControlTransport {
+    struct HTTPPayload {
+        var data: Data
+        var response: HTTPURLResponse
+    }
+
     enum Service {
         case renderingControl
         case avTransport
         case contentDirectory
         case zoneGroupTopology
 
-        var soapNamespace: String {
+        nonisolated var soapNamespace: String {
             switch self {
             case .renderingControl:
                 "urn:schemas-upnp-org:service:RenderingControl:1"
@@ -20,7 +25,7 @@ struct SonosControlTransport {
             }
         }
 
-        var controlPath: String {
+        nonisolated var controlPath: String {
             switch self {
             case .renderingControl:
                 "/MediaRenderer/RenderingControl/Control"
@@ -54,18 +59,23 @@ struct SonosControlTransport {
         }
     }
 
-    func performGET(resource: String, host: String) async throws -> Data {
+    nonisolated func performGET(resource: String, host: String) async throws -> Data {
+        let payload = try await performGETWithResponse(resource: resource, host: host)
+        return payload.data
+    }
+
+    nonisolated func performGETWithResponse(resource: String, host: String) async throws -> HTTPPayload {
         let resourceURL = try url(for: resource, host: host)
         var request = URLRequest(url: resourceURL)
         request.httpMethod = "GET"
         request.timeoutInterval = 5
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        try validate(response)
-        return data
+        let httpResponse = try validate(response)
+        return HTTPPayload(data: data, response: httpResponse)
     }
 
-    func performAction(service: Service, named actionName: String, body: String, host: String) async throws -> Data {
+    nonisolated func performAction(service: Service, named actionName: String, body: String, host: String) async throws -> Data {
         let controlURL = try controlURL(for: host, service: service)
         var request = URLRequest(url: controlURL)
         request.httpMethod = "POST"
@@ -78,12 +88,12 @@ struct SonosControlTransport {
         )
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        try validate(response)
+        _ = try validate(response)
         return data
     }
 
-    func url(for resource: String, host: String) throws -> URL {
-        let trimmedResource = resource.trimmingCharacters(in: .whitespacesAndNewlines)
+    nonisolated func url(for resource: String, host: String) throws -> URL {
+        let trimmedResource = resource.sonoicTrimmed
 
         if let absoluteURL = URL(string: trimmedResource), absoluteURL.scheme != nil {
             return absoluteURL
@@ -96,7 +106,7 @@ struct SonosControlTransport {
         return resolvedURL
     }
 
-    private func controlURL(for host: String, service: Service) throws -> URL {
+    nonisolated private func controlURL(for host: String, service: Service) throws -> URL {
         let url = try baseURL(for: host)
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw TransportError.invalidHost
@@ -113,7 +123,7 @@ struct SonosControlTransport {
         return controlURL
     }
 
-    private func validate(_ response: URLResponse) throws {
+    nonisolated private func validate(_ response: URLResponse) throws -> HTTPURLResponse {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw TransportError.invalidResponse
         }
@@ -121,10 +131,12 @@ struct SonosControlTransport {
         guard (200 ..< 300).contains(httpResponse.statusCode) else {
             throw TransportError.httpStatus(httpResponse.statusCode)
         }
+
+        return httpResponse
     }
 
-    private func baseURL(for host: String) throws -> URL {
-        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+    nonisolated private func baseURL(for host: String) throws -> URL {
+        let trimmedHost = host.sonoicTrimmed
         guard !trimmedHost.isEmpty else {
             throw TransportError.invalidHost
         }
@@ -147,7 +159,7 @@ struct SonosControlTransport {
         return url
     }
 
-    private func soapEnvelope(containing body: String) -> String {
+    nonisolated private func soapEnvelope(containing body: String) -> String {
         """
         <?xml version="1.0" encoding="utf-8"?>
         <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">

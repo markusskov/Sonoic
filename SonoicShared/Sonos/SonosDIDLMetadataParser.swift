@@ -71,7 +71,7 @@ final class SonosDIDLMetadataParser: NSObject, XMLParserDelegate {
     }
 
     private func normalizedFieldName(for elementName: String) -> String? {
-        let localName = elementName.split(separator: ":").last.map(String.init) ?? elementName
+        let localName = elementName.sonosXMLLocalName
 
         switch localName {
         case "title", "creator", "artist", "album", "albumArtURI":
@@ -82,8 +82,7 @@ final class SonosDIDLMetadataParser: NSObject, XMLParserDelegate {
     }
 
     private func assign(_ value: String, to fieldName: String) {
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedValue.isEmpty else {
+        guard let trimmedValue = value.sonoicNonEmptyTrimmed else {
             return
         }
 

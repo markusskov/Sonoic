@@ -33,7 +33,8 @@ struct SonosNowPlayingClient {
         let resolvedMediaInfo = try? await mediaInfo
         let trackMetadata = parseMetadata(from: resolvedPositionInfo?.trackMetadata)
         let sourceMetadata = parseMetadata(from: resolvedMediaInfo?.currentURIMetadata)
-        let currentURI = nonEmpty(resolvedMediaInfo?.currentURI) ?? nonEmpty(resolvedPositionInfo?.trackURI)
+        let currentURI = resolvedMediaInfo?.currentURI.sonoicNonEmptyTrimmed
+            ?? resolvedPositionInfo?.trackURI.sonoicNonEmptyTrimmed
         let hasRealMetadataContext = trackMetadata?.isEmpty == false
             || sourceMetadata?.isEmpty == false
             || currentURI != nil
@@ -72,8 +73,8 @@ struct SonosNowPlayingClient {
             playbackState: playbackState,
             artworkURL: trackMetadata?.albumArtURI ?? sourceMetadata?.albumArtURI,
             artworkIdentifier: fallback.artworkIdentifier,
-            elapsedTime: parseDuration(from: resolvedPositionInfo?.relativeTime),
-            duration: parseDuration(from: resolvedPositionInfo?.trackDuration)
+            elapsedTime: SonosDurationParser.parseTimeInterval(from: resolvedPositionInfo?.relativeTime),
+            duration: SonosDurationParser.parseTimeInterval(from: resolvedPositionInfo?.trackDuration)
         )
     }
 
@@ -89,11 +90,20 @@ struct SonosNowPlayingClient {
             host: host
         )
 
+        let values = try SonosSOAPValuesParser(
+            expectedElements: [
+                "TrackMetaData",
+                "TrackURI",
+                "TrackDuration",
+                "RelTime",
+            ]
+        ).parse(data)
+
         return PositionInfo(
-            trackMetadata: extractOptionalSOAPValue(named: "TrackMetaData", from: data),
-            trackURI: extractOptionalSOAPValue(named: "TrackURI", from: data),
-            trackDuration: extractOptionalSOAPValue(named: "TrackDuration", from: data),
-            relativeTime: extractOptionalSOAPValue(named: "RelTime", from: data)
+            trackMetadata: values["TrackMetaData"],
+            trackURI: values["TrackURI"],
+            trackDuration: values["TrackDuration"],
+            relativeTime: values["RelTime"]
         )
     }
 
@@ -109,39 +119,25 @@ struct SonosNowPlayingClient {
             host: host
         )
 
+        let values = try SonosSOAPValuesParser(
+            expectedElements: [
+                "CurrentURIMetaData",
+                "CurrentURI",
+            ]
+        ).parse(data)
+
         return MediaInfo(
-            currentURIMetadata: extractOptionalSOAPValue(named: "CurrentURIMetaData", from: data),
-            currentURI: extractOptionalSOAPValue(named: "CurrentURI", from: data)
+            currentURIMetadata: values["CurrentURIMetaData"],
+            currentURI: values["CurrentURI"]
         )
     }
 
-    private func extractOptionalSOAPValue(named elementName: String, from data: Data) -> String? {
-        try? SonosSOAPValueParser(expectedElement: elementName).parse(data)
-    }
-
     private func parseMetadata(from xmlString: String?) -> SonosDIDLMetadata? {
-        guard let xmlString = nonEmpty(xmlString) else {
+        guard let xmlString = xmlString.sonoicNonEmptyTrimmed else {
             return nil
         }
 
         return try? SonosDIDLMetadataParser().parse(xmlString)
-    }
-
-    private func parseDuration(from value: String?) -> TimeInterval? {
-        guard let value = nonEmpty(value), value != "NOT_IMPLEMENTED" else {
-            return nil
-        }
-
-        let components = value.split(separator: ":")
-        guard components.count == 3,
-              let hours = Int(components[0]),
-              let minutes = Int(components[1]),
-              let seconds = Int(components[2])
-        else {
-            return nil
-        }
-
-        return TimeInterval(hours * 3600 + minutes * 60 + seconds)
     }
 
     private func resolveSourceName(
@@ -156,13 +152,5 @@ struct SonosNowPlayingClient {
             currentURI: currentURI,
             trackURI: trackURI
         )
-    }
-
-    private func nonEmpty(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
     }
 }

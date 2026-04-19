@@ -7,7 +7,7 @@ struct SonosSourceNameResolver {
         currentURI: String?,
         trackURI: String?
     ) -> String {
-        let normalizedSourceMetadataTitle = nonEmpty(sourceMetadataTitle)
+        let normalizedSourceMetadataTitle = sourceMetadataTitle.sonoicNonEmptyTrimmed
         let preferredURI = preferredSourceURI(currentURI: currentURI, trackURI: trackURI)
 
         if let inferredSourceName = inferredSourceName(from: preferredURI) {
@@ -20,7 +20,9 @@ struct SonosSourceNameResolver {
             return sourceMetadataTitle
         }
 
-        if let sourceMetadataTitle = normalizedSourceMetadataTitle, sourceMetadataTitle != nonEmpty(trackTitle) {
+        if let sourceMetadataTitle = normalizedSourceMetadataTitle,
+           sourceMetadataTitle != trackTitle.sonoicNonEmptyTrimmed
+        {
             return sourceMetadataTitle
         }
 
@@ -28,8 +30,8 @@ struct SonosSourceNameResolver {
     }
 
     private func preferredSourceURI(currentURI: String?, trackURI: String?) -> String? {
-        let normalizedCurrentURI = nonEmpty(currentURI)
-        let normalizedTrackURI = nonEmpty(trackURI)
+        let normalizedCurrentURI = currentURI.sonoicNonEmptyTrimmed
+        let normalizedTrackURI = trackURI.sonoicNonEmptyTrimmed
 
         if let normalizedCurrentURI,
            SonosMetadataHeuristics.isQueueContainerURI(normalizedCurrentURI),
@@ -42,7 +44,7 @@ struct SonosSourceNameResolver {
     }
 
     private func inferredSourceName(from uri: String?) -> String? {
-        guard let uri = nonEmpty(uri)?.lowercased() else {
+        guard let uri = uri.sonoicNonEmptyTrimmed?.lowercased() else {
             return nil
         }
 
@@ -112,13 +114,5 @@ struct SonosSourceNameResolver {
         default:
             return nil
         }
-    }
-
-    private func nonEmpty(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
     }
 }

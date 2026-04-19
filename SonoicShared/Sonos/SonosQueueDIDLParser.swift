@@ -21,7 +21,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         currentFieldName = nil
         capturedValue = ""
 
-        guard !xmlString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard xmlString.sonoicNonEmptyTrimmed != nil else {
             return []
         }
 
@@ -45,7 +45,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         let localName = localName(for: qName ?? elementName)
 
         if localName == "item" {
-            currentItem = PartialItem(id: nonEmpty(attributeDict["id"]))
+            currentItem = PartialItem(id: attributeDict["id"].sonoicNonEmptyTrimmed)
             return
         }
 
@@ -59,7 +59,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         capturedValue = ""
 
         if fieldName == "res" {
-            currentItem?.duration = parseDuration(from: attributeDict["duration"])
+            currentItem?.duration = SonosDurationParser.parseTimeInterval(from: attributeDict["duration"])
         }
     }
 
@@ -106,7 +106,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
     }
 
     private func localName(for elementName: String) -> String {
-        elementName.split(separator: ":").last.map(String.init) ?? elementName
+        elementName.sonosXMLLocalName
     }
 
     private func normalizedFieldName(for elementName: String) -> String? {
@@ -119,7 +119,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
     }
 
     private func assign(_ value: String, to fieldName: String) {
-        guard let value = nonEmpty(value) else {
+        guard let value = value.sonoicNonEmptyTrimmed else {
             return
         }
 
@@ -143,30 +143,5 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         default:
             break
         }
-    }
-
-    private func parseDuration(from value: String?) -> TimeInterval? {
-        guard let value = nonEmpty(value), value != "NOT_IMPLEMENTED" else {
-            return nil
-        }
-
-        let components = value.split(separator: ":")
-        guard components.count == 3,
-              let hours = Int(components[0]),
-              let minutes = Int(components[1]),
-              let seconds = Int(components[2])
-        else {
-            return nil
-        }
-
-        return TimeInterval(hours * 3600 + minutes * 60 + seconds)
-    }
-
-    private func nonEmpty(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-
-        return value
     }
 }

@@ -5,8 +5,8 @@ struct SonoicSharedStore {
         case unavailableAppGroup(String)
     }
 
-    static let appGroupIdentifier = "group.com.markusskov.sonoic.shared"
-    static let externalControlStateKey = "externalControlState"
+    nonisolated static let appGroupIdentifier = "group.com.markusskov.sonoic.shared"
+    nonisolated static let externalControlStateKey = "externalControlState"
 
     private let userDefaults: UserDefaults
 

@@ -100,6 +100,6 @@ extension SonoicModel {
     }
 
     func normalizedManualSonosHost(_ host: String) -> String {
-        host.trimmingCharacters(in: .whitespacesAndNewlines)
+        host.sonoicTrimmed
     }
 }

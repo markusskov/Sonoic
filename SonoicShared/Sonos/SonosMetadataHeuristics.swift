@@ -11,7 +11,7 @@ enum SonosMetadataHeuristics {
     }
 
     static func isQueueContainerURI(_ uri: String?) -> Bool {
-        guard let normalizedURI = uri?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
+        guard let normalizedURI = uri.sonoicNonEmptyTrimmed?.lowercased() else {
             return false
         }
 
