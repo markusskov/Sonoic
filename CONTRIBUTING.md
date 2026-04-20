@@ -33,11 +33,22 @@ Please keep these rules in mind:
 
 Before opening a pull request:
 
-- make sure the project builds
+- make sure the project builds locally when needed
+- make sure the latest PR commit is green in GitHub checks before asking to merge
 - remove temporary debug code and logging
 - make sure the diff does not include personal Xcode state
 - update `README.md` or `plan.md` when project behavior or setup changed
 - keep the PR description clear about what changed and why
+
+## CI And Branch Sync
+
+Sonoic uses GitHub checks to keep the `main` branch safe.
+
+- open a pull request early so the required `build-ios` check runs on each push
+- wait for the latest PR commit to go green before merging `main` into your branch
+- if you merge `main` into your branch, treat that merge commit as a fresh candidate and wait for `build-ios` to pass again
+- do not merge while GitHub shows the branch is behind `main` or while required checks are still running or failing
+- include manual device verification in the PR when the change depends on a real Sonos setup, widget behavior, or outside-app controls
 
 ## Scope Guidance
 
