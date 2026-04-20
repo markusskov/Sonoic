@@ -127,11 +127,35 @@ struct SonosAVTransportClient {
         )
     }
 
+    func setTransportURI(host: String, uri: String, metadataXML: String?) async throws {
+        _ = try await transport.performAction(
+            service: .avTransport,
+            named: "SetAVTransportURI",
+            body: """
+            <u:SetAVTransportURI xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+              <CurrentURI>\(escapedSOAPValue(uri))</CurrentURI>
+              <CurrentURIMetaData>\(escapedSOAPValue(metadataXML ?? ""))</CurrentURIMetaData>
+            </u:SetAVTransportURI>
+            """,
+            host: host
+        )
+    }
+
     private func formattedSeekTarget(for timeInterval: TimeInterval) -> String {
         let totalSeconds = max(0, Int(timeInterval.rounded()))
         let hours = totalSeconds / 3600
         let minutes = (totalSeconds % 3600) / 60
         let seconds = totalSeconds % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    private func escapedSOAPValue(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
     }
 }
