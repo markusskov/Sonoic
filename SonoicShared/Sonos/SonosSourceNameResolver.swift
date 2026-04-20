@@ -71,9 +71,7 @@ struct SonosSourceNameResolver {
             || uri.hasPrefix("x-sonosapi-http:")
             || uri.hasPrefix("x-sonosapi-static:")
         {
-            if let serviceID = serviceID(from: uri),
-               let serviceName = knownServiceName(for: serviceID)
-            {
+            if let serviceName = SonosServiceCatalog.descriptor(from: uri)?.name {
                 return serviceName
             }
 
@@ -85,34 +83,5 @@ struct SonosSourceNameResolver {
         }
 
         return nil
-    }
-
-    private func serviceID(from uri: String) -> String? {
-        guard let queryRange = uri.range(of: "?") else {
-            return nil
-        }
-
-        let query = uri[queryRange.upperBound...]
-        let queryItems = query.split(separator: "&")
-
-        for queryItem in queryItems {
-            let parts = queryItem.split(separator: "=", maxSplits: 1)
-            guard parts.count == 2, parts[0] == "sid" else {
-                continue
-            }
-
-            return String(parts[1])
-        }
-
-        return nil
-    }
-
-    private func knownServiceName(for serviceID: String) -> String? {
-        switch serviceID {
-        case "204":
-            return "Apple Music"
-        default:
-            return nil
-        }
     }
 }
