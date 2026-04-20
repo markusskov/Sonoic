@@ -13,11 +13,12 @@ Implemented so far:
 - feature-shaped iPhone app shell with `Home`, `Rooms`, `Queue`, and `Settings`
 - one shared app model, `SonoicModel`
 - typed Sonos domain models for active target, room list, queue, and now playing
+- favorites-first `Home` surface with real Sonos favorites and a best-effort services row
 - real mini-player and draggable player sheet
 - real local Sonos `play/pause`, `next`, `previous`, `mute`, and seek
 - real now-playing title, artist, album, source, artwork, duration, and progress reads
 - manual-host based real room naming and bonded home theater member details
-- read-only Sonos queue inspection with current-item highlighting
+- Sonos queue inspection with current-item highlighting and tap-to-play
 - shared external-control snapshot for widgets
 - App Group-backed artwork cache and shared state store
 - manual-host based local Sonos configuration through `Settings`
@@ -91,16 +92,17 @@ The next meaningful expansion is:
 - real room or group identity beyond the configured manual player
 - eventually discovery, once the added complexity is justified
 
-### 3. Expand queue and add source-entry flows
+### 3. Expand the Home music hub and queue actions
 
-The app can now read the active Sonos queue, which is the right base for the next product step.
+The app can now read the active Sonos queue and start playback from saved Sonos favorites on `Home`, which is the right base for the next product step.
 
 The next meaningful work here is:
 
 - queue actions
-- first source entry from `Home`
+- `Home` recently played
+- `Home` sources
+- interactive services or service destinations
 - groups
-- favorites
 - playlists
 
 These should stay narrow and useful rather than trying to mirror the entire Sonos app at once.

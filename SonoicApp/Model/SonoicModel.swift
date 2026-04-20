@@ -31,6 +31,7 @@ final class SonoicModel {
     @ObservationIgnored var lastPersistedSharedWidgetPresentation: SonoicExternalControlState.WidgetPresentation?
     @ObservationIgnored var lastSharedStorePersistAt: Date?
     @ObservationIgnored var isManualTransportCommandInFlight = false
+    @ObservationIgnored var isHomeFavoritesRefreshing = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
     @ObservationIgnored var isManualPlayTransitionAwaitingConfirmation = false
     @ObservationIgnored var backgroundExecutionIdentifier: UIBackgroundTaskIdentifier = .invalid
@@ -42,6 +43,7 @@ final class SonoicModel {
     @ObservationIgnored let avTransportClient: SonosAVTransportClient
     @ObservationIgnored let nowPlayingClient: SonosNowPlayingClient
     @ObservationIgnored let queueClient: SonosQueueClient
+    @ObservationIgnored let favoritesClient: SonosFavoritesClient
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
 
     var selectedTab: RootTab = .home
@@ -53,6 +55,7 @@ final class SonoicModel {
             manualHostTopologyStatus = .idle
             manualHostLastSuccessfulRefreshAt = nil
             queueState = .idle
+            homeFavoritesState = .idle
             isQueueRefreshing = false
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
@@ -64,6 +67,7 @@ final class SonoicModel {
     var manualHostIdentityStatus: SonosRoomDataStatus = .idle
     var manualHostTopologyStatus: SonosRoomDataStatus = .idle
     var queueState: SonosQueueState = .idle
+    var homeFavoritesState: SonosFavoritesState = .idle
     var isQueueRefreshing = false
 
     var activeTarget = SonoicModel.unconfiguredTarget {
@@ -105,6 +109,19 @@ final class SonoicModel {
         ]
     }
 
+    var homeServices: [SonosServiceDescriptor] {
+        var orderedServices = homeFavoritesState.snapshot?.services ?? []
+        let currentSourceService = SonosServiceCatalog.descriptor(named: nowPlaying.sourceName)
+
+        if let currentSourceService,
+           !orderedServices.contains(currentSourceService)
+        {
+            orderedServices.append(currentSourceService)
+        }
+
+        return orderedServices
+    }
+
     init() {
         settingsStore = SonoicSettingsStore()
         let sonosControlTransport = SonosControlTransport()
@@ -114,6 +131,7 @@ final class SonoicModel {
         avTransportClient = SonosAVTransportClient(transport: sonosControlTransport)
         nowPlayingClient = SonosNowPlayingClient(transport: sonosControlTransport)
         queueClient = SonosQueueClient(transport: sonosControlTransport)
+        favoritesClient = SonosFavoritesClient(transport: sonosControlTransport)
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         manualSonosHost = settingsStore.loadManualSonosHost()
 

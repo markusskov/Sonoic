@@ -75,6 +75,24 @@ extension SonoicModel {
         }
     }
 
+    func playManualSonosFavorite(_ favorite: SonosFavoriteItem) async -> Bool {
+        guard favorite.playbackURI.sonoicNonEmptyTrimmed != nil else {
+            return false
+        }
+
+        queueState = .idle
+        beginManualPlayTransitionGrace()
+        markLocalPlaybackState(.playing)
+        return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
+            try await avTransportClient.setTransportURI(
+                host: manualSonosHost,
+                uri: favorite.playbackURI,
+                metadataXML: favorite.playbackMetadataXML
+            )
+            try await avTransportClient.play(host: manualSonosHost)
+        }
+    }
+
     func toggleManualSonosMute() async {
         guard hasManualSonosHost else {
             return
