@@ -2,6 +2,7 @@ import SwiftUI
 
 struct QueueView: View {
     @Environment(SonoicModel.self) private var model
+    @State private var isClearQueueConfirmationPresented = false
     private static let autoRefreshInterval: Duration = .seconds(8)
 
     var body: some View {
@@ -10,7 +11,19 @@ struct QueueView: View {
         .navigationTitle("Queue")
         .toolbar {
             if model.hasManualSonosHost {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button(role: .destructive) {
+                        isClearQueueConfirmationPresented = true
+                    } label: {
+                        if model.isQueueClearing {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "trash")
+                        }
+                    }
+                    .disabled(isClearQueueDisabled)
+                    .accessibilityLabel("Clear Queue")
+
                     Button {
                         Task {
                             await model.refreshQueue(showLoading: false)
@@ -22,9 +35,23 @@ struct QueueView: View {
                             Image(systemName: "arrow.clockwise")
                         }
                     }
-                    .disabled(model.isQueueRefreshing)
+                    .disabled(model.isQueueRefreshing || model.isQueueClearing)
+                    .accessibilityLabel("Refresh Queue")
                 }
             }
+        }
+        .alert(
+            "Clear Queue?",
+            isPresented: $isClearQueueConfirmationPresented,
+        ) {
+            Button("Clear Queue", role: .destructive) {
+                Task {
+                    await model.clearQueue()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes every item from the active Sonos queue.")
         }
         .task(id: model.queueRefreshContext) {
             await loadQueueForCurrentContext()
@@ -134,6 +161,12 @@ struct QueueView: View {
 
             await model.refreshQueue(showLoading: false)
         }
+    }
+
+    private var isClearQueueDisabled: Bool {
+        model.isQueueRefreshing
+            || model.isQueueClearing
+            || model.queueState.snapshot?.items.isEmpty == true
     }
 }
 

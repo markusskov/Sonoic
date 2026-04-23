@@ -35,7 +35,7 @@ struct RoomsCurrentRoomCard: View {
     }
 
     var body: some View {
-        RoomSurfaceCard {
+        RoomSurfaceCard(isInteractive: true) {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: "speaker.wave.3.fill")
                     .font(.title2.weight(.semibold))

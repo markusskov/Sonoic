@@ -31,6 +31,8 @@ final class SonoicModel {
     @ObservationIgnored var lastPersistedSharedWidgetPresentation: SonoicExternalControlState.WidgetPresentation?
     @ObservationIgnored var lastSharedStorePersistAt: Date?
     @ObservationIgnored var isManualTransportCommandInFlight = false
+    @ObservationIgnored var isManualVolumeCommandInFlight = false
+    @ObservationIgnored var pendingManualVolumeLevel: Int?
     @ObservationIgnored var isHomeFavoritesRefreshing = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
     @ObservationIgnored var isManualPlayTransitionAwaitingConfirmation = false
@@ -69,6 +71,7 @@ final class SonoicModel {
     var queueState: SonosQueueState = .idle
     var homeFavoritesState: SonosFavoritesState = .idle
     var isQueueRefreshing = false
+    var isQueueClearing = false
 
     var activeTarget = SonoicModel.unconfiguredTarget {
         didSet {

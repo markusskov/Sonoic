@@ -68,9 +68,9 @@ struct SonoicSharedArtworkStore {
             return nil
         }
 
-        let pinnedResource = try pinnedArtworkResource(from: trimmedRemotePath)
-        let remoteURL = try transport.url(for: pinnedResource, host: host)
-        let payload = try await transport.performGETWithResponse(resource: pinnedResource, host: host)
+        let artworkResource = try validatedArtworkResource(from: trimmedRemotePath)
+        let remoteURL = try transport.url(for: artworkResource, host: host)
+        let payload = try await transport.performGETWithResponse(resource: artworkResource, host: host)
         let data = payload.data
 
         guard !data.isEmpty else {
@@ -144,12 +144,14 @@ struct SonoicSharedArtworkStore {
         }
     }
 
-    nonisolated private func pinnedArtworkResource(from remotePath: String) throws -> String {
+    nonisolated private func validatedArtworkResource(from remotePath: String) throws -> String {
         guard let absoluteURL = URL(string: remotePath), absoluteURL.scheme != nil else {
             return remotePath
         }
 
-        guard let components = URLComponents(url: absoluteURL, resolvingAgainstBaseURL: false) else {
+        guard let components = URLComponents(url: absoluteURL, resolvingAgainstBaseURL: false),
+              components.host != nil
+        else {
             throw StoreError.invalidArtworkResource
         }
 
@@ -159,9 +161,7 @@ struct SonoicSharedArtworkStore {
             throw StoreError.invalidArtworkResource
         }
 
-        let path = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
-        let query = components.percentEncodedQuery.map { "?\($0)" } ?? ""
-        return "\(path)\(query)"
+        return remotePath
     }
 
     nonisolated private func validateArtworkPayload(_ payload: SonosControlTransport.HTTPPayload) throws {

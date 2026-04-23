@@ -1,14 +1,14 @@
 import Foundation
 
 struct SonoicSilentAudioAnchor {
-    private static let anchorDurationSeconds = 60 * 60
-    private let fileManager: FileManager
+    nonisolated private static let anchorDurationSeconds = 60 * 60
+    nonisolated(unsafe) private let fileManager: FileManager
 
-    init(fileManager: FileManager = .default) {
+    nonisolated init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
     }
 
-    func fileURL() throws -> URL {
+    nonisolated func fileURL() throws -> URL {
         let cachesDirectoryURL = try fileManager.url(
             for: .cachesDirectory,
             in: .userDomainMask,
@@ -24,7 +24,7 @@ struct SonoicSilentAudioAnchor {
         return fileURL
     }
 
-    private func makeSilentWaveData() -> Data {
+    nonisolated private func makeSilentWaveData() -> Data {
         let sampleRate = 8_000
         let channelCount: UInt16 = 1
         let bitsPerSample: UInt16 = 8
@@ -54,7 +54,7 @@ struct SonoicSilentAudioAnchor {
 }
 
 private extension Data {
-    mutating func append<T: FixedWidthInteger>(littleEndian value: T) {
+    nonisolated mutating func append<T: FixedWidthInteger>(littleEndian value: T) {
         var littleEndianValue = value.littleEndian
         Swift.withUnsafeBytes(of: &littleEndianValue) { buffer in
             append(buffer.bindMemory(to: UInt8.self))

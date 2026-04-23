@@ -18,9 +18,11 @@ struct RoomsSectionHeader: View {
 }
 
 struct RoomSurfaceCard<Content: View>: View {
+    private let isInteractive: Bool
     private let content: Content
 
-    init(@ViewBuilder content: () -> Content) {
+    init(isInteractive: Bool = false, @ViewBuilder content: () -> Content) {
+        self.isInteractive = isInteractive
         self.content = content()
     }
 
@@ -30,7 +32,10 @@ struct RoomSurfaceCard<Content: View>: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .glassEffect(
+            isInteractive ? .regular.interactive() : .regular,
+            in: .rect(cornerRadius: 24)
+        )
     }
 }
 
@@ -42,6 +47,6 @@ struct RoomProductIconView: View {
             .font(.body.weight(.semibold))
             .foregroundStyle(.primary)
             .frame(width: 44, height: 44)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .glassEffect(.regular, in: .rect(cornerRadius: 14))
     }
 }

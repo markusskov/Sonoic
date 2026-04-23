@@ -134,7 +134,7 @@ final class SonosFavoritesDIDLParser: NSObject, XMLParserDelegate {
                 artworkURL: currentItem.artworkURL,
                 service: currentItem.service ?? SonosServiceCatalog.descriptor(from: playbackURI),
                 playbackURI: playbackURI,
-                playbackMetadataXML: wrappedDIDL(for: currentItem.playbackMetadataXML ?? currentItemXML)
+                playbackMetadataXML: playbackMetadataXML(for: currentItem)
             )
         )
 
@@ -143,7 +143,7 @@ final class SonosFavoritesDIDLParser: NSObject, XMLParserDelegate {
 
     private func normalizedFieldName(for elementName: String) -> String? {
         switch elementName {
-        case "title", "creator", "artist", "album", "albumArtURI", "res", "description":
+        case "title", "creator", "artist", "album", "albumArtURI", "res", "resMD", "description":
             return elementName
         default:
             return nil
@@ -175,6 +175,10 @@ final class SonosFavoritesDIDLParser: NSObject, XMLParserDelegate {
         case "res":
             if currentItem?.playbackURI == nil {
                 currentItem?.playbackURI = value
+            }
+        case "resMD":
+            if currentItem?.playbackMetadataXML == nil {
+                currentItem?.playbackMetadataXML = value
             }
         case "description":
             if currentItem?.service == nil {
@@ -209,6 +213,18 @@ final class SonosFavoritesDIDLParser: NSObject, XMLParserDelegate {
         \(itemXML)
         </DIDL-Lite>
         """
+    }
+
+    private func playbackMetadataXML(for item: PartialItem) -> String {
+        if let playbackMetadataXML = item.playbackMetadataXML?.sonoicNonEmptyTrimmed {
+            if playbackMetadataXML.localizedCaseInsensitiveContains("<DIDL-Lite") {
+                return playbackMetadataXML
+            }
+
+            return wrappedDIDL(for: playbackMetadataXML)
+        }
+
+        return wrappedDIDL(for: currentItemXML)
     }
 
     private func resetCurrentItem() {

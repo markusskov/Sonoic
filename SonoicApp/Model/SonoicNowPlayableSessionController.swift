@@ -20,6 +20,7 @@ final class SonoicNowPlayableSessionController: NSObject {
     private var canAdvanceProgress = true
     private var currentObservedAt = Date()
     private var progressUpdateTask: Task<Void, Never>?
+    private var anchorPreparationTask: Task<Void, Never>?
 
     override init() {
         anchorPlayer.isMuted = true
@@ -106,11 +107,11 @@ final class SonoicNowPlayableSessionController: NSObject {
         }
 
         configureAudioSession()
-        preparePlaybackAnchorIfNeeded()
         currentNowPlaying = nowPlaying
         currentPlaybackState = nowPlaying.playbackState
         self.canAdvanceProgress = canAdvanceProgress
         currentObservedAt = observedAt
+        preparePlaybackAnchorIfNeeded(activeTargetName: activeTargetName)
         publishNowPlayingInfo(nowPlaying: effectiveNowPlayingSnapshot(at: .now), publishedAt: .now, activeTargetName: activeTargetName)
         syncAnchorPlayback(nowPlaying: nowPlaying, observedAt: observedAt)
         updateCommandAvailability(for: nowPlaying)
@@ -121,6 +122,8 @@ final class SonoicNowPlayableSessionController: NSObject {
     func clear() {
         anchorPlayer.pause()
         anchorPlayer.seek(to: .zero)
+        anchorPreparationTask?.cancel()
+        anchorPreparationTask = nil
         progressUpdateTask?.cancel()
         progressUpdateTask = nil
         currentNowPlaying = nil
@@ -278,7 +281,7 @@ final class SonoicNowPlayableSessionController: NSObject {
         commandCenter.togglePlayPauseCommand.isEnabled = true
         commandCenter.nextTrackCommand.isEnabled = nowPlaying.supportsTrackNavigation
         commandCenter.previousTrackCommand.isEnabled = nowPlaying.supportsTrackNavigation
-        commandCenter.changePlaybackPositionCommand.isEnabled = false
+        commandCenter.changePlaybackPositionCommand.isEnabled = seekHandler != nil && nowPlaying.duration != nil
     }
 
     private func updateCommandAvailability(isEnabled: Bool) {
@@ -303,16 +306,52 @@ final class SonoicNowPlayableSessionController: NSObject {
         return .success
     }
 
-    private func preparePlaybackAnchorIfNeeded() {
-        guard anchorPlayer.currentItem == nil else {
+    private func preparePlaybackAnchorIfNeeded(activeTargetName: String) {
+        guard anchorPlayer.currentItem == nil,
+              anchorPreparationTask == nil
+        else {
             return
         }
 
-        do {
-            let fileURL = try SonoicSilentAudioAnchor().fileURL()
-            anchorPlayer.replaceCurrentItem(with: AVPlayerItem(url: fileURL))
-        } catch {
-            assertionFailure("Unable to prepare the local playback anchor: \(error)")
+        anchorPreparationTask = Task { [weak self] in
+            let result = await Task.detached(priority: .utility) {
+                do {
+                    return Result<URL, Error>.success(try SonoicSilentAudioAnchor().fileURL())
+                } catch {
+                    return Result<URL, Error>.failure(error)
+                }
+            }.value
+
+            guard let self,
+                  !Task.isCancelled
+            else {
+                return
+            }
+
+            anchorPreparationTask = nil
+
+            switch result {
+            case let .success(fileURL):
+                guard anchorPlayer.currentItem == nil else {
+                    return
+                }
+
+                anchorPlayer.replaceCurrentItem(with: AVPlayerItem(url: fileURL))
+
+                if let currentNowPlaying {
+                    let publicationDate = Date()
+                    publishNowPlayingInfo(
+                        nowPlaying: effectiveNowPlayingSnapshot(at: publicationDate),
+                        publishedAt: publicationDate,
+                        activeTargetName: activeTargetName
+                    )
+                    syncAnchorPlayback(nowPlaying: currentNowPlaying, observedAt: currentObservedAt)
+                    updateProgressLoop(activeTargetName: activeTargetName)
+                    nowPlayingSession.becomeActiveIfPossible(completion: nil)
+                }
+            case let .failure(error):
+                assertionFailure("Unable to prepare the local playback anchor: \(error)")
+            }
         }
     }
 

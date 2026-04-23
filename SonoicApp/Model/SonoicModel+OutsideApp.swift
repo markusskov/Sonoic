@@ -107,7 +107,7 @@ extension SonoicModel {
                 return
             }
 
-            await self.persistPendingSharedExternalControlStateIfNeeded()
+            self.persistPendingSharedExternalControlStateIfNeeded()
         }
     }
 

@@ -10,11 +10,11 @@ enum SonosDurationParser {
         guard components.count == 3,
               let hours = Int(components[0]),
               let minutes = Int(components[1]),
-              let seconds = Int(components[2])
+              let seconds = TimeInterval(components[2])
         else {
             return nil
         }
 
-        return TimeInterval(hours * 3600 + minutes * 60 + seconds)
+        return TimeInterval(hours * 3600 + minutes * 60) + seconds
     }
 }
