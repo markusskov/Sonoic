@@ -60,7 +60,7 @@ struct SonosNowPlayingClient {
             trackURI: resolvedPositionInfo?.trackURI
         )
 
-        return SonosNowPlayingSnapshot(
+        let nextSnapshot = SonosNowPlayingSnapshot(
             title: titleResolver.resolveTitle(
                 trackMetadata: trackMetadata,
                 sourceMetadata: sourceMetadata,
@@ -76,6 +76,8 @@ struct SonosNowPlayingClient {
             elapsedTime: SonosDurationParser.parseTimeInterval(from: resolvedPositionInfo?.relativeTime),
             duration: SonosDurationParser.parseTimeInterval(from: resolvedPositionInfo?.trackDuration)
         )
+
+        return snapshotPreservingRecentMetadata(nextSnapshot, fallback: fallback)
     }
 
     private func fetchPositionInfo(host: String) async throws -> PositionInfo {
@@ -152,5 +154,28 @@ struct SonosNowPlayingClient {
             currentURI: currentURI,
             trackURI: trackURI
         )
+    }
+
+    private func snapshotPreservingRecentMetadata(
+        _ snapshot: SonosNowPlayingSnapshot,
+        fallback: SonosNowPlayingSnapshot
+    ) -> SonosNowPlayingSnapshot {
+        guard isSameContent(snapshot, fallback) else {
+            return snapshot
+        }
+
+        var preservedSnapshot = snapshot
+        preservedSnapshot.artworkURL = snapshot.artworkURL ?? fallback.artworkURL
+        preservedSnapshot.artworkIdentifier = snapshot.artworkIdentifier ?? fallback.artworkIdentifier
+        preservedSnapshot.elapsedTime = snapshot.elapsedTime ?? fallback.elapsedTime
+        preservedSnapshot.duration = snapshot.duration ?? fallback.duration
+        return preservedSnapshot
+    }
+
+    private func isSameContent(_ lhs: SonosNowPlayingSnapshot, _ rhs: SonosNowPlayingSnapshot) -> Bool {
+        lhs.title == rhs.title
+            && lhs.artistName == rhs.artistName
+            && lhs.albumTitle == rhs.albumTitle
+            && lhs.sourceName == rhs.sourceName
     }
 }

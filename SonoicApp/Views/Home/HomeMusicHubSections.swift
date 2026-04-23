@@ -68,12 +68,14 @@ struct HomeServicesSection: View {
 
     var body: some View {
         ScrollView(.horizontal) {
-            HStack(spacing: 12) {
-                ForEach(services) { service in
-                    HomeServiceChip(service: service)
+            GlassEffectContainer(spacing: 12) {
+                HStack(spacing: 12) {
+                    ForEach(services) { service in
+                        HomeServiceChip(service: service)
+                    }
                 }
+                .padding(.vertical, 2)
             }
-            .padding(.vertical, 2)
         }
         .scrollIndicators(.hidden)
     }
@@ -184,7 +186,7 @@ private struct HomeServiceChip: View {
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 38, height: 38)
-                .background(.thinMaterial, in: Circle())
+                .glassEffect(.regular, in: Circle())
 
             Text(service.name)
                 .font(.subheadline.weight(.medium))
@@ -192,7 +194,7 @@ private struct HomeServiceChip: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.thinMaterial, in: Capsule())
+        .glassEffect(.regular, in: Capsule())
     }
 }
 

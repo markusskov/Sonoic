@@ -42,6 +42,23 @@ struct SonosRenderingControlClient {
         )
     }
 
+    func setVolume(host: String, level: Int) async throws {
+        let boundedLevel = min(max(level, 0), 100)
+
+        _ = try await transport.performAction(
+            service: .renderingControl,
+            named: "SetVolume",
+            body: """
+            <u:SetVolume xmlns:u="\(SonosControlTransport.Service.renderingControl.soapNamespace)">
+              <InstanceID>0</InstanceID>
+              <Channel>Master</Channel>
+              <DesiredVolume>\(boundedLevel)</DesiredVolume>
+            </u:SetVolume>
+            """,
+            host: host
+        )
+    }
+
     private func fetchVolumeLevel(host: String) async throws -> Int {
         let data = try await transport.performAction(
             service: .renderingControl,

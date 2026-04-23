@@ -23,7 +23,7 @@ enum SonoicNowPlayableArtworkProvider {
         }
     }
 
-    private nonisolated static func downsampledArtworkImage(
+    nonisolated static func downsampledArtworkImage(
         from data: Data,
         maxDimension: CGFloat = 512
     ) -> UIImage? {

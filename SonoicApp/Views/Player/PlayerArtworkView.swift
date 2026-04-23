@@ -2,9 +2,12 @@ import SwiftUI
 import UIKit
 
 struct PlayerArtworkView: View {
+    @Environment(\.displayScale) private var displayScale
+
     let artworkIdentifier: String?
     let reloadKey: String
     let cornerRadius: CGFloat
+    let maximumDisplayDimension: CGFloat
 
     @State private var artworkImage: UIImage?
 
@@ -36,11 +39,13 @@ struct PlayerArtworkView: View {
                 .strokeBorder(.white.opacity(0.08))
         }
         .task(id: reloadKey) {
-            artworkImage = await loadArtworkImage()
+            artworkImage = await loadArtworkImage(
+                maxPixelDimension: max(maximumDisplayDimension * displayScale, 1)
+            )
         }
     }
 
-    private func loadArtworkImage() async -> UIImage? {
+    private func loadArtworkImage(maxPixelDimension: CGFloat) async -> UIImage? {
         let artworkIdentifier = artworkIdentifier
 
         return await Task.detached(priority: .utility) {
@@ -51,13 +56,21 @@ struct PlayerArtworkView: View {
                 return nil
             }
 
-            return UIImage(data: data)
+            return SonoicNowPlayableArtworkProvider.downsampledArtworkImage(
+                from: data,
+                maxDimension: maxPixelDimension
+            )
         }.value
     }
 }
 
 #Preview {
-    PlayerArtworkView(artworkIdentifier: nil, reloadKey: "preview", cornerRadius: 24)
+    PlayerArtworkView(
+        artworkIdentifier: nil,
+        reloadKey: "preview",
+        cornerRadius: 24,
+        maximumDisplayDimension: 180
+    )
         .frame(width: 180, height: 180)
         .padding()
 }

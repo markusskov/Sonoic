@@ -2,99 +2,159 @@ import SwiftUI
 
 struct PlayerSheetView: View {
     @Environment(SonoicModel.self) private var model
+    @State private var isAdjustingVolume = false
+    @State private var volumeCommitTask: Task<Void, Never>?
+    @State private var volumeLevel = 0.0
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 28) {
-                PlayerArtworkView(
-                    artworkIdentifier: model.nowPlaying.artworkIdentifier,
-                    reloadKey: artworkReloadKey,
-                    cornerRadius: 28
-                )
-                    .aspectRatio(1, contentMode: .fit)
-                    .frame(maxWidth: 360)
-                    .frame(maxWidth: .infinity)
+            GlassEffectContainer(spacing: 24) {
+                VStack(spacing: 28) {
+                    PlayerArtworkView(
+                        artworkIdentifier: model.nowPlaying.artworkIdentifier,
+                        reloadKey: artworkReloadKey,
+                        cornerRadius: 28,
+                        maximumDisplayDimension: 360
+                    )
+                        .aspectRatio(1, contentMode: .fit)
+                        .frame(maxWidth: 360)
+                        .frame(maxWidth: .infinity)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(model.nowPlaying.title)
-                        .font(.title.weight(.bold))
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(model.nowPlaying.title)
+                            .font(.title.weight(.bold))
+                            .lineLimit(2)
 
-                    Text(model.nowPlaying.subtitle ?? model.nowPlaying.sourceName)
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                PlayerProgressSection(
-                    nowPlaying: model.nowPlaying,
-                    observedAt: model.nowPlayingObservedAt,
-                    isEnabled: model.hasManualSonosHost,
-                    seek: { timeInterval in
-                        Task {
-                            _ = await model.seekManualSonosPlayback(to: timeInterval)
-                        }
+                        Text(model.nowPlaying.subtitle ?? model.nowPlaying.sourceName)
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
                     }
-                )
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 28) {
-                    Button("Previous", systemImage: "backward.fill") {
-                        Task {
-                            await model.skipToPreviousManualSonosTrack()
-                        }
-                    }
-                    .disabled(!supportsTrackNavigation)
-                    .buttonStyle(PlayerTransportButtonStyle())
-
-                    Button(model.nowPlaying.playbackState.controlTitle, systemImage: model.nowPlaying.playbackState.controlSystemImage) {
-                        Task {
-                            await model.toggleManualSonosPlayback()
-                        }
-                    }
-                    .buttonStyle(PlayerPrimaryTransportButtonStyle())
-
-                    Button("Next", systemImage: "forward.fill") {
-                        Task {
-                            await model.skipToNextManualSonosTrack()
-                        }
-                    }
-                    .disabled(!supportsTrackNavigation)
-                    .buttonStyle(PlayerTransportButtonStyle())
-                }
-                .labelStyle(.iconOnly)
-
-                VStack(spacing: 14) {
-                    HStack {
-                        Label(model.activeTarget.name, systemImage: model.activeTarget.kind.systemImage)
-                        Spacer()
-                        Label(model.nowPlaying.sourceName, systemImage: "music.note.list")
-                    }
-
-                    HStack {
-                        Label(model.externalVolume.labelText, systemImage: model.externalVolume.systemImage)
-                        Spacer()
-
-                        Button(muteButtonTitle, systemImage: muteButtonSystemImage) {
+                    PlayerProgressSection(
+                        nowPlaying: model.nowPlaying,
+                        observedAt: model.nowPlayingObservedAt,
+                        isEnabled: model.hasManualSonosHost,
+                        seek: { timeInterval in
                             Task {
-                                await model.toggleManualSonosMute()
+                                _ = await model.seekManualSonosPlayback(to: timeInterval)
                             }
                         }
+                    )
+
+                    HStack(spacing: 28) {
+                        Button {
+                            Task {
+                                await model.skipToPreviousManualSonosTrack()
+                            }
+                        } label: {
+                            Label("Previous", systemImage: "backward.fill")
+                                .labelStyle(.iconOnly)
+                                .font(.title2.weight(.semibold))
+                                .frame(width: 58, height: 58)
+                        }
+                        .disabled(!supportsTrackNavigation)
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+
+                        Button {
+                            Task {
+                                await model.toggleManualSonosPlayback()
+                            }
+                        } label: {
+                            Label(
+                                model.nowPlaying.playbackState.controlTitle,
+                                systemImage: model.nowPlaying.playbackState.controlSystemImage
+                            )
+                            .labelStyle(.iconOnly)
+                            .font(.title2.weight(.semibold))
+                            .frame(width: 74, height: 74)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.circle)
+
+                        Button {
+                            Task {
+                                await model.skipToNextManualSonosTrack()
+                            }
+                        } label: {
+                            Label("Next", systemImage: "forward.fill")
+                                .labelStyle(.iconOnly)
+                                .font(.title2.weight(.semibold))
+                                .frame(width: 58, height: 58)
+                        }
+                        .disabled(!supportsTrackNavigation)
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
                     }
+
+                    PlayerVolumeSection(
+                        activeTargetName: model.activeTarget.name,
+                        activeTargetSystemImage: model.activeTarget.kind.systemImage,
+                        sourceName: model.nowPlaying.sourceName,
+                        volume: volumeBinding,
+                        volumeLabelText: volumeLabelText,
+                        volumeSystemImage: volumeSystemImage,
+                        muteButtonTitle: muteButtonTitle,
+                        muteButtonSystemImage: muteButtonSystemImage,
+                        isEnabled: model.hasManualSonosHost,
+                        volumeEditingChanged: handleVolumeEditingChanged,
+                        toggleMute: toggleMute
+                    )
                 }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(18)
-                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .padding(24)
+                .frame(maxWidth: .infinity)
             }
-            .padding(24)
-            .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+        .onChange(of: model.externalVolume.level, initial: true) { _, newValue in
+            guard !isAdjustingVolume else {
+                return
+            }
+
+            volumeLevel = Double(newValue)
+        }
+        .onDisappear {
+            volumeCommitTask?.cancel()
+            volumeCommitTask = nil
+        }
     }
 
     private var supportsTrackNavigation: Bool {
         model.nowPlaying.supportsTrackNavigation
+    }
+
+    private var volumeBinding: Binding<Double> {
+        Binding(
+            get: {
+                volumeLevel
+            },
+            set: { newValue in
+                volumeLevel = min(max(newValue.rounded(), 0), 100)
+                scheduleVolumeCommit()
+            }
+        )
+    }
+
+    private var volumeLabelText: String {
+        model.externalVolume.isMuted ? "Muted" : "\(Int(volumeLevel.rounded()))%"
+    }
+
+    private var volumeSystemImage: String {
+        if model.externalVolume.isMuted || volumeLevel == 0 {
+            return "speaker.slash.fill"
+        }
+
+        if volumeLevel < 34 {
+            return "speaker.wave.1.fill"
+        }
+
+        if volumeLevel < 67 {
+            return "speaker.wave.2.fill"
+        }
+
+        return "speaker.wave.3.fill"
     }
 
     private var muteButtonTitle: String {
@@ -116,31 +176,108 @@ struct PlayerSheetView: View {
         .compactMap { $0 }
         .joined(separator: "|")
     }
-}
 
-private struct PlayerTransportButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.title2.weight(.semibold))
-            .frame(width: 58, height: 58)
-            .background(.thinMaterial, in: Circle())
-            .foregroundStyle(.primary)
-            .opacity(configuration.isPressed ? 0.75 : 1)
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.snappy(duration: 0.18), value: configuration.isPressed)
+    private func handleVolumeEditingChanged(_ isEditing: Bool) {
+        isAdjustingVolume = isEditing
+
+        if !isEditing {
+            commitVolumeImmediately()
+        }
+    }
+
+    private func scheduleVolumeCommit() {
+        volumeCommitTask?.cancel()
+
+        let targetLevel = Int(volumeLevel.rounded())
+        volumeCommitTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(250))
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            Task { @MainActor in
+                _ = await model.setManualSonosVolume(to: targetLevel)
+            }
+        }
+    }
+
+    private func commitVolumeImmediately() {
+        volumeCommitTask?.cancel()
+        volumeCommitTask = nil
+
+        let targetLevel = Int(volumeLevel.rounded())
+        Task { @MainActor in
+            _ = await model.setManualSonosVolume(to: targetLevel)
+        }
+    }
+
+    private func toggleMute() {
+        Task {
+            await model.toggleManualSonosMute()
+        }
     }
 }
 
-private struct PlayerPrimaryTransportButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.title2.weight(.semibold))
-            .frame(width: 74, height: 74)
-            .background(.black.opacity(0.82), in: Circle())
-            .foregroundStyle(.white)
-            .opacity(configuration.isPressed ? 0.82 : 1)
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.snappy(duration: 0.18), value: configuration.isPressed)
+private struct PlayerVolumeSection: View {
+    let activeTargetName: String
+    let activeTargetSystemImage: String
+    let sourceName: String
+    @Binding var volume: Double
+    let volumeLabelText: String
+    let volumeSystemImage: String
+    let muteButtonTitle: String
+    let muteButtonSystemImage: String
+    let isEnabled: Bool
+    let volumeEditingChanged: (Bool) -> Void
+    let toggleMute: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Label(activeTargetName, systemImage: activeTargetSystemImage)
+                Spacer()
+                Label(sourceName, systemImage: "music.note.list")
+            }
+
+            Divider()
+
+            VStack(spacing: 10) {
+                HStack {
+                    Label(volumeLabelText, systemImage: volumeSystemImage)
+                    Spacer()
+
+                    Button(muteButtonTitle, systemImage: muteButtonSystemImage, action: toggleMute)
+                        .buttonStyle(.glass)
+                        .disabled(!isEnabled)
+                }
+
+                HStack(spacing: 12) {
+                    Image(systemName: "speaker.fill")
+                        .foregroundStyle(.tertiary)
+
+                    Slider(
+                        value: $volume,
+                        in: 0 ... 100,
+                        step: 1,
+                        onEditingChanged: volumeEditingChanged
+                    )
+                    .disabled(!isEnabled)
+
+                    Image(systemName: "speaker.wave.3.fill")
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(.secondary)
+        .padding(18)
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
+        .accessibilityElement(children: .contain)
     }
 }
 

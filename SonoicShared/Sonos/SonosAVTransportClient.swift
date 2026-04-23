@@ -3,11 +3,14 @@ import Foundation
 struct SonosAVTransportClient {
     enum ClientError: LocalizedError {
         case invalidTransportState(String)
+        case invalidQueueTrackNumber(String)
 
         var errorDescription: String? {
             switch self {
             case let .invalidTransportState(value):
                 "The Sonos player returned an invalid transport state: \(value)."
+            case let .invalidQueueTrackNumber(value):
+                "The Sonos player returned an invalid queue track number: \(value)."
             }
         }
     }
@@ -137,6 +140,44 @@ struct SonosAVTransportClient {
               <CurrentURI>\(escapedSOAPValue(uri))</CurrentURI>
               <CurrentURIMetaData>\(escapedSOAPValue(metadataXML ?? ""))</CurrentURIMetaData>
             </u:SetAVTransportURI>
+            """,
+            host: host
+        )
+    }
+
+    func addURIToQueue(host: String, uri: String, metadataXML: String?) async throws -> Int {
+        let data = try await transport.performAction(
+            service: .avTransport,
+            named: "AddURIToQueue",
+            body: """
+            <u:AddURIToQueue xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+              <EnqueuedURI>\(escapedSOAPValue(uri))</EnqueuedURI>
+              <EnqueuedURIMetaData>\(escapedSOAPValue(metadataXML ?? ""))</EnqueuedURIMetaData>
+              <DesiredFirstTrackNumberEnqueued>0</DesiredFirstTrackNumberEnqueued>
+              <EnqueueAsNext>1</EnqueueAsNext>
+            </u:AddURIToQueue>
+            """,
+            host: host
+        )
+
+        let values = try SonosSOAPValuesParser(expectedElements: ["FirstTrackNumberEnqueued"]).parse(data)
+        let value = values["FirstTrackNumberEnqueued"] ?? ""
+        guard let trackNumber = Int(value), trackNumber > 0 else {
+            throw ClientError.invalidQueueTrackNumber(value)
+        }
+
+        return trackNumber
+    }
+
+    func removeAllTracksFromQueue(host: String) async throws {
+        _ = try await transport.performAction(
+            service: .avTransport,
+            named: "RemoveAllTracksFromQueue",
+            body: """
+            <u:RemoveAllTracksFromQueue xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+            </u:RemoveAllTracksFromQueue>
             """,
             host: host
         )

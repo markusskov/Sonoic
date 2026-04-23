@@ -100,24 +100,6 @@ extension SonoicModel {
         }
     }
 
-    func confirmManualPlayTransitionIfNeeded(
-        rawPlaybackState: SonosNowPlayingSnapshot.PlaybackState
-    ) {
-        guard isManualPlayTransitionAwaitingConfirmation else {
-            return
-        }
-
-        guard rawPlaybackState == .buffering,
-              let manualPlayTransitionGraceDeadline,
-              manualPlayTransitionGraceDeadline > .now
-        else {
-            return
-        }
-
-        self.manualPlayTransitionGraceDeadline = nil
-        setManualPlayTransitionAwaitingConfirmation(false)
-    }
-
     func smoothedNowPlayingSnapshot(_ snapshot: SonosNowPlayingSnapshot) -> SonosNowPlayingSnapshot {
         guard snapshot.playbackState == .playing || snapshot.playbackState == .paused,
               snapshot.title == nowPlaying.title,

@@ -14,35 +14,37 @@ struct RoomDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                RoomsSectionHeader(
-                    title: "Name",
-                    subtitle: "The current room Sonoic is controlling right now."
-                )
+            GlassEffectContainer(spacing: 18) {
+                VStack(alignment: .leading, spacing: 28) {
+                    RoomsSectionHeader(
+                        title: "Name",
+                        subtitle: "The current room Sonoic is controlling right now."
+                    )
 
-                RoomSurfaceCard {
-                    RoomFactRow(title: "Room", value: activeTarget.name)
-                }
+                    RoomSurfaceCard {
+                        RoomFactRow(title: "Room", value: activeTarget.name)
+                    }
 
-                RoomsSectionHeader(
-                    title: "Products",
-                    subtitle: setupSummary
-                )
+                    RoomsSectionHeader(
+                        title: "Products",
+                        subtitle: setupSummary
+                    )
 
-                RoomSurfaceCard {
-                    VStack(spacing: 0) {
-                        ForEach(Array(activeTarget.setupProducts.enumerated()), id: \.element.id) { index, product in
-                            RoomProductRow(product: product)
+                    RoomSurfaceCard {
+                        VStack(spacing: 0) {
+                            ForEach(Array(activeTarget.setupProducts.enumerated()), id: \.element.id) { index, product in
+                                RoomProductRow(product: product)
 
-                            if index < activeTarget.setupProducts.count - 1 {
-                                Divider()
-                                    .padding(.leading, 56)
+                                if index < activeTarget.setupProducts.count - 1 {
+                                    Divider()
+                                        .padding(.leading, 56)
+                                }
                             }
                         }
                     }
                 }
+                .padding(20)
             }
-            .padding(20)
         }
         .miniPlayerContentInset()
         .scrollIndicators(.hidden)

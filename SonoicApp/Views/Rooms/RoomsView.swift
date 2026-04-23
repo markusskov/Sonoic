@@ -9,107 +9,109 @@ struct RoomsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                RoomsSectionHeader(
-                    title: "Current Room",
-                    subtitle: model.hasManualSonosHost
-                        ? "Your active room and bonded setup."
-                        : "Connect a player in Settings to load your room."
-                )
+            GlassEffectContainer(spacing: 18) {
+                VStack(alignment: .leading, spacing: 28) {
+                    RoomsSectionHeader(
+                        title: "Current Room",
+                        subtitle: model.hasManualSonosHost
+                            ? "Your active room and bonded setup."
+                            : "Connect a player in Settings to load your room."
+                    )
 
-                if model.hasManualSonosHost {
-                    if model.manualHostIdentityStatus.isResolved {
-                        NavigationLink {
-                            RoomDetailView(activeTarget: model.activeTarget)
-                        } label: {
-                            RoomsCurrentRoomCard(
-                                roomName: model.activeTarget.name,
-                                roomSummary: model.activeTarget.summary,
-                                setupProducts: model.activeTarget.setupProducts,
-                                topologyStatus: model.manualHostTopologyStatus,
-                                isRefreshing: isRefreshingRoomState,
-                                lastUpdatedAt: model.manualHostRefreshStatus.updatedAt,
-                                refreshAction: refreshRoomState
+                    if model.hasManualSonosHost {
+                        if model.manualHostIdentityStatus.isResolved {
+                            NavigationLink {
+                                RoomDetailView(activeTarget: model.activeTarget)
+                            } label: {
+                                RoomsCurrentRoomCard(
+                                    roomName: model.activeTarget.name,
+                                    roomSummary: model.activeTarget.summary,
+                                    setupProducts: model.activeTarget.setupProducts,
+                                    topologyStatus: model.manualHostTopologyStatus,
+                                    isRefreshing: isRefreshingRoomState,
+                                    lastUpdatedAt: model.manualHostRefreshStatus.updatedAt,
+                                    refreshAction: refreshRoomState
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        } else if let failureDetail = model.manualHostIdentityStatus.failureDetail {
+                            RoomResolutionStateCard(
+                                title: "Couldn't Load Room",
+                                detail: failureDetail,
+                                systemImage: "exclamationmark.triangle.fill",
+                                tint: .orange,
+                                isLoading: false,
+                                actionTitle: "Try Again",
+                                action: refreshRoomState
+                            )
+                        } else {
+                            RoomResolutionStateCard(
+                                title: "Resolving Room",
+                                detail: "Sonoic is loading the current room name and bonded setup from the configured player.",
+                                systemImage: "arrow.clockwise",
+                                tint: .secondary,
+                                isLoading: true,
+                                actionTitle: nil,
+                                action: nil
                             )
                         }
-                        .buttonStyle(.plain)
-                    } else if let failureDetail = model.manualHostIdentityStatus.failureDetail {
-                        RoomResolutionStateCard(
-                            title: "Couldn't Load Room",
-                            detail: failureDetail,
-                            systemImage: "exclamationmark.triangle.fill",
-                            tint: .orange,
-                            isLoading: false,
-                            actionTitle: "Try Again",
-                            action: refreshRoomState
-                        )
                     } else {
-                        RoomResolutionStateCard(
-                            title: "Resolving Room",
-                            detail: "Sonoic is loading the current room name and bonded setup from the configured player.",
-                            systemImage: "arrow.clockwise",
-                            tint: .secondary,
-                            isLoading: true,
-                            actionTitle: nil,
-                            action: nil
-                        )
+                        RoomsEmptyStateCard {
+                            model.selectedTab = .settings
+                        }
                     }
-                } else {
-                    RoomsEmptyStateCard {
-                        model.selectedTab = .settings
+
+                    RoomsSectionHeader(
+                        title: "Room List",
+                        subtitle: model.roomListItems.isEmpty
+                            ? "Discovery will populate this when real room scanning arrives."
+                            : "The current fallback room list will grow into real discovered rooms."
+                    )
+
+                    if model.roomListItems.isEmpty {
+                        RoomSurfaceCard {
+                            Text("No rooms are available yet.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        RoomsListCard(items: model.roomListItems)
                     }
-                }
 
-                RoomsSectionHeader(
-                    title: "Room List",
-                    subtitle: model.roomListItems.isEmpty
-                        ? "Discovery will populate this when real room scanning arrives."
-                        : "The current fallback room list will grow into real discovered rooms."
-                )
+                    RoomsSectionHeader(
+                        title: "Discovery",
+                        subtitle: "Groundwork for real room lists and grouping."
+                    )
 
-                if model.roomListItems.isEmpty {
+                    RoomsDiscoveryStatusCard(
+                        status: model.roomDiscoveryStatus,
+                        roomCount: model.roomListItems.count
+                    )
+
                     RoomSurfaceCard {
-                        Text("No rooms are available yet.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    RoomsListCard(items: model.roomListItems)
-                }
+                        VStack(alignment: .leading, spacing: 12) {
+                            RoomsUpcomingRow(
+                                title: "Room list",
+                                detail: "Show nearby Sonos rooms instead of only the active manual-host room.",
+                                systemImage: "list.bullet"
+                            )
 
-                RoomsSectionHeader(
-                    title: "Discovery",
-                    subtitle: "Groundwork for real room lists and grouping."
-                )
+                            RoomsUpcomingRow(
+                                title: "Grouping",
+                                detail: "See real room combinations and switch targets with confidence.",
+                                systemImage: "square.stack.3d.up.fill"
+                            )
 
-                RoomsDiscoveryStatusCard(
-                    status: model.roomDiscoveryStatus,
-                    roomCount: model.roomListItems.count
-                )
-
-                RoomSurfaceCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        RoomsUpcomingRow(
-                            title: "Room list",
-                            detail: "Show nearby Sonos rooms instead of only the active manual-host room.",
-                            systemImage: "list.bullet"
-                        )
-
-                        RoomsUpcomingRow(
-                            title: "Grouping",
-                            detail: "See real room combinations and switch targets with confidence.",
-                            systemImage: "square.stack.3d.up.fill"
-                        )
-
-                        RoomsUpcomingRow(
-                            title: "Household overview",
-                            detail: "Surface the rest of the home theater and room relationships cleanly.",
-                            systemImage: "house.fill"
-                        )
+                            RoomsUpcomingRow(
+                                title: "Household overview",
+                                detail: "Surface the rest of the home theater and room relationships cleanly.",
+                                systemImage: "house.fill"
+                            )
+                        }
                     }
                 }
+                .padding(20)
             }
-            .padding(20)
         }
         .miniPlayerContentInset()
         .scrollIndicators(.hidden)

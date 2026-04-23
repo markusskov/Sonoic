@@ -26,13 +26,7 @@ struct SonosZoneGroupTopology: Equatable {
         let normalizedLookupHost = normalizedHost(host)
 
         for group in groups {
-            if let targetID,
-               let matchingMember = group.members.first(where: { $0.id == targetID })
-            {
-                return matchingMember
-            }
-
-            if let matchingMember = group.members.first(where: { normalizedHost($0.host) == normalizedLookupHost }) {
+            if let matchingMember = group.matchingMember(targetID: targetID, normalizedHost: normalizedLookupHost) {
                 return matchingMember
             }
         }
@@ -40,8 +34,42 @@ struct SonosZoneGroupTopology: Equatable {
         return nil
     }
 
+    func coordinatorID(matchingTargetID targetID: String?, host: String) -> String? {
+        let normalizedLookupHost = normalizedHost(host)
+
+        for group in groups where group.matchingMember(targetID: targetID, normalizedHost: normalizedLookupHost) != nil {
+            return group.coordinatorID
+        }
+
+        return nil
+    }
+
+    func coordinatorHost(matchingTargetID targetID: String?, host: String) -> String? {
+        let normalizedLookupHost = normalizedHost(host)
+
+        for group in groups where group.matchingMember(targetID: targetID, normalizedHost: normalizedLookupHost) != nil {
+            return group.members.first { $0.id == group.coordinatorID }?.host
+        }
+
+        return nil
+    }
+
     private func normalizedHost(_ host: String?) -> String? {
         host.sonoicNonEmptyTrimmed?.lowercased()
+    }
+}
+
+private extension SonosZoneGroupTopology.Group {
+    func matchingMember(targetID: String?, normalizedHost: String?) -> SonosZoneGroupTopology.Member? {
+        if let targetID,
+           let matchingMember = members.first(where: { $0.id == targetID })
+        {
+            return matchingMember
+        }
+
+        return members.first { member in
+            member.host.sonoicNonEmptyTrimmed?.lowercased() == normalizedHost
+        }
     }
 }
 
