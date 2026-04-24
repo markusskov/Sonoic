@@ -6,6 +6,7 @@ import UIKit
 @MainActor
 final class SonoicModel {
     @ObservationIgnored static let manualPlayTransitionGraceInterval: TimeInterval = 3
+    @ObservationIgnored static let homeRecentPlayLimit = 12
     @ObservationIgnored static let unconfiguredTarget = SonosActiveTarget(
         id: "unconfigured-room",
         name: "No Room Loaded",
@@ -37,11 +38,14 @@ final class SonoicModel {
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
     @ObservationIgnored var isManualPlayTransitionAwaitingConfirmation = false
     @ObservationIgnored var backgroundExecutionIdentifier: UIBackgroundTaskIdentifier = .invalid
+    @ObservationIgnored let sonosDiscoveryBrowser: SonosBonjourBrowser
+    @ObservationIgnored var discoverySnapshotTask: Task<Void, Never>?
     @ObservationIgnored let sharedStore: SonoicSharedStore?
     @ObservationIgnored let settingsStore: SonoicSettingsStore
     @ObservationIgnored let deviceInfoClient: SonosDeviceInfoClient
     @ObservationIgnored let zoneGroupTopologyClient: SonosZoneGroupTopologyClient
     @ObservationIgnored let renderingControlClient: SonosRenderingControlClient
+    @ObservationIgnored let htControlClient: SonosHTControlClient
     @ObservationIgnored let avTransportClient: SonosAVTransportClient
     @ObservationIgnored let nowPlayingClient: SonosNowPlayingClient
     @ObservationIgnored let queueClient: SonosQueueClient
@@ -58,7 +62,15 @@ final class SonoicModel {
             manualHostLastSuccessfulRefreshAt = nil
             queueState = .idle
             homeFavoritesState = .idle
+            homeTheaterState = .idle
+            homeTheaterTVDiagnostics = .empty
             isQueueRefreshing = false
+            isQueueMutating = false
+            isHomeTheaterRefreshing = false
+            isHomeTheaterMutating = false
+            queueOperationErrorDetail = nil
+            homeTheaterOperationErrorDetail = nil
+            nowPlayingDiagnostics = .empty
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
@@ -70,8 +82,23 @@ final class SonoicModel {
     var manualHostTopologyStatus: SonosRoomDataStatus = .idle
     var queueState: SonosQueueState = .idle
     var homeFavoritesState: SonosFavoritesState = .idle
+    var homeTheaterState: SonosHomeTheaterState = .idle
+    var homeTheaterTVDiagnostics = SonosHomeTheaterTVDiagnostics.empty
+    var recentPlays: [SonoicRecentPlayItem] = []
     var isQueueRefreshing = false
     var isQueueClearing = false
+    var isQueueMutating = false
+    var isHomeTheaterRefreshing = false
+    var isHomeTheaterMutating = false
+    var queueOperationErrorDetail: String?
+    var homeTheaterOperationErrorDetail: String?
+    var discoveredBonjourServices: [SonosBonjourBrowser.Service] = []
+    var discoveredPlayers: [SonosDiscoveredPlayer] = []
+    var discoveredGroups: [SonosDiscoveredGroup] = []
+    var isSonosDiscoveryRefreshing = false
+    var discoveryErrorDetail: String?
+    var lastSonosDiscoveryRefreshAt: Date?
+    var selectingDiscoveredPlayerID: String?
 
     var activeTarget = SonoicModel.unconfiguredTarget {
         didSet {
@@ -80,10 +107,12 @@ final class SonoicModel {
     }
 
     var nowPlayingObservedAt = Date()
+    var nowPlayingDiagnostics = SonosNowPlayingDiagnostics.empty
 
     var nowPlaying = SonosNowPlayingSnapshot.unconfigured {
         didSet {
             nowPlayingObservedAt = .now
+            recordRecentPlayIfNeeded(nowPlaying)
             persistSharedExternalControlState()
         }
     }
@@ -95,21 +124,49 @@ final class SonoicModel {
     }
 
     var roomDiscoveryStatus: SonosRoomDiscoveryStatus {
-        hasManualSonosHost ? .manualFallback : .setupRequired
+        if let discoveryErrorDetail = discoveryErrorDetail?.sonoicNonEmptyTrimmed {
+            return .failed(discoveryErrorDetail)
+        }
+
+        if hasDiscoveredPlayers {
+            return .ready
+        }
+
+        if !discoveredBonjourServices.isEmpty {
+            return .resolving
+        }
+
+        return .scanning
     }
 
     var roomListItems: [SonosRoomListItem] {
-        guard hasManualSonosHost else {
-            return []
+        let selectedDiscoveredGroup = selectedDiscoveredGroup
+        var items = discoveredPlayers.map { player in
+            var item = player.roomListItem
+            item.isActive = activeTarget.kind == .group
+                ? false
+                : isDiscoveredPlayerSelected(player)
+            return item
         }
 
-        return [
-            SonosRoomListItem(
-                activeTarget: activeTarget,
-                source: .manualFallback,
-                isActive: true
+        let hasActiveSelection = activeTarget.kind == .group
+            ? selectedDiscoveredGroup != nil
+            : items.contains(where: \.isActive)
+
+        if hasManualSonosHost,
+           !hasActiveSelection
+        {
+            items.insert(
+                SonosRoomListItem(
+                    activeTarget: activeTarget,
+                    source: .manualFallback,
+                    isActive: true
+                ),
+                at: 0
             )
-        ]
+        }
+
+        return items
     }
 
     var homeServices: [SonosServiceDescriptor] {
@@ -128,15 +185,18 @@ final class SonoicModel {
     init() {
         settingsStore = SonoicSettingsStore()
         let sonosControlTransport = SonosControlTransport()
+        sonosDiscoveryBrowser = SonosBonjourBrowser()
         deviceInfoClient = SonosDeviceInfoClient(transport: sonosControlTransport)
         zoneGroupTopologyClient = SonosZoneGroupTopologyClient(transport: sonosControlTransport)
         renderingControlClient = SonosRenderingControlClient(transport: sonosControlTransport)
+        htControlClient = SonosHTControlClient(transport: sonosControlTransport)
         avTransportClient = SonosAVTransportClient(transport: sonosControlTransport)
         nowPlayingClient = SonosNowPlayingClient(transport: sonosControlTransport)
         queueClient = SonosQueueClient(transport: sonosControlTransport)
         favoritesClient = SonosFavoritesClient(transport: sonosControlTransport)
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         manualSonosHost = settingsStore.loadManualSonosHost()
+        recentPlays = settingsStore.loadRecentPlays()
 
         do {
             sharedStore = try SonoicSharedStore()
@@ -148,5 +208,6 @@ final class SonoicModel {
         resetManualHostIdentity()
         persistSharedExternalControlState()
         configureNowPlayableSessionController()
+        configureSonosDiscoveryBrowser()
     }
 }

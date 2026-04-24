@@ -1,33 +1,56 @@
 import Foundation
 
 enum SonosRoomDiscoveryStatus: Equatable {
-    case setupRequired
-    case manualFallback
+    case scanning
+    case resolving
+    case ready
+    case failed(String)
 
     var title: String {
         switch self {
-        case .setupRequired:
-            "Discovery Needs Setup"
-        case .manualFallback:
-            "Manual Room Fallback"
+        case .scanning:
+            "Scanning for Rooms"
+        case .resolving:
+            "Loading Household"
+        case .ready:
+            "Rooms Ready"
+        case .failed:
+            "Discovery Failed"
         }
     }
 
     var detail: String {
         switch self {
-        case .setupRequired:
-            "Sonoic still needs a manual player in Settings before it can show the current room. Future discovery will replace that one-host bootstrap flow."
-        case .manualFallback:
-            "Sonoic is currently deriving the active room from your configured player. Real discovery will expand this into a household room list and grouping surface."
+        case .scanning:
+            "Sonoic is scanning your local network for Sonos speakers through Bonjour."
+        case .resolving:
+            "Sonoic found Sonos speakers and is loading room names, models, and bonded setup."
+        case .ready:
+            "Tap a room below to make it the active player throughout Sonoic."
+        case let .failed(detail):
+            detail
         }
     }
 
     var systemImage: String {
         switch self {
-        case .setupRequired:
+        case .scanning:
             "dot.radiowaves.left.and.right"
-        case .manualFallback:
-            "wave.3.right.circle"
+        case .resolving:
+            "arrow.triangle.2.circlepath"
+        case .ready:
+            "checkmark.circle.fill"
+        case .failed:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    var isLoading: Bool {
+        switch self {
+        case .scanning, .resolving:
+            true
+        case .ready, .failed:
+            false
         }
     }
 }

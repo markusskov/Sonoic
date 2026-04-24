@@ -19,7 +19,7 @@ extension SonoicModel {
             nowPlayingSnapshot: nowPlaying,
             volume: externalVolume,
             availability: externalAvailability,
-            updatedAt: .now
+            updatedAt: externalControlStateUpdatedAt
         )
     }
 
@@ -28,18 +28,22 @@ extension SonoicModel {
         case .active:
             isSceneActive = true
             endBackgroundExecutionIfNeeded()
+            startSonosDiscoveryIfPossible()
             scheduleBackgroundPlayerRefreshIfPossible()
             startManualHostRefreshLoopIfPossible()
         case .inactive:
             isSceneActive = false
+            stopSonosDiscovery()
             stopManualHostRefreshLoop()
         case .background:
             isSceneActive = false
+            stopSonosDiscovery()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
             refreshPlayerStateOnBackgroundTransitionIfPossible()
         @unknown default:
             isSceneActive = false
+            stopSonosDiscovery()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
         }
@@ -184,6 +188,15 @@ extension SonoicModel {
         }
 
         return lastReloadedWidgetPresentation != widgetPresentation
+    }
+
+    private var externalControlStateUpdatedAt: Date {
+        switch manualHostRefreshStatus {
+        case .updated(let updatedAt):
+            return updatedAt
+        case .idle, .refreshing, .failed:
+            return manualHostLastSuccessfulRefreshAt ?? nowPlayingObservedAt
+        }
     }
 
     func configureNowPlayableSessionController() {

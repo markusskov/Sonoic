@@ -31,7 +31,7 @@ struct SonosRoomListItem: Identifiable, Equatable {
         var title: String {
             switch self {
             case .manualFallback:
-                "Manual Fallback"
+                "Saved Player"
             case .discovered:
                 "Discovered"
             }

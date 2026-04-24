@@ -1,6 +1,11 @@
 import Foundation
 
 struct SonosFavoriteItem: Identifiable, Equatable {
+    enum Kind: String, Codable, Equatable {
+        case item
+        case collection
+    }
+
     let id: String
     var title: String
     var subtitle: String?
@@ -8,6 +13,20 @@ struct SonosFavoriteItem: Identifiable, Equatable {
     var service: SonosServiceDescriptor?
     var playbackURI: String
     var playbackMetadataXML: String?
+    var kind: Kind = .item
+
+    var isCollectionLike: Bool {
+        if kind == .collection {
+            return true
+        }
+
+        let normalizedURI = playbackURI.lowercased()
+        return normalizedURI.contains("container")
+            || normalizedURI.contains("playlist")
+            || normalizedURI.contains("station")
+            || normalizedURI.contains("radio")
+            || normalizedURI.contains("album")
+    }
 }
 
 struct SonosFavoritesSnapshot: Equatable {
@@ -25,5 +44,9 @@ struct SonosFavoritesSnapshot: Equatable {
 
             return service
         }
+    }
+
+    var collectionItems: [SonosFavoriteItem] {
+        items.filter(\.isCollectionLike)
     }
 }

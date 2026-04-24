@@ -153,7 +153,11 @@ extension SonoicModel {
         return elapsedTime + max(referenceDate.timeIntervalSince(nowPlayingObservedAt), 0)
     }
 
-    func scheduleManualStateSync(after delay: Duration, restartRefreshLoop: Bool = false) {
+    func scheduleManualStateSync(
+        after delay: Duration,
+        restartRefreshLoop: Bool = false,
+        refreshQueueAfterSync: Bool = false
+    ) {
         manualHostDeferredSyncTask?.cancel()
         manualHostDeferredSyncTask = Task { [weak self] in
             do {
@@ -167,6 +171,10 @@ extension SonoicModel {
             }
 
             _ = await self.syncManualSonosState(showProgress: false)
+
+            if refreshQueueAfterSync {
+                await self.refreshQueueAfterPlaybackChangeIfNeeded()
+            }
 
             if restartRefreshLoop {
                 self.startManualHostRefreshLoopIfPossible()

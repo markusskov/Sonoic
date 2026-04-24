@@ -61,7 +61,7 @@ struct SonosNowPlayingSnapshot: Equatable {
         title: "No Player Connected",
         artistName: nil,
         albumTitle: nil,
-        sourceName: "Open Settings to connect a player",
+        sourceName: "Open Rooms to choose a player",
         playbackState: .paused
     )
 

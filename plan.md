@@ -6,27 +6,33 @@ It describes what is already real in the app, the architectural guardrails we wa
 
 ## Current State
 
-Sonoic already has a real app shell and a first real local Sonos control path.
+Sonoic already has a real app shell and a full first-pass local Sonos control path.
 
 Implemented so far:
 
 - feature-shaped iPhone app shell with `Home`, `Rooms`, `Queue`, and `Settings`
 - one shared app model, `SonoicModel`
 - typed Sonos domain models for active target, room list, queue, and now playing
-- favorites-first `Home` surface with real Sonos favorites and a best-effort services row
+- favorites-first `Home` surface with real Sonos favorites, collections, recently played items, source summaries, and now-playing context
 - real mini-player and draggable player sheet
-- real local Sonos `play/pause`, `next`, `previous`, `mute`, and seek
+- real local Sonos `play/pause`, `next`, `previous`, `mute`, volume, and seek
 - real now-playing title, artist, album, source, artwork, duration, and progress reads
-- manual-host based real room naming and bonded home theater member details
-- Sonos queue inspection with current-item highlighting and tap-to-play
+- now-playing diagnostics for raw Sonos metadata, transport URI, duration, and elapsed-time behavior
+- manual playback transition smoothing so local progress does not run ahead before Sonos confirms `PLAYING`
+- discovery-backed Sonos room selection through Bonjour and household topology
+- real group awareness for current Sonos groups and group coordinator selection
+- real room naming and bonded home theater member details
+- Sonos queue inspection with current-item highlighting, tap-to-play, clear, remove, and reorder
 - shared external-control snapshot for widgets
 - App Group-backed artwork cache and shared state store
-- manual-host based local Sonos configuration through `Settings`
-- `Rooms` surface for the resolved active room, bonded setup, and manual refresh state
+- manual host fallback through `Settings`
+- `Rooms` surface for the selected room or group, discovered groups, discovered room list, bonded setup, discovery refresh state, and home theater entry point
 - `Settings` focused on manual player setup and diagnostics
 - lightweight foreground polling for playback, metadata, volume, and mute
 - stale-state handling for outside-app state
-- first native Apple now-playing integration work
+- native Apple now-playing integration for playback commands, artwork, progress, and lock-screen scrubbing when duration is available
+- home theater controls for EQ, sub level, speech enhancement, night sound, and TV audio diagnostics
+- Swift Testing target for focused Sonos parser coverage
 
 ## Architecture Guardrails
 
@@ -71,62 +77,71 @@ SonoicApp/
 
 ## Near-Term Priorities
 
-### 1. Finish the native now-playing path cleanly
+### 1. Harden the current Sonos path on real hardware
 
-The project now has a real player surface in the app and a working experimental path into Apple’s native now-playing UI.
+The project now has enough real behavior that the highest-value work is making it boring on actual Sonos households.
 
 The next work here should be careful:
 
-- keep the lock-screen path stable
-- tighten timing and metadata behavior without overfitting hacks
-- keep app-owned playback state understandable
-- remove any temporary scaffolding once the flow is stable
+- verify discovery against multiple households and room names
+- verify queue editing during transitions and grouped playback
+- verify lock-screen scrubbing and progress across services
+- verify home theater controls across products with and without Sub, surrounds, speech enhancement, and night sound
+- keep diagnostics useful without turning them into product clutter
 
-### 2. Make targets and rooms real
+### 2. Expand music sources from Home
 
-The app can already control one manually configured local Sonos player.
-
-The next meaningful expansion is:
-
-- discovery-backed target lists instead of manual-host placeholders
-- real room or group identity beyond the configured manual player
-- eventually discovery, once the added complexity is justified
-
-### 3. Expand the Home music hub and queue actions
-
-The app can now read the active Sonos queue and start playback from saved Sonos favorites on `Home`, which is the right base for the next product step.
+Home now has enough gravity to become the center of Sonoic.
 
 The next meaningful work here is:
 
-- queue actions
-- `Home` recently played
-- `Home` sources
-- interactive services or service destinations
-- groups
-- playlists
+- service destinations from sources
+- playlist browsing and saved playlist playback
+- queue-derived actions from recent plays and favorites
+- clearer collection flows
+- eventually Apple Music, Spotify, and other service-specific integrations
 
-These should stay narrow and useful rather than trying to mirror the entire Sonos app at once.
+### 3. Make Queue a creation surface
 
-### 4. Extend the home theater path
+Queue is now a real control surface. The next step is letting it create useful playback states, not only edit the current one.
 
-Sonoic is also meant to become a practical controller for a Sonos home theater setup.
+The next meaningful work here is:
 
-Later slices should cover:
+- add next / play next flows from favorites and Home
+- save or reuse useful queue states
+- improve empty-queue recovery
+- expose queue actions cleanly without duplicating the player surface
 
-- EQ
-- sub level
-- speech enhancement
-- night sound
-- TV audio diagnostics
+### 4. Deepen outside-app controls
+
+Sonoic can publish native now-playing state, but it is still a remote-control app rather than the audio output owner.
+
+The useful path is:
+
+- keep Lock Screen and Control Center controls reliable
+- add App Intents for common actions
+- consider Control Center controls and widgets for rooms, volume, and favorites
+- preserve clear stale-state behavior whenever Sonos cannot be confirmed
+
+### 5. Polish the home theater path
+
+The first home theater path is real. It should now get product polish and more device verification.
+
+Next slices:
+
+- better capability descriptions for unsupported controls
+- stronger TV audio diagnostics if more HTControl state proves available
+- product-specific tuning for Arc, Beam, Ray, Amp, Sub, and surround setups
+- fast room switching without stale theater state
 
 ## Open Questions
 
 These are real project decisions, but they do not all need to be answered right away.
 
 - How far should the project go with background refresh before the complexity stops being worth it?
-- When is multicast discovery worth the added entitlement and networking complexity?
 - How much of the Apple native now-playing experience can be supported reliably for a remote-control app?
-- How far should the `Rooms` tab go before full discovery and grouping make sense?
+- How far should Sonoic go into service-native browsing before it starts duplicating the Sonos app?
+- Which home theater diagnostics are stable enough to make user-facing rather than diagnostic-only?
 
 ## Working Style
 

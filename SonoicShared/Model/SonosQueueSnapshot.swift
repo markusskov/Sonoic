@@ -75,4 +75,87 @@ struct SonosQueueSnapshot: Equatable {
 
         return "Track \(currentItemIndex + 1) of \(items.count)"
     }
+
+    func removingItems(atOffsets offsets: IndexSet) -> SonosQueueSnapshot {
+        var updatedItems = items
+        let previousCurrentItemID = currentItem?.id
+        let removedCurrentItem = currentItemIndex.map(offsets.contains) ?? false
+        let removedCurrentIndex = currentItemIndex
+
+        for offset in offsets.sorted(by: >) where updatedItems.indices.contains(offset) {
+            updatedItems.remove(at: offset)
+        }
+
+        let nextCurrentItemIndex = resolvedCurrentItemIndex(
+            in: updatedItems,
+            previousCurrentItemID: previousCurrentItemID,
+            removedCurrentItem: removedCurrentItem,
+            removedCurrentIndex: removedCurrentIndex
+        )
+
+        return SonosQueueSnapshot(items: updatedItems, currentItemIndex: nextCurrentItemIndex)
+    }
+
+    func movingItems(fromOffsets source: IndexSet, toOffset destination: Int) -> SonosQueueSnapshot {
+        var updatedItems = items
+        moveItems(in: &updatedItems, fromOffsets: source, toOffset: destination)
+
+        let nextCurrentItemIndex = resolvedCurrentItemIndex(
+            in: updatedItems,
+            previousCurrentItemID: currentItem?.id,
+            removedCurrentItem: false,
+            removedCurrentIndex: currentItemIndex
+        )
+
+        return SonosQueueSnapshot(items: updatedItems, currentItemIndex: nextCurrentItemIndex)
+    }
+
+    private func resolvedCurrentItemIndex(
+        in updatedItems: [SonosQueueItem],
+        previousCurrentItemID: String?,
+        removedCurrentItem: Bool,
+        removedCurrentIndex: Int?
+    ) -> Int? {
+        if let previousCurrentItemID,
+           let movedCurrentIndex = updatedItems.firstIndex(where: { $0.id == previousCurrentItemID })
+        {
+            return movedCurrentIndex
+        }
+
+        guard removedCurrentItem,
+              let removedCurrentIndex,
+              !updatedItems.isEmpty
+        else {
+            return nil
+        }
+
+        return min(removedCurrentIndex, updatedItems.count - 1)
+    }
+
+    private func moveItems(
+        in items: inout [SonosQueueItem],
+        fromOffsets source: IndexSet,
+        toOffset destination: Int
+    ) {
+        let sourceOffsets = source.sorted()
+        guard !sourceOffsets.isEmpty else {
+            return
+        }
+
+        let movedItems = sourceOffsets.compactMap { offset in
+            items.indices.contains(offset) ? items[offset] : nil
+        }
+
+        for offset in sourceOffsets.reversed() where items.indices.contains(offset) {
+            items.remove(at: offset)
+        }
+
+        let removedBeforeDestinationCount = sourceOffsets.reduce(into: 0) { count, offset in
+            if offset < destination {
+                count += 1
+            }
+        }
+        let insertionIndex = max(0, min(destination - removedBeforeDestinationCount, items.count))
+        items.insert(contentsOf: movedItems, at: insertionIndex)
+    }
 }

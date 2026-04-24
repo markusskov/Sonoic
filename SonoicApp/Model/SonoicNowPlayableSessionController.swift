@@ -116,7 +116,7 @@ final class SonoicNowPlayableSessionController: NSObject {
         syncAnchorPlayback(nowPlaying: nowPlaying, observedAt: observedAt)
         updateCommandAvailability(for: nowPlaying)
         updateProgressLoop(activeTargetName: activeTargetName)
-        nowPlayingSession.becomeActiveIfPossible(completion: nil)
+        activateNowPlayingSession()
     }
 
     func clear() {
@@ -347,7 +347,7 @@ final class SonoicNowPlayableSessionController: NSObject {
                     )
                     syncAnchorPlayback(nowPlaying: currentNowPlaying, observedAt: currentObservedAt)
                     updateProgressLoop(activeTargetName: activeTargetName)
-                    nowPlayingSession.becomeActiveIfPossible(completion: nil)
+                    activateNowPlayingSession()
                 }
             case let .failure(error):
                 assertionFailure("Unable to prepare the local playback anchor: \(error)")
@@ -363,6 +363,12 @@ final class SonoicNowPlayableSessionController: NSObject {
             UIApplication.shared.beginReceivingRemoteControlEvents()
         } catch {
             assertionFailure("Unable to configure the audio session for the now playable session: \(error)")
+        }
+    }
+
+    private func activateNowPlayingSession() {
+        Task {
+            _ = await nowPlayingSession.becomeActiveIfPossible()
         }
     }
 

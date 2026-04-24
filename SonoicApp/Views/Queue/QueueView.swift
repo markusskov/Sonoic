@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct QueueView: View {
+    @Environment(\.editMode) private var editMode
     @Environment(SonoicModel.self) private var model
     @State private var isClearQueueConfirmationPresented = false
     private static let autoRefreshInterval: Duration = .seconds(8)
@@ -10,6 +11,13 @@ struct QueueView: View {
         .miniPlayerContentInset()
         .navigationTitle("Queue")
         .toolbar {
+            if canEditQueue {
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                        .disabled(isQueueInteractionDisabled)
+                }
+            }
+
             if model.hasManualSonosHost {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button(role: .destructive) {
@@ -35,7 +43,7 @@ struct QueueView: View {
                             Image(systemName: "arrow.clockwise")
                         }
                     }
-                    .disabled(model.isQueueRefreshing || model.isQueueClearing)
+                    .disabled(isQueueInteractionDisabled || isEditingQueue)
                     .accessibilityLabel("Refresh Queue")
                 }
             }
@@ -53,6 +61,23 @@ struct QueueView: View {
         } message: {
             Text("This removes every item from the active Sonos queue.")
         }
+        .alert(
+            "Couldn't Update Queue",
+            isPresented: Binding(
+                get: {
+                    model.queueOperationErrorDetail != nil
+                },
+                set: { isPresented in
+                    if !isPresented {
+                        model.queueOperationErrorDetail = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.queueOperationErrorDetail ?? "")
+        }
         .task(id: model.queueRefreshContext) {
             await loadQueueForCurrentContext()
         }
@@ -65,12 +90,12 @@ struct QueueView: View {
     private var content: some View {
         if !model.hasManualSonosHost {
             ContentUnavailableView {
-                Label("No Player Connected", systemImage: "speaker.slash.fill")
+                Label("No Room Selected", systemImage: "speaker.slash.fill")
             } description: {
-                Text("Connect a manual Sonos player in Settings before trying to inspect the active queue.")
+                Text("Choose a discovered Sonos room before trying to inspect the active queue.")
             } actions: {
-                Button("Open Settings") {
-                    model.selectedTab = .settings
+                Button("Open Rooms") {
+                    model.selectedTab = .rooms
                 }
             }
         } else {
@@ -110,7 +135,9 @@ struct QueueView: View {
                     QueueSnapshotList(
                         snapshot: snapshot,
                         nowPlaying: model.nowPlaying,
-                        playQueueItem: playQueueItem
+                        playQueueItem: playQueueItem,
+                        deleteQueueItems: deleteQueueItems,
+                        moveQueueItems: moveQueueItems
                     ) {
                         await model.refreshQueue(showLoading: false)
                     }
@@ -128,11 +155,23 @@ struct QueueView: View {
     }
 
     private func playQueueItem(at position: Int) async {
+        guard !isQueueInteractionDisabled else {
+            return
+        }
+
         guard await model.playManualSonosQueueItem(at: position) else {
             return
         }
 
         await model.refreshQueue(showLoading: false)
+    }
+
+    private func deleteQueueItems(_ offsets: IndexSet) async {
+        _ = await model.removeQueueItems(atOffsets: offsets)
+    }
+
+    private func moveQueueItems(_ source: IndexSet, _ destination: Int) async {
+        _ = await model.moveQueueItems(fromOffsets: source, toOffset: destination)
     }
 
     private var queueAutoRefreshLoopKey: String {
@@ -155,6 +194,10 @@ struct QueueView: View {
                 return
             }
 
+            guard !isEditingQueue, !model.isQueueMutating else {
+                continue
+            }
+
             guard model.queueState.snapshot != nil else {
                 continue
             }
@@ -164,9 +207,22 @@ struct QueueView: View {
     }
 
     private var isClearQueueDisabled: Bool {
-        model.isQueueRefreshing
+        isQueueInteractionDisabled
             || model.isQueueClearing
+            || isEditingQueue
             || model.queueState.snapshot?.items.isEmpty == true
+    }
+
+    private var isQueueInteractionDisabled: Bool {
+        model.isQueueRefreshing || model.isQueueClearing || model.isQueueMutating
+    }
+
+    private var canEditQueue: Bool {
+        model.queueState.snapshot?.items.isEmpty == false
+    }
+
+    private var isEditingQueue: Bool {
+        editMode?.wrappedValue.isEditing == true
     }
 }
 

@@ -6,30 +6,34 @@ The app is being built as a local-first Sonos hub rather than a generic music cl
 
 ## Status
 
-Sonoic is still an early work-in-progress, but the core app shell and first real Sonos control path are already in place.
+Sonoic is still an early work-in-progress, but the core Sonos control experience is now real across playback, rooms, queue, Home, and home theater controls.
 
 What works today:
 
 - iPhone app shell with `Home`, `Rooms`, `Queue`, and `Settings`
-- `Home` showing real Sonos favorites plus a best-effort services row
+- `Home` showing real Sonos favorites, collections, recently played items, now-playing context, and a sources row
 - real bottom mini-player and expandable player sheet
-- manual Sonos host configuration for one local player
-- real room naming and bonded home theater member details for the configured manual player
-- `Rooms` tab showing the resolved current room, bonded setup, and lightweight refresh state
-- `Queue` tab showing the active Sonos queue with current-item highlighting and tap-to-play
-- `Settings` focused on manual player configuration and diagnostics
-- real local `play/pause`, `next`, `previous`, `mute`, and seek commands
+- local network discovery for nearby Sonos players
+- room and group selection from discovered household topology
+- real room naming and bonded home theater member details for the selected player
+- `Rooms` tab showing the current room or group, discovered groups, room list, discovery state, and home theater entry point
+- `Queue` tab showing the active Sonos queue with current-item highlighting, tap-to-play, clear, remove, and reorder
+- `Settings` focused on diagnostics and manual connection fallback
+- real local `play/pause`, `next`, `previous`, `mute`, seek, and volume commands
 - real now-playing metadata, artwork, source attribution, and progress reads
+- manual playback transition smoothing so Sonoic waits for Sonos confirmation before advancing app-owned progress
+- shared parser/transport test target for core Sonos parsing behavior
 - widget backed by shared app state
-- first native Apple now-playing integration experiments
+- native Apple now-playing integration with play/pause, next/previous, artwork, progress, and lock-screen scrubbing when Sonos exposes duration
+- home theater controls for EQ, sub level, speech enhancement, night sound, and TV audio diagnostics
 
 What is still in progress:
 
 - stable Lock Screen / Control Center ownership through Apple’s native now-playing surfaces
-- real target and room discovery
-- queue editing, grouping, and playlist flows
-- `Home` expansion beyond favorites into recently played, sources, and deeper music-service integrations
-- home theater controls and diagnostics
+- deeper music-service integrations for Apple Music, Spotify, playlists, and source destinations
+- queue-derived flows from `Home`
+- broader home theater validation across more Sonos products
+- App Intents, shortcuts, and richer outside-app entry points
 
 ## Product Direction
 
@@ -100,15 +104,16 @@ Before running on your own Apple developer account:
    - `SonoicShared/Storage/SonoicSharedStore.swift`
    - `SonoicApp/App/SonoicBackgroundRefresh.swift`
    - `SonoicApp/Info.plist`
-5. Run the app and enter a Sonos player host or IP in `Settings`.
+5. Run the app on a device connected to the same local network as your Sonos household.
+6. Open `Rooms`, allow local-network access, and choose a discovered player or group.
 
 Notes:
 
-- The current real Sonos path is manual-host based. Discovery is not implemented yet.
-- `Home` is now a favorites-first launch surface. `Services` is informative in this slice and does not yet open destinations.
-- The configured manual player can already resolve its real room name and bonded home theater setup in `Rooms`, but it does not yet expose household-wide discovery or grouping.
-- `Queue` can now jump playback to an item, but it does not yet offer reordering or add-to-queue flows from inside Sonoic.
-- `Settings` is currently the manual connection and diagnostics surface rather than the place to browse rooms.
+- Sonoic uses Bonjour discovery first and keeps manual host entry as a fallback in `Settings`.
+- `Home` is now a music hub for favorites, collections, recent plays, sources, and the current session. Service rows are still mostly informational in this slice.
+- `Rooms` can show discovered rooms, current groups, selected target state, bonded home theater setup, and home theater controls.
+- `Queue` can inspect, jump, clear, remove, and reorder the active Sonos queue. Adding new queue items from arbitrary services is still future work.
+- `Settings` is now mostly diagnostics and fallback connection details.
 - The app requests local-network access because Sonos control currently happens over the LAN.
 - Some now-playing behavior on the Lock Screen is still experimental and under active refinement.
 
@@ -119,9 +124,9 @@ The public development roadmap lives in [plan.md](plan.md).
 The short version:
 
 1. finish the native now-playing path cleanly
-2. make room and target handling real instead of sample-backed
-3. expand the favorites-first `Home` surface into a broader music hub
-4. expand into home theater controls and diagnostics
+2. validate discovery, queue, Home, and home theater controls on more real Sonos households
+3. expand music-service destinations and playlist/source flows
+4. add App Intents, shortcuts, and deeper outside-app entry points
 
 ## Open Source Notes
 

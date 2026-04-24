@@ -7,6 +7,29 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 if model.hasManualSonosHost {
+                    HomeNowPlayingCard(
+                        activeTarget: model.activeTarget,
+                        nowPlaying: model.nowPlaying,
+                        queueState: model.queueState,
+                        togglePlayback: togglePlayback,
+                        openRooms: openRooms,
+                        openQueue: openQueue
+                    )
+
+                    if !model.recentPlays.isEmpty {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HomeSectionHeader(
+                                title: "Recently Played",
+                                subtitle: "Fresh listening history from this Sonoic setup."
+                            )
+
+                            HomeRecentlyPlayedSection(
+                                items: model.recentPlays,
+                                playRecentItem: playRecentItem
+                            )
+                        }
+                    }
+
                     HomeSectionHeader(
                         title: "Favorites",
                         subtitle: "Start something quickly from your saved Sonos favorites."
@@ -18,19 +41,33 @@ struct HomeView: View {
                         retryAction: refreshFavorites
                     )
 
-                    if !model.homeServices.isEmpty {
+                    if !model.homeFavoriteCollections.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
                             HomeSectionHeader(
-                                title: "Services",
-                                subtitle: "Truthful shortcuts inferred from what Sonoic can already see."
+                                title: "Playlists & Stations",
+                                subtitle: "Collection-style Sonos favorites ready for this room."
                             )
 
-                            HomeServicesSection(services: model.homeServices)
+                            HomeCollectionsSection(
+                                collections: model.homeFavoriteCollections,
+                                playFavorite: playFavorite
+                            )
+                        }
+                    }
+
+                    if !model.homeSourceSummaries.isEmpty {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HomeSectionHeader(
+                                title: "Sources",
+                                subtitle: "Services currently visible through favorites, history, and now playing."
+                            )
+
+                            HomeServicesSection(summaries: model.homeSourceSummaries)
                         }
                     }
                 } else {
                     HomeSetupCard {
-                        model.selectedTab = .settings
+                        openRooms()
                     }
                 }
             }
@@ -43,12 +80,19 @@ struct HomeView: View {
                 return
             }
 
-            await refreshFavorites()
+            await refreshHome()
         }
         .task(id: model.manualSonosHost) {
             await model.loadHomeFavoritesIfNeeded()
+            await model.refreshQueue(showLoading: false)
         }
         .navigationTitle("Sonoic")
+    }
+
+    private func refreshHome() async {
+        await model.refreshManualSonosPlayerState(forceRoomRefresh: false)
+        await refreshFavorites()
+        await model.refreshQueue(showLoading: false)
     }
 
     private func refreshFavorites() async {
@@ -58,22 +102,38 @@ struct HomeView: View {
     private func playFavorite(_ favorite: SonosFavoriteItem) async {
         _ = await model.playManualSonosFavorite(favorite)
     }
+
+    private func playRecentItem(_ recentItem: SonoicRecentPlayItem) async {
+        _ = await model.playRecentItem(recentItem)
+    }
+
+    private func togglePlayback() async {
+        await model.toggleManualSonosPlayback()
+    }
+
+    private func openRooms() {
+        model.selectedTab = .rooms
+    }
+
+    private func openQueue() {
+        model.selectedTab = .queue
+    }
 }
 
 private struct HomeSetupCard: View {
-    let openSettings: () -> Void
+    let openRooms: () -> Void
 
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 14) {
-                Label("Connect a Player", systemImage: "speaker.wave.2.circle")
+                Label("Choose a Room", systemImage: "speaker.wave.2.circle")
                     .font(.headline)
 
-                Text("Add a manual Sonos player in Settings to load favorites, services, rooms, and playback controls.")
+                Text("Pick one of your discovered Sonos rooms to load favorites, services, and playback controls.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Button("Open Settings", systemImage: "slider.horizontal.3", action: openSettings)
+                Button("Open Rooms", systemImage: "speaker.wave.3", action: openRooms)
                     .buttonStyle(.borderedProminent)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

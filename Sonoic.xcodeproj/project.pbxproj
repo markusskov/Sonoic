@@ -20,6 +20,13 @@
 			remoteGlobalIDString = 5093741D2F8903DC0029EF88;
 			remoteInfo = SonoicWidgetsExtension;
 		};
+		60AF4D3C2F8D6CB000C3E321 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 509373FE2F8902BC0029EF88 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 509374052F8902BC0029EF88;
+			remoteInfo = Sonoic;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -42,6 +49,7 @@
 		509374202F8903DC0029EF88 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		509374222F8903DC0029EF88 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		5093743C2F89055E0029EF88 /* SonoicWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SonoicWidgetsExtension.entitlements; sourceTree = "<group>"; };
+		60AF4D392F8D6CB000C3E321 /* SonoicTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SonoicTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -56,8 +64,23 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				Views/AGENTS.md,
 			);
 			target = 509374052F8902BC0029EF88 /* Sonoic */;
+		};
+		60AF4D382F8D6CB000C3E321 /* Exceptions for "SonoicShared" folder in "Sonoic" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Sonos/AGENTS.md,
+			);
+			target = 509374052F8902BC0029EF88 /* Sonoic */;
+		};
+		60AF4D452F8D6CB000C3E321 /* Exceptions for "SonoicShared" folder in "SonoicWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Sonos/AGENTS.md,
+			);
+			target = 5093741D2F8903DC0029EF88 /* SonoicWidgetsExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -80,7 +103,16 @@
 		};
 		60AF4D362F8D6CB000C3E321 /* SonoicShared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				60AF4D382F8D6CB000C3E321 /* Exceptions for "SonoicShared" folder in "Sonoic" target */,
+				60AF4D452F8D6CB000C3E321 /* Exceptions for "SonoicShared" folder in "SonoicWidgetsExtension" target */,
+			);
 			path = SonoicShared;
+			sourceTree = "<group>";
+		};
+		60AF4D3A2F8D6CB000C3E321 /* SonoicTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SonoicTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -102,6 +134,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		60AF4D3B2F8D6CB000C3E321 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -111,6 +150,7 @@
 				5093743C2F89055E0029EF88 /* SonoicWidgetsExtension.entitlements */,
 				509374082F8902BC0029EF88 /* SonoicApp */,
 				60AF4D362F8D6CB000C3E321 /* SonoicShared */,
+				60AF4D3A2F8D6CB000C3E321 /* SonoicTests */,
 				509374242F8903DC0029EF88 /* SonoicWidgets */,
 				5093741F2F8903DC0029EF88 /* Frameworks */,
 				509374072F8902BC0029EF88 /* Products */,
@@ -122,6 +162,7 @@
 			children = (
 				509374062F8902BC0029EF88 /* Sonoic.app */,
 				5093741E2F8903DC0029EF88 /* SonoicWidgetsExtension.appex */,
+				60AF4D392F8D6CB000C3E321 /* SonoicTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -186,6 +227,29 @@
 			productReference = 5093741E2F8903DC0029EF88 /* SonoicWidgetsExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		60AF4D3D2F8D6CB000C3E321 /* SonoicTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 60AF4D442F8D6CB000C3E321 /* Build configuration list for PBXNativeTarget "SonoicTests" */;
+			buildPhases = (
+				60AF4D3F2F8D6CB000C3E321 /* Sources */,
+				60AF4D3B2F8D6CB000C3E321 /* Frameworks */,
+				60AF4D402F8D6CB000C3E321 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				60AF4D3E2F8D6CB000C3E321 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				60AF4D3A2F8D6CB000C3E321 /* SonoicTests */,
+			);
+			name = SonoicTests;
+			packageProductDependencies = (
+			);
+			productName = SonoicTests;
+			productReference = 60AF4D392F8D6CB000C3E321 /* SonoicTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -201,6 +265,10 @@
 					};
 					5093741D2F8903DC0029EF88 = {
 						CreatedOnToolsVersion = 26.4;
+					};
+					60AF4D3D2F8D6CB000C3E321 = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = 509374052F8902BC0029EF88;
 					};
 				};
 			};
@@ -220,6 +288,7 @@
 			targets = (
 				509374052F8902BC0029EF88 /* Sonoic */,
 				5093741D2F8903DC0029EF88 /* SonoicWidgetsExtension */,
+				60AF4D3D2F8D6CB000C3E321 /* SonoicTests */,
 			);
 		};
 /* End PBXProject section */
@@ -233,6 +302,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5093741C2F8903DC0029EF88 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		60AF4D402F8D6CB000C3E321 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -256,6 +332,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		60AF4D3F2F8D6CB000C3E321 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -263,6 +346,11 @@
 			isa = PBXTargetDependency;
 			target = 5093741D2F8903DC0029EF88 /* SonoicWidgetsExtension */;
 			targetProxy = 509374322F8903DE0029EF88 /* PBXContainerItemProxy */;
+		};
+		60AF4D3E2F8D6CB000C3E321 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 509374052F8902BC0029EF88 /* Sonoic */;
+			targetProxy = 60AF4D3C2F8D6CB000C3E321 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -512,6 +600,60 @@
 			};
 			name = Release;
 		};
+		60AF4D422F8D6CB000C3E321 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N2M33U7L7U;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markusskov.SonoicTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.3;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sonoic.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Sonoic";
+				TEST_TARGET_NAME = Sonoic;
+			};
+			name = Debug;
+		};
+		60AF4D432F8D6CB000C3E321 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N2M33U7L7U;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markusskov.SonoicTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.3;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sonoic.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Sonoic";
+				TEST_TARGET_NAME = Sonoic;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -538,6 +680,15 @@
 			buildConfigurations = (
 				509374372F8903DE0029EF88 /* Debug */,
 				509374382F8903DE0029EF88 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		60AF4D442F8D6CB000C3E321 /* Build configuration list for PBXNativeTarget "SonoicTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				60AF4D422F8D6CB000C3E321 /* Debug */,
+				60AF4D432F8D6CB000C3E321 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

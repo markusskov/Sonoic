@@ -1,6 +1,11 @@
 import Foundation
 
 struct SonosNowPlayingClient {
+    struct SnapshotResult {
+        let snapshot: SonosNowPlayingSnapshot
+        let diagnostics: SonosNowPlayingDiagnostics
+    }
+
     private let transport: SonosControlTransport
     private let sourceNameResolver = SonosSourceNameResolver()
     private let titleResolver = SonosNowPlayingTitleResolver()
@@ -25,7 +30,7 @@ struct SonosNowPlayingClient {
         host: String,
         playbackState: SonosNowPlayingSnapshot.PlaybackState,
         fallback: SonosNowPlayingSnapshot
-    ) async -> SonosNowPlayingSnapshot {
+    ) async -> SnapshotResult {
         async let positionInfo = fetchPositionInfo(host: host)
         async let mediaInfo = fetchMediaInfo(host: host)
 
@@ -38,18 +43,30 @@ struct SonosNowPlayingClient {
         let hasRealMetadataContext = trackMetadata?.isEmpty == false
             || sourceMetadata?.isEmpty == false
             || currentURI != nil
+        let diagnostics = SonosNowPlayingDiagnostics(
+            currentURI: resolvedMediaInfo?.currentURI.sonoicNonEmptyTrimmed,
+            trackURI: resolvedPositionInfo?.trackURI.sonoicNonEmptyTrimmed,
+            rawDuration: resolvedPositionInfo?.trackDuration.sonoicNonEmptyTrimmed,
+            rawElapsedTime: resolvedPositionInfo?.relativeTime.sonoicNonEmptyTrimmed,
+            hasTrackMetadata: trackMetadata?.isEmpty == false,
+            hasSourceMetadata: sourceMetadata?.isEmpty == false,
+            usedFallbackSnapshot: !hasRealMetadataContext
+        )
 
         guard hasRealMetadataContext else {
-            return SonosNowPlayingSnapshot(
-                title: fallback.title,
-                artistName: fallback.artistName,
-                albumTitle: fallback.albumTitle,
-                sourceName: fallback.sourceName,
-                playbackState: playbackState,
-                artworkURL: fallback.artworkURL,
-                artworkIdentifier: fallback.artworkIdentifier,
-                elapsedTime: fallback.elapsedTime,
-                duration: fallback.duration
+            return SnapshotResult(
+                snapshot: SonosNowPlayingSnapshot(
+                    title: fallback.title,
+                    artistName: fallback.artistName,
+                    albumTitle: fallback.albumTitle,
+                    sourceName: fallback.sourceName,
+                    playbackState: playbackState,
+                    artworkURL: fallback.artworkURL,
+                    artworkIdentifier: fallback.artworkIdentifier,
+                    elapsedTime: fallback.elapsedTime,
+                    duration: fallback.duration
+                ),
+                diagnostics: diagnostics
             )
         }
 
@@ -77,7 +94,10 @@ struct SonosNowPlayingClient {
             duration: SonosDurationParser.parseTimeInterval(from: resolvedPositionInfo?.trackDuration)
         )
 
-        return snapshotPreservingRecentMetadata(nextSnapshot, fallback: fallback)
+        return SnapshotResult(
+            snapshot: snapshotPreservingRecentMetadata(nextSnapshot, fallback: fallback),
+            diagnostics: diagnostics
+        )
     }
 
     private func fetchPositionInfo(host: String) async throws -> PositionInfo {

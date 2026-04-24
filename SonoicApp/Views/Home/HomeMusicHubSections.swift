@@ -17,6 +17,100 @@ struct HomeSectionHeader: View {
     }
 }
 
+struct HomeNowPlayingCard: View {
+    let activeTarget: SonosActiveTarget
+    let nowPlaying: SonosNowPlayingSnapshot
+    let queueState: SonosQueueState
+    let togglePlayback: () async -> Void
+    let openRooms: () -> Void
+    let openQueue: () -> Void
+
+    private var queueSummary: String {
+        switch queueState {
+        case .idle, .loading:
+            return "Queue loading"
+        case .unavailable:
+            return "No active queue"
+        case .failed:
+            return "Queue needs refresh"
+        case let .loaded(snapshot):
+            return snapshot.currentPositionText ?? snapshot.itemCountText
+        }
+    }
+
+    var body: some View {
+        RoomSurfaceCard {
+            HStack(alignment: .top, spacing: 16) {
+                PlayerArtworkView(
+                    artworkIdentifier: nowPlaying.artworkIdentifier,
+                    reloadKey: nowPlaying.artworkIdentifier ?? nowPlaying.artworkURL ?? nowPlaying.title,
+                    cornerRadius: 22,
+                    maximumDisplayDimension: 92
+                )
+                .frame(width: 92, height: 92)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Label(activeTarget.name, systemImage: activeTarget.kind.systemImage)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 0)
+                    }
+
+                    Text(nowPlaying.title)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+
+                    Text(nowPlaying.subtitle ?? nowPlaying.sourceName)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
+                    Text(queueSummary)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    nowPlayingControls
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    nowPlayingControls
+                }
+            }
+            .controlSize(.small)
+        }
+    }
+
+    @ViewBuilder
+    private var nowPlayingControls: some View {
+        Button {
+            Task {
+                await togglePlayback()
+            }
+        } label: {
+            Label(nowPlaying.playbackState.controlTitle, systemImage: nowPlaying.playbackState.controlSystemImage)
+        }
+        .buttonStyle(.borderedProminent)
+
+        Button(action: openQueue) {
+            Label("Queue", systemImage: "list.triangle")
+        }
+        .buttonStyle(.bordered)
+
+        Button(action: openRooms) {
+            Label(activeTarget.kind.title, systemImage: activeTarget.kind.systemImage)
+        }
+        .buttonStyle(.bordered)
+    }
+}
+
 struct HomeFavoritesSection: View {
     let state: SonosFavoritesState
     let playFavorite: (SonosFavoriteItem) async -> Void
@@ -63,15 +157,53 @@ struct HomeFavoritesSection: View {
     }
 }
 
+struct HomeRecentlyPlayedSection: View {
+    let items: [SonoicRecentPlayItem]
+    let playRecentItem: (SonoicRecentPlayItem) async -> Void
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 16) {
+                ForEach(items) { item in
+                    HomeRecentPlayCard(item: item) {
+                        await playRecentItem(item)
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+struct HomeCollectionsSection: View {
+    let collections: [SonosFavoriteItem]
+    let playFavorite: (SonosFavoriteItem) async -> Void
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 16) {
+                ForEach(collections) { collection in
+                    HomeFavoriteCard(favorite: collection) {
+                        await playFavorite(collection)
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
 struct HomeServicesSection: View {
-    let services: [SonosServiceDescriptor]
+    let summaries: [SonoicHomeSourceSummary]
 
     var body: some View {
         ScrollView(.horizontal) {
             GlassEffectContainer(spacing: 12) {
                 HStack(spacing: 12) {
-                    ForEach(services) { service in
-                        HomeServiceChip(service: service)
+                    ForEach(summaries) { summary in
+                        HomeServiceChip(summary: summary)
                     }
                 }
                 .padding(.vertical, 2)
@@ -92,7 +224,11 @@ private struct HomeFavoriteCard: View {
             }
         } label: {
             VStack(alignment: .leading, spacing: 12) {
-                HomeFavoriteArtworkView(artworkURL: favorite.artworkURL)
+                HomeFavoriteArtworkView(
+                    artworkURL: favorite.artworkURL,
+                    artworkIdentifier: nil,
+                    maximumDisplayDimension: 178
+                )
                     .frame(width: 178, height: 178)
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -121,38 +257,111 @@ private struct HomeFavoriteCard: View {
     }
 }
 
-private struct HomeFavoriteArtworkView: View {
-    let artworkURL: String?
+private struct HomeRecentPlayCard: View {
+    let item: SonoicRecentPlayItem
+    let playAction: () async -> Void
 
     var body: some View {
-        AsyncImage(url: artworkURL.flatMap(URL.init(string:))) { phase in
-            switch phase {
-            case let .success(image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            case .empty, .failure:
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [.orange.opacity(0.85), .pink.opacity(0.7), .indigo.opacity(0.85)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 42, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.92))
+        Group {
+            if item.canReplay {
+                Button {
+                    Task {
+                        await playAction()
                     }
-            @unknown default:
-                Color.secondary.opacity(0.12)
+                } label: {
+                    cardContent
+                }
+                .buttonStyle(.plain)
+            } else {
+                cardContent
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .strokeBorder(.white.opacity(0.08))
+        .frame(width: 156, alignment: .leading)
+    }
+
+    private var cardContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ZStack(alignment: .bottomTrailing) {
+                HomeFavoriteArtworkView(
+                    artworkURL: item.artworkURL,
+                    artworkIdentifier: item.artworkIdentifier,
+                    maximumDisplayDimension: 156
+                )
+                    .frame(width: 156, height: 156)
+
+                if item.canReplay {
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 30, height: 30)
+                        .glassEffect(.regular, in: Circle())
+                        .padding(8)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(item.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                Text(item.subtitle ?? item.sourceName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                Label(item.sourceName, systemImage: item.service?.systemImage ?? "music.note")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+}
+
+private struct HomeFavoriteArtworkView: View {
+    let artworkURL: String?
+    let artworkIdentifier: String?
+    let maximumDisplayDimension: CGFloat
+
+    var body: some View {
+        if let artworkIdentifier {
+            PlayerArtworkView(
+                artworkIdentifier: artworkIdentifier,
+                reloadKey: artworkIdentifier,
+                cornerRadius: 26,
+                maximumDisplayDimension: maximumDisplayDimension
+            )
+        } else {
+            AsyncImage(url: artworkURL.flatMap(URL.init(string:))) { phase in
+                switch phase {
+                case let .success(image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .empty, .failure:
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [.orange.opacity(0.85), .pink.opacity(0.7), .indigo.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay {
+                            Image(systemName: "music.note")
+                                .font(.system(size: 42, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.92))
+                        }
+                @unknown default:
+                    Color.secondary.opacity(0.12)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .strokeBorder(.white.opacity(0.08))
+            }
         }
     }
 }
@@ -178,23 +387,42 @@ private struct HomeFavoriteLoadingCard: View {
 }
 
 private struct HomeServiceChip: View {
-    let service: SonosServiceDescriptor
+    let summary: SonoicHomeSourceSummary
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: service.systemImage)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 38, height: 38)
-                .glassEffect(.regular, in: Circle())
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: summary.service.systemImage)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 38, height: 38)
+                    .glassEffect(.regular, in: Circle())
 
-            Text(service.name)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(summary.service.name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        if summary.isCurrent {
+                            Image(systemName: "speaker.wave.2.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(summary.detailText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .glassEffect(.regular, in: Capsule())
+        .frame(width: 220, alignment: .leading)
+        .glassEffect(.regular, in: .rect(cornerRadius: 18))
     }
 }
 
