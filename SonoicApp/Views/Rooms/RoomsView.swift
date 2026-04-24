@@ -19,7 +19,12 @@ struct RoomsView: View {
                 refreshRoomState: refreshRoomState,
                 refreshDiscovery: refreshDiscovery,
                 selectRoom: selectRoom,
-                selectGroup: selectGroup
+                selectGroup: selectGroup,
+                refreshGroupControl: refreshGroupControl,
+                addRoomToGroup: addRoomToGroup,
+                removeRoomFromGroup: removeRoomFromGroup,
+                setRoomVolume: setRoomVolume,
+                toggleRoomMute: toggleRoomMute
             )
         }
         .miniPlayerContentInset()
@@ -29,6 +34,26 @@ struct RoomsView: View {
         }
         .task(id: model.manualSonosHost) {
             await loadRoomStateIfNeeded()
+        }
+        .task(id: groupControlRefreshContext) {
+            await refreshGroupControl()
+        }
+        .alert(
+            "Couldn't Update Group",
+            isPresented: Binding(
+                get: {
+                    model.groupControlErrorDetail != nil
+                },
+                set: { isPresented in
+                    if !isPresented {
+                        model.groupControlErrorDetail = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.groupControlErrorDetail ?? "")
         }
         .navigationTitle("Rooms")
     }

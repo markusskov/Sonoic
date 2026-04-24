@@ -45,6 +45,7 @@ final class SonoicModel {
     @ObservationIgnored let deviceInfoClient: SonosDeviceInfoClient
     @ObservationIgnored let zoneGroupTopologyClient: SonosZoneGroupTopologyClient
     @ObservationIgnored let renderingControlClient: SonosRenderingControlClient
+    @ObservationIgnored let groupRenderingControlClient: SonosGroupRenderingControlClient
     @ObservationIgnored let htControlClient: SonosHTControlClient
     @ObservationIgnored let avTransportClient: SonosAVTransportClient
     @ObservationIgnored let nowPlayingClient: SonosNowPlayingClient
@@ -69,8 +70,10 @@ final class SonoicModel {
             isHomeTheaterRefreshing = false
             isHomeTheaterMutating = false
             queueOperationErrorDetail = nil
+            groupControlErrorDetail = nil
             homeTheaterOperationErrorDetail = nil
             nowPlayingDiagnostics = .empty
+            roomVolumes = [:]
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
@@ -88,10 +91,15 @@ final class SonoicModel {
     var isQueueRefreshing = false
     var isQueueClearing = false
     var isQueueMutating = false
+    var isGroupControlRefreshing = false
+    var groupControlMutatingPlayerID: String?
+    var roomVolumeMutatingPlayerID: String?
     var isHomeTheaterRefreshing = false
     var isHomeTheaterMutating = false
     var queueOperationErrorDetail: String?
+    var groupControlErrorDetail: String?
     var homeTheaterOperationErrorDetail: String?
+    var roomVolumes: [String: SonoicExternalControlState.Volume] = [:]
     var discoveredBonjourServices: [SonosBonjourBrowser.Service] = []
     var discoveredPlayers: [SonosDiscoveredPlayer] = []
     var discoveredGroups: [SonosDiscoveredGroup] = []
@@ -102,6 +110,14 @@ final class SonoicModel {
 
     var activeTarget = SonoicModel.unconfiguredTarget {
         didSet {
+            if oldValue != activeTarget {
+                queueState = .idle
+                queueOperationErrorDetail = nil
+                isQueueRefreshing = false
+                isQueueClearing = false
+                isQueueMutating = false
+            }
+
             persistSharedExternalControlState()
         }
     }
@@ -189,6 +205,7 @@ final class SonoicModel {
         deviceInfoClient = SonosDeviceInfoClient(transport: sonosControlTransport)
         zoneGroupTopologyClient = SonosZoneGroupTopologyClient(transport: sonosControlTransport)
         renderingControlClient = SonosRenderingControlClient(transport: sonosControlTransport)
+        groupRenderingControlClient = SonosGroupRenderingControlClient(transport: sonosControlTransport)
         htControlClient = SonosHTControlClient(transport: sonosControlTransport)
         avTransportClient = SonosAVTransportClient(transport: sonosControlTransport)
         nowPlayingClient = SonosNowPlayingClient(transport: sonosControlTransport)

@@ -71,7 +71,7 @@ extension SonoicModel {
 
         do {
             let wasAwaitingConfirmation = isManualPlayTransitionAwaitingConfirmation
-            async let refreshedVolume = renderingControlClient.fetchVolume(host: manualSonosHost)
+            async let refreshedVolume = fetchExternalVolumeForActiveTarget()
             async let refreshedPlaybackState = avTransportClient.fetchPlaybackState(host: manualSonosHost)
             let rawPlaybackState = try await refreshedPlaybackState
             let playbackState = resolvedPlaybackState(rawPlaybackState)
@@ -153,5 +153,18 @@ extension SonoicModel {
                 preferredIdentifier: preferredIdentifier
             )
         }.value
+    }
+
+    private func fetchExternalVolumeForActiveTarget() async throws -> SonoicExternalControlState.Volume {
+        guard activeTarget.kind == .group else {
+            return try await renderingControlClient.fetchVolume(host: manualSonosHost)
+        }
+
+        do {
+            let groupHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+            return try await groupRenderingControlClient.fetchVolume(host: groupHost)
+        } catch {
+            return try await renderingControlClient.fetchVolume(host: manualSonosHost)
+        }
     }
 }

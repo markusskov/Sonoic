@@ -8,6 +8,7 @@ struct SonosControlTransport {
 
     enum Service {
         case renderingControl
+        case groupRenderingControl
         case avTransport
         case contentDirectory
         case zoneGroupTopology
@@ -17,6 +18,8 @@ struct SonosControlTransport {
             switch self {
             case .renderingControl:
                 "urn:schemas-upnp-org:service:RenderingControl:1"
+            case .groupRenderingControl:
+                "urn:schemas-upnp-org:service:GroupRenderingControl:1"
             case .avTransport:
                 "urn:schemas-upnp-org:service:AVTransport:1"
             case .contentDirectory:
@@ -32,6 +35,8 @@ struct SonosControlTransport {
             switch self {
             case .renderingControl:
                 "/MediaRenderer/RenderingControl/Control"
+            case .groupRenderingControl:
+                "/MediaRenderer/GroupRenderingControl/Control"
             case .avTransport:
                 "/MediaRenderer/AVTransport/Control"
             case .contentDirectory:

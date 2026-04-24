@@ -128,7 +128,13 @@ extension SonoicModel {
         manualHostRefreshStatus = .refreshing
 
         do {
-            try await renderingControlClient.setMute(host: manualSonosHost, isMuted: desiredMute)
+            if activeTarget.kind == .group {
+                let groupHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+                try await groupRenderingControlClient.setMute(host: groupHost, isMuted: desiredMute)
+            } else {
+                try await renderingControlClient.setMute(host: manualSonosHost, isMuted: desiredMute)
+            }
+
             externalVolume.isMuted = desiredMute
             manualHostRefreshStatus = .updated(.now)
             startManualHostRefreshLoopIfPossible()
@@ -164,7 +170,13 @@ extension SonoicModel {
             manualHostRefreshStatus = .refreshing
 
             do {
-                try await renderingControlClient.setVolume(host: manualSonosHost, level: nextLevel)
+                if activeTarget.kind == .group {
+                    let groupHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+                    try await groupRenderingControlClient.setVolume(host: groupHost, level: nextLevel)
+                } else {
+                    try await renderingControlClient.setVolume(host: manualSonosHost, level: nextLevel)
+                }
+
                 manualHostRefreshStatus = .updated(.now)
                 latestRequestSucceeded = true
             } catch {

@@ -76,6 +76,11 @@ extension SonoicModel {
         scheduleDiscoveredPlayersRefresh()
     }
 
+    func refreshSonosDiscoveryNow() async {
+        discoveryErrorDetail = nil
+        await refreshDiscoveredPlayers(from: discoveredBonjourServices)
+    }
+
     func selectDiscoveredPlayer(_ player: SonosDiscoveredPlayer) async {
         guard selectingDiscoveredPlayerID != player.id else {
             return
@@ -86,10 +91,16 @@ extension SonoicModel {
             selectingDiscoveredPlayerID = nil
         }
 
-        if manualSonosHost != player.host {
-            manualSonosHost = player.host
-        } else if activeTarget != player.activeTargetPlaceholder {
-            activeTarget = player.activeTargetPlaceholder
+        let playerGroup = player.groupID.flatMap { groupID in
+            discoveredGroups.first { $0.id == groupID }
+        }
+        let nextHost = playerGroup?.coordinatorHost ?? player.host
+        let nextTarget = playerGroup?.activeTargetPlaceholder ?? player.activeTargetPlaceholder
+
+        if manualSonosHost != nextHost {
+            manualSonosHost = nextHost
+        } else if activeTarget != nextTarget {
+            activeTarget = nextTarget
         }
 
         await refreshManualSonosPlayerState()
