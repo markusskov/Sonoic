@@ -42,28 +42,63 @@ extension SonoicModel {
 
     @discardableResult
     private func applyManualHostTopologyIfNeeded(_ topology: SonosZoneGroupTopology, host: String) -> Bool {
-        guard let matchedMember = topology.member(matchingTargetID: activeTarget.id, host: host) else {
+        guard let matchedContext = topology.matchedGroupContext(targetID: activeTarget.id, host: host) else {
             return false
         }
 
+        let matchedGroup = matchedContext.group
+        let matchedMember = matchedContext.member
         resolvedManualHostTopologyHost = host
 
-        let setupMemberNames = setupMemberNames(
-            primaryMemberName: matchedMember.name,
-            satellites: matchedMember.satellites
-        )
-        let bondedAccessories = bondedAccessories(from: matchedMember.satellites)
-
-        var nextTarget = activeTarget
-        nextTarget.name = matchedMember.name
-        nextTarget.memberNames = setupMemberNames
-        nextTarget.bondedAccessories = bondedAccessories
+        let nextTarget: SonosActiveTarget
+        if matchedGroup.members.count > 1 {
+            nextTarget = groupedActiveTarget(from: matchedGroup)
+        } else {
+            nextTarget = roomActiveTarget(from: matchedMember)
+        }
 
         if nextTarget != activeTarget {
             activeTarget = nextTarget
         }
 
         return true
+    }
+
+    private func groupedActiveTarget(from group: SonosZoneGroupTopology.Group) -> SonosActiveTarget {
+        let groupedRoomNames = group.members.compactMap { member in
+            member.name.sonoicNonEmptyTrimmed
+        }
+        let coordinatorName = group.members.first(where: { $0.id == group.coordinatorID })?.name ?? ""
+
+        return SonosActiveTarget(
+            id: group.id,
+            name: SonosDiscoveredGroup.displayName(for: groupedRoomNames),
+            householdName: coordinatorName,
+            kind: .group,
+            memberNames: groupedRoomNames
+        )
+    }
+
+    private func roomActiveTarget(from member: SonosZoneGroupTopology.Member) -> SonosActiveTarget {
+        let roomID = member.id
+        let setupMemberNames = setupMemberNames(
+            primaryMemberName: member.name,
+            satellites: member.satellites
+        )
+        let bondedAccessories = bondedAccessories(
+            from: member.satellites,
+            owningTargetID: roomID
+        )
+        let roomDetail = selectedDiscoveredPlayer?.modelName ?? activeTarget.householdName
+
+        return SonosActiveTarget(
+            id: roomID,
+            name: member.name,
+            householdName: roomDetail,
+            kind: .room,
+            memberNames: setupMemberNames,
+            bondedAccessories: bondedAccessories
+        )
     }
 
     private func setupMemberNames(
@@ -84,7 +119,8 @@ extension SonoicModel {
     }
 
     private func bondedAccessories(
-        from satellites: [SonosZoneGroupTopology.Satellite]
+        from satellites: [SonosZoneGroupTopology.Satellite],
+        owningTargetID: String
     ) -> [SonosActiveTarget.BondedAccessory] {
         let nonSubwooferCount = satellites.reduce(into: 0) { count, satellite in
             if !satellite.name.localizedCaseInsensitiveContains("sub") {
@@ -107,7 +143,7 @@ extension SonoicModel {
             seenSatelliteIDs.insert(satellite.id)
             accessories.append(
                 SonosActiveTarget.BondedAccessory(
-                    id: "\(activeTarget.id):satellite:\(satellite.id)",
+                    id: "\(owningTargetID):satellite:\(satellite.id)",
                     name: trimmedName,
                     role: bondedAccessoryRole(
                         for: satellite,

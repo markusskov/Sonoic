@@ -11,6 +11,7 @@ struct SonosControlTransport {
         case avTransport
         case contentDirectory
         case zoneGroupTopology
+        case htControl
 
         nonisolated var soapNamespace: String {
             switch self {
@@ -22,6 +23,8 @@ struct SonosControlTransport {
                 "urn:schemas-upnp-org:service:ContentDirectory:1"
             case .zoneGroupTopology:
                 "urn:schemas-upnp-org:service:ZoneGroupTopology:1"
+            case .htControl:
+                "urn:schemas-upnp-org:service:HTControl:1"
             }
         }
 
@@ -35,6 +38,8 @@ struct SonosControlTransport {
                 "/MediaServer/ContentDirectory/Control"
             case .zoneGroupTopology:
                 "/ZoneGroupTopology/Control"
+            case .htControl:
+                "/HTControl/Control"
             }
         }
     }

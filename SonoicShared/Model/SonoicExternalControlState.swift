@@ -174,7 +174,7 @@ extension SonoicExternalControlState {
             title: "No Player Connected",
             artistName: nil,
             subtitle: nil,
-            sourceName: "Open Settings to connect a player",
+            sourceName: "Open Rooms to choose a player",
             artworkIdentifier: nil
         ),
         playbackState: .paused,

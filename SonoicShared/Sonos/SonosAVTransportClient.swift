@@ -183,6 +183,50 @@ struct SonosAVTransportClient {
         )
     }
 
+    func removeTrackRangeFromQueue(
+        host: String,
+        startingIndex: Int,
+        numberOfTracks: Int,
+        updateID: Int = 0
+    ) async throws {
+        _ = try await transport.performAction(
+            service: .avTransport,
+            named: "RemoveTrackRangeFromQueue",
+            body: """
+            <u:RemoveTrackRangeFromQueue xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+              <UpdateID>\(updateID)</UpdateID>
+              <StartingIndex>\(startingIndex)</StartingIndex>
+              <NumberOfTracks>\(numberOfTracks)</NumberOfTracks>
+            </u:RemoveTrackRangeFromQueue>
+            """,
+            host: host
+        )
+    }
+
+    func reorderTracksInQueue(
+        host: String,
+        startingIndex: Int,
+        numberOfTracks: Int,
+        insertBefore: Int,
+        updateID: Int = 0
+    ) async throws {
+        _ = try await transport.performAction(
+            service: .avTransport,
+            named: "ReorderTracksInQueue",
+            body: """
+            <u:ReorderTracksInQueue xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+              <StartingIndex>\(startingIndex)</StartingIndex>
+              <NumberOfTracks>\(numberOfTracks)</NumberOfTracks>
+              <InsertBefore>\(insertBefore)</InsertBefore>
+              <UpdateID>\(updateID)</UpdateID>
+            </u:ReorderTracksInQueue>
+            """,
+            host: host
+        )
+    }
+
     private func formattedSeekTarget(for timeInterval: TimeInterval) -> String {
         let totalSeconds = max(0, Int(timeInterval.rounded()))
         let hours = totalSeconds / 3600

@@ -1,9 +1,13 @@
 import SwiftUI
 
 struct QueueSnapshotList: View {
+    @Environment(\.editMode) private var editMode
+
     let snapshot: SonosQueueSnapshot
     let nowPlaying: SonosNowPlayingSnapshot
     let playQueueItem: (Int) async -> Void
+    let deleteQueueItems: (IndexSet) async -> Void
+    let moveQueueItems: (IndexSet, Int) async -> Void
     let refreshAction: () async -> Void
 
     private var currentTitle: String {
@@ -51,8 +55,19 @@ struct QueueSnapshotList: View {
                         position: index + 1,
                         item: item,
                         isCurrent: snapshot.currentItemIndex == index,
+                        isEditing: isEditing,
                         playAction: playQueueItem
                     )
+                }
+                .onDelete { offsets in
+                    Task {
+                        await deleteQueueItems(offsets)
+                    }
+                }
+                .onMove { source, destination in
+                    Task {
+                        await moveQueueItems(source, destination)
+                    }
                 }
             }
         }
@@ -61,61 +76,76 @@ struct QueueSnapshotList: View {
             await refreshAction()
         }
     }
+
+    private var isEditing: Bool {
+        editMode?.wrappedValue.isEditing == true
+    }
 }
 
 private struct QueueItemRow: View {
     let position: Int
     let item: SonosQueueItem
     let isCurrent: Bool
+    let isEditing: Bool
     let playAction: (Int) async -> Void
 
     var body: some View {
-        Button {
-            Task {
-                await playAction(position)
-            }
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Text("\(position)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(item.title)
-                            .font(.body.weight(isCurrent ? .semibold : .regular))
-                            .foregroundStyle(.primary)
-                            .lineLimit(2)
-
-                        if isCurrent {
-                            Text("Playing")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.thinMaterial, in: Capsule())
-                        }
+        Group {
+            if isEditing {
+                rowContent
+            } else {
+                Button {
+                    Task {
+                        await playAction(position)
                     }
-
-                    if let subtitle = item.subtitle {
-                        Text(subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
+                } label: {
+                    rowContent
                 }
-
-                Spacer(minLength: 8)
-
-                if let durationText = item.durationText {
-                    Text(durationText)
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
+                .buttonStyle(.plain)
             }
-            .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
+    }
+
+    private var rowContent: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text("\(position)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 24, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(item.title)
+                        .font(.body.weight(isCurrent ? .semibold : .regular))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+
+                    if isCurrent {
+                        Text("Playing")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.thinMaterial, in: Capsule())
+                    }
+                }
+
+                if let subtitle = item.subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            if let durationText = item.durationText {
+                Text(durationText)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }

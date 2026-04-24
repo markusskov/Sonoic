@@ -155,10 +155,18 @@ struct SonosActiveTarget: Identifiable, Equatable {
     }
 
     var primaryProductName: String? {
-        householdName.sonoicNonEmptyTrimmed
+        guard kind == .room else {
+            return nil
+        }
+
+        return householdName.sonoicNonEmptyTrimmed
     }
 
     var setupProducts: [SetupProduct] {
+        guard kind == .room else {
+            return []
+        }
+
         var products: [SetupProduct] = []
 
         if let primaryProductName {

@@ -11,9 +11,14 @@ extension SonoicModel {
         manualHostIdentityStatus = .idle
         manualHostTopologyStatus = .idle
 
-        let nextTarget = hasManualSonosHost
-            ? manualHostPlaceholderTarget(for: manualSonosHost)
-            : Self.unconfiguredTarget
+        let nextTarget: SonosActiveTarget
+        if let discoveredPlayer = discoveredPlayer(matchingHost: manualSonosHost) {
+            nextTarget = discoveredPlayer.activeTargetPlaceholder
+        } else if hasManualSonosHost {
+            nextTarget = manualHostPlaceholderTarget(for: manualSonosHost)
+        } else {
+            nextTarget = Self.unconfiguredTarget
+        }
 
         guard activeTarget != nextTarget else {
             return

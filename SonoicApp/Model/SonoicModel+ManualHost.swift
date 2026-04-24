@@ -81,7 +81,8 @@ extension SonoicModel {
                 fallback: nowPlaying
             )
             let volume = try await refreshedVolume
-            var nextNowPlaying = await refreshedNowPlaying
+            let nowPlayingResult = await refreshedNowPlaying
+            var nextNowPlaying = nowPlayingResult.snapshot
             nextNowPlaying = smoothedNowPlayingSnapshot(nextNowPlaying)
             nextNowPlaying.artworkIdentifier = try? await syncArtworkIdentifier(for: nextNowPlaying)
 
@@ -91,6 +92,10 @@ extension SonoicModel {
 
             if nowPlaying != nextNowPlaying {
                 nowPlaying = nextNowPlaying
+            }
+
+            if nowPlayingDiagnostics != nowPlayingResult.diagnostics {
+                nowPlayingDiagnostics = nowPlayingResult.diagnostics
             }
 
             await refreshManualHostIdentityIfNeeded(force: forceRoomRefresh)
@@ -104,8 +109,9 @@ extension SonoicModel {
 
             scheduleManualPlayConfirmationRetryIfNeeded(for: rawPlaybackState)
 
-            manualHostLastSuccessfulRefreshAt = .now
-            manualHostRefreshStatus = .updated(.now)
+            let refreshedAt = Date()
+            manualHostLastSuccessfulRefreshAt = refreshedAt
+            manualHostRefreshStatus = .updated(refreshedAt)
             return true
         } catch {
             manualPlayTransitionGraceDeadline = nil

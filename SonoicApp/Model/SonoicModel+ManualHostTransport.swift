@@ -40,7 +40,10 @@ extension SonoicModel {
             markLocalPlaybackState(.playing)
         }
 
-        return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
+        return await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay,
+            refreshQueueAfterSuccess: true
+        ) {
             try await avTransportClient.next(host: manualSonosHost)
         }
     }
@@ -51,7 +54,10 @@ extension SonoicModel {
             markLocalPlaybackState(.playing)
         }
 
-        return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
+        return await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay,
+            refreshQueueAfterSuccess: true
+        ) {
             try await avTransportClient.previous(host: manualSonosHost)
         }
     }
@@ -69,7 +75,10 @@ extension SonoicModel {
 
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
-        return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
+        return await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay,
+            refreshQueueAfterSuccess: true
+        ) {
             try await avTransportClient.seekToTrack(host: manualSonosHost, trackNumber: position)
             try await avTransportClient.play(host: manualSonosHost)
         }
@@ -85,7 +94,10 @@ extension SonoicModel {
         queueState = .idle
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
-        return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
+        let didStartPlayback = await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay,
+            refreshQueueAfterSuccess: true
+        ) {
             let trackNumber = try await avTransportClient.addURIToQueue(
                 host: manualSonosHost,
                 uri: playbackURI,
@@ -99,6 +111,12 @@ extension SonoicModel {
             try await avTransportClient.seekToTrack(host: manualSonosHost, trackNumber: trackNumber)
             try await avTransportClient.play(host: manualSonosHost)
         }
+
+        if didStartPlayback {
+            recordRecentFavoritePlayback(favorite)
+        }
+
+        return didStartPlayback
     }
 
     func toggleManualSonosMute() async {
@@ -164,6 +182,7 @@ extension SonoicModel {
 
     private func performManualTransportCommand(
         syncDelay: Duration? = nil,
+        refreshQueueAfterSuccess: Bool = false,
         _ action: () async throws -> Void
     ) async -> Bool {
         guard hasManualSonosHost else {
@@ -189,10 +208,17 @@ extension SonoicModel {
         do {
             try await action()
             if let syncDelay {
-                scheduleManualStateSync(after: syncDelay, restartRefreshLoop: true)
-                manualHostRefreshStatus = .updated(.now)
+                manualHostRefreshStatus = .refreshing
+                scheduleManualStateSync(
+                    after: syncDelay,
+                    restartRefreshLoop: true,
+                    refreshQueueAfterSync: refreshQueueAfterSuccess
+                )
             } else {
                 _ = await syncManualSonosState(showProgress: false)
+                if refreshQueueAfterSuccess {
+                    await refreshQueueAfterPlaybackChangeIfNeeded()
+                }
                 startManualHostRefreshLoopIfPossible()
             }
             return true

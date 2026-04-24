@@ -1,7 +1,7 @@
 import Foundation
 
-struct SonosServiceDescriptor: Identifiable, Equatable, Hashable {
-    enum Kind: String, Equatable, Hashable {
+struct SonosServiceDescriptor: Identifiable, Codable, Equatable, Hashable {
+    enum Kind: String, Codable, Equatable, Hashable {
         case appleMusic
         case spotify
         case sonosRadio

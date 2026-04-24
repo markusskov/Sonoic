@@ -29,8 +29,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_sonos._tcp</string>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Sonoic needs local network access to read volume and mute from your Sonos player.</string>
+	<string>Sonoic needs local network access to discover your Sonos speakers and control playback, volume, queue, and room state.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

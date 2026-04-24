@@ -3,6 +3,7 @@ import Foundation
 final class SonosFavoritesDIDLParser: NSObject, XMLParserDelegate {
     private struct PartialItem {
         var id: String?
+        var kind: SonosFavoriteItem.Kind = .item
         var title: String?
         var artistName: String?
         var albumTitle: String?
@@ -59,7 +60,10 @@ final class SonosFavoritesDIDLParser: NSObject, XMLParserDelegate {
         let localName = rawElementName.sonosXMLLocalName
 
         if localName == "item" || localName == "container" {
-            currentItem = PartialItem(id: attributeDict["id"].sonoicNonEmptyTrimmed)
+            currentItem = PartialItem(
+                id: attributeDict["id"].sonoicNonEmptyTrimmed,
+                kind: localName == "container" ? .collection : .item
+            )
             currentItemElementName = localName
             currentItemXML = openingTag(named: rawElementName, attributes: attributeDict)
             return
@@ -134,7 +138,8 @@ final class SonosFavoritesDIDLParser: NSObject, XMLParserDelegate {
                 artworkURL: currentItem.artworkURL,
                 service: currentItem.service ?? SonosServiceCatalog.descriptor(from: playbackURI),
                 playbackURI: playbackURI,
-                playbackMetadataXML: playbackMetadataXML(for: currentItem)
+                playbackMetadataXML: playbackMetadataXML(for: currentItem),
+                kind: currentItem.kind
             )
         )
 

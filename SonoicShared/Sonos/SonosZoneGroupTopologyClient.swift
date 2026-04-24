@@ -22,36 +22,39 @@ struct SonosZoneGroupTopology: Equatable {
 
     var groups: [Group]
 
-    func member(matchingTargetID targetID: String?, host: String) -> Member? {
+    func matchedGroupContext(
+        targetID: String?,
+        host: String
+    ) -> (group: Group, member: Member)? {
         let normalizedLookupHost = normalizedHost(host)
 
         for group in groups {
             if let matchingMember = group.matchingMember(targetID: targetID, normalizedHost: normalizedLookupHost) {
-                return matchingMember
+                return (group, matchingMember)
             }
         }
 
         return nil
     }
 
+    func member(matchingTargetID targetID: String?, host: String) -> Member? {
+        matchedGroupContext(targetID: targetID, host: host)?.member
+    }
+
+    func group(matchingTargetID targetID: String?, host: String) -> Group? {
+        matchedGroupContext(targetID: targetID, host: host)?.group
+    }
+
     func coordinatorID(matchingTargetID targetID: String?, host: String) -> String? {
-        let normalizedLookupHost = normalizedHost(host)
-
-        for group in groups where group.matchingMember(targetID: targetID, normalizedHost: normalizedLookupHost) != nil {
-            return group.coordinatorID
-        }
-
-        return nil
+        matchedGroupContext(targetID: targetID, host: host)?.group.coordinatorID
     }
 
     func coordinatorHost(matchingTargetID targetID: String?, host: String) -> String? {
-        let normalizedLookupHost = normalizedHost(host)
-
-        for group in groups where group.matchingMember(targetID: targetID, normalizedHost: normalizedLookupHost) != nil {
-            return group.members.first { $0.id == group.coordinatorID }?.host
+        guard let matchedGroup = matchedGroupContext(targetID: targetID, host: host)?.group else {
+            return nil
         }
 
-        return nil
+        return matchedGroup.members.first { $0.id == matchedGroup.coordinatorID }?.host
     }
 
     private func normalizedHost(_ host: String?) -> String? {
