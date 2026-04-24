@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct PlayerSheetView: View {
-    @Environment(SonoicModel.self) private var model
-    @State private var isAdjustingVolume = false
-    @State private var volumeCommitTask: Task<Void, Never>?
-    @State private var volumeLevel = 0.0
+    @Environment(SonoicModel.self) var model
+    @State var isAdjustingVolume = false
+    @State var volumeCommitTask: Task<Void, Never>?
+    @State var volumeLevel = 0.0
 
     var body: some View {
         ScrollView {
@@ -37,57 +37,16 @@ struct PlayerSheetView: View {
                         observedAt: model.nowPlayingObservedAt,
                         isEnabled: model.hasManualSonosHost,
                         seek: { timeInterval in
-                            Task {
-                                _ = await model.seekManualSonosPlayback(to: timeInterval)
-                            }
+                            seek(to: timeInterval)
                         }
                     )
 
-                    HStack(spacing: 28) {
-                        Button {
-                            Task {
-                                await model.skipToPreviousManualSonosTrack()
-                            }
-                        } label: {
-                            Label("Previous", systemImage: "backward.fill")
-                                .labelStyle(.iconOnly)
-                                .font(.title2.weight(.semibold))
-                                .frame(width: 58, height: 58)
-                        }
-                        .disabled(!supportsTrackNavigation)
-                        .buttonStyle(.glass)
-                        .buttonBorderShape(.circle)
-
-                        Button {
-                            Task {
-                                await model.toggleManualSonosPlayback()
-                            }
-                        } label: {
-                            Label(
-                                model.nowPlaying.playbackState.controlTitle,
-                                systemImage: model.nowPlaying.playbackState.controlSystemImage
-                            )
-                            .labelStyle(.iconOnly)
-                            .font(.title2.weight(.semibold))
-                            .frame(width: 74, height: 74)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .buttonBorderShape(.circle)
-
-                        Button {
-                            Task {
-                                await model.skipToNextManualSonosTrack()
-                            }
-                        } label: {
-                            Label("Next", systemImage: "forward.fill")
-                                .labelStyle(.iconOnly)
-                                .font(.title2.weight(.semibold))
-                                .frame(width: 58, height: 58)
-                        }
-                        .disabled(!supportsTrackNavigation)
-                        .buttonStyle(.glass)
-                        .buttonBorderShape(.circle)
-                    }
+                    PlayerTransportControls(
+                        nowPlaying: model.nowPlaying,
+                        skipPrevious: skipToPreviousTrack,
+                        togglePlayback: togglePlayback,
+                        skipNext: skipToNextTrack
+                    )
 
                     PlayerVolumeSection(
                         activeTargetName: model.activeTarget.name,
@@ -119,165 +78,6 @@ struct PlayerSheetView: View {
             volumeCommitTask?.cancel()
             volumeCommitTask = nil
         }
-    }
-
-    private var supportsTrackNavigation: Bool {
-        model.nowPlaying.supportsTrackNavigation
-    }
-
-    private var volumeBinding: Binding<Double> {
-        Binding(
-            get: {
-                volumeLevel
-            },
-            set: { newValue in
-                volumeLevel = min(max(newValue.rounded(), 0), 100)
-                scheduleVolumeCommit()
-            }
-        )
-    }
-
-    private var volumeLabelText: String {
-        model.externalVolume.isMuted ? "Muted" : "\(Int(volumeLevel.rounded()))%"
-    }
-
-    private var volumeSystemImage: String {
-        if model.externalVolume.isMuted || volumeLevel == 0 {
-            return "speaker.slash.fill"
-        }
-
-        if volumeLevel < 34 {
-            return "speaker.wave.1.fill"
-        }
-
-        if volumeLevel < 67 {
-            return "speaker.wave.2.fill"
-        }
-
-        return "speaker.wave.3.fill"
-    }
-
-    private var muteButtonTitle: String {
-        model.externalVolume.isMuted ? "Unmute" : "Mute"
-    }
-
-    private var muteButtonSystemImage: String {
-        model.externalVolume.isMuted ? "speaker.wave.2.fill" : "speaker.slash.fill"
-    }
-
-    private var artworkReloadKey: String {
-        [
-            model.nowPlaying.artworkIdentifier,
-            model.nowPlaying.title,
-            model.nowPlaying.artistName,
-            model.nowPlaying.albumTitle,
-            model.nowPlaying.sourceName,
-        ]
-        .compactMap { $0 }
-        .joined(separator: "|")
-    }
-
-    private func handleVolumeEditingChanged(_ isEditing: Bool) {
-        isAdjustingVolume = isEditing
-
-        if !isEditing {
-            commitVolumeImmediately()
-        }
-    }
-
-    private func scheduleVolumeCommit() {
-        volumeCommitTask?.cancel()
-
-        let targetLevel = Int(volumeLevel.rounded())
-        volumeCommitTask = Task { @MainActor in
-            do {
-                try await Task.sleep(for: .milliseconds(250))
-            } catch {
-                return
-            }
-
-            guard !Task.isCancelled else {
-                return
-            }
-
-            Task { @MainActor in
-                _ = await model.setManualSonosVolume(to: targetLevel)
-            }
-        }
-    }
-
-    private func commitVolumeImmediately() {
-        volumeCommitTask?.cancel()
-        volumeCommitTask = nil
-
-        let targetLevel = Int(volumeLevel.rounded())
-        Task { @MainActor in
-            _ = await model.setManualSonosVolume(to: targetLevel)
-        }
-    }
-
-    private func toggleMute() {
-        Task {
-            await model.toggleManualSonosMute()
-        }
-    }
-}
-
-private struct PlayerVolumeSection: View {
-    let activeTargetName: String
-    let activeTargetSystemImage: String
-    let sourceName: String
-    @Binding var volume: Double
-    let volumeLabelText: String
-    let volumeSystemImage: String
-    let muteButtonTitle: String
-    let muteButtonSystemImage: String
-    let isEnabled: Bool
-    let volumeEditingChanged: (Bool) -> Void
-    let toggleMute: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Label(activeTargetName, systemImage: activeTargetSystemImage)
-                Spacer()
-                Label(sourceName, systemImage: "music.note.list")
-            }
-
-            Divider()
-
-            VStack(spacing: 10) {
-                HStack {
-                    Label(volumeLabelText, systemImage: volumeSystemImage)
-                    Spacer()
-
-                    Button(muteButtonTitle, systemImage: muteButtonSystemImage, action: toggleMute)
-                        .buttonStyle(.glass)
-                        .disabled(!isEnabled)
-                }
-
-                HStack(spacing: 12) {
-                    Image(systemName: "speaker.fill")
-                        .foregroundStyle(.tertiary)
-
-                    Slider(
-                        value: $volume,
-                        in: 0 ... 100,
-                        step: 1,
-                        onEditingChanged: volumeEditingChanged
-                    )
-                    .disabled(!isEnabled)
-
-                    Image(systemName: "speaker.wave.3.fill")
-                        .foregroundStyle(.tertiary)
-                }
-            }
-        }
-        .font(.subheadline.weight(.medium))
-        .foregroundStyle(.secondary)
-        .padding(18)
-        .glassEffect(.regular, in: .rect(cornerRadius: 24))
-        .accessibilityElement(children: .contain)
     }
 }
 

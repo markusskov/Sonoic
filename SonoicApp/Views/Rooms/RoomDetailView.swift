@@ -100,11 +100,13 @@ private struct RoomGroupedRoomRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: "speaker.wave.2.fill")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 44, height: 44)
-                .glassEffect(.regular, in: .rect(cornerRadius: 14))
+            RoomSurfaceIconView(
+                systemImage: "speaker.wave.2.fill",
+                size: 44,
+                cornerRadius: 14,
+                font: .body.weight(.semibold),
+                style: .glass
+            )
 
             Text(roomName)
                 .font(.body.weight(.medium))
