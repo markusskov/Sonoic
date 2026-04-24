@@ -61,7 +61,8 @@ struct RootView: View {
         .sheet(isPresented: $isPlayerPresented) {
             PlayerSheetView()
                 .environment(model)
-                .presentationDetents([.large])
+                .presentationDetents([.fraction(1.0)])
+                .presentationBackground(.clear)
                 .presentationDragIndicator(.visible)
         }
     }

@@ -4,6 +4,8 @@ struct PlayerProgressSection: View {
     let nowPlaying: SonosNowPlayingSnapshot
     let observedAt: Date
     let isEnabled: Bool
+    var showsTimeLabels = true
+    var showsThumb = true
     let seek: (TimeInterval) -> Void
 
     @State private var isScrubbing = false
@@ -13,7 +15,7 @@ struct PlayerProgressSection: View {
         TimelineView(.periodic(from: observedAt, by: 1)) { context in
             if let durationSeconds {
                 VStack(spacing: 10) {
-                    Slider(
+                    PlayerScrubber(
                         value: Binding(
                             get: {
                                 isScrubbing ? scrubElapsedSeconds : displayedElapsedSeconds(at: context.date)
@@ -23,18 +25,22 @@ struct PlayerProgressSection: View {
                                 isScrubbing = true
                             }
                         ),
-                        in: 0 ... durationSeconds,
+                        bounds: 0 ... durationSeconds,
+                        isEnabled: isEnabled,
+                        showsThumb: showsThumb,
+                        accessibilityLabel: "Playback position",
                         onEditingChanged: handleEditingChanged
                     )
-                    .disabled(!isEnabled)
 
-                    HStack {
-                        Text(elapsedLabelText(at: context.date))
-                        Spacer()
-                        Text(formatTime(durationSeconds))
+                    if showsTimeLabels {
+                        HStack {
+                            Text(elapsedLabelText(at: context.date))
+                            Spacer()
+                            Text(formatTime(durationSeconds))
+                        }
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
                     }
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
                 }
             }
         }

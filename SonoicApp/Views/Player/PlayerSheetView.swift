@@ -1,72 +1,89 @@
 import SwiftUI
+import UIKit
 
 struct PlayerSheetView: View {
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.displayScale) private var displayScale
     @Environment(SonoicModel.self) var model
     @State var isAdjustingVolume = false
+    @State private var artworkImage: UIImage?
     @State var volumeCommitTask: Task<Void, Never>?
     @State var volumeLevel = 0.0
 
     var body: some View {
-        ScrollView {
-            GlassEffectContainer(spacing: 24) {
-                VStack(spacing: 28) {
-                    PlayerArtworkView(
-                        artworkIdentifier: model.nowPlaying.artworkIdentifier,
-                        reloadKey: artworkReloadKey,
-                        cornerRadius: 28,
-                        maximumDisplayDimension: 360
+        GeometryReader { geometry in
+            let contentWidth = max(geometry.size.width - 60, 1)
+            let heroSize = CGSize(width: geometry.size.width, height: heroHeight(for: geometry))
+
+            ZStack {
+                PlayerFullscreenArtworkBackground(
+                    artworkImage: artworkImage,
+                    size: geometry.size
+                )
+
+                VStack(spacing: 0) {
+                    PlayerFullscreenHeroArtwork(
+                        artworkImage: artworkImage,
+                        size: heroSize
                     )
-                        .aspectRatio(1, contentMode: .fit)
-                        .frame(maxWidth: 360)
-                        .frame(maxWidth: .infinity)
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(model.nowPlaying.title)
-                            .font(.title.weight(.bold))
-                            .lineLimit(2)
+                    Spacer(minLength: 0)
 
-                        Text(model.nowPlaying.subtitle ?? model.nowPlaying.sourceName)
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                    VStack(spacing: controlSpacing(for: geometry)) {
+                        PlayerFullscreenTitleBlock(
+                            title: model.nowPlaying.title,
+                            subtitle: model.nowPlaying.subtitle ?? model.nowPlaying.sourceName
+                        )
+
+                        PlayerProgressSection(
+                            nowPlaying: model.nowPlaying,
+                            observedAt: model.nowPlayingObservedAt,
+                            isEnabled: model.hasManualSonosHost,
+                            showsTimeLabels: true,
+                            showsThumb: false,
+                            seek: { timeInterval in
+                                seek(to: timeInterval)
+                            }
+                        )
+
+                        PlayerTransportControls(
+                            nowPlaying: model.nowPlaying,
+                            skipPrevious: skipToPreviousTrack,
+                            togglePlayback: togglePlayback,
+                            skipNext: skipToNextTrack
+                        )
+
+                        PlayerFullscreenVolumeBar(
+                            volume: volumeBinding,
+                            isEnabled: model.hasManualSonosHost,
+                            volumeEditingChanged: handleVolumeEditingChanged
+                        )
+
+                        PlayerFullscreenSonosActions(
+                            activeTargetSystemImage: model.activeTarget.kind.systemImage,
+                            muteButtonSystemImage: muteButtonSystemImage,
+                            isEnabled: model.hasManualSonosHost,
+                            openRooms: openRooms,
+                            toggleMute: toggleMute,
+                            openQueue: openQueue
+                        )
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    PlayerProgressSection(
-                        nowPlaying: model.nowPlaying,
-                        observedAt: model.nowPlayingObservedAt,
-                        isEnabled: model.hasManualSonosHost,
-                        seek: { timeInterval in
-                            seek(to: timeInterval)
-                        }
-                    )
-
-                    PlayerTransportControls(
-                        nowPlaying: model.nowPlaying,
-                        skipPrevious: skipToPreviousTrack,
-                        togglePlayback: togglePlayback,
-                        skipNext: skipToNextTrack
-                    )
-
-                    PlayerVolumeSection(
-                        activeTargetName: model.activeTarget.name,
-                        activeTargetSystemImage: model.activeTarget.kind.systemImage,
-                        sourceName: model.nowPlaying.sourceName,
-                        volume: volumeBinding,
-                        volumeLabelText: volumeLabelText,
-                        volumeSystemImage: volumeSystemImage,
-                        muteButtonTitle: muteButtonTitle,
-                        muteButtonSystemImage: muteButtonSystemImage,
-                        isEnabled: model.hasManualSonosHost,
-                        volumeEditingChanged: handleVolumeEditingChanged,
-                        toggleMute: toggleMute
-                    )
+                    .frame(width: contentWidth)
+                    .padding(.bottom, max(geometry.safeAreaInsets.bottom + 16, 28))
                 }
-                .padding(24)
-                .frame(maxWidth: .infinity)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
         }
-        .scrollIndicators(.hidden)
+        .ignoresSafeArea()
+        .task(id: artworkReloadKey) {
+            artworkImage = await PlayerArtworkImageLoader.loadArtworkImage(
+                artworkIdentifier: model.nowPlaying.artworkIdentifier,
+                maxPixelDimension: max(geometryIndependentArtworkDimension * displayScale, 1)
+            )
+        }
         .onChange(of: model.externalVolume.level, initial: true) { _, newValue in
             guard !isAdjustingVolume else {
                 return
@@ -78,6 +95,19 @@ struct PlayerSheetView: View {
             volumeCommitTask?.cancel()
             volumeCommitTask = nil
         }
+    }
+
+    private var geometryIndependentArtworkDimension: CGFloat {
+        1400
+    }
+
+    private func heroHeight(for geometry: GeometryProxy) -> CGFloat {
+        let availableHeight = geometry.size.height + geometry.safeAreaInsets.top
+        return min(max(availableHeight * 0.52, 320), 560)
+    }
+
+    private func controlSpacing(for geometry: GeometryProxy) -> CGFloat {
+        geometry.size.height < 720 ? 20 : 28
     }
 }
 
