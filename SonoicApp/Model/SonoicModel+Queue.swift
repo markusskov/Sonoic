@@ -9,6 +9,9 @@ extension SonoicModel {
     var queueRefreshContext: String {
         [
             manualSonosHost,
+            activeTarget.id,
+            String(describing: activeTarget.kind),
+            activeTarget.memberNames.joined(separator: ","),
             nowPlaying.sourceName,
             nowPlaying.title,
             nowPlaying.artistName ?? "",

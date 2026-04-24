@@ -37,13 +37,15 @@ struct PlayerVolumeSection: View {
                     Image(systemName: "speaker.fill")
                         .foregroundStyle(.tertiary)
 
-                    Slider(
+                    PlayerScrubber(
                         value: $volume,
-                        in: 0 ... 100,
+                        bounds: 0 ... 100,
                         step: 1,
+                        isEnabled: isEnabled,
+                        showsThumb: false,
+                        accessibilityLabel: "Volume",
                         onEditingChanged: volumeEditingChanged
                     )
-                    .disabled(!isEnabled)
 
                     Image(systemName: "speaker.wave.3.fill")
                         .foregroundStyle(.tertiary)

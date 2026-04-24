@@ -43,6 +43,26 @@ extension RoomsView {
         await model.selectDiscoveredGroup(group)
     }
 
+    func refreshGroupControl() async {
+        await model.refreshActiveGroupVolumes()
+    }
+
+    func addRoomToGroup(_ player: SonosDiscoveredPlayer) async {
+        await model.addPlayerToActiveGroup(player)
+    }
+
+    func removeRoomFromGroup(_ player: SonosDiscoveredPlayer) async {
+        await model.removePlayerFromActiveGroup(player)
+    }
+
+    func setRoomVolume(_ player: SonosDiscoveredPlayer, _ level: Int) async {
+        await model.setRoomVolume(player, to: level)
+    }
+
+    func toggleRoomMute(_ player: SonosDiscoveredPlayer) async {
+        await model.toggleRoomMute(player)
+    }
+
     var currentRoomSubtitle: String {
         if activeTargetIsGroup {
             return "Your selected Sonos group and grouped rooms."
@@ -102,6 +122,16 @@ extension RoomsView {
 
     var activeTargetIsGroup: Bool {
         model.activeTarget.kind == .group
+    }
+
+    var groupControlRefreshContext: String {
+        [
+            model.manualSonosHost,
+            model.selectedDiscoveredGroup?.id ?? "",
+            model.selectedDiscoveredGroup?.memberIDs.joined(separator: ",") ?? "",
+            model.selectedDiscoveredPlayer?.id ?? ""
+        ]
+        .joined(separator: "|")
     }
 
     var activeTargetHasSubwoofer: Bool {

@@ -19,8 +19,7 @@ struct PlayerTransportControls: View {
                     .frame(width: 58, height: 58)
             }
             .disabled(!supportsTrackNavigation)
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
+            .buttonStyle(.plain)
 
             Button(action: playPauseTapped) {
                 Label(
@@ -31,7 +30,7 @@ struct PlayerTransportControls: View {
                 .font(.title2.weight(.semibold))
                 .frame(width: 74, height: 74)
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.glass)
             .buttonBorderShape(.circle)
 
             Button(action: skipNextTapped) {
@@ -41,8 +40,7 @@ struct PlayerTransportControls: View {
                     .frame(width: 58, height: 58)
             }
             .disabled(!supportsTrackNavigation)
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
+            .buttonStyle(.plain)
         }
     }
 

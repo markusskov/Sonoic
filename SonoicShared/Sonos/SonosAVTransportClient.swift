@@ -145,6 +145,27 @@ struct SonosAVTransportClient {
         )
     }
 
+    func joinGroup(host: String, coordinatorID: String) async throws {
+        try await setTransportURI(
+            host: host,
+            uri: "x-rincon:\(coordinatorID)",
+            metadataXML: nil
+        )
+    }
+
+    func becomeStandaloneGroup(host: String) async throws {
+        _ = try await transport.performAction(
+            service: .avTransport,
+            named: "BecomeCoordinatorOfStandaloneGroup",
+            body: """
+            <u:BecomeCoordinatorOfStandaloneGroup xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+            </u:BecomeCoordinatorOfStandaloneGroup>
+            """,
+            host: host
+        )
+    }
+
     func addURIToQueue(host: String, uri: String, metadataXML: String?) async throws -> Int {
         let data = try await transport.performAction(
             service: .avTransport,

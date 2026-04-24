@@ -15,6 +15,11 @@ struct RoomsViewContent: View {
     let refreshDiscovery: () async -> Void
     let selectRoom: (SonosRoomListItem) async -> Void
     let selectGroup: (SonosDiscoveredGroup) async -> Void
+    let refreshGroupControl: () async -> Void
+    let addRoomToGroup: (SonosDiscoveredPlayer) async -> Void
+    let removeRoomFromGroup: (SonosDiscoveredPlayer) async -> Void
+    let setRoomVolume: (SonosDiscoveredPlayer, Int) async -> Void
+    let toggleRoomMute: (SonosDiscoveredPlayer) async -> Void
 
     private var isRefreshingRoomState: Bool {
         model.manualHostRefreshStatus.isRefreshing
@@ -26,6 +31,7 @@ struct RoomsViewContent: View {
                 currentRoomSection
                 homeTheaterSection
                 groupsSection
+                groupControlSection
                 roomListSection
                 discoverySection
             }
@@ -130,6 +136,29 @@ struct RoomsViewContent: View {
                 selectingTargetID: model.selectingDiscoveredPlayerID,
                 activeGroupID: model.selectedDiscoveredGroup?.id,
                 selectGroup: selectGroup
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var groupControlSection: some View {
+        if model.hasDiscoveredPlayers, model.hasManualSonosHost {
+            RoomsSectionHeader(
+                title: "Group Control",
+                subtitle: model.activeTarget.kind == .group
+                    ? "Manage grouped rooms and per-room volume."
+                    : "Build a group from the active room."
+            )
+
+            RoomsGroupControlCard(
+                members: model.groupControlMembers,
+                options: model.groupControlOptions,
+                isRefreshing: model.isGroupControlRefreshing,
+                addRoomToGroup: addRoomToGroup,
+                removeRoomFromGroup: removeRoomFromGroup,
+                setRoomVolume: setRoomVolume,
+                toggleRoomMute: toggleRoomMute,
+                refreshGroupControl: refreshGroupControl
             )
         }
     }

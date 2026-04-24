@@ -115,4 +115,14 @@ extension PlayerSheetView {
             await model.toggleManualSonosMute()
         }
     }
+
+    func openRooms() {
+        model.selectedTab = .rooms
+        dismiss()
+    }
+
+    func openQueue() {
+        model.selectedTab = .queue
+        dismiss()
+    }
 }

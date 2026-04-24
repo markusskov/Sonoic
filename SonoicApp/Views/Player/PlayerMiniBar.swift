@@ -44,8 +44,7 @@ struct PlayerMiniBar: View {
                     .frame(width: 44, height: 44)
                 }
                 .foregroundStyle(.primary)
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.circle)
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)

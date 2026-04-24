@@ -46,21 +46,10 @@ struct PlayerArtworkView: View {
     }
 
     private func loadArtworkImage(maxPixelDimension: CGFloat) async -> UIImage? {
-        let artworkIdentifier = artworkIdentifier
-
-        return await Task.detached(priority: .utility) {
-            guard let artworkIdentifier,
-                  let artworkStore = try? SonoicSharedArtworkStore(),
-                  let data = artworkStore.loadArtworkData(named: artworkIdentifier)
-            else {
-                return nil
-            }
-
-            return SonoicNowPlayableArtworkProvider.downsampledArtworkImage(
-                from: data,
-                maxDimension: maxPixelDimension
-            )
-        }.value
+        await PlayerArtworkImageLoader.loadArtworkImage(
+            artworkIdentifier: artworkIdentifier,
+            maxPixelDimension: maxPixelDimension
+        )
     }
 }
 
