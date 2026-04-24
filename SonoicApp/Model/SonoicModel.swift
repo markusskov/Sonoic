@@ -34,6 +34,7 @@ final class SonoicModel {
     @ObservationIgnored var isManualTransportCommandInFlight = false
     @ObservationIgnored var isManualVolumeCommandInFlight = false
     @ObservationIgnored var pendingManualVolumeLevel: Int?
+    @ObservationIgnored var isRoomVolumeRefreshInFlight = false
     @ObservationIgnored var isHomeFavoritesRefreshing = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
     @ObservationIgnored var isManualPlayTransitionAwaitingConfirmation = false
@@ -64,12 +65,15 @@ final class SonoicModel {
             homeFavoritesState = .idle
             homeTheaterState = .idle
             homeTheaterTVDiagnostics = .empty
+            roomVolumeState = .idle
             isQueueRefreshing = false
             isQueueMutating = false
             isHomeTheaterRefreshing = false
             isHomeTheaterMutating = false
+            mutatingRoomVolumeIDs = []
             queueOperationErrorDetail = nil
             homeTheaterOperationErrorDetail = nil
+            roomVolumeOperationErrorDetail = nil
             nowPlayingDiagnostics = .empty
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
@@ -84,14 +88,17 @@ final class SonoicModel {
     var homeFavoritesState: SonosFavoritesState = .idle
     var homeTheaterState: SonosHomeTheaterState = .idle
     var homeTheaterTVDiagnostics = SonosHomeTheaterTVDiagnostics.empty
+    var roomVolumeState: SonosRoomVolumeState = .idle
     var recentPlays: [SonoicRecentPlayItem] = []
     var isQueueRefreshing = false
     var isQueueClearing = false
     var isQueueMutating = false
     var isHomeTheaterRefreshing = false
     var isHomeTheaterMutating = false
+    var mutatingRoomVolumeIDs: Set<String> = []
     var queueOperationErrorDetail: String?
     var homeTheaterOperationErrorDetail: String?
+    var roomVolumeOperationErrorDetail: String?
     var discoveredBonjourServices: [SonosBonjourBrowser.Service] = []
     var discoveredPlayers: [SonosDiscoveredPlayer] = []
     var discoveredGroups: [SonosDiscoveredGroup] = []

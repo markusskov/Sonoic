@@ -1,7 +1,11 @@
 import SwiftUI
 
 struct RoomDetailView: View {
-    let activeTarget: SonosActiveTarget
+    @Environment(SonoicModel.self) private var model
+
+    private var activeTarget: SonosActiveTarget {
+        model.activeTarget
+    }
 
     private var setupSummary: String {
         let count = activeTarget.setupProducts.count
@@ -25,6 +29,20 @@ struct RoomDetailView: View {
         ScrollView {
             GlassEffectContainer(spacing: 18) {
                 VStack(alignment: .leading, spacing: 28) {
+                    RoomVolumeControlsSection(
+                        activeTarget: activeTarget,
+                        targetVolume: model.externalVolume,
+                        roomVolumeState: model.roomVolumeState,
+                        mutatingRoomVolumeIDs: model.mutatingRoomVolumeIDs,
+                        operationErrorDetail: model.roomVolumeOperationErrorDetail,
+                        isEnabled: model.hasManualSonosHost,
+                        refreshAction: refreshRoomVolumes,
+                        setTargetVolume: setTargetVolume,
+                        toggleTargetMute: toggleTargetMute,
+                        setRoomVolume: setRoomVolume,
+                        toggleRoomMute: toggleRoomMute
+                    )
+
                     if activeTarget.kind == .group {
                         RoomsSectionHeader(
                             title: "Group",
@@ -92,97 +110,62 @@ struct RoomDetailView: View {
         .miniPlayerContentInset()
         .scrollIndicators(.hidden)
         .navigationTitle(activeTarget.name)
-    }
-}
-
-private struct RoomGroupedRoomRow: View {
-    let roomName: String
-
-    var body: some View {
-        HStack(spacing: 14) {
-            RoomSurfaceIconView(
-                systemImage: "speaker.wave.2.fill",
-                size: 44,
-                cornerRadius: 14,
-                font: .body.weight(.semibold),
-                style: .glass
-            )
-
-            Text(roomName)
-                .font(.body.weight(.medium))
-                .foregroundStyle(.primary)
-
-            Spacer(minLength: 0)
+        .task(id: activeTarget.id) {
+            await refreshRoomVolumes()
         }
-        .padding(.vertical, 12)
-    }
-}
-
-private struct RoomFactRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            Text(title)
-                .foregroundStyle(.secondary)
-
-            Spacer(minLength: 0)
-
-            Text(value)
-                .foregroundStyle(.primary)
+        .refreshable {
+            await refreshRoomVolumes()
         }
-        .font(.body)
     }
-}
 
-private struct RoomProductRow: View {
-    let product: SonosActiveTarget.SetupProduct
+    private func refreshRoomVolumes() async {
+        await model.refreshRoomVolumes(showLoading: model.roomVolumeState.snapshot?.targetID != activeTarget.id)
+    }
 
-    var body: some View {
-        HStack(spacing: 14) {
-            RoomProductIconView(product: product)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(product.name)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
-
-                Text(product.categoryTitle)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-
-            Text(product.badgeTitle)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.thinMaterial, in: Capsule())
+    private func setTargetVolume(_ level: Int) async -> Bool {
+        let didSetVolume = await model.setManualSonosVolume(to: level)
+        if didSetVolume {
+            await model.refreshRoomVolumes(showLoading: false)
         }
-        .padding(.vertical, 12)
+
+        return didSetVolume
+    }
+
+    private func toggleTargetMute() async {
+        await model.toggleManualSonosMute()
+        await model.refreshRoomVolumes(showLoading: false)
+    }
+
+    private func setRoomVolume(_ item: SonosRoomVolumeItem, level: Int) async -> Bool {
+        await model.setRoomVolume(item, to: level)
+    }
+
+    private func toggleRoomMute(_ item: SonosRoomVolumeItem) async {
+        await model.toggleRoomMute(item)
     }
 }
 
 #Preview {
+    @Previewable @State var model = SonoicModel()
+
     NavigationStack {
-        RoomDetailView(
-            activeTarget: SonosActiveTarget(
-                id: "living-room",
-                name: "Living Room",
-                householdName: "Sonos Arc Ultra",
-                kind: .room,
-                memberNames: ["Living Room", "Sub Mini"],
-                bondedAccessories: [
-                    .init(
-                        id: "living-room:satellite:sub-mini",
-                        name: "Sub Mini",
-                        role: .subwoofer
-                    )
-                ]
-            )
+        RoomDetailView()
+            .environment(model)
+    }
+    .onAppear {
+        model.activeTarget = SonosActiveTarget(
+            id: "living-room",
+            name: "Living Room",
+            householdName: "Sonos Arc Ultra",
+            kind: .room,
+            memberNames: ["Living Room", "Sub Mini"],
+            bondedAccessories: [
+                .init(
+                    id: "living-room:satellite:sub-mini",
+                    name: "Sub Mini",
+                    role: .subwoofer
+                )
+            ]
         )
     }
 }
