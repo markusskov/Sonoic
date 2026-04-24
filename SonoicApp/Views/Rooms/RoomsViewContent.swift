@@ -51,7 +51,7 @@ struct RoomsViewContent: View {
         if model.hasManualSonosHost {
             if model.manualHostIdentityStatus.isResolved {
                 NavigationLink {
-                    RoomDetailView(activeTarget: model.activeTarget)
+                    RoomDetailView()
                 } label: {
                     RoomsCurrentRoomCard(
                         roomName: model.activeTarget.name,
