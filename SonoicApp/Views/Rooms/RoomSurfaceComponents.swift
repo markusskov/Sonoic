@@ -43,10 +43,44 @@ struct RoomProductIconView: View {
     let product: SonosActiveTarget.SetupProduct
 
     var body: some View {
-        Image(systemName: product.systemImage)
-            .font(.body.weight(.semibold))
-            .foregroundStyle(.primary)
-            .frame(width: 44, height: 44)
-            .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        RoomSurfaceIconView(
+            systemImage: product.systemImage,
+            size: 44,
+            cornerRadius: 14,
+            font: .body.weight(.semibold),
+            style: .glass
+        )
+    }
+}
+
+struct RoomSurfaceIconView: View {
+    enum Style {
+        case material
+        case glass
+    }
+
+    let systemImage: String
+    var size: CGFloat = 52
+    var cornerRadius: CGFloat = 18
+    var font: Font = .title3.weight(.semibold)
+    var tint: Color = .primary
+    var style: Style = .material
+
+    var body: some View {
+        switch style {
+        case .material:
+            icon
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        case .glass:
+            icon
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+        }
+    }
+
+    private var icon: some View {
+        Image(systemName: systemImage)
+            .font(font)
+            .foregroundStyle(tint)
+            .frame(width: size, height: size)
     }
 }

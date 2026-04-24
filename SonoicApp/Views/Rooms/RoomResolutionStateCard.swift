@@ -19,11 +19,7 @@ struct RoomResolutionStateCard: View {
                         .padding(14)
                         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 } else {
-                    Image(systemName: systemImage)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(tint)
-                        .frame(width: 52, height: 52)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    RoomSurfaceIconView(systemImage: systemImage, tint: tint)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
