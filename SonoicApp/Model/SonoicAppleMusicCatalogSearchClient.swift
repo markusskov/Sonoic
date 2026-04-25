@@ -4,12 +4,15 @@ import MusicKit
 struct SonoicAppleMusicCatalogSearchClient {
     enum ClientError: LocalizedError {
         case unauthorized(MusicAuthorization.Status)
+        case missingDeveloperTokenSetup
 
         var errorDescription: String? {
             switch self {
             case let .unauthorized(status):
                 let appStatus = SonoicAppleMusicAuthorizationState.Status(status)
                 return "Apple Music access is \(appStatus.sonoicDisplayName.lowercased())."
+            case .missingDeveloperTokenSetup:
+                return "Enable MusicKit for Sonoic's App ID and provisioning profile, then rebuild the app."
             }
         }
     }
@@ -24,18 +27,22 @@ struct SonoicAppleMusicCatalogSearchClient {
     }
 
     func fetchServiceDetails() async throws -> SonoicAppleMusicServiceDetails {
-        async let subscription = MusicSubscription.current
-        async let storefrontCountryCode = MusicDataRequest.currentCountryCode
+        do {
+            async let subscription = MusicSubscription.current
+            async let storefrontCountryCode = MusicDataRequest.currentCountryCode
 
-        let resolvedSubscription = try await subscription
-        let resolvedStorefrontCountryCode = try await storefrontCountryCode
+            let resolvedSubscription = try await subscription
+            let resolvedStorefrontCountryCode = try await storefrontCountryCode
 
-        return .loaded(
-            storefrontCountryCode: resolvedStorefrontCountryCode,
-            canPlayCatalogContent: resolvedSubscription.canPlayCatalogContent,
-            canBecomeSubscriber: resolvedSubscription.canBecomeSubscriber,
-            hasCloudLibraryEnabled: resolvedSubscription.hasCloudLibraryEnabled
-        )
+            return .loaded(
+                storefrontCountryCode: resolvedStorefrontCountryCode,
+                canPlayCatalogContent: resolvedSubscription.canPlayCatalogContent,
+                canBecomeSubscriber: resolvedSubscription.canBecomeSubscriber,
+                hasCloudLibraryEnabled: resolvedSubscription.hasCloudLibraryEnabled
+            )
+        } catch {
+            throw mappedMusicKitError(error)
+        }
     }
 
     func searchCatalog(term: String) async throws -> [SonoicSourceItem] {
@@ -49,7 +56,13 @@ struct SonoicAppleMusicCatalogSearchClient {
         )
         request.limit = 8
 
-        let response = try await request.response()
+        let response: MusicCatalogSearchResponse
+        do {
+            response = try await request.response()
+        } catch {
+            throw mappedMusicKitError(error)
+        }
+
         let songs = response.songs.map { song in
             SonoicSourceItem.catalogMetadata(
                 id: "song-\(song.id)",
@@ -70,6 +83,14 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
 
         return Array((songs + albums).prefix(8))
+    }
+
+    private func mappedMusicKitError(_ error: Error) -> Error {
+        if error.localizedDescription.localizedCaseInsensitiveContains("developer token") {
+            return ClientError.missingDeveloperTokenSetup
+        }
+
+        return error
     }
 }
 
