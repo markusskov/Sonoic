@@ -145,6 +145,33 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
     }
 
+    func fetchLibraryArtists(limit: Int = 50) async throws -> [SonoicSourceItem] {
+        guard MusicAuthorization.currentStatus == .authorized else {
+            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+        }
+
+        var request = MusicLibraryRequest<Artist>()
+        request.limit = limit
+
+        let response: MusicLibraryResponse<Artist>
+        do {
+            response = try await request.response()
+        } catch {
+            throw mappedMusicKitError(error)
+        }
+
+        return response.items.map { artist in
+            SonoicSourceItem.catalogMetadata(
+                id: "library-artist-\(artist.id)",
+                title: artist.name,
+                subtitle: "Artist",
+                artworkURL: artist.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .artist,
+                service: .appleMusic
+            )
+        }
+    }
+
     func fetchLibrarySongs(limit: Int = 50) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)

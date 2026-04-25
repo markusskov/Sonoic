@@ -183,7 +183,7 @@ struct AppleMusicLibraryDestinationView: View {
         case .songs:
             try await model.appleMusicCatalogSearchClient.fetchLibrarySongs()
         case .artists:
-            []
+            try await model.appleMusicCatalogSearchClient.fetchLibraryArtists()
         }
     }
 }
