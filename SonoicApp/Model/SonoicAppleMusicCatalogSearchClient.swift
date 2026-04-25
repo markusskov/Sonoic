@@ -5,7 +5,6 @@ struct SonoicAppleMusicCatalogSearchClient {
     enum ClientError: LocalizedError {
         case unauthorized(MusicAuthorization.Status)
         case missingDeveloperTokenSetup(MusicKitRequestFailure)
-        case timedOut
 
         var errorDescription: String? {
             switch self {
@@ -18,11 +17,11 @@ struct SonoicAppleMusicCatalogSearchClient {
 
                 \(failure.displayDetail)
                 """
-            case .timedOut:
-                return "Apple Music did not respond. Try again in a moment."
             }
         }
     }
+
+    private let requestGate = SonoicMusicKitRequestGate()
 
     func currentAuthorizationState() -> SonoicAppleMusicAuthorizationState {
         SonoicAppleMusicAuthorizationState(status: SonoicAppleMusicAuthorizationState.Status(MusicAuthorization.currentStatus))
@@ -35,21 +34,13 @@ struct SonoicAppleMusicCatalogSearchClient {
 
     func fetchServiceDetails() async throws -> SonoicAppleMusicServiceDetails {
         do {
-            async let subscription = withMusicKitTimeout {
-                try await MusicSubscription.current
-            }
-            async let storefrontCountryCode = withMusicKitTimeout {
-                try await MusicDataRequest.currentCountryCode
-            }
-
-            let resolvedSubscription = try await subscription
-            let resolvedStorefrontCountryCode = try await storefrontCountryCode
+            let metadata = try await requestGate.fetchServiceDetails()
 
             return .loaded(
-                storefrontCountryCode: resolvedStorefrontCountryCode,
-                canPlayCatalogContent: resolvedSubscription.canPlayCatalogContent,
-                canBecomeSubscriber: resolvedSubscription.canBecomeSubscriber,
-                hasCloudLibraryEnabled: resolvedSubscription.hasCloudLibraryEnabled
+                storefrontCountryCode: metadata.storefrontCountryCode,
+                canPlayCatalogContent: metadata.canPlayCatalogContent,
+                canBecomeSubscriber: metadata.canBecomeSubscriber,
+                hasCloudLibraryEnabled: metadata.hasCloudLibraryEnabled
             )
         } catch {
             throw mappedMusicKitError(error)
@@ -61,44 +52,11 @@ struct SonoicAppleMusicCatalogSearchClient {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)
         }
 
-        var request = MusicCatalogSearchRequest(
-            term: term,
-            types: [Song.self, Album.self]
-        )
-        request.limit = 8
-        let configuredRequest = request
-
-        let response: MusicCatalogSearchResponse
         do {
-            response = try await withMusicKitTimeout {
-                try await configuredRequest.response()
-            }
+            return try await requestGate.searchCatalog(term: term, limit: 8).map(sourceItem)
         } catch {
             throw mappedMusicKitError(error)
         }
-
-        let songs = response.songs.map { song in
-            SonoicSourceItem.catalogMetadata(
-                id: "song-\(song.id)",
-                title: song.title,
-                subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
-                artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .song,
-                service: .appleMusic
-            )
-        }
-        let albums = response.albums.map { album in
-            SonoicSourceItem.catalogMetadata(
-                id: "album-\(album.id)",
-                title: album.title,
-                subtitle: album.artistName,
-                artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .album,
-                service: .appleMusic
-            )
-        }
-
-        return Array((songs + albums).prefix(8))
     }
 
     func fetchLibraryAlbums(limit: Int = 24) async throws -> [SonoicSourceItem] {
@@ -106,28 +64,10 @@ struct SonoicAppleMusicCatalogSearchClient {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)
         }
 
-        var request = MusicLibraryRequest<Album>()
-        request.limit = limit
-        let configuredRequest = request
-
-        let response: MusicLibraryResponse<Album>
         do {
-            response = try await withMusicKitTimeout {
-                try await configuredRequest.response()
-            }
+            return try await requestGate.fetchLibraryAlbums(limit: limit).map(sourceItem)
         } catch {
             throw mappedMusicKitError(error)
-        }
-
-        return response.items.map { album in
-            SonoicSourceItem.catalogMetadata(
-                id: "library-album-\(album.id)",
-                title: album.title,
-                subtitle: album.artistName,
-                artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .album,
-                service: .appleMusic
-            )
         }
     }
 
@@ -136,28 +76,10 @@ struct SonoicAppleMusicCatalogSearchClient {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)
         }
 
-        var request = MusicLibraryRequest<Playlist>()
-        request.limit = limit
-        let configuredRequest = request
-
-        let response: MusicLibraryResponse<Playlist>
         do {
-            response = try await withMusicKitTimeout {
-                try await configuredRequest.response()
-            }
+            return try await requestGate.fetchLibraryPlaylists(limit: limit).map(sourceItem)
         } catch {
             throw mappedMusicKitError(error)
-        }
-
-        return response.items.map { playlist in
-            SonoicSourceItem.catalogMetadata(
-                id: "library-playlist-\(playlist.id)",
-                title: playlist.name,
-                subtitle: playlist.curatorName,
-                artworkURL: playlist.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .playlist,
-                service: .appleMusic
-            )
         }
     }
 
@@ -166,28 +88,10 @@ struct SonoicAppleMusicCatalogSearchClient {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)
         }
 
-        var request = MusicLibraryRequest<Artist>()
-        request.limit = limit
-        let configuredRequest = request
-
-        let response: MusicLibraryResponse<Artist>
         do {
-            response = try await withMusicKitTimeout {
-                try await configuredRequest.response()
-            }
+            return try await requestGate.fetchLibraryArtists(limit: limit).map(sourceItem)
         } catch {
             throw mappedMusicKitError(error)
-        }
-
-        return response.items.map { artist in
-            SonoicSourceItem.catalogMetadata(
-                id: "library-artist-\(artist.id)",
-                title: artist.name,
-                subtitle: "Artist",
-                artworkURL: artist.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .artist,
-                service: .appleMusic
-            )
         }
     }
 
@@ -196,28 +100,10 @@ struct SonoicAppleMusicCatalogSearchClient {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)
         }
 
-        var request = MusicLibraryRequest<Song>()
-        request.limit = limit
-        let configuredRequest = request
-
-        let response: MusicLibraryResponse<Song>
         do {
-            response = try await withMusicKitTimeout {
-                try await configuredRequest.response()
-            }
+            return try await requestGate.fetchLibrarySongs(limit: limit).map(sourceItem)
         } catch {
             throw mappedMusicKitError(error)
-        }
-
-        return response.items.map { song in
-            SonoicSourceItem.catalogMetadata(
-                id: "library-song-\(song.id)",
-                title: song.title,
-                subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
-                artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .song,
-                service: .appleMusic
-            )
         }
     }
 
@@ -229,91 +115,158 @@ struct SonoicAppleMusicCatalogSearchClient {
         return error
     }
 
-    private func withMusicKitTimeout<Value: Sendable>(
-        _ duration: Duration = .seconds(8),
-        operation: @escaping @Sendable () async throws -> Value
-    ) async throws -> Value {
-        let box = MusicKitTimeoutBox<Value>()
+    private func sourceItem(from metadata: AppleMusicItemMetadata) -> SonoicSourceItem {
+        SonoicSourceItem.catalogMetadata(
+            id: metadata.id,
+            title: metadata.title,
+            subtitle: metadata.subtitle,
+            artworkURL: metadata.artworkURL,
+            kind: metadata.kind.sonoicKind,
+            service: .appleMusic
+        )
+    }
+}
 
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                box.setContinuation(continuation)
+private actor SonoicMusicKitRequestGate {
+    func fetchServiceDetails() async throws -> AppleMusicServiceMetadata {
+        let subscription = try await MusicSubscription.current
+        let storefrontCountryCode = try await MusicDataRequest.currentCountryCode
 
-                let operationTask = Task {
-                    do {
-                        let value = try await operation()
-                        box.resume(.success(value))
-                    } catch {
-                        box.resume(.failure(error))
-                    }
-                }
-                let timeoutTask = Task {
-                    do {
-                        try await Task.sleep(for: duration)
-                        box.resume(.failure(ClientError.timedOut))
-                    } catch {
-                        // The timeout task is canceled when the operation wins the race.
-                    }
-                }
-                box.setTasks(operationTask: operationTask, timeoutTask: timeoutTask)
-            }
-        } onCancel: {
-            box.cancel()
+        return AppleMusicServiceMetadata(
+            storefrontCountryCode: storefrontCountryCode,
+            canPlayCatalogContent: subscription.canPlayCatalogContent,
+            canBecomeSubscriber: subscription.canBecomeSubscriber,
+            hasCloudLibraryEnabled: subscription.hasCloudLibraryEnabled
+        )
+    }
+
+    func searchCatalog(term: String, limit: Int) async throws -> [AppleMusicItemMetadata] {
+        var request = MusicCatalogSearchRequest(
+            term: term,
+            types: [Song.self, Album.self]
+        )
+        request.limit = limit
+
+        let response = try await request.response()
+        let songs = response.songs.map { song in
+            AppleMusicItemMetadata(
+                id: "song-\(song.id)",
+                title: song.title,
+                subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
+                artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .song
+            )
+        }
+        let albums = response.albums.map { album in
+            AppleMusicItemMetadata(
+                id: "album-\(album.id)",
+                title: album.title,
+                subtitle: album.artistName,
+                artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .album
+            )
+        }
+
+        return Array((songs + albums).prefix(limit))
+    }
+
+    func fetchLibraryAlbums(limit: Int) async throws -> [AppleMusicItemMetadata] {
+        var request = MusicLibraryRequest<Album>()
+        request.limit = limit
+
+        let response = try await request.response()
+        return response.items.map { album in
+            AppleMusicItemMetadata(
+                id: "library-album-\(album.id)",
+                title: album.title,
+                subtitle: album.artistName,
+                artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .album
+            )
+        }
+    }
+
+    func fetchLibraryPlaylists(limit: Int) async throws -> [AppleMusicItemMetadata] {
+        var request = MusicLibraryRequest<Playlist>()
+        request.limit = limit
+
+        let response = try await request.response()
+        return response.items.map { playlist in
+            AppleMusicItemMetadata(
+                id: "library-playlist-\(playlist.id)",
+                title: playlist.name,
+                subtitle: playlist.curatorName,
+                artworkURL: playlist.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .playlist
+            )
+        }
+    }
+
+    func fetchLibraryArtists(limit: Int) async throws -> [AppleMusicItemMetadata] {
+        var request = MusicLibraryRequest<Artist>()
+        request.limit = limit
+
+        let response = try await request.response()
+        return response.items.map { artist in
+            AppleMusicItemMetadata(
+                id: "library-artist-\(artist.id)",
+                title: artist.name,
+                subtitle: "Artist",
+                artworkURL: artist.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .artist
+            )
+        }
+    }
+
+    func fetchLibrarySongs(limit: Int) async throws -> [AppleMusicItemMetadata] {
+        var request = MusicLibraryRequest<Song>()
+        request.limit = limit
+
+        let response = try await request.response()
+        return response.items.map { song in
+            AppleMusicItemMetadata(
+                id: "library-song-\(song.id)",
+                title: song.title,
+                subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
+                artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .song
+            )
         }
     }
 }
 
-private nonisolated final class MusicKitTimeoutBox<Value: Sendable>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var hasResolved = false
-    private var continuation: CheckedContinuation<Value, Error>?
-    private var operationTask: Task<Void, Never>?
-    private var timeoutTask: Task<Void, Never>?
+private struct AppleMusicServiceMetadata: Sendable {
+    var storefrontCountryCode: String
+    var canPlayCatalogContent: Bool
+    var canBecomeSubscriber: Bool
+    var hasCloudLibraryEnabled: Bool
+}
 
-    func setContinuation(_ continuation: CheckedContinuation<Value, Error>) {
-        lock.lock()
-        if hasResolved {
-            lock.unlock()
-            continuation.resume(throwing: CancellationError())
-        } else {
-            self.continuation = continuation
-            lock.unlock()
+private struct AppleMusicItemMetadata: Sendable {
+    var id: String
+    var title: String
+    var subtitle: String?
+    var artworkURL: String?
+    var kind: AppleMusicItemKind
+}
+
+private enum AppleMusicItemKind: Sendable {
+    case album
+    case artist
+    case playlist
+    case song
+
+    var sonoicKind: SonoicSourceItem.Kind {
+        switch self {
+        case .album:
+            .album
+        case .artist:
+            .artist
+        case .playlist:
+            .playlist
+        case .song:
+            .song
         }
-    }
-
-    func setTasks(operationTask: Task<Void, Never>, timeoutTask: Task<Void, Never>) {
-        lock.lock()
-        if hasResolved {
-            lock.unlock()
-            operationTask.cancel()
-            timeoutTask.cancel()
-        } else {
-            self.operationTask = operationTask
-            self.timeoutTask = timeoutTask
-            lock.unlock()
-        }
-    }
-
-    func resume(_ result: Result<Value, Error>) {
-        lock.lock()
-        guard !hasResolved else {
-            lock.unlock()
-            return
-        }
-        hasResolved = true
-        let continuation = continuation
-        self.continuation = nil
-        let operationTask = operationTask
-        let timeoutTask = timeoutTask
-        lock.unlock()
-
-        operationTask?.cancel()
-        timeoutTask?.cancel()
-        continuation?.resume(with: result)
-    }
-
-    func cancel() {
-        resume(.failure(CancellationError()))
     }
 }
 
