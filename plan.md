@@ -33,6 +33,8 @@ Implemented so far:
 - native Apple now-playing integration for playback commands, artwork, progress, and lock-screen scrubbing when duration is available
 - home theater controls for EQ, sub level, speech enhancement, night sound, and TV audio diagnostics
 - Swift Testing target for focused Sonos parser coverage
+- Apple Music source surface with authorization diagnostics, catalog search, saved playlists/artists/albums/songs, recently added library metadata, search/library item detail pages, and structured Browse destinations
+- explicit playback capability states so service metadata does not pretend to be Sonos-playable until Sonoic has a Sonos-native payload
 
 ## Architecture Guardrails
 
@@ -93,13 +95,16 @@ The next work here should be careful:
 
 Home now has enough gravity to become the center of Sonoic.
 
+Apple Music V1 is now a real metadata surface. It can search Apple Music, browse saved library lanes, open item details, and show recently added library content. Playback still stays honest: only Sonos-native favorites can start playback today.
+
 The next meaningful work here is:
 
-- service destinations from sources
-- playlist browsing and saved playlist playback
-- queue-derived actions from recent plays and favorites
-- clearer collection flows
-- eventually Apple Music, Spotify, and other service-specific integrations
+- wire real Apple Music Browse lanes for recommendations, categories, curated playlists, new releases, and radio metadata
+- research and implement Sonos-native service payload generation for Apple Music items
+- decide whether Apple Music library playlists/albums can be mapped safely into Sonos queue/session starts
+- keep Spotify as a separate integration path because Spotify iOS SDK/App Remote is app-owned control, not Sonos-native playback
+- add queue-derived actions from recent plays, favorites, and service metadata once payload ownership is clear
+- keep capability labels visible until each item has a trustworthy playback path
 
 ### 3. Make Queue a creation surface
 
@@ -141,6 +146,8 @@ These are real project decisions, but they do not all need to be answered right 
 - How far should the project go with background refresh before the complexity stops being worth it?
 - How much of the Apple native now-playing experience can be supported reliably for a remote-control app?
 - How far should Sonoic go into service-native browsing before it starts duplicating the Sonos app?
+- Which Apple Music API lanes are worth making first: recently added, charts, editorial playlists, recommendations, or category browsing?
+- What is the smallest reliable Sonos-native payload path for an Apple Music catalog/library item?
 - Which home theater diagnostics are stable enough to make user-facing rather than diagnostic-only?
 
 ## Working Style
