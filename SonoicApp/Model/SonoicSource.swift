@@ -259,3 +259,92 @@ struct SonoicSourceSearchState: Equatable {
         }
     }
 }
+
+enum SonoicAppleMusicLibraryDestination: String, CaseIterable, Identifiable, Equatable {
+    case playlists
+    case artists
+    case albums
+    case songs
+
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .playlists:
+            "Playlists"
+        case .artists:
+            "Artists"
+        case .albums:
+            "Albums"
+        case .songs:
+            "Songs"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .playlists:
+            "Saved Apple Music playlists"
+        case .artists:
+            "Saved Apple Music artists"
+        case .albums:
+            "Saved Apple Music albums"
+        case .songs:
+            "Saved Apple Music songs"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .playlists:
+            "music.note.list"
+        case .artists:
+            "music.mic"
+        case .albums:
+            "rectangle.stack"
+        case .songs:
+            "music.note"
+        }
+    }
+
+    var isImplemented: Bool {
+        self == .albums
+    }
+}
+
+struct SonoicAppleMusicLibraryState: Equatable {
+    enum Status: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed(String)
+    }
+
+    var destination: SonoicAppleMusicLibraryDestination
+    var items: [SonoicSourceItem]
+    var status: Status
+
+    init(
+        destination: SonoicAppleMusicLibraryDestination,
+        items: [SonoicSourceItem] = [],
+        status: Status = .idle
+    ) {
+        self.destination = destination
+        self.items = items
+        self.status = status
+    }
+
+    var isLoading: Bool {
+        status == .loading
+    }
+
+    var failureDetail: String? {
+        if case let .failed(detail) = status {
+            detail
+        } else {
+            nil
+        }
+    }
+}

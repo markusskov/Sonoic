@@ -91,6 +91,33 @@ struct SonoicAppleMusicCatalogSearchClient {
         return Array((songs + albums).prefix(8))
     }
 
+    func fetchLibraryAlbums(limit: Int = 24) async throws -> [SonoicSourceItem] {
+        guard MusicAuthorization.currentStatus == .authorized else {
+            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+        }
+
+        var request = MusicLibraryRequest<Album>()
+        request.limit = limit
+
+        let response: MusicLibraryResponse<Album>
+        do {
+            response = try await request.response()
+        } catch {
+            throw mappedMusicKitError(error)
+        }
+
+        return response.items.map { album in
+            SonoicSourceItem.catalogMetadata(
+                id: "library-album-\(album.id)",
+                title: album.title,
+                subtitle: album.artistName,
+                artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .album,
+                service: .appleMusic
+            )
+        }
+    }
+
     private func mappedMusicKitError(_ error: Error) -> Error {
         if error.localizedDescription.localizedCaseInsensitiveContains("developer token") {
             return ClientError.missingDeveloperTokenSetup(MusicKitRequestFailure(error))

@@ -112,22 +112,48 @@ private struct AppleMusicStatusChip: View {
 }
 
 struct AppleMusicLibrarySection: View {
-    private let rows: [AppleMusicSourceNavigationRow.Model] = [
-        .init(title: "Playlists", subtitle: nil, systemImage: "music.note.list"),
-        .init(title: "Artists", subtitle: nil, systemImage: "music.mic"),
-        .init(title: "Albums", subtitle: nil, systemImage: "rectangle.stack"),
-        .init(title: "Songs", subtitle: nil, systemImage: "music.note")
-    ]
+    private let destinations = SonoicAppleMusicLibraryDestination.allCases
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: "Library",
-                subtitle: "Saved Apple Music content will live here as library browsing comes online."
+                subtitle: "Saved Apple Music content. Albums are the first live metadata lane."
             )
 
             RoomSurfaceCard {
-                AppleMusicSourceRows(rows: rows)
+                VStack(spacing: 0) {
+                    ForEach(Array(destinations.enumerated()), id: \.element.id) { index, destination in
+                        if destination.isImplemented {
+                            NavigationLink {
+                                AppleMusicLibraryDestinationView(destination: destination)
+                            } label: {
+                                AppleMusicSourceNavigationRow(
+                                    row: .init(
+                                        title: destination.title,
+                                        subtitle: destination.subtitle,
+                                        systemImage: destination.systemImage,
+                                        badgeTitle: "Open"
+                                    )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            AppleMusicSourceNavigationRow(
+                                row: .init(
+                                    title: destination.title,
+                                    subtitle: destination.subtitle,
+                                    systemImage: destination.systemImage
+                                )
+                            )
+                        }
+
+                        if index < destinations.count - 1 {
+                            Divider()
+                                .padding(.leading, 58)
+                        }
+                    }
+                }
             }
         }
     }
@@ -179,6 +205,7 @@ private struct AppleMusicSourceNavigationRow: View {
         var title: String
         var subtitle: String?
         var systemImage: String
+        var badgeTitle = "Soon"
 
         var id: String {
             title
@@ -210,7 +237,7 @@ private struct AppleMusicSourceNavigationRow: View {
 
             Spacer(minLength: 0)
 
-            Text("Soon")
+            Text(row.badgeTitle)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
