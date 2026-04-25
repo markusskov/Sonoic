@@ -3,7 +3,6 @@ import SwiftUI
 struct SearchView: View {
     @Environment(SonoicModel.self) private var model
     @State private var selectedServiceID = SonosServiceDescriptor.appleMusic.id
-    @State private var selectedItem: SonoicSourceItem?
 
     private var services: [SonosServiceDescriptor] {
         orderedServices(model.homeSources.map(\.service) + SonosServiceCatalog.browsableServices)
@@ -57,8 +56,7 @@ struct SearchView: View {
                         SearchResultsSection(
                             service: selectedService,
                             state: searchState,
-                            availabilityMessage: appleMusicAvailabilityMessage,
-                            selectItem: { selectedItem = $0 }
+                            availabilityMessage: appleMusicAvailabilityMessage
                         )
                     } else {
                         SearchComingSoonCard(service: selectedService)
@@ -70,11 +68,6 @@ struct SearchView: View {
         .miniPlayerContentInset()
         .scrollIndicators(.hidden)
         .navigationTitle("Search")
-        .sheet(item: $selectedItem) { item in
-            SourceItemDetailSheet(item: item) {}
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
     }
 
     private func orderedServices(_ services: [SonosServiceDescriptor]) -> [SonosServiceDescriptor] {

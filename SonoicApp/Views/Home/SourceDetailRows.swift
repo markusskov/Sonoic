@@ -330,6 +330,8 @@ struct SourceItemRow: View {
             "Catalog"
         case .favorite:
             "Favorite"
+        case .library:
+            "Library"
         case .recentPlay:
             "Recent Play"
         }
@@ -342,12 +344,79 @@ struct SourceItemRow: View {
     }
 }
 
+struct SourceItemNavigationRow: View {
+    let item: SonoicSourceItem
+
+    var body: some View {
+        NavigationLink {
+            AppleMusicItemDetailView(item: item)
+        } label: {
+            SourceItemMetadataRow(item: item)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct SourceItemMetadataRow: View {
+    let item: SonoicSourceItem
+
+    var body: some View {
+        HStack(spacing: 14) {
+            HomeFavoriteArtworkView(
+                artworkURL: item.artworkURL,
+                artworkIdentifier: item.artworkIdentifier,
+                maximumDisplayDimension: 58
+            )
+            .frame(width: 58, height: 58)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(item.title)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                if let subtitle = item.subtitle {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Label(originTitle, systemImage: item.service.systemImage)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+
+    private var originTitle: String {
+        switch item.origin {
+        case .catalogSearch:
+            "Catalog"
+        case .favorite:
+            "Favorite"
+        case .library:
+            "Library"
+        case .recentPlay:
+            "Recent Play"
+        }
+    }
+}
+
 struct SourceSearchSection: View {
     let serviceName: String
     @Binding var query: String
     let state: SonoicSourceSearchState
     let availabilityMessage: SourceSearchAvailabilityMessage?
-    let selectItem: (SonoicSourceItem) -> Void
     let search: () async -> Void
 
     var body: some View {
@@ -405,9 +474,7 @@ struct SourceSearchSection: View {
                         )
                     } else {
                         ForEach(state.items) { item in
-                            SourceItemRow(item: item) {
-                                selectItem(item)
-                            } playAction: {}
+                            SourceItemNavigationRow(item: item)
                         }
                     }
                 }

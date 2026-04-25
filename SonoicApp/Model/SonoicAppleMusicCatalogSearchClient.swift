@@ -107,6 +107,40 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
     }
 
+    func fetchItemDetailSections(for item: SonoicSourceItem) async throws -> [SonoicAppleMusicItemDetailSection] {
+        guard MusicAuthorization.currentStatus == .authorized else {
+            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+        }
+
+        guard let serviceItemID = item.serviceItemID else {
+            return []
+        }
+        guard let kind = appleMusicKind(for: item.kind),
+              let origin = appleMusicOrigin(for: item.origin)
+        else {
+            return []
+        }
+        let lookup = AppleMusicItemLookup(
+            serviceItemID: serviceItemID,
+            title: item.title,
+            kind: kind,
+            origin: origin
+        )
+
+        do {
+            return try await requestGate.fetchItemDetailSections(for: lookup).map { section in
+                SonoicAppleMusicItemDetailSection(
+                    id: section.id,
+                    title: section.title,
+                    subtitle: section.subtitle,
+                    items: section.items.map(sourceItem)
+                )
+            }
+        } catch {
+            throw mappedMusicKitError(error)
+        }
+    }
+
     private func mappedMusicKitError(_ error: Error) -> Error {
         if error.localizedDescription.localizedCaseInsensitiveContains("developer token") {
             return ClientError.missingDeveloperTokenSetup(MusicKitRequestFailure(error))
@@ -116,14 +150,62 @@ struct SonoicAppleMusicCatalogSearchClient {
     }
 
     private func sourceItem(from metadata: AppleMusicItemMetadata) -> SonoicSourceItem {
-        SonoicSourceItem.catalogMetadata(
-            id: metadata.id,
+        SonoicSourceItem.appleMusicMetadata(
+            id: metadata.serviceItemID,
             title: metadata.title,
             subtitle: metadata.subtitle,
             artworkURL: metadata.artworkURL,
-            kind: metadata.kind.sonoicKind,
-            service: .appleMusic
+            kind: sourceKind(for: metadata.kind),
+            origin: sourceOrigin(for: metadata.origin)
         )
+    }
+
+    private func appleMusicKind(for sourceKind: SonoicSourceItem.Kind) -> AppleMusicItemKind? {
+        switch sourceKind {
+        case .album:
+            .album
+        case .artist:
+            .artist
+        case .playlist:
+            .playlist
+        case .song:
+            .song
+        case .station, .unknown:
+            nil
+        }
+    }
+
+    private func appleMusicOrigin(for sourceOrigin: SonoicSourceItem.Origin) -> AppleMusicItemOrigin? {
+        switch sourceOrigin {
+        case .catalogSearch:
+            .catalogSearch
+        case .library:
+            .library
+        case .favorite, .recentPlay:
+            nil
+        }
+    }
+
+    private func sourceKind(for appleMusicKind: AppleMusicItemKind) -> SonoicSourceItem.Kind {
+        switch appleMusicKind {
+        case .album:
+            .album
+        case .artist:
+            .artist
+        case .playlist:
+            .playlist
+        case .song:
+            .song
+        }
+    }
+
+    private func sourceOrigin(for appleMusicOrigin: AppleMusicItemOrigin) -> SonoicSourceItem.Origin {
+        switch appleMusicOrigin {
+        case .catalogSearch:
+            .catalogSearch
+        case .library:
+            .library
+        }
     }
 }
 
@@ -152,38 +234,42 @@ private actor SonoicMusicKitRequestGate {
         let response = try await request.response()
         let songs = response.songs.map { song in
             AppleMusicItemMetadata(
-                id: "song-\(song.id)",
+                serviceItemID: song.id.rawValue,
                 title: song.title,
                 subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
                 artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .song
+                kind: .song,
+                origin: .catalogSearch
             )
         }
         let albums = response.albums.map { album in
             AppleMusicItemMetadata(
-                id: "album-\(album.id)",
+                serviceItemID: album.id.rawValue,
                 title: album.title,
                 subtitle: album.artistName,
                 artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .album
+                kind: .album,
+                origin: .catalogSearch
             )
         }
         let artists = response.artists.map { artist in
             AppleMusicItemMetadata(
-                id: "artist-\(artist.id)",
+                serviceItemID: artist.id.rawValue,
                 title: artist.name,
                 subtitle: "Artist",
                 artworkURL: artist.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .artist
+                kind: .artist,
+                origin: .catalogSearch
             )
         }
         let playlists = response.playlists.map { playlist in
             AppleMusicItemMetadata(
-                id: "playlist-\(playlist.id)",
+                serviceItemID: playlist.id.rawValue,
                 title: playlist.name,
                 subtitle: playlist.curatorName,
                 artworkURL: playlist.artwork?.url(width: 400, height: 400)?.absoluteString,
-                kind: .playlist
+                kind: .playlist,
+                origin: .catalogSearch
             )
         }
 
@@ -194,11 +280,12 @@ private actor SonoicMusicKitRequestGate {
         let response = try await fetchLibraryResponse(path: "albums", limit: limit)
         return response.data.map { album in
             AppleMusicItemMetadata(
-                id: "library-album-\(album.id)",
+                serviceItemID: album.id,
                 title: album.attributes?.name ?? "Unknown Album",
                 subtitle: album.attributes?.artistName,
                 artworkURL: album.attributes?.artwork?.sizedURL(width: 400, height: 400),
-                kind: .album
+                kind: .album,
+                origin: .library
             )
         }
     }
@@ -207,11 +294,12 @@ private actor SonoicMusicKitRequestGate {
         let response = try await fetchLibraryResponse(path: "playlists", limit: limit)
         return response.data.map { playlist in
             AppleMusicItemMetadata(
-                id: "library-playlist-\(playlist.id)",
+                serviceItemID: playlist.id,
                 title: playlist.attributes?.name ?? "Unknown Playlist",
                 subtitle: playlist.attributes?.curatorName,
                 artworkURL: playlist.attributes?.artwork?.sizedURL(width: 400, height: 400),
-                kind: .playlist
+                kind: .playlist,
+                origin: .library
             )
         }
     }
@@ -220,11 +308,12 @@ private actor SonoicMusicKitRequestGate {
         let response = try await fetchLibraryResponse(path: "artists", limit: limit)
         var artists = response.data.map { artist in
             AppleMusicItemMetadata(
-                id: "library-artist-\(artist.id)",
+                serviceItemID: artist.id,
                 title: artist.attributes?.name ?? "Unknown Artist",
                 subtitle: "Artist",
                 artworkURL: artist.attributes?.artwork?.sizedURL(width: 400, height: 400),
-                kind: .artist
+                kind: .artist,
+                origin: .library
             )
         }
 
@@ -246,14 +335,83 @@ private actor SonoicMusicKitRequestGate {
             let albumName = song.attributes?.albumName
 
             return AppleMusicItemMetadata(
-                id: "library-song-\(song.id)",
+                serviceItemID: song.id,
                 title: song.attributes?.name ?? "Unknown Song",
                 subtitle: albumName.map { albumName in
                     [artistName, albumName].compactMap(\.self).joined(separator: " • ")
                 } ?? artistName,
                 artworkURL: song.attributes?.artwork?.sizedURL(width: 400, height: 400),
-                kind: .song
+                kind: .song,
+                origin: .library
             )
+        }
+    }
+
+    func fetchItemDetailSections(for lookup: AppleMusicItemLookup) async throws -> [AppleMusicItemMetadataSection] {
+        switch lookup.kind {
+        case .album:
+            let tracks = try await fetchRelatedItems(
+                origin: lookup.origin,
+                path: "albums",
+                id: lookup.serviceItemID,
+                relation: "tracks",
+                limit: 40
+            )
+
+            return tracks.isEmpty ? [] : [
+                AppleMusicItemMetadataSection(
+                    id: "tracks",
+                    title: "Tracks",
+                    subtitle: "\(tracks.count) songs",
+                    items: tracks
+                )
+            ]
+        case .playlist:
+            let tracks = try await fetchRelatedItems(
+                origin: lookup.origin,
+                path: "playlists",
+                id: lookup.serviceItemID,
+                relation: "tracks",
+                limit: 40
+            )
+
+            return tracks.isEmpty ? [] : [
+                AppleMusicItemMetadataSection(
+                    id: "tracks",
+                    title: "Tracks",
+                    subtitle: "\(tracks.count) songs",
+                    items: tracks
+                )
+            ]
+        case .artist:
+            let results = try await searchCatalog(term: lookup.title, limit: 16)
+            let songs = Array(results.filter { $0.kind == .song }.prefix(8))
+            let albums = Array(results.filter { $0.kind == .album }.prefix(8))
+            var sections: [AppleMusicItemMetadataSection] = []
+
+            if !songs.isEmpty {
+                sections.append(
+                    AppleMusicItemMetadataSection(
+                        id: "songs",
+                        title: "Songs",
+                        items: songs
+                    )
+                )
+            }
+
+            if !albums.isEmpty {
+                sections.append(
+                    AppleMusicItemMetadataSection(
+                        id: "albums",
+                        title: "Albums",
+                        items: albums
+                    )
+                )
+            }
+
+            return sections
+        case .song:
+            return []
         }
     }
 
@@ -262,6 +420,89 @@ private actor SonoicMusicKitRequestGate {
         components.scheme = "https"
         components.host = "api.music.apple.com"
         components.path = "/v1/me/library/\(path)"
+        components.queryItems = [
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+
+        guard let url = components.url else {
+            throw URLError(.badURL)
+        }
+
+        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
+        let response = try await request.response()
+        return try JSONDecoder().decode(AppleMusicLibraryResponse.self, from: response.data)
+    }
+
+    private func fetchRelatedItems(
+        origin: AppleMusicItemOrigin,
+        path: String,
+        id: String,
+        relation: String,
+        limit: Int
+    ) async throws -> [AppleMusicItemMetadata] {
+        let response: AppleMusicLibraryResponse
+
+        switch origin {
+        case .library:
+            response = try await fetchLibraryRelationshipResponse(
+                path: path,
+                id: id,
+                relation: relation,
+                limit: limit
+            )
+        case .catalogSearch:
+            response = try await fetchCatalogRelationshipResponse(
+                path: path,
+                id: id,
+                relation: relation,
+                limit: limit
+            )
+        }
+
+        return response.data.map { resource in
+            AppleMusicItemMetadata(
+                serviceItemID: resource.id,
+                title: resource.attributes?.name ?? "Unknown",
+                subtitle: resource.attributes?.albumName.map { albumName in
+                    [resource.attributes?.artistName, albumName].compactMap(\.self).joined(separator: " • ")
+                } ?? resource.attributes?.artistName ?? resource.attributes?.curatorName,
+                artworkURL: resource.attributes?.artwork?.sizedURL(width: 400, height: 400),
+                kind: AppleMusicItemKind(resourceType: resource.type),
+                origin: origin
+            )
+        }
+    }
+
+    private func fetchCatalogRelationshipResponse(
+        path: String,
+        id: String,
+        relation: String,
+        limit: Int
+    ) async throws -> AppleMusicLibraryResponse {
+        let storefrontCountryCode = try await storefrontCountryCode()
+        return try await fetchResourceResponse(
+            path: "/v1/catalog/\(storefrontCountryCode)/\(path)/\(id)/\(relation)",
+            limit: limit
+        )
+    }
+
+    private func fetchLibraryRelationshipResponse(
+        path: String,
+        id: String,
+        relation: String,
+        limit: Int
+    ) async throws -> AppleMusicLibraryResponse {
+        try await fetchResourceResponse(
+            path: "/v1/me/library/\(path)/\(id)/\(relation)",
+            limit: limit
+        )
+    }
+
+    private func fetchResourceResponse(path: String, limit: Int) async throws -> AppleMusicLibraryResponse {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "api.music.apple.com"
+        components.path = path
         components.queryItems = [
             URLQueryItem(name: "limit", value: "\(limit)")
         ]
@@ -318,32 +559,55 @@ private struct AppleMusicServiceMetadata: Sendable {
     var hasCloudLibraryEnabled: Bool
 }
 
-private struct AppleMusicItemMetadata: Sendable {
-    var id: String
+private nonisolated struct AppleMusicItemMetadata: Sendable {
+    var serviceItemID: String
     var title: String
     var subtitle: String?
     var artworkURL: String?
     var kind: AppleMusicItemKind
+    var origin: AppleMusicItemOrigin
 }
 
-private enum AppleMusicItemKind: Sendable {
+private nonisolated struct AppleMusicItemMetadataSection: Sendable {
+    var id: String
+    var title: String
+    var subtitle: String?
+    var items: [AppleMusicItemMetadata]
+}
+
+private nonisolated struct AppleMusicItemLookup: Sendable {
+    var serviceItemID: String
+    var title: String
+    var kind: AppleMusicItemKind
+    var origin: AppleMusicItemOrigin
+}
+
+private nonisolated enum AppleMusicItemOrigin: Sendable {
+    case catalogSearch
+    case library
+}
+
+private nonisolated enum AppleMusicItemKind: Sendable {
     case album
     case artist
     case playlist
     case song
 
-    var sonoicKind: SonoicSourceItem.Kind {
-        switch self {
-        case .album:
-            .album
-        case .artist:
-            .artist
-        case .playlist:
-            .playlist
-        case .song:
-            .song
+    init(resourceType: String?) {
+        switch resourceType {
+        case "albums", "library-albums":
+            self = .album
+        case "artists", "library-artists":
+            self = .artist
+        case "playlists", "library-playlists":
+            self = .playlist
+        case "songs", "library-songs":
+            self = .song
+        default:
+            self = .song
         }
     }
+
 }
 
 private nonisolated struct AppleMusicLibraryResponse: Decodable {
@@ -352,6 +616,7 @@ private nonisolated struct AppleMusicLibraryResponse: Decodable {
 
 private nonisolated struct AppleMusicLibraryResource: Decodable {
     var id: String
+    var type: String?
     var attributes: AppleMusicLibraryAttributes?
 }
 

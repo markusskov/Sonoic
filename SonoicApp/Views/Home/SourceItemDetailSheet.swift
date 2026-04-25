@@ -99,6 +99,8 @@ struct SourceItemDetailSheet: View {
             "Catalog"
         case .favorite:
             "Favorite"
+        case .library:
+            "Library"
         case .recentPlay:
             "Recent"
         }
@@ -110,6 +112,8 @@ struct SourceItemDetailSheet: View {
             "magnifyingglass"
         case .favorite:
             "star"
+        case .library:
+            "rectangle.stack"
         case .recentPlay:
             "clock"
         }

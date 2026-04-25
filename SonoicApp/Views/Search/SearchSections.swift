@@ -129,7 +129,6 @@ struct SearchResultsSection: View {
     let service: SonosServiceDescriptor
     let state: SonoicSourceSearchState
     let availabilityMessage: SearchMessage?
-    let selectItem: (SonoicSourceItem) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -168,9 +167,7 @@ struct SearchResultsSection: View {
                         )
                     } else {
                         ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
-                            SourceItemRow(item: item) {
-                                selectItem(item)
-                            } playAction: {}
+                            SourceItemNavigationRow(item: item)
 
                             if index < state.items.count - 1 {
                                 Divider()

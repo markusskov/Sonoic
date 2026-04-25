@@ -48,7 +48,6 @@ struct SourceDetailView: View {
                             query: catalogSearchBinding,
                             state: catalogSearchState,
                             availabilityMessage: appleMusicAvailabilityMessage,
-                            selectItem: { selectedItem = $0 },
                             search: searchCatalog
                         )
                     }

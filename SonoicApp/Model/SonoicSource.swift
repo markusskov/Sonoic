@@ -87,13 +87,14 @@ enum SonoicPlaybackCapability: Equatable {
 }
 
 struct SonoicSourceItem: Identifiable, Equatable {
-    enum Origin: String, Equatable {
+    enum Origin: String, Equatable, Sendable {
         case catalogSearch
         case favorite
+        case library
         case recentPlay
     }
 
-    enum Kind: String, Equatable {
+    enum Kind: String, Equatable, Sendable {
         case album
         case artist
         case playlist
@@ -141,6 +142,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
     var subtitle: String?
     var artworkURL: String?
     var artworkIdentifier: String?
+    var serviceItemID: String?
     var service: SonosServiceDescriptor
     var origin: Origin
     var kind: Kind
@@ -152,6 +154,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         subtitle: String?,
         artworkURL: String?,
         artworkIdentifier: String?,
+        serviceItemID: String? = nil,
         service: SonosServiceDescriptor,
         origin: Origin,
         kind: Kind = .unknown,
@@ -162,6 +165,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         self.subtitle = subtitle
         self.artworkURL = artworkURL
         self.artworkIdentifier = artworkIdentifier
+        self.serviceItemID = serviceItemID
         self.service = service
         self.origin = origin
         self.kind = kind
@@ -212,8 +216,31 @@ struct SonoicSourceItem: Identifiable, Equatable {
             subtitle: subtitle,
             artworkURL: artworkURL,
             artworkIdentifier: nil,
+            serviceItemID: id,
             service: service,
             origin: .catalogSearch,
+            kind: kind,
+            playbackCapability: .metadataOnly
+        )
+    }
+
+    static func appleMusicMetadata(
+        id: String,
+        title: String,
+        subtitle: String?,
+        artworkURL: String?,
+        kind: Kind,
+        origin: Origin
+    ) -> SonoicSourceItem {
+        SonoicSourceItem(
+            id: "\(origin.rawValue)-\(SonosServiceDescriptor.appleMusic.id)-\(kind.rawValue)-\(id)",
+            title: title,
+            subtitle: subtitle,
+            artworkURL: artworkURL,
+            artworkIdentifier: nil,
+            serviceItemID: id,
+            service: .appleMusic,
+            origin: origin,
             kind: kind,
             playbackCapability: .metadataOnly
         )
@@ -342,5 +369,59 @@ struct SonoicAppleMusicLibraryState: Equatable {
         } else {
             nil
         }
+    }
+}
+
+struct SonoicAppleMusicItemDetailState: Equatable {
+    enum Status: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed(String)
+    }
+
+    var item: SonoicSourceItem
+    var sections: [SonoicAppleMusicItemDetailSection]
+    var status: Status
+
+    init(
+        item: SonoicSourceItem,
+        sections: [SonoicAppleMusicItemDetailSection] = [],
+        status: Status = .idle
+    ) {
+        self.item = item
+        self.sections = sections
+        self.status = status
+    }
+
+    var isLoading: Bool {
+        status == .loading
+    }
+
+    var failureDetail: String? {
+        if case let .failed(detail) = status {
+            detail
+        } else {
+            nil
+        }
+    }
+}
+
+struct SonoicAppleMusicItemDetailSection: Identifiable, Equatable {
+    var id: String
+    var title: String
+    var subtitle: String?
+    var items: [SonoicSourceItem]
+
+    init(
+        id: String,
+        title: String,
+        subtitle: String? = nil,
+        items: [SonoicSourceItem]
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.items = items
     }
 }

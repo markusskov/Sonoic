@@ -40,6 +40,73 @@ extension SonoicModel {
         appleMusicLibraryStates[destination] ?? SonoicAppleMusicLibraryState(destination: destination)
     }
 
+    func appleMusicItemDetailState(for item: SonoicSourceItem) -> SonoicAppleMusicItemDetailState {
+        appleMusicItemDetailStates[item.id] ?? SonoicAppleMusicItemDetailState(item: item)
+    }
+
+    func loadAppleMusicItemDetail(
+        for item: SonoicSourceItem,
+        force: Bool = false
+    ) {
+        let currentState = appleMusicItemDetailState(for: item)
+
+        if currentState.isLoading || (!force && currentState.status == .loaded) {
+            return
+        }
+
+        guard item.service.kind == .appleMusic,
+              item.serviceItemID != nil
+        else {
+            appleMusicItemDetailStates[item.id] = SonoicAppleMusicItemDetailState(
+                item: item,
+                status: .loaded
+            )
+            return
+        }
+
+        refreshAppleMusicAuthorizationState()
+        guard appleMusicAuthorizationState.allowsCatalogSearch else {
+            appleMusicItemDetailStates[item.id] = SonoicAppleMusicItemDetailState(
+                item: item,
+                status: .failed(appleMusicAuthorizationState.detail)
+            )
+            return
+        }
+
+        appleMusicItemDetailLoadTasks[item.id]?.cancel()
+        appleMusicItemDetailStates[item.id] = SonoicAppleMusicItemDetailState(item: item, status: .loading)
+
+        appleMusicItemDetailLoadTasks[item.id] = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let sections = try await self.appleMusicCatalogSearchClient.fetchItemDetailSections(for: item)
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                self.appleMusicItemDetailStates[item.id] = SonoicAppleMusicItemDetailState(
+                    item: item,
+                    sections: sections,
+                    status: .loaded
+                )
+            } catch is CancellationError {
+                if self.appleMusicItemDetailState(for: item).isLoading {
+                    self.appleMusicItemDetailStates[item.id] = SonoicAppleMusicItemDetailState(item: item)
+                }
+            } catch {
+                self.appleMusicItemDetailStates[item.id] = SonoicAppleMusicItemDetailState(
+                    item: item,
+                    status: .failed(error.localizedDescription)
+                )
+            }
+
+            self.appleMusicItemDetailLoadTasks[item.id] = nil
+        }
+    }
+
     func loadAppleMusicLibraryDestination(
         _ destination: SonoicAppleMusicLibraryDestination,
         force: Bool = false

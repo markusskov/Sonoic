@@ -2,7 +2,6 @@ import SwiftUI
 
 struct AppleMusicLibraryDestinationView: View {
     @Environment(SonoicModel.self) private var model
-    @State private var selectedItem: SonoicSourceItem?
 
     let destination: SonoicAppleMusicLibraryDestination
 
@@ -37,11 +36,6 @@ struct AppleMusicLibraryDestinationView: View {
         }
         .refreshable {
             refreshTapped()
-        }
-        .sheet(item: $selectedItem) { item in
-            SourceItemDetailSheet(item: item) {}
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
     }
 
@@ -102,9 +96,7 @@ struct AppleMusicLibraryDestinationView: View {
                 RoomSurfaceCard {
                     VStack(spacing: 0) {
                         ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
-                            SourceItemRow(item: item) {
-                                selectedItem = item
-                            } playAction: {}
+                            SourceItemNavigationRow(item: item)
 
                             if index < state.items.count - 1 {
                                 Divider()
@@ -114,9 +106,7 @@ struct AppleMusicLibraryDestinationView: View {
                     }
                 }
             } else {
-                AppleMusicLibraryGrid(items: state.items) { item in
-                    selectedItem = item
-                }
+                AppleMusicLibraryGrid(items: state.items)
             }
         }
     }
@@ -128,7 +118,6 @@ struct AppleMusicLibraryDestinationView: View {
 
 private struct AppleMusicLibraryGrid: View {
     let items: [SonoicSourceItem]
-    let selectItem: (SonoicSourceItem) -> Void
 
     private let columns = [
         GridItem(.flexible(), spacing: 14),
@@ -138,9 +127,7 @@ private struct AppleMusicLibraryGrid: View {
     var body: some View {
         LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
             ForEach(items) { item in
-                AppleMusicLibraryGridCard(item: item) {
-                    selectItem(item)
-                }
+                AppleMusicLibraryGridCard(item: item)
             }
         }
     }
@@ -148,10 +135,11 @@ private struct AppleMusicLibraryGrid: View {
 
 private struct AppleMusicLibraryGridCard: View {
     let item: SonoicSourceItem
-    let select: () -> Void
 
     var body: some View {
-        Button(action: select) {
+        NavigationLink {
+            AppleMusicItemDetailView(item: item)
+        } label: {
             VStack(alignment: .leading, spacing: 9) {
                 HomeFavoriteArtworkView(
                     artworkURL: item.artworkURL,
