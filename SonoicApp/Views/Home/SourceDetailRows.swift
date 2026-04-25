@@ -1,5 +1,130 @@
 import SwiftUI
 
+struct AppleMusicSourceHeader: View {
+    let source: SonoicSource
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Apple Music", systemImage: source.service.systemImage)
+                .font(.largeTitle.weight(.bold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            Text(source.detailText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct AppleMusicLibrarySection: View {
+    private let rows: [AppleMusicSourceNavigationRow.Model] = [
+        .init(title: "Playlists", subtitle: "Saved Apple Music playlists", systemImage: "music.note.list"),
+        .init(title: "Artists", subtitle: "Saved artists from your library", systemImage: "music.mic"),
+        .init(title: "Albums", subtitle: "Saved albums and releases", systemImage: "rectangle.stack"),
+        .init(title: "Songs", subtitle: "Saved songs in your library", systemImage: "music.note")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HomeSectionHeader(
+                title: "Library",
+                subtitle: "Apple Music destinations that will connect to user-library browsing next."
+            )
+
+            RoomSurfaceCard {
+                AppleMusicSourceRows(rows: rows)
+            }
+        }
+    }
+}
+
+struct AppleMusicDiscoverySection: View {
+    private let rows: [AppleMusicSourceNavigationRow.Model] = [
+        .init(title: "Popular Recommendations", subtitle: "Editorial and listener-driven picks", systemImage: "sparkles"),
+        .init(title: "Categories", subtitle: "Browse moods, genres, and activity lanes", systemImage: "square.grid.2x2"),
+        .init(title: "Playlists Created for You", subtitle: "Personalized mixes when library auth expands", systemImage: "person.crop.circle.badge.checkmark"),
+        .init(title: "Apple Music Playlists", subtitle: "Curated playlists from Apple Music", systemImage: "music.note.list"),
+        .init(title: "New Releases", subtitle: "Fresh albums and singles by service", systemImage: "calendar.badge.plus"),
+        .init(title: "Radio Shows", subtitle: "Apple Music radio and hosted shows", systemImage: "dot.radiowaves.left.and.right")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HomeSectionHeader(
+                title: "Browse",
+                subtitle: "Catalog surfaces for the service path. Metadata first, Sonos playback later."
+            )
+
+            RoomSurfaceCard {
+                AppleMusicSourceRows(rows: rows)
+            }
+        }
+    }
+}
+
+private struct AppleMusicSourceRows: View {
+    let rows: [AppleMusicSourceNavigationRow.Model]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                AppleMusicSourceNavigationRow(row: row)
+
+                if index < rows.count - 1 {
+                    Divider()
+                        .padding(.leading, 58)
+                }
+            }
+        }
+    }
+}
+
+private struct AppleMusicSourceNavigationRow: View {
+    struct Model: Identifiable, Equatable {
+        var title: String
+        var subtitle: String
+        var systemImage: String
+
+        var id: String {
+            title
+        }
+    }
+
+    let row: Model
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: row.systemImage)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.pink)
+                .frame(width: 44, height: 44)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.title)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(row.subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 13)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct SourceItemRow: View {
     let item: SonoicSourceItem
     let playAction: () async -> Void
@@ -77,7 +202,7 @@ struct SourceSearchSection: View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: "Catalog",
-                subtitle: "Search will start here before service auth and Sonos-native playback arrive."
+                subtitle: "Search Apple Music metadata. Playback stays Sonos-native until a playable payload exists."
             )
 
             RoomSurfaceCard {
@@ -112,7 +237,7 @@ struct SourceSearchSection: View {
                             detail: availabilityMessage.detail,
                             systemImage: availabilityMessage.systemImage
                         )
-                    } else if !state.hasQuery {
+                    } else if !state.hasQuery || state.status == .idle {
                         SourceSearchIdleRow(serviceName: serviceName)
                     } else if let failureDetail = state.failureDetail {
                         SourceSearchMessageRow(
@@ -231,7 +356,7 @@ private struct SourceSearchIdleRow: View {
                 Text("\(serviceName) Search")
                     .font(.body.weight(.medium))
 
-                Text("Catalog browsing is not connected yet")
+                Text("Enter a search term to preview catalog metadata")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

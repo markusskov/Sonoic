@@ -21,11 +21,21 @@ struct SourceDetailView: View {
         source.service.kind == .appleMusic
     }
 
+    private var isAppleMusic: Bool {
+        source.service.kind == .appleMusic
+    }
+
     var body: some View {
         ScrollView {
             GlassEffectContainer(spacing: 18) {
                 VStack(alignment: .leading, spacing: 28) {
-                    SourceHeaderCard(source: source)
+                    if isAppleMusic {
+                        AppleMusicSourceHeader(source: source)
+                        AppleMusicLibrarySection()
+                        AppleMusicDiscoverySection()
+                    } else {
+                        SourceHeaderCard(source: source)
+                    }
 
                     if showsCatalogSearch {
                         SourceSearchSection(

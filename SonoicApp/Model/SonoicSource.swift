@@ -128,26 +128,6 @@ struct SonoicSourceItem: Identifiable, Equatable {
         )
     }
 
-    static func catalogSearchPlaceholder(
-        query: String,
-        service: SonosServiceDescriptor
-    ) -> SonoicSourceItem? {
-        guard let normalizedQuery = query.sonoicNonEmptyTrimmed else {
-            return nil
-        }
-
-        return SonoicSourceItem(
-            id: "catalog-\(service.id)-\(normalizedQuery.lowercased())",
-            title: normalizedQuery,
-            subtitle: "\(service.name) catalog search",
-            artworkURL: nil,
-            artworkIdentifier: nil,
-            service: service,
-            origin: .catalogSearch,
-            playbackCapability: .metadataOnly
-        )
-    }
-
     static func catalogMetadata(
         id: String,
         title: String,
@@ -187,9 +167,7 @@ struct SonoicSourceSearchState: Equatable {
         status: Status = .idle
     ) {
         self.query = query
-        self.items = items ?? SonoicSourceItem
-            .catalogSearchPlaceholder(query: query, service: service)
-            .map { [$0] } ?? []
+        self.items = items ?? []
         self.status = status
     }
 
