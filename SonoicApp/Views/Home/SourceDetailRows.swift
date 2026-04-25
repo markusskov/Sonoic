@@ -171,14 +171,7 @@ struct AppleMusicLibrarySection: View {
 }
 
 struct AppleMusicDiscoverySection: View {
-    private let rows: [AppleMusicSourceNavigationRow.Model] = [
-        .init(title: "Popular Recommendations", subtitle: "Editorial and listener-driven picks", systemImage: "sparkles", showsChevron: false),
-        .init(title: "Categories", subtitle: "Browse moods, genres, and activity lanes", systemImage: "square.grid.2x2", showsChevron: false),
-        .init(title: "Playlists Created for You", subtitle: "Personalized mixes when library auth expands", systemImage: "person.crop.circle.badge.checkmark", showsChevron: false),
-        .init(title: "Apple Music Playlists", subtitle: "Curated playlists from Apple Music", systemImage: "music.note.list", showsChevron: false),
-        .init(title: "New Releases", subtitle: "Fresh albums and singles by service", systemImage: "calendar.badge.plus", showsChevron: false),
-        .init(title: "Radio Shows", subtitle: "Apple Music radio and hosted shows", systemImage: "dot.radiowaves.left.and.right", showsChevron: false)
-    ]
+    private let destinations = SonoicAppleMusicBrowseDestination.allCases
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -188,9 +181,33 @@ struct AppleMusicDiscoverySection: View {
             )
 
             RoomSurfaceCard {
-                AppleMusicSourceRows(rows: rows)
+                VStack(spacing: 0) {
+                    ForEach(Array(destinations.enumerated()), id: \.element.id) { index, destination in
+                        NavigationLink {
+                            AppleMusicBrowseDestinationView(destination: destination)
+                        } label: {
+                            AppleMusicSourceNavigationRow(row: browseRow(for: destination))
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < destinations.count - 1 {
+                            Divider()
+                                .padding(.leading, 58)
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private func browseRow(
+        for destination: SonoicAppleMusicBrowseDestination
+    ) -> AppleMusicSourceNavigationRow.Model {
+        AppleMusicSourceNavigationRow.Model(
+            title: destination.title,
+            subtitle: destination.subtitle,
+            systemImage: destination.systemImage
+        )
     }
 }
 

@@ -337,6 +337,70 @@ enum SonoicAppleMusicLibraryDestination: String, CaseIterable, Identifiable, Equ
     }
 }
 
+enum SonoicAppleMusicBrowseDestination: String, CaseIterable, Identifiable, Equatable {
+    case popularRecommendations
+    case categories
+    case playlistsForYou
+    case appleMusicPlaylists
+    case newReleases
+    case radioShows
+
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .popularRecommendations:
+            "Popular Recommendations"
+        case .categories:
+            "Categories"
+        case .playlistsForYou:
+            "Playlists Created for You"
+        case .appleMusicPlaylists:
+            "Apple Music Playlists"
+        case .newReleases:
+            "New Releases"
+        case .radioShows:
+            "Radio Shows"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .popularRecommendations:
+            "Editorial and listener-driven picks"
+        case .categories:
+            "Browse moods, genres, and activity lanes"
+        case .playlistsForYou:
+            "Personalized mixes when recommendations are wired"
+        case .appleMusicPlaylists:
+            "Curated playlists from Apple Music"
+        case .newReleases:
+            "Fresh albums and singles by service"
+        case .radioShows:
+            "Apple Music radio and hosted shows"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .popularRecommendations:
+            "sparkles"
+        case .categories:
+            "square.grid.2x2"
+        case .playlistsForYou:
+            "person.crop.circle.badge.checkmark"
+        case .appleMusicPlaylists:
+            "music.note.list"
+        case .newReleases:
+            "calendar.badge.plus"
+        case .radioShows:
+            "dot.radiowaves.left.and.right"
+        }
+    }
+}
+
 struct SonoicAppleMusicLibraryState: Equatable {
     enum Status: Equatable {
         case idle
