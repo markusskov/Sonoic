@@ -178,7 +178,9 @@ struct AppleMusicLibraryDestinationView: View {
         switch destination {
         case .albums:
             try await model.appleMusicCatalogSearchClient.fetchLibraryAlbums()
-        case .playlists, .artists, .songs:
+        case .songs:
+            try await model.appleMusicCatalogSearchClient.fetchLibrarySongs()
+        case .playlists, .artists:
             []
         }
     }

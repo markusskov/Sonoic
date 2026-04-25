@@ -118,6 +118,33 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
     }
 
+    func fetchLibrarySongs(limit: Int = 50) async throws -> [SonoicSourceItem] {
+        guard MusicAuthorization.currentStatus == .authorized else {
+            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+        }
+
+        var request = MusicLibraryRequest<Song>()
+        request.limit = limit
+
+        let response: MusicLibraryResponse<Song>
+        do {
+            response = try await request.response()
+        } catch {
+            throw mappedMusicKitError(error)
+        }
+
+        return response.items.map { song in
+            SonoicSourceItem.catalogMetadata(
+                id: "library-song-\(song.id)",
+                title: song.title,
+                subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
+                artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .song,
+                service: .appleMusic
+            )
+        }
+    }
+
     private func mappedMusicKitError(_ error: Error) -> Error {
         if error.localizedDescription.localizedCaseInsensitiveContains("developer token") {
             return ClientError.missingDeveloperTokenSetup(MusicKitRequestFailure(error))
