@@ -57,14 +57,14 @@ struct HomeView: View {
                         }
                     }
 
-                    if !model.homeSourceSummaries.isEmpty {
+                    if !model.homeSources.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
                             HomeSectionHeader(
                                 title: "Sources",
                                 subtitle: "Services currently visible through favorites, history, and now playing."
                             )
 
-                            HomeServicesSection(summaries: model.homeSourceSummaries)
+                            HomeServicesSection(sources: model.homeSources)
                         }
                     }
                 } else {

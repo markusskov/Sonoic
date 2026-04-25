@@ -1,0 +1,123 @@
+import SwiftUI
+
+struct SourceDetailView: View {
+    @Environment(SonoicModel.self) private var model
+
+    let source: SonoicSource
+
+    private var favoriteItems: [SonoicSourceItem] {
+        model.favoriteSourceItems(for: source)
+    }
+
+    private var recentItems: [SonoicSourceItem] {
+        model.recentSourceItems(for: source)
+    }
+
+    var body: some View {
+        ScrollView {
+            GlassEffectContainer(spacing: 18) {
+                VStack(alignment: .leading, spacing: 28) {
+                    SourceHeaderCard(source: source)
+
+                    if !favoriteItems.isEmpty {
+                        sourceSection(
+                            title: "Favorites",
+                            subtitle: "Saved Sonos favorites from \(source.service.name).",
+                            items: favoriteItems
+                        )
+                    }
+
+                    if !recentItems.isEmpty {
+                        sourceSection(
+                            title: "Recently Played",
+                            subtitle: "History Sonoic has seen from this source.",
+                            items: recentItems
+                        )
+                    }
+
+                    if favoriteItems.isEmpty && recentItems.isEmpty {
+                        SourceEmptyCard(serviceName: source.service.name)
+                    }
+
+                    SourceCatalogPlaceholderCard(serviceName: source.service.name)
+                }
+                .padding(20)
+            }
+        }
+        .miniPlayerContentInset()
+        .scrollIndicators(.hidden)
+        .navigationTitle(source.service.name)
+    }
+
+    private func sourceSection(
+        title: String,
+        subtitle: String,
+        items: [SonoicSourceItem]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HomeSectionHeader(title: title, subtitle: subtitle)
+
+            RoomSurfaceCard {
+                VStack(spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        SourceItemRow(item: item) {
+                            await play(item)
+                        }
+
+                        if index < items.count - 1 {
+                            Divider()
+                                .padding(.leading, 76)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func play(_ item: SonoicSourceItem) async {
+        guard case let .sonosNative(favorite) = item.playbackCapability else {
+            return
+        }
+
+        _ = await model.playManualSonosFavorite(favorite)
+    }
+}
+
+private struct SourceHeaderCard: View {
+    let source: SonoicSource
+
+    var body: some View {
+        RoomSurfaceCard {
+            HStack(spacing: 16) {
+                RoomSurfaceIconView(
+                    systemImage: source.service.systemImage,
+                    size: 58,
+                    cornerRadius: 20,
+                    font: .title3.weight(.semibold),
+                    style: .glass
+                )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(source.service.name)
+                            .font(.title2.weight(.semibold))
+                            .lineLimit(1)
+
+                        if source.isCurrent {
+                            Image(systemName: "speaker.wave.2.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(source.detailText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}

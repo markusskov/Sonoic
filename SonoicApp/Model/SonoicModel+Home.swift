@@ -9,7 +9,7 @@ extension SonoicModel {
         visibleUniqueRecentPlays(from: recentPlays)
     }
 
-    var homeSourceSummaries: [SonoicHomeSourceSummary] {
+    var homeSources: [SonoicSource] {
         let favorites = homeFavoritesState.snapshot?.items ?? []
         let favoriteServices = favorites.compactMap(\.service)
         let recentPlays = homeRecentPlays
@@ -21,7 +21,7 @@ extension SonoicModel {
             let matchingFavorites = favorites.filter { $0.service?.id == service.id }
             let matchingRecentPlays = recentPlays.filter { $0.service?.id == service.id }
 
-            return SonoicHomeSourceSummary(
+            return SonoicSource(
                 service: service,
                 favoriteCount: matchingFavorites.count,
                 collectionCount: matchingFavorites.filter(\.isCollectionLike).count,
@@ -29,6 +29,19 @@ extension SonoicModel {
                 isCurrent: currentService?.id == service.id
             )
         }
+    }
+
+    func favoriteSourceItems(for source: SonoicSource) -> [SonoicSourceItem] {
+        let favorites = homeFavoritesState.snapshot?.items ?? []
+        return favorites
+            .filter { $0.service?.id == source.service.id }
+            .map(SonoicSourceItem.init(favorite:))
+    }
+
+    func recentSourceItems(for source: SonoicSource) -> [SonoicSourceItem] {
+        homeRecentPlays
+            .filter { $0.service?.id == source.service.id }
+            .map(SonoicSourceItem.init(recentPlay:))
     }
 
     func refreshHomeFavorites(showLoading: Bool = true) async {
