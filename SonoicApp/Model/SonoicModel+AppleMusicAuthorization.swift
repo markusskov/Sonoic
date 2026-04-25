@@ -50,14 +50,6 @@ extension SonoicModel {
             return
         }
 
-        guard destination.isImplemented else {
-            appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(
-                destination: destination,
-                status: .failed("\(destination.title) browsing is coming next.")
-            )
-            return
-        }
-
         refreshAppleMusicAuthorizationState()
         guard appleMusicAuthorizationState.allowsCatalogSearch else {
             appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(

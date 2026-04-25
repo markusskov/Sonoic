@@ -112,41 +112,26 @@ private struct AppleMusicStatusChip: View {
 }
 
 struct AppleMusicLibrarySection: View {
+    @Environment(SonoicModel.self) private var model
+
     private let destinations = SonoicAppleMusicLibraryDestination.allCases
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: "Library",
-                subtitle: "Saved Apple Music content. Albums are the first live metadata lane."
+                subtitle: "Your saved Apple Music playlists, artists, albums, and songs."
             )
 
             RoomSurfaceCard {
                 VStack(spacing: 0) {
                     ForEach(Array(destinations.enumerated()), id: \.element.id) { index, destination in
-                        if destination.isImplemented {
-                            NavigationLink {
-                                AppleMusicLibraryDestinationView(destination: destination)
-                            } label: {
-                                AppleMusicSourceNavigationRow(
-                                    row: .init(
-                                        title: destination.title,
-                                        subtitle: destination.subtitle,
-                                        systemImage: destination.systemImage,
-                                        badgeTitle: "Open"
-                                    )
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            AppleMusicSourceNavigationRow(
-                                row: .init(
-                                    title: destination.title,
-                                    subtitle: destination.subtitle,
-                                    systemImage: destination.systemImage
-                                )
-                            )
+                        NavigationLink {
+                            AppleMusicLibraryDestinationView(destination: destination)
+                        } label: {
+                            AppleMusicSourceNavigationRow(row: libraryRow(for: destination))
                         }
+                        .buttonStyle(.plain)
 
                         if index < destinations.count - 1 {
                             Divider()
@@ -157,23 +142,49 @@ struct AppleMusicLibrarySection: View {
             }
         }
     }
+
+    private func libraryRow(
+        for destination: SonoicAppleMusicLibraryDestination
+    ) -> AppleMusicSourceNavigationRow.Model {
+        let state = model.appleMusicLibraryState(for: destination)
+
+        return AppleMusicSourceNavigationRow.Model(
+            title: destination.title,
+            subtitle: destination.subtitle,
+            systemImage: destination.systemImage,
+            badgeTitle: libraryBadgeTitle(for: state)
+        )
+    }
+
+    private func libraryBadgeTitle(for state: SonoicAppleMusicLibraryState) -> String {
+        switch state.status {
+        case .idle:
+            "Open"
+        case .loading:
+            "Loading"
+        case .loaded:
+            "\(state.items.count)"
+        case .failed:
+            "Error"
+        }
+    }
 }
 
 struct AppleMusicDiscoverySection: View {
     private let rows: [AppleMusicSourceNavigationRow.Model] = [
-        .init(title: "Popular Recommendations", subtitle: "Editorial and listener-driven picks", systemImage: "sparkles"),
-        .init(title: "Categories", subtitle: "Browse moods, genres, and activity lanes", systemImage: "square.grid.2x2"),
-        .init(title: "Playlists Created for You", subtitle: "Personalized mixes when library auth expands", systemImage: "person.crop.circle.badge.checkmark"),
-        .init(title: "Apple Music Playlists", subtitle: "Curated playlists from Apple Music", systemImage: "music.note.list"),
-        .init(title: "New Releases", subtitle: "Fresh albums and singles by service", systemImage: "calendar.badge.plus"),
-        .init(title: "Radio Shows", subtitle: "Apple Music radio and hosted shows", systemImage: "dot.radiowaves.left.and.right")
+        .init(title: "Popular Recommendations", subtitle: "Editorial and listener-driven picks", systemImage: "sparkles", showsChevron: false),
+        .init(title: "Categories", subtitle: "Browse moods, genres, and activity lanes", systemImage: "square.grid.2x2", showsChevron: false),
+        .init(title: "Playlists Created for You", subtitle: "Personalized mixes when library auth expands", systemImage: "person.crop.circle.badge.checkmark", showsChevron: false),
+        .init(title: "Apple Music Playlists", subtitle: "Curated playlists from Apple Music", systemImage: "music.note.list", showsChevron: false),
+        .init(title: "New Releases", subtitle: "Fresh albums and singles by service", systemImage: "calendar.badge.plus", showsChevron: false),
+        .init(title: "Radio Shows", subtitle: "Apple Music radio and hosted shows", systemImage: "dot.radiowaves.left.and.right", showsChevron: false)
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: "Browse",
-                subtitle: "Discovery surfaces for catalog metadata and future Sonos-native starts."
+                subtitle: "Catalog lanes for discovery, recommendations, and future Sonos-native starts."
             )
 
             RoomSurfaceCard {
@@ -206,6 +217,7 @@ private struct AppleMusicSourceNavigationRow: View {
         var subtitle: String?
         var systemImage: String
         var badgeTitle = "Soon"
+        var showsChevron = true
 
         var id: String {
             title
@@ -244,9 +256,11 @@ private struct AppleMusicSourceNavigationRow: View {
                 .padding(.vertical, 5)
                 .background(.quaternary.opacity(0.45), in: Capsule())
 
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.tertiary)
+            if row.showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.vertical, 13)
         .accessibilityElement(children: .combine)

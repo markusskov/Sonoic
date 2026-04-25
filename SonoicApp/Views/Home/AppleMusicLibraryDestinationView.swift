@@ -35,6 +35,9 @@ struct AppleMusicLibraryDestinationView: View {
                 .accessibilityLabel("Refresh \(destination.title)")
             }
         }
+        .refreshable {
+            refreshTapped()
+        }
         .sheet(item: $selectedItem) { item in
             SourceItemDetailSheet(item: item) {}
                 .presentationDetents([.medium, .large])
@@ -87,6 +90,7 @@ struct AppleMusicLibraryDestinationView: View {
         }
     }
 
+    @ViewBuilder
     private var libraryItemsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
@@ -94,18 +98,24 @@ struct AppleMusicLibraryDestinationView: View {
                 subtitle: "Apple Music library metadata. These are not Sonos-playable yet."
             )
 
-            RoomSurfaceCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
-                        SourceItemRow(item: item) {
-                            selectedItem = item
-                        } playAction: {}
+            if destination == .songs {
+                RoomSurfaceCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
+                            SourceItemRow(item: item) {
+                                selectedItem = item
+                            } playAction: {}
 
-                        if index < state.items.count - 1 {
-                            Divider()
-                                .padding(.leading, 76)
+                            if index < state.items.count - 1 {
+                                Divider()
+                                    .padding(.leading, 76)
+                            }
                         }
                     }
+                }
+            } else {
+                AppleMusicLibraryGrid(items: state.items) { item in
+                    selectedItem = item
                 }
             }
         }
@@ -113,6 +123,64 @@ struct AppleMusicLibraryDestinationView: View {
 
     private func refreshTapped() {
         model.loadAppleMusicLibraryDestination(destination, force: true)
+    }
+}
+
+private struct AppleMusicLibraryGrid: View {
+    let items: [SonoicSourceItem]
+    let selectItem: (SonoicSourceItem) -> Void
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 14),
+        GridItem(.flexible(), spacing: 14)
+    ]
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
+            ForEach(items) { item in
+                AppleMusicLibraryGridCard(item: item) {
+                    selectItem(item)
+                }
+            }
+        }
+    }
+}
+
+private struct AppleMusicLibraryGridCard: View {
+    let item: SonoicSourceItem
+    let select: () -> Void
+
+    var body: some View {
+        Button(action: select) {
+            VStack(alignment: .leading, spacing: 9) {
+                HomeFavoriteArtworkView(
+                    artworkURL: item.artworkURL,
+                    artworkIdentifier: item.artworkIdentifier,
+                    maximumDisplayDimension: 220
+                )
+                .aspectRatio(1, contentMode: .fit)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+
+                    if let subtitle = item.subtitle {
+                        Text(subtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.title)
     }
 }
 

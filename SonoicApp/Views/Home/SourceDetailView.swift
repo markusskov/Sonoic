@@ -85,7 +85,7 @@ struct SourceDetailView: View {
         .navigationTitle(source.service.name)
         .task(id: source.id) {
             if isAppleMusic {
-                model.refreshAppleMusicAuthorizationState()
+                await model.refreshAppleMusicServiceDetails()
             }
         }
         .sheet(item: $selectedItem) { item in

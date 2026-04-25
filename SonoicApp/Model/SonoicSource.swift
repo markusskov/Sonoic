@@ -308,10 +308,6 @@ enum SonoicAppleMusicLibraryDestination: String, CaseIterable, Identifiable, Equ
             "music.note"
         }
     }
-
-    var isImplemented: Bool {
-        self == .playlists || self == .artists || self == .albums || self == .songs
-    }
 }
 
 struct SonoicAppleMusicLibraryState: Equatable {
