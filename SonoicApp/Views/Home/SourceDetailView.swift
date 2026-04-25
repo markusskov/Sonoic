@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SourceDetailView: View {
     @Environment(SonoicModel.self) private var model
+    @State private var selectedItem: SonoicSourceItem?
 
     let source: SonoicSource
 
@@ -47,6 +48,7 @@ struct SourceDetailView: View {
                             query: catalogSearchBinding,
                             state: catalogSearchState,
                             availabilityMessage: appleMusicAvailabilityMessage,
+                            selectItem: { selectedItem = $0 },
                             search: searchCatalog
                         )
                     }
@@ -86,6 +88,13 @@ struct SourceDetailView: View {
                 await model.refreshAppleMusicServiceDetails()
             }
         }
+        .sheet(item: $selectedItem) { item in
+            SourceItemDetailSheet(item: item) {
+                await play(item)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     private func sourceSection(
@@ -100,6 +109,8 @@ struct SourceDetailView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         SourceItemRow(item: item) {
+                            selectedItem = item
+                        } playAction: {
                             await play(item)
                         }
 

@@ -73,6 +73,7 @@ struct SonoicAppleMusicCatalogSearchClient {
                 title: song.title,
                 subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
                 artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .song,
                 service: .appleMusic
             )
         }
@@ -82,6 +83,7 @@ struct SonoicAppleMusicCatalogSearchClient {
                 title: album.title,
                 subtitle: album.artistName,
                 artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .album,
                 service: .appleMusic
             )
         }

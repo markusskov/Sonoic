@@ -228,10 +228,20 @@ private struct AppleMusicSourceNavigationRow: View {
 
 struct SourceItemRow: View {
     let item: SonoicSourceItem
+    let selectAction: () -> Void
     let playAction: () async -> Void
 
     var body: some View {
         HStack(spacing: 14) {
+            rowContent
+        }
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: selectAction)
+    }
+
+    private var rowContent: some View {
+        Group {
             HomeFavoriteArtworkView(
                 artworkURL: item.artworkURL,
                 artworkIdentifier: item.artworkIdentifier,
@@ -271,7 +281,6 @@ struct SourceItemRow: View {
                 .accessibilityLabel("Play \(item.title)")
             }
         }
-        .padding(.vertical, 12)
     }
 
     private var originTitle: String {
@@ -297,6 +306,7 @@ struct SourceSearchSection: View {
     @Binding var query: String
     let state: SonoicSourceSearchState
     let availabilityMessage: SourceSearchAvailabilityMessage?
+    let selectItem: (SonoicSourceItem) -> Void
     let search: () async -> Void
 
     var body: some View {
@@ -354,7 +364,9 @@ struct SourceSearchSection: View {
                         )
                     } else {
                         ForEach(state.items) { item in
-                            SourceItemRow(item: item) {}
+                            SourceItemRow(item: item) {
+                                selectItem(item)
+                            } playAction: {}
                         }
                     }
                 }

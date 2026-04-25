@@ -62,6 +62,28 @@ enum SonoicPlaybackCapability: Equatable {
             false
         }
     }
+
+    var displayTitle: String {
+        switch self {
+        case .sonosNative:
+            "Playable on Sonos"
+        case .metadataOnly:
+            "Metadata Only"
+        case .unsupported:
+            "Unsupported"
+        }
+    }
+
+    var disabledReason: String? {
+        switch self {
+        case .sonosNative:
+            nil
+        case .metadataOnly:
+            "Sonoic can show this item, but needs a Sonos-native playback payload before it can start playback."
+        case .unsupported:
+            "This item does not include enough Sonos playback data."
+        }
+    }
 }
 
 struct SonoicSourceItem: Identifiable, Equatable {
@@ -71,6 +93,49 @@ struct SonoicSourceItem: Identifiable, Equatable {
         case recentPlay
     }
 
+    enum Kind: String, Equatable {
+        case album
+        case artist
+        case playlist
+        case song
+        case station
+        case unknown
+
+        var title: String {
+            switch self {
+            case .album:
+                "Album"
+            case .artist:
+                "Artist"
+            case .playlist:
+                "Playlist"
+            case .song:
+                "Song"
+            case .station:
+                "Station"
+            case .unknown:
+                "Item"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .album:
+                "rectangle.stack"
+            case .artist:
+                "music.mic"
+            case .playlist:
+                "music.note.list"
+            case .song:
+                "music.note"
+            case .station:
+                "dot.radiowaves.left.and.right"
+            case .unknown:
+                "music.note"
+            }
+        }
+    }
+
     var id: String
     var title: String
     var subtitle: String?
@@ -78,6 +143,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
     var artworkIdentifier: String?
     var service: SonosServiceDescriptor
     var origin: Origin
+    var kind: Kind
     var playbackCapability: SonoicPlaybackCapability
 
     init(
@@ -88,6 +154,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         artworkIdentifier: String?,
         service: SonosServiceDescriptor,
         origin: Origin,
+        kind: Kind = .unknown,
         playbackCapability: SonoicPlaybackCapability
     ) {
         self.id = id
@@ -97,6 +164,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         self.artworkIdentifier = artworkIdentifier
         self.service = service
         self.origin = origin
+        self.kind = kind
         self.playbackCapability = playbackCapability
     }
 
@@ -109,6 +177,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
             artworkIdentifier: nil,
             service: favorite.service ?? .genericStreaming,
             origin: .favorite,
+            kind: favorite.isCollectionLike ? .playlist : .unknown,
             playbackCapability: favorite.playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .unsupported
         )
     }
@@ -124,6 +193,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
             artworkIdentifier: recentPlay.artworkIdentifier,
             service: recentPlay.service ?? .genericStreaming,
             origin: .recentPlay,
+            kind: .unknown,
             playbackCapability: playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .metadataOnly
         )
     }
@@ -133,6 +203,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         title: String,
         subtitle: String?,
         artworkURL: String?,
+        kind: Kind,
         service: SonosServiceDescriptor
     ) -> SonoicSourceItem {
         SonoicSourceItem(
@@ -143,6 +214,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
             artworkIdentifier: nil,
             service: service,
             origin: .catalogSearch,
+            kind: kind,
             playbackCapability: .metadataOnly
         )
     }
