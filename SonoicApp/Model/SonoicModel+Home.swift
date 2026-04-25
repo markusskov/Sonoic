@@ -79,6 +79,16 @@ extension SonoicModel {
             let items: [SonoicSourceItem]
             switch source.service.kind {
             case .appleMusic:
+                refreshAppleMusicAuthorizationState()
+                guard appleMusicAuthorizationState.allowsCatalogSearch else {
+                    sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+                        query: query,
+                        service: source.service,
+                        status: .failed(appleMusicAuthorizationState.detail)
+                    )
+                    return
+                }
+
                 items = try await appleMusicCatalogSearchClient.searchCatalog(term: query)
             case .spotify, .sonosRadio, .genericStreaming:
                 items = []

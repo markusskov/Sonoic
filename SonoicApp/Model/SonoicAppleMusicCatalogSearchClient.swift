@@ -25,12 +25,7 @@ struct SonoicAppleMusicCatalogSearchClient {
 
     func searchCatalog(term: String) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
-            let status = await MusicAuthorization.request()
-            guard status == .authorized else {
-                throw ClientError.unauthorized(status)
-            }
-
-            return try await searchCatalog(term: term)
+            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
         }
 
         var request = MusicCatalogSearchRequest(
