@@ -176,11 +176,13 @@ struct AppleMusicLibraryDestinationView: View {
 
     private func fetchItems() async throws -> [SonoicSourceItem] {
         switch destination {
+        case .playlists:
+            try await model.appleMusicCatalogSearchClient.fetchLibraryPlaylists()
         case .albums:
             try await model.appleMusicCatalogSearchClient.fetchLibraryAlbums()
         case .songs:
             try await model.appleMusicCatalogSearchClient.fetchLibrarySongs()
-        case .playlists, .artists:
+        case .artists:
             []
         }
     }

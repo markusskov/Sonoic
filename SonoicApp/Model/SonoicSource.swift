@@ -310,7 +310,7 @@ enum SonoicAppleMusicLibraryDestination: String, CaseIterable, Identifiable, Equ
     }
 
     var isImplemented: Bool {
-        self == .albums || self == .songs
+        self == .playlists || self == .albums || self == .songs
     }
 }
 
