@@ -2,14 +2,12 @@ import SwiftUI
 
 struct AppleMusicLibraryDestinationView: View {
     @Environment(SonoicModel.self) private var model
-    @State private var state: SonoicAppleMusicLibraryState
     @State private var selectedItem: SonoicSourceItem?
 
     let destination: SonoicAppleMusicLibraryDestination
 
-    init(destination: SonoicAppleMusicLibraryDestination) {
-        self.destination = destination
-        _state = State(initialValue: SonoicAppleMusicLibraryState(destination: destination))
+    private var state: SonoicAppleMusicLibraryState {
+        model.appleMusicLibraryState(for: destination)
     }
 
     var body: some View {
@@ -26,7 +24,7 @@ struct AppleMusicLibraryDestinationView: View {
         .scrollIndicators(.hidden)
         .navigationTitle(destination.title)
         .task(id: destination.id) {
-            await loadIfNeeded()
+            model.loadAppleMusicLibraryDestination(destination)
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -114,83 +112,7 @@ struct AppleMusicLibraryDestinationView: View {
     }
 
     private func refreshTapped() {
-        Task {
-            await load()
-        }
-    }
-
-    private func loadIfNeeded() async {
-        if state.destination != destination || state.isLoading {
-            state = SonoicAppleMusicLibraryState(destination: destination)
-        }
-
-        guard state.status == .idle else {
-            return
-        }
-
-        await load()
-    }
-
-    private func load() async {
-        if state.isLoading {
-            return
-        }
-
-        guard destination.isImplemented else {
-            state = SonoicAppleMusicLibraryState(
-                destination: destination,
-                status: .failed("\(destination.title) browsing is coming next.")
-            )
-            return
-        }
-
-        model.refreshAppleMusicAuthorizationState()
-        guard model.appleMusicAuthorizationState.allowsCatalogSearch else {
-            state = SonoicAppleMusicLibraryState(
-                destination: destination,
-                status: .failed(model.appleMusicAuthorizationState.detail)
-            )
-            return
-        }
-
-        if model.appleMusicServiceDetails.hasCloudLibraryEnabled == .some(false) {
-            state = SonoicAppleMusicLibraryState(
-                destination: destination,
-                status: .failed("iCloud Music Library is not enabled for this Apple Music account.")
-            )
-            return
-        }
-
-        state = SonoicAppleMusicLibraryState(destination: destination, status: .loading)
-
-        do {
-            let items = try await fetchItems()
-            state = SonoicAppleMusicLibraryState(
-                destination: destination,
-                items: items,
-                status: .loaded
-            )
-        } catch is CancellationError {
-            state = SonoicAppleMusicLibraryState(destination: destination)
-        } catch {
-            state = SonoicAppleMusicLibraryState(
-                destination: destination,
-                status: .failed(error.localizedDescription)
-            )
-        }
-    }
-
-    private func fetchItems() async throws -> [SonoicSourceItem] {
-        switch destination {
-        case .playlists:
-            try await model.appleMusicCatalogSearchClient.fetchLibraryPlaylists()
-        case .albums:
-            try await model.appleMusicCatalogSearchClient.fetchLibraryAlbums()
-        case .songs:
-            try await model.appleMusicCatalogSearchClient.fetchLibrarySongs()
-        case .artists:
-            try await model.appleMusicCatalogSearchClient.fetchLibraryArtists()
-        }
+        model.loadAppleMusicLibraryDestination(destination, force: true)
     }
 }
 
