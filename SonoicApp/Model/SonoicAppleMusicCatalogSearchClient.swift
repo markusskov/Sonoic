@@ -128,9 +128,11 @@ struct SonoicAppleMusicCatalogSearchClient {
 }
 
 private actor SonoicMusicKitRequestGate {
+    private var cachedStorefrontCountryCode: String?
+
     func fetchServiceDetails() async throws -> AppleMusicServiceMetadata {
         let subscription = try await MusicSubscription.current
-        let storefrontCountryCode = try await MusicDataRequest.currentCountryCode
+        let storefrontCountryCode = try await storefrontCountryCode()
 
         return AppleMusicServiceMetadata(
             storefrontCountryCode: storefrontCountryCode,
@@ -198,7 +200,7 @@ private actor SonoicMusicKitRequestGate {
 
     func fetchLibraryArtists(limit: Int) async throws -> [AppleMusicItemMetadata] {
         let response = try await fetchLibraryResponse(path: "artists", limit: limit)
-        return response.data.map { artist in
+        var artists = response.data.map { artist in
             AppleMusicItemMetadata(
                 id: "library-artist-\(artist.id)",
                 title: artist.attributes?.name ?? "Unknown Artist",
@@ -207,6 +209,16 @@ private actor SonoicMusicKitRequestGate {
                 kind: .artist
             )
         }
+
+        for index in artists.indices where artists[index].artworkURL == nil {
+            artists[index].artworkURL = try await fetchCatalogArtistArtworkURL(
+                artistName: artists[index].title,
+                width: 400,
+                height: 400
+            )
+        }
+
+        return artists
     }
 
     func fetchLibrarySongs(limit: Int) async throws -> [AppleMusicItemMetadata] {
@@ -243,6 +255,41 @@ private actor SonoicMusicKitRequestGate {
         let request = MusicDataRequest(urlRequest: URLRequest(url: url))
         let response = try await request.response()
         return try JSONDecoder().decode(AppleMusicLibraryResponse.self, from: response.data)
+    }
+
+    private func fetchCatalogArtistArtworkURL(
+        artistName: String,
+        width: Int,
+        height: Int
+    ) async throws -> String? {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "api.music.apple.com"
+        components.path = "/v1/catalog/\(try await storefrontCountryCode())/search"
+        components.queryItems = [
+            URLQueryItem(name: "term", value: artistName),
+            URLQueryItem(name: "types", value: "artists"),
+            URLQueryItem(name: "limit", value: "1")
+        ]
+
+        guard let url = components.url else {
+            throw URLError(.badURL)
+        }
+
+        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
+        let response = try await request.response()
+        let searchResponse = try JSONDecoder().decode(AppleMusicCatalogSearchResponse.self, from: response.data)
+        return searchResponse.results.artists?.data.first?.attributes?.artwork?.sizedURL(width: width, height: height)
+    }
+
+    private func storefrontCountryCode() async throws -> String {
+        if let cachedStorefrontCountryCode {
+            return cachedStorefrontCountryCode
+        }
+
+        let storefrontCountryCode = try await MusicDataRequest.currentCountryCode
+        cachedStorefrontCountryCode = storefrontCountryCode
+        return storefrontCountryCode
     }
 }
 
@@ -306,6 +353,18 @@ private nonisolated struct AppleMusicLibraryArtwork: Decodable {
             .replacingOccurrences(of: "{w}", with: "\(width)")
             .replacingOccurrences(of: "{h}", with: "\(height)")
     }
+}
+
+private nonisolated struct AppleMusicCatalogSearchResponse: Decodable {
+    var results: AppleMusicCatalogSearchResults
+}
+
+private nonisolated struct AppleMusicCatalogSearchResults: Decodable {
+    var artists: AppleMusicCatalogResourceCollection?
+}
+
+private nonisolated struct AppleMusicCatalogResourceCollection: Decodable {
+    var data: [AppleMusicLibraryResource]
 }
 
 struct MusicKitRequestFailure: Equatable {
