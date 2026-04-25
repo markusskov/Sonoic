@@ -138,3 +138,54 @@ struct SettingsStatusSection: View {
         }
     }
 }
+
+struct SettingsMusicServicesSection: View {
+    var body: some View {
+        Section {
+            ForEach(SonosServiceCatalog.browsableServices) { service in
+                SettingsStatusRow(
+                    title: service.name,
+                    statusTitle: statusTitle(for: service),
+                    detail: detailText(for: service),
+                    systemImage: service.systemImage,
+                    tint: tint(for: service)
+                )
+            }
+        } header: {
+            Text("Music Services")
+        } footer: {
+            Text("Sonoic will keep Sonos as the playback owner. Service accounts will only unlock catalog metadata and Sonos-native playback payloads when those integrations are ready.")
+        }
+    }
+
+    private func statusTitle(for service: SonosServiceDescriptor) -> String {
+        switch service.kind {
+        case .appleMusic:
+            "Search Shell Ready"
+        case .spotify:
+            "Coming Later"
+        case .sonosRadio, .genericStreaming:
+            "Visible Through Sonos"
+        }
+    }
+
+    private func detailText(for service: SonosServiceDescriptor) -> String {
+        switch service.kind {
+        case .appleMusic:
+            "Catalog search UI is in place. Authorization is not connected yet."
+        case .spotify:
+            "Spotify account and catalog access are planned after Apple Music."
+        case .sonosRadio, .genericStreaming:
+            "This source appears when Sonos reports matching favorites or playback."
+        }
+    }
+
+    private func tint(for service: SonosServiceDescriptor) -> Color {
+        switch service.kind {
+        case .appleMusic:
+            .orange
+        case .spotify, .sonosRadio, .genericStreaming:
+            .secondary
+        }
+    }
+}
