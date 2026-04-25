@@ -100,12 +100,13 @@ extension SonoicModel {
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
         let didStartPlayback = await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
+            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
             try await avTransportClient.setTransportURI(
-                host: manualSonosHost,
+                host: playbackHost,
                 uri: payload.uri,
                 metadataXML: payload.metadataXML
             )
-            try await avTransportClient.play(host: manualSonosHost)
+            try await avTransportClient.play(host: playbackHost)
         }
 
         if didStartPlayback {
