@@ -25,7 +25,7 @@ extension SonoicModel {
     }
 
     func startManualHostRefreshLoopIfPossible() {
-        guard isSceneActive, hasManualSonosHost else {
+        guard shouldRunManualHostRefreshLoop else {
             stopManualHostRefreshLoop()
             return
         }
@@ -64,6 +64,17 @@ extension SonoicModel {
         }
     }
 
+    private var shouldRunManualHostRefreshLoop: Bool {
+        guard hasManualSonosHost else {
+            return false
+        }
+
+        return isSceneActive
+            || isManualPlayTransitionAwaitingConfirmation
+            || nowPlaying.playbackState == .playing
+            || nowPlaying.playbackState == .buffering
+    }
+
     func syncManualSonosState(showProgress: Bool, forceRoomRefresh: Bool = false) async -> Bool {
         if showProgress {
             manualHostRefreshStatus = .refreshing
@@ -73,6 +84,7 @@ extension SonoicModel {
             let wasAwaitingConfirmation = isManualPlayTransitionAwaitingConfirmation
             async let refreshedVolume = fetchExternalVolumeForActiveTarget()
             async let refreshedPlaybackState = avTransportClient.fetchPlaybackState(host: manualSonosHost)
+            async let refreshedTransportActions = fetchManualTransportActions()
             let rawPlaybackState = try await refreshedPlaybackState
             let playbackState = resolvedPlaybackState(rawPlaybackState)
             async let refreshedNowPlaying = nowPlayingClient.fetchSnapshot(
@@ -85,6 +97,7 @@ extension SonoicModel {
             var nextNowPlaying = nowPlayingResult.snapshot
             nextNowPlaying = smoothedNowPlayingSnapshot(nextNowPlaying)
             nextNowPlaying.artworkIdentifier = try? await syncArtworkIdentifier(for: nextNowPlaying)
+            nextNowPlaying.transportActions = await refreshedTransportActions ?? nowPlaying.transportActions
 
             if externalVolume != volume {
                 externalVolume = volume
@@ -127,6 +140,10 @@ extension SonoicModel {
         }
     }
 
+    private func fetchManualTransportActions() async -> SonosTransportActions? {
+        try? await avTransportClient.fetchCurrentTransportActions(host: manualSonosHost)
+    }
+
     private func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {
         let normalizedIncomingArtworkURL = snapshot.artworkURL.sonoicNonEmptyTrimmed
         let normalizedCurrentArtworkURL = nowPlaying.artworkURL.sonoicNonEmptyTrimmed
@@ -155,16 +172,4 @@ extension SonoicModel {
         }.value
     }
 
-    private func fetchExternalVolumeForActiveTarget() async throws -> SonoicExternalControlState.Volume {
-        guard activeTarget.kind == .group else {
-            return try await renderingControlClient.fetchVolume(host: manualSonosHost)
-        }
-
-        do {
-            let groupHost = await manualSonosCoordinatorHost() ?? manualSonosHost
-            return try await groupRenderingControlClient.fetchVolume(host: groupHost)
-        } catch {
-            return try await renderingControlClient.fetchVolume(host: manualSonosHost)
-        }
-    }
 }

@@ -31,9 +31,14 @@ final class SonoicModel {
     @ObservationIgnored var pendingSharedExternalControlState: SonoicExternalControlState?
     @ObservationIgnored var lastPersistedSharedWidgetPresentation: SonoicExternalControlState.WidgetPresentation?
     @ObservationIgnored var lastSharedStorePersistAt: Date?
+    @ObservationIgnored var appleMusicLibraryLoadTasks: [SonoicAppleMusicLibraryDestination: Task<Void, Never>] = [:]
+    @ObservationIgnored var appleMusicBrowseLoadTasks: [SonoicAppleMusicBrowseDestination: Task<Void, Never>] = [:]
+    @ObservationIgnored var appleMusicItemDetailLoadTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored var appleMusicRecentlyAddedLoadTask: Task<Void, Never>?
     @ObservationIgnored var isManualTransportCommandInFlight = false
     @ObservationIgnored var isManualVolumeCommandInFlight = false
     @ObservationIgnored var pendingManualVolumeLevel: Int?
+    @ObservationIgnored var pendingRoomVolumeLevels: [String: Int] = [:]
     @ObservationIgnored var isRoomVolumeRefreshInFlight = false
     @ObservationIgnored var isHomeFavoritesRefreshing = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
@@ -52,6 +57,7 @@ final class SonoicModel {
     @ObservationIgnored let nowPlayingClient: SonosNowPlayingClient
     @ObservationIgnored let queueClient: SonosQueueClient
     @ObservationIgnored let favoritesClient: SonosFavoritesClient
+    @ObservationIgnored let appleMusicCatalogSearchClient: SonoicAppleMusicCatalogSearchClient
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
 
     var selectedTab: RootTab = .home
@@ -72,12 +78,12 @@ final class SonoicModel {
             isHomeTheaterRefreshing = false
             isHomeTheaterMutating = false
             mutatingRoomVolumeIDs = []
+            pendingRoomVolumeLevels = [:]
             queueOperationErrorDetail = nil
             groupControlErrorDetail = nil
             homeTheaterOperationErrorDetail = nil
             roomVolumeOperationErrorDetail = nil
             nowPlayingDiagnostics = .empty
-            roomVolumes = [:]
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
@@ -93,19 +99,25 @@ final class SonoicModel {
     var homeTheaterTVDiagnostics = SonosHomeTheaterTVDiagnostics.empty
     var roomVolumeState: SonosRoomVolumeState = .idle
     var recentPlays: [SonoicRecentPlayItem] = []
+    var sourceSearchStates: [String: SonoicSourceSearchState] = [:]
+    var appleMusicLibraryStates: [SonoicAppleMusicLibraryDestination: SonoicAppleMusicLibraryState] = [:]
+    var appleMusicBrowseStates: [SonoicAppleMusicBrowseDestination: SonoicAppleMusicBrowseState] = [:]
+    var appleMusicItemDetailStates: [String: SonoicAppleMusicItemDetailState] = [:]
+    var appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
+    var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
+    var appleMusicServiceDetails = SonoicAppleMusicServiceDetails.idle
+    var musicKitDiagnostics = SonoicMusicKitDiagnostics.current
     var isQueueRefreshing = false
     var isQueueClearing = false
     var isQueueMutating = false
     var isGroupControlRefreshing = false
     var groupControlMutatingPlayerID: String?
-    var roomVolumeMutatingPlayerID: String?
     var isHomeTheaterRefreshing = false
     var isHomeTheaterMutating = false
     var mutatingRoomVolumeIDs: Set<String> = []
     var queueOperationErrorDetail: String?
     var groupControlErrorDetail: String?
     var homeTheaterOperationErrorDetail: String?
-    var roomVolumes: [String: SonoicExternalControlState.Volume] = [:]
     var roomVolumeOperationErrorDetail: String?
     var discoveredBonjourServices: [SonosBonjourBrowser.Service] = []
     var discoveredPlayers: [SonosDiscoveredPlayer] = []
@@ -218,9 +230,11 @@ final class SonoicModel {
         nowPlayingClient = SonosNowPlayingClient(transport: sonosControlTransport)
         queueClient = SonosQueueClient(transport: sonosControlTransport)
         favoritesClient = SonosFavoritesClient(transport: sonosControlTransport)
+        appleMusicCatalogSearchClient = SonoicAppleMusicCatalogSearchClient()
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         manualSonosHost = settingsStore.loadManualSonosHost()
         recentPlays = settingsStore.loadRecentPlays()
+        appleMusicAuthorizationState = appleMusicCatalogSearchClient.currentAuthorizationState()
 
         do {
             sharedStore = try SonoicSharedStore()

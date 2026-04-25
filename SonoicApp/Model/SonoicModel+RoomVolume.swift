@@ -56,27 +56,50 @@ extension SonoicModel {
 
     func setRoomVolume(_ item: SonosRoomVolumeItem, to level: Int) async -> Bool {
         let boundedLevel = min(max(level, 0), 100)
-        mutatingRoomVolumeIDs.insert(item.id)
-        roomVolumeOperationErrorDetail = nil
         updateRoomVolumeItem(id: item.id) { roomItem in
             roomItem.volume.level = boundedLevel
         }
+        pendingRoomVolumeLevels[item.id] = boundedLevel
 
-        defer {
-            mutatingRoomVolumeIDs.remove(item.id)
-        }
-
-        do {
-            try await renderingControlClient.setVolume(host: item.host, level: boundedLevel)
-            if normalizedManualSonosHost(item.host) == normalizedManualSonosHost(manualSonosHost) {
-                externalVolume.level = boundedLevel
-            }
+        guard !mutatingRoomVolumeIDs.contains(item.id) else {
             return true
-        } catch {
-            roomVolumeOperationErrorDetail = error.localizedDescription
-            await refreshRoomVolumes(showLoading: false)
-            return false
         }
+
+        mutatingRoomVolumeIDs.insert(item.id)
+        roomVolumeOperationErrorDetail = nil
+        var latestRequestSucceeded = true
+
+        while let nextLevel = pendingRoomVolumeLevels[item.id] {
+            pendingRoomVolumeLevels[item.id] = nil
+            let previousVolume = roomVolumeState.snapshot?.items.first { $0.id == item.id }?.volume
+
+            updateRoomVolumeItem(id: item.id) { roomItem in
+                roomItem.volume.level = nextLevel
+            }
+
+            do {
+                try await renderingControlClient.setVolume(host: item.host, level: nextLevel)
+                if normalizedManualSonosHost(item.host) == normalizedManualSonosHost(manualSonosHost) {
+                    externalVolume.level = nextLevel
+                }
+                latestRequestSucceeded = true
+            } catch {
+                latestRequestSucceeded = false
+                if pendingRoomVolumeLevels[item.id] == nil {
+                    roomVolumeOperationErrorDetail = error.localizedDescription
+                    if let previousVolume {
+                        updateRoomVolumeItem(id: item.id) { roomItem in
+                            roomItem.volume = previousVolume
+                        }
+                    } else {
+                        await refreshRoomVolumes(showLoading: false)
+                    }
+                }
+            }
+        }
+
+        mutatingRoomVolumeIDs.remove(item.id)
+        return latestRequestSucceeded
     }
 
     func toggleRoomMute(_ item: SonosRoomVolumeItem) async {

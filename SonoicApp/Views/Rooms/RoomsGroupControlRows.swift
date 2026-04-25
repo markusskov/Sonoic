@@ -3,8 +3,8 @@ import SwiftUI
 struct RoomsGroupMemberRow: View {
     let member: SonosGroupControlMember
     let canRemove: Bool
-    let setRoomVolume: (SonosDiscoveredPlayer, Int) async -> Void
-    let toggleRoomMute: (SonosDiscoveredPlayer) async -> Void
+    let setRoomVolume: (SonosRoomVolumeItem, Int) async -> Bool
+    let toggleRoomMute: (SonosRoomVolumeItem) async -> Void
     let removeAction: () -> Void
 
     var body: some View {
@@ -54,10 +54,9 @@ struct RoomsGroupMemberRow: View {
                 }
             }
 
-            if let volume = member.volume {
+            if let volumeItem = member.volumeItem {
                 RoomVolumeControl(
-                    player: member.player,
-                    volume: volume,
+                    item: volumeItem,
                     isMutating: member.isMutatingVolume,
                     setRoomVolume: setRoomVolume,
                     toggleRoomMute: toggleRoomMute

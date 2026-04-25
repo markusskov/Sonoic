@@ -38,8 +38,8 @@ struct RoomsGroupControlCard: View {
     let isRefreshing: Bool
     let addRoomToGroup: (SonosDiscoveredPlayer) async -> Void
     let removeRoomFromGroup: (SonosDiscoveredPlayer) async -> Void
-    let setRoomVolume: (SonosDiscoveredPlayer, Int) async -> Void
-    let toggleRoomMute: (SonosDiscoveredPlayer) async -> Void
+    let setRoomVolume: (SonosRoomVolumeItem, Int) async -> Bool
+    let toggleRoomMute: (SonosRoomVolumeItem) async -> Void
     let refreshGroupControl: () async -> Void
 
     @State private var pendingAction: PendingAction?

@@ -85,35 +85,36 @@ extension SonoicModel {
     }
 
     func playManualSonosFavorite(_ favorite: SonosFavoriteItem) async -> Bool {
-        guard let playbackURI = favorite.playbackURI.sonoicNonEmptyTrimmed,
-              let queuePlayerID = await manualSonosQueuePlayerID()
-        else {
+        guard let payload = favorite.playablePayload else {
             return false
         }
 
-        queueState = .idle
+        return await playManualSonosPayload(payload)
+    }
+
+    func playManualSonosPayload(_ payload: SonosPlayablePayload) async -> Bool {
+        guard payload.isValidForLaunch else {
+            return false
+        }
+
+        if let snapshot = queueState.snapshot {
+            queueState = .loaded(SonosQueueSnapshot(items: snapshot.items, currentItemIndex: nil))
+        }
+
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
-        let didStartPlayback = await performManualTransportCommand(
-            syncDelay: Self.manualTransportSyncDelay,
-            refreshQueueAfterSuccess: true
-        ) {
-            let trackNumber = try await avTransportClient.addURIToQueue(
-                host: manualSonosHost,
-                uri: playbackURI,
-                metadataXML: favorite.playbackMetadataXML
-            )
+        let didStartPlayback = await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
+            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
             try await avTransportClient.setTransportURI(
-                host: manualSonosHost,
-                uri: "x-rincon-queue:\(queuePlayerID)#0",
-                metadataXML: nil
+                host: playbackHost,
+                uri: payload.uri,
+                metadataXML: payload.metadataXML
             )
-            try await avTransportClient.seekToTrack(host: manualSonosHost, trackNumber: trackNumber)
-            try await avTransportClient.play(host: manualSonosHost)
+            try await avTransportClient.play(host: playbackHost)
         }
 
         if didStartPlayback {
-            recordRecentFavoritePlayback(favorite)
+            recordRecentPlayablePayload(payload)
         }
 
         return didStartPlayback
@@ -128,13 +129,7 @@ extension SonoicModel {
         manualHostRefreshStatus = .refreshing
 
         do {
-            if activeTarget.kind == .group {
-                let groupHost = await manualSonosCoordinatorHost() ?? manualSonosHost
-                try await groupRenderingControlClient.setMute(host: groupHost, isMuted: desiredMute)
-            } else {
-                try await renderingControlClient.setMute(host: manualSonosHost, isMuted: desiredMute)
-            }
-
+            try await setExternalMuteForActiveTarget(desiredMute)
             externalVolume.isMuted = desiredMute
             manualHostRefreshStatus = .updated(.now)
             startManualHostRefreshLoopIfPossible()
@@ -170,13 +165,7 @@ extension SonoicModel {
             manualHostRefreshStatus = .refreshing
 
             do {
-                if activeTarget.kind == .group {
-                    let groupHost = await manualSonosCoordinatorHost() ?? manualSonosHost
-                    try await groupRenderingControlClient.setVolume(host: groupHost, level: nextLevel)
-                } else {
-                    try await renderingControlClient.setVolume(host: manualSonosHost, level: nextLevel)
-                }
-
+                try await setExternalVolumeForActiveTarget(to: nextLevel)
                 manualHostRefreshStatus = .updated(.now)
                 latestRequestSucceeded = true
             } catch {

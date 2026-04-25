@@ -5,23 +5,125 @@ extension SonoicModel {
         homeFavoritesState.snapshot?.collectionItems ?? []
     }
 
-    var homeSourceSummaries: [SonoicHomeSourceSummary] {
+    var homeRecentPlays: [SonoicRecentPlayItem] {
+        visibleUniqueRecentPlays(from: recentPlays)
+    }
+
+    var homeSources: [SonoicSource] {
         let favorites = homeFavoritesState.snapshot?.items ?? []
         let favoriteServices = favorites.compactMap(\.service)
+        let recentPlays = homeRecentPlays
         let recentServices = recentPlays.compactMap(\.service)
         let currentService = SonosServiceCatalog.descriptor(named: nowPlaying.sourceName)
-        let services = orderedUniqueServices(favoriteServices + recentServices + [currentService].compactMap { $0 })
+        let services = orderedUniqueServices(
+            favoriteServices
+                + recentServices
+                + [currentService].compactMap { $0 }
+                + SonosServiceCatalog.browsableServices
+        )
 
         return services.map { service in
             let matchingFavorites = favorites.filter { $0.service?.id == service.id }
             let matchingRecentPlays = recentPlays.filter { $0.service?.id == service.id }
+            let isVisibleThroughSonos = !matchingFavorites.isEmpty || !matchingRecentPlays.isEmpty || currentService?.id == service.id
 
-            return SonoicHomeSourceSummary(
+            return SonoicSource(
                 service: service,
                 favoriteCount: matchingFavorites.count,
                 collectionCount: matchingFavorites.filter(\.isCollectionLike).count,
                 recentCount: matchingRecentPlays.count,
-                isCurrent: currentService?.id == service.id
+                isCurrent: currentService?.id == service.id,
+                status: isVisibleThroughSonos ? .visibleThroughSonos : .availableForSetup
+            )
+        }
+    }
+
+    func favoriteSourceItems(for source: SonoicSource) -> [SonoicSourceItem] {
+        let favorites = homeFavoritesState.snapshot?.items ?? []
+        return favorites
+            .filter { $0.service?.id == source.service.id }
+            .map(SonoicSourceItem.init(favorite:))
+    }
+
+    func recentSourceItems(for source: SonoicSource) -> [SonoicSourceItem] {
+        homeRecentPlays
+            .filter { $0.service?.id == source.service.id }
+            .map(SonoicSourceItem.init(recentPlay:))
+    }
+
+    func sourceSearchState(for source: SonoicSource) -> SonoicSourceSearchState {
+        sourceSearchStates[source.service.id] ?? SonoicSourceSearchState(service: source.service)
+    }
+
+    func updateSourceSearchQuery(_ query: String, for source: SonoicSource) {
+        let currentState = sourceSearchState(for: source)
+        sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+            query: query,
+            service: source.service,
+            scope: currentState.scope
+        )
+    }
+
+    func updateSourceSearchScope(_ scope: SonoicSourceSearchScope, for source: SonoicSource) {
+        let currentState = sourceSearchState(for: source)
+        sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+            query: currentState.query,
+            service: source.service,
+            scope: scope,
+            items: scope == currentState.scope ? currentState.items : [],
+            status: scope == currentState.scope ? currentState.status : .idle
+        )
+    }
+
+    func searchSourceCatalog(for source: SonoicSource) async {
+        let currentState = sourceSearchState(for: source)
+        guard let query = currentState.query.sonoicNonEmptyTrimmed else {
+            updateSourceSearchQuery("", for: source)
+            return
+        }
+
+        sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+            query: query,
+            service: source.service,
+            scope: currentState.scope,
+            status: .loading
+        )
+
+        do {
+            let items: [SonoicSourceItem]
+            switch source.service.kind {
+            case .appleMusic:
+                refreshAppleMusicAuthorizationState()
+                guard appleMusicAuthorizationState.allowsCatalogSearch else {
+                    sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+                        query: query,
+                        service: source.service,
+                        status: .failed(appleMusicAuthorizationState.detail)
+                    )
+                    return
+                }
+
+                items = try await appleMusicCatalogSearchClient.searchCatalog(
+                    term: query,
+                    scope: currentState.scope
+                )
+            case .spotify, .sonosRadio, .genericStreaming:
+                items = []
+            }
+
+            sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+                query: query,
+                service: source.service,
+                scope: currentState.scope,
+                items: items,
+                status: .loaded
+            )
+        } catch {
+            sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+                query: query,
+                service: source.service,
+                scope: currentState.scope,
+                status: .failed(error.localizedDescription)
             )
         }
     }
@@ -78,9 +180,17 @@ extension SonoicModel {
     }
 
     func recordRecentFavoritePlayback(_ favorite: SonosFavoriteItem) {
+        guard let payload = favorite.playablePayload else {
+            return
+        }
+
+        recordRecentPlayablePayload(payload)
+    }
+
+    func recordRecentPlayablePayload(_ payload: SonosPlayablePayload) {
         upsertRecentPlay(
             SonoicRecentPlayItem(
-                favorite: favorite,
+                payload: payload,
                 playedAt: .now
             )
         )
@@ -95,21 +205,22 @@ extension SonoicModel {
     }
 
     private func upsertRecentPlay(_ recentPlay: SonoicRecentPlayItem) {
-        if let firstRecentPlay = recentPlays.first,
-           firstRecentPlay.id == recentPlay.id
-        {
-            let enrichedRecentPlay = firstRecentPlay.enriched(with: recentPlay)
-            guard enrichedRecentPlay != firstRecentPlay else {
-                return
-            }
-
-            recentPlays[0] = enrichedRecentPlay
-            settingsStore.saveRecentPlays(recentPlays)
+        guard recentPlay.isVisibleInHomeHistory else {
             return
         }
 
-        var nextRecentPlays = recentPlays.filter { $0.id != recentPlay.id }
-        nextRecentPlays.insert(recentPlay, at: 0)
+        let existingRecentPlay = recentPlays.first {
+            $0.isVisibleInHomeHistory
+                && ($0.id == recentPlay.id || $0.matchesHomeHistoryIdentity(of: recentPlay))
+        }
+        let resolvedRecentPlay = existingRecentPlay?.enriched(with: recentPlay) ?? recentPlay
+
+        var nextRecentPlays = recentPlays.filter {
+            $0.isVisibleInHomeHistory
+                && $0.id != resolvedRecentPlay.id
+                && !$0.matchesHomeHistoryIdentity(of: resolvedRecentPlay)
+        }
+        nextRecentPlays.insert(resolvedRecentPlay, at: 0)
 
         if nextRecentPlays.count > Self.homeRecentPlayLimit {
             nextRecentPlays = Array(nextRecentPlays.prefix(Self.homeRecentPlayLimit))
@@ -121,6 +232,20 @@ extension SonoicModel {
 
         recentPlays = nextRecentPlays
         settingsStore.saveRecentPlays(nextRecentPlays)
+    }
+
+    private func visibleUniqueRecentPlays(from recentPlays: [SonoicRecentPlayItem]) -> [SonoicRecentPlayItem] {
+        var seenIdentities: Set<String> = []
+
+        return recentPlays.compactMap { recentPlay in
+            guard recentPlay.isVisibleInHomeHistory,
+                  seenIdentities.insert(recentPlay.homeHistoryIdentity).inserted
+            else {
+                return nil
+            }
+
+            return recentPlay
+        }
     }
 
     private func orderedUniqueServices(_ services: [SonosServiceDescriptor]) -> [SonosServiceDescriptor] {

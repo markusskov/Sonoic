@@ -99,7 +99,7 @@ extension PlayerSheetView {
     }
 
     func skipToPreviousTrack() async {
-        await model.skipToPreviousManualSonosTrack()
+        _ = await model.skipToPreviousManualSonosTrack()
     }
 
     func togglePlayback() async {
@@ -107,7 +107,7 @@ extension PlayerSheetView {
     }
 
     func skipToNextTrack() async {
-        await model.skipToNextManualSonosTrack()
+        _ = await model.skipToNextManualSonosTrack()
     }
 
     func toggleMute() {

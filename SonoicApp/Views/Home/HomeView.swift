@@ -4,6 +4,8 @@ struct HomeView: View {
     @Environment(SonoicModel.self) private var model
 
     var body: some View {
+        let recentPlays = model.homeRecentPlays
+
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 if model.hasManualSonosHost {
@@ -16,7 +18,7 @@ struct HomeView: View {
                         openQueue: openQueue
                     )
 
-                    if !model.recentPlays.isEmpty {
+                    if !recentPlays.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
                             HomeSectionHeader(
                                 title: "Recently Played",
@@ -24,7 +26,7 @@ struct HomeView: View {
                             )
 
                             HomeRecentlyPlayedSection(
-                                items: model.recentPlays,
+                                items: recentPlays,
                                 playRecentItem: playRecentItem
                             )
                         }
@@ -55,14 +57,14 @@ struct HomeView: View {
                         }
                     }
 
-                    if !model.homeSourceSummaries.isEmpty {
+                    if !model.homeSources.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
                             HomeSectionHeader(
                                 title: "Sources",
-                                subtitle: "Services currently visible through favorites, history, and now playing."
+                                subtitle: "Services visible through Sonos, plus the next integrations."
                             )
 
-                            HomeServicesSection(summaries: model.homeSourceSummaries)
+                            HomeServicesSection(sources: model.homeSources)
                         }
                     }
                 } else {

@@ -26,11 +26,14 @@ What works today:
 - widget backed by shared app state
 - native Apple now-playing integration with play/pause, next/previous, artwork, progress, and lock-screen scrubbing when Sonos exposes duration
 - home theater controls for EQ, sub level, speech enhancement, night sound, and TV audio diagnostics
+- Apple Music source surface with authorization status, catalog search, saved library lanes, recently added items, and item detail pages
+- explicit service playback capability labels so metadata-only Apple Music items are not presented as Sonos-playable
 
 What is still in progress:
 
 - stable Lock Screen / Control Center ownership through Apple’s native now-playing surfaces
-- deeper music-service integrations for Apple Music, Spotify, playlists, and source destinations
+- Sonos-native playback payloads for Apple Music catalog and library items
+- deeper music-service integrations for Spotify, playlists, and source destinations
 - queue-derived flows from `Home`
 - broader home theater validation across more Sonos products
 - App Intents, shortcuts, and richer outside-app entry points
@@ -110,11 +113,12 @@ Before running on your own Apple developer account:
 Notes:
 
 - Sonoic uses Bonjour discovery first and keeps manual host entry as a fallback in `Settings`.
-- `Home` is now a music hub for favorites, collections, recent plays, sources, and the current session. Service rows are still mostly informational in this slice.
+- `Home` is now a music hub for favorites, collections, recent plays, sources, and the current session. Apple Music can show authorized metadata, library lanes, search results, item details, and recently added items, while playback stays Sonos-native.
 - `Rooms` can show discovered rooms, current groups, selected target state, bonded home theater setup, and home theater controls.
 - `Queue` can inspect, jump, clear, remove, and reorder the active Sonos queue. Adding new queue items from arbitrary services is still future work.
 - `Settings` is now mostly diagnostics and fallback connection details.
 - The app requests local-network access because Sonos control currently happens over the LAN.
+- The app requests Apple Music access only for Apple Music metadata surfaces. Sonoic does not use MusicKit app-owned playback as the main path because Sonos should remain the audio owner.
 - Some now-playing behavior on the Lock Screen is still experimental and under active refinement.
 
 ## Development Roadmap
@@ -125,7 +129,7 @@ The short version:
 
 1. finish the native now-playing path cleanly
 2. validate discovery, queue, Home, and home theater controls on more real Sonos households
-3. expand music-service destinations and playlist/source flows
+3. expand Apple Music metadata into Sonos-native playback payload research and playlist/source flows
 4. add App Intents, shortcuts, and deeper outside-app entry points
 
 ## Open Source Notes

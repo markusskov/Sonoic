@@ -6,10 +6,6 @@ struct PlayerTransportControls: View {
     let togglePlayback: () async -> Void
     let skipNext: () async -> Void
 
-    private var supportsTrackNavigation: Bool {
-        nowPlaying.supportsTrackNavigation
-    }
-
     var body: some View {
         HStack(spacing: 28) {
             Button(action: skipPreviousTapped) {
@@ -18,7 +14,7 @@ struct PlayerTransportControls: View {
                     .font(.title2.weight(.semibold))
                     .frame(width: 58, height: 58)
             }
-            .disabled(!supportsTrackNavigation)
+            .disabled(!nowPlaying.canSkipPrevious)
             .buttonStyle(.plain)
 
             Button(action: playPauseTapped) {
@@ -32,6 +28,7 @@ struct PlayerTransportControls: View {
             }
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
+            .disabled(!nowPlaying.canTogglePlayback)
 
             Button(action: skipNextTapped) {
                 Label("Next", systemImage: "forward.fill")
@@ -39,7 +36,7 @@ struct PlayerTransportControls: View {
                     .font(.title2.weight(.semibold))
                     .frame(width: 58, height: 58)
             }
-            .disabled(!supportsTrackNavigation)
+            .disabled(!nowPlaying.canSkipNext)
             .buttonStyle(.plain)
         }
     }
