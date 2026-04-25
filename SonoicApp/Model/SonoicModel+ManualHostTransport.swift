@@ -93,6 +93,10 @@ extension SonoicModel {
     }
 
     func playManualSonosPayload(_ payload: SonosPlayablePayload) async -> Bool {
+        guard payload.isValidForLaunch else {
+            return false
+        }
+
         if let snapshot = queueState.snapshot {
             queueState = .loaded(SonosQueueSnapshot(items: snapshot.items, currentItemIndex: nil))
         }

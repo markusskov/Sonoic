@@ -8,6 +8,7 @@ struct SonosPlayablePayload: Identifiable, Equatable {
 
     enum LaunchMode: String, Codable, Equatable {
         case direct
+        case queueNext
     }
 
     let id: String
@@ -19,6 +20,31 @@ struct SonosPlayablePayload: Identifiable, Equatable {
     var metadataXML: String?
     var kind: Kind
     var launchMode: LaunchMode
+
+    var validationFailureReason: String? {
+        if uri.sonoicNonEmptyTrimmed == nil {
+            return "Missing Sonos playback URI."
+        }
+
+        switch launchMode {
+        case .direct:
+            return nil
+        case .queueNext:
+            guard kind == .item else {
+                return "Only item payloads can be queued next."
+            }
+
+            guard metadataXML.sonoicNonEmptyTrimmed != nil else {
+                return "Queue playback needs Sonos DIDL metadata."
+            }
+
+            return nil
+        }
+    }
+
+    var isValidForLaunch: Bool {
+        validationFailureReason == nil
+    }
 
     init(
         id: String,
