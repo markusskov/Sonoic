@@ -292,7 +292,8 @@ private struct SettingsMusicKitDiagnosticsRows: View {
 
     var body: some View {
         LabeledContent("Bundle ID", value: diagnostics.bundleIdentifier)
-        LabeledContent("MusicKit Entitlement", value: diagnostics.expectsMusicUserTokenEntitlement ? "Configured" : "Missing")
+        LabeledContent("MusicKit App Service", value: "Developer Portal")
+        LabeledContent("Developer Token", value: diagnostics.usesAutomaticDeveloperTokenGeneration ? "Automatic" : "Manual")
         LabeledContent("Usage Description", value: diagnostics.hasUsageDescription ? "Present" : "Missing")
     }
 }

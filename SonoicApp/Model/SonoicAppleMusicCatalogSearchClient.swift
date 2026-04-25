@@ -4,15 +4,19 @@ import MusicKit
 struct SonoicAppleMusicCatalogSearchClient {
     enum ClientError: LocalizedError {
         case unauthorized(MusicAuthorization.Status)
-        case missingDeveloperTokenSetup
+        case missingDeveloperTokenSetup(MusicKitRequestFailure)
 
         var errorDescription: String? {
             switch self {
             case let .unauthorized(status):
                 let appStatus = SonoicAppleMusicAuthorizationState.Status(status)
                 return "Apple Music access is \(appStatus.sonoicDisplayName.lowercased())."
-            case .missingDeveloperTokenSetup:
-                return "Enable MusicKit for Sonoic's App ID and provisioning profile, then rebuild the app."
+            case let .missingDeveloperTokenSetup(failure):
+                return """
+                MusicKit could not receive Apple's automatic developer token for this bundle. Confirm MusicKit is enabled for com.markusskov.Sonoic in Apple Developer, then rebuild after the App ID has propagated.
+
+                \(failure.displayDetail)
+                """
             }
         }
     }
@@ -87,10 +91,27 @@ struct SonoicAppleMusicCatalogSearchClient {
 
     private func mappedMusicKitError(_ error: Error) -> Error {
         if error.localizedDescription.localizedCaseInsensitiveContains("developer token") {
-            return ClientError.missingDeveloperTokenSetup
+            return ClientError.missingDeveloperTokenSetup(MusicKitRequestFailure(error))
         }
 
         return error
+    }
+}
+
+struct MusicKitRequestFailure: Equatable {
+    var domain: String
+    var code: Int
+    var message: String
+
+    init(_ error: Error) {
+        let nsError = error as NSError
+        domain = nsError.domain
+        code = nsError.code
+        message = nsError.localizedDescription
+    }
+
+    nonisolated var displayDetail: String {
+        "\(domain) \(code): \(message)"
     }
 }
 

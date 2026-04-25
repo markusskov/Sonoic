@@ -123,17 +123,15 @@ struct SonoicAppleMusicServiceDetails: Equatable {
 }
 
 struct SonoicMusicKitDiagnostics: Equatable {
-    static let musicUserTokenEntitlement = "com.apple.developer.music-user-token"
-
     var bundleIdentifier: String
     var hasUsageDescription: Bool
-    var expectsMusicUserTokenEntitlement: Bool
+    var usesAutomaticDeveloperTokenGeneration: Bool
 
     static var current: SonoicMusicKitDiagnostics {
         SonoicMusicKitDiagnostics(
             bundleIdentifier: Bundle.main.bundleIdentifier ?? "Unknown",
             hasUsageDescription: Bundle.main.object(forInfoDictionaryKey: "NSAppleMusicUsageDescription") != nil,
-            expectsMusicUserTokenEntitlement: true
+            usesAutomaticDeveloperTokenGeneration: true
         )
     }
 }
