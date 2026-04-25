@@ -70,6 +70,7 @@ struct SourceSearchSection: View {
     let serviceName: String
     @Binding var query: String
     let state: SonoicSourceSearchState
+    let availabilityMessage: SourceSearchAvailabilityMessage?
     let search: () async -> Void
 
     var body: some View {
@@ -105,7 +106,13 @@ struct SourceSearchSection: View {
                         .accessibilityLabel("Search \(serviceName)")
                     }
 
-                    if !state.hasQuery {
+                    if let availabilityMessage {
+                        SourceSearchMessageRow(
+                            title: availabilityMessage.title,
+                            detail: availabilityMessage.detail,
+                            systemImage: availabilityMessage.systemImage
+                        )
+                    } else if !state.hasQuery {
                         SourceSearchIdleRow(serviceName: serviceName)
                     } else if let failureDetail = state.failureDetail {
                         SourceSearchMessageRow(
@@ -134,6 +141,12 @@ struct SourceSearchSection: View {
             await search()
         }
     }
+}
+
+struct SourceSearchAvailabilityMessage: Equatable {
+    var title: String
+    var detail: String
+    var systemImage: String
 }
 
 private struct SourceSearchField: View {

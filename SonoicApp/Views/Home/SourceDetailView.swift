@@ -32,6 +32,7 @@ struct SourceDetailView: View {
                             serviceName: source.service.name,
                             query: catalogSearchBinding,
                             state: catalogSearchState,
+                            availabilityMessage: appleMusicAvailabilityMessage,
                             search: searchCatalog
                         )
                     }
@@ -114,6 +115,20 @@ struct SourceDetailView: View {
 
     private func searchCatalog() async {
         await model.searchSourceCatalog(for: source)
+    }
+
+    private var appleMusicAvailabilityMessage: SourceSearchAvailabilityMessage? {
+        guard source.service.kind == .appleMusic,
+              !model.appleMusicAuthorizationState.allowsCatalogSearch
+        else {
+            return nil
+        }
+
+        return SourceSearchAvailabilityMessage(
+            title: model.appleMusicAuthorizationState.title,
+            detail: model.appleMusicAuthorizationState.detail,
+            systemImage: model.appleMusicAuthorizationState.systemImage
+        )
     }
 }
 
