@@ -97,6 +97,7 @@ final class SonoicModel {
     var recentPlays: [SonoicRecentPlayItem] = []
     var sourceSearchStates: [String: SonoicSourceSearchState] = [:]
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
+    var appleMusicServiceDetails = SonoicAppleMusicServiceDetails.idle
     var isQueueRefreshing = false
     var isQueueClearing = false
     var isQueueMutating = false

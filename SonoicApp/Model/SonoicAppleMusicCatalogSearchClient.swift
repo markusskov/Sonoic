@@ -23,6 +23,21 @@ struct SonoicAppleMusicCatalogSearchClient {
         return SonoicAppleMusicAuthorizationState(status: SonoicAppleMusicAuthorizationState.Status(status))
     }
 
+    func fetchServiceDetails() async throws -> SonoicAppleMusicServiceDetails {
+        async let subscription = MusicSubscription.current
+        async let storefrontCountryCode = MusicDataRequest.currentCountryCode
+
+        let resolvedSubscription = try await subscription
+        let resolvedStorefrontCountryCode = try await storefrontCountryCode
+
+        return .loaded(
+            storefrontCountryCode: resolvedStorefrontCountryCode,
+            canPlayCatalogContent: resolvedSubscription.canPlayCatalogContent,
+            canBecomeSubscriber: resolvedSubscription.canBecomeSubscriber,
+            hasCloudLibraryEnabled: resolvedSubscription.hasCloudLibraryEnabled
+        )
+    }
+
     func searchCatalog(term: String) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)

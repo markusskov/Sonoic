@@ -38,6 +38,7 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .task {
             model.refreshAppleMusicAuthorizationState()
+            await model.refreshAppleMusicServiceDetails()
         }
     }
 

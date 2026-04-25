@@ -165,6 +165,22 @@ struct SettingsMusicServicesSection: View {
                         }
                     }
                     .disabled(!model.appleMusicAuthorizationState.canRequestAuthorization)
+
+                    if model.appleMusicAuthorizationState.allowsCatalogSearch {
+                        SettingsAppleMusicServiceDetailsRows(details: model.appleMusicServiceDetails)
+
+                        Button(action: refreshAppleMusicDetails) {
+                            if model.appleMusicServiceDetails.isLoading {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                    Text("Refreshing Apple Music Details")
+                                }
+                            } else {
+                                Label("Refresh Apple Music Details", systemImage: "arrow.clockwise")
+                            }
+                        }
+                        .disabled(model.appleMusicServiceDetails.isLoading)
+                    }
                 }
             }
         } header: {
@@ -231,5 +247,40 @@ struct SettingsMusicServicesSection: View {
         Task {
             await model.requestAppleMusicAuthorization()
         }
+    }
+
+    private func refreshAppleMusicDetails() {
+        Task {
+            await model.refreshAppleMusicServiceDetails()
+        }
+    }
+}
+
+private struct SettingsAppleMusicServiceDetailsRows: View {
+    let details: SonoicAppleMusicServiceDetails
+
+    var body: some View {
+        if let failureDetail = details.failureDetail {
+            SettingsStatusRow(
+                title: "Apple Music Details",
+                statusTitle: "Unavailable",
+                detail: failureDetail,
+                systemImage: "exclamationmark.triangle.fill",
+                tint: .red
+            )
+        } else {
+            LabeledContent("Storefront", value: details.storefrontCountryCode ?? "Unknown")
+            LabeledContent("Catalog Playback", value: label(for: details.canPlayCatalogContent))
+            LabeledContent("Subscription Offer", value: label(for: details.canBecomeSubscriber))
+            LabeledContent("Cloud Library", value: label(for: details.hasCloudLibraryEnabled))
+        }
+    }
+
+    private func label(for value: Bool?) -> String {
+        guard let value else {
+            return "Unknown"
+        }
+
+        return value ? "Available" : "Unavailable"
     }
 }

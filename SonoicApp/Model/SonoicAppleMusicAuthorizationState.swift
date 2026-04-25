@@ -73,3 +73,51 @@ struct SonoicAppleMusicAuthorizationState: Equatable {
         }
     }
 }
+
+struct SonoicAppleMusicServiceDetails: Equatable {
+    enum Status: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed(String)
+    }
+
+    var status: Status = .idle
+    var storefrontCountryCode: String?
+    var canPlayCatalogContent: Bool?
+    var canBecomeSubscriber: Bool?
+    var hasCloudLibraryEnabled: Bool?
+
+    static let idle = SonoicAppleMusicServiceDetails()
+
+    static func loaded(
+        storefrontCountryCode: String,
+        canPlayCatalogContent: Bool,
+        canBecomeSubscriber: Bool,
+        hasCloudLibraryEnabled: Bool
+    ) -> SonoicAppleMusicServiceDetails {
+        SonoicAppleMusicServiceDetails(
+            status: .loaded,
+            storefrontCountryCode: storefrontCountryCode,
+            canPlayCatalogContent: canPlayCatalogContent,
+            canBecomeSubscriber: canBecomeSubscriber,
+            hasCloudLibraryEnabled: hasCloudLibraryEnabled
+        )
+    }
+
+    static func failed(_ detail: String) -> SonoicAppleMusicServiceDetails {
+        SonoicAppleMusicServiceDetails(status: .failed(detail))
+    }
+
+    var isLoading: Bool {
+        status == .loading
+    }
+
+    var failureDetail: String? {
+        if case let .failed(detail) = status {
+            detail
+        } else {
+            nil
+        }
+    }
+}
