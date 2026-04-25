@@ -61,6 +61,7 @@ enum SonoicPlaybackCapability: Equatable {
 
 struct SonoicSourceItem: Identifiable, Equatable {
     enum Origin: String, Equatable {
+        case catalogSearch
         case favorite
         case recentPlay
     }
@@ -130,6 +131,26 @@ struct SonoicSourceItem: Identifiable, Equatable {
             service: recentPlay.service ?? .genericStreaming,
             origin: .recentPlay,
             playbackCapability: recentPlay.replayFavorite.map(SonoicPlaybackCapability.sonosNative) ?? .metadataOnly
+        )
+    }
+
+    static func catalogSearchPlaceholder(
+        query: String,
+        service: SonosServiceDescriptor
+    ) -> SonoicSourceItem? {
+        guard let normalizedQuery = query.sonoicNonEmptyTrimmed else {
+            return nil
+        }
+
+        return SonoicSourceItem(
+            id: "catalog-\(service.id)-\(normalizedQuery.lowercased())",
+            title: normalizedQuery,
+            subtitle: "\(service.name) catalog search",
+            artworkURL: nil,
+            artworkIdentifier: nil,
+            service: service,
+            origin: .catalogSearch,
+            playbackCapability: .metadataOnly
         )
     }
 }

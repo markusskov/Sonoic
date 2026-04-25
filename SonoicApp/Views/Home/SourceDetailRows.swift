@@ -50,6 +50,8 @@ struct SourceItemRow: View {
 
     private var originTitle: String {
         switch item.origin {
+        case .catalogSearch:
+            "Catalog"
         case .favorite:
             "Favorite"
         case .recentPlay:
@@ -61,6 +63,96 @@ struct SourceItemRow: View {
         Task {
             await playAction()
         }
+    }
+}
+
+struct SourceSearchSection: View {
+    let serviceName: String
+    @Binding var query: String
+    let items: [SonoicSourceItem]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HomeSectionHeader(
+                title: "Catalog",
+                subtitle: "Search will start here before service auth and Sonos-native playback arrive."
+            )
+
+            RoomSurfaceCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    SourceSearchField(query: $query, serviceName: serviceName)
+
+                    if query.sonoicNonEmptyTrimmed == nil {
+                        SourceSearchIdleRow(serviceName: serviceName)
+                    } else {
+                        ForEach(items) { item in
+                            SourceItemRow(item: item) {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct SourceSearchField: View {
+    @Binding var query: String
+    let serviceName: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.body.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            TextField("Search \(serviceName)", text: $query)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled(false)
+
+            if query.sonoicNonEmptyTrimmed != nil {
+                Button(action: clearQuery) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(.quaternary.opacity(0.35), in: Capsule())
+    }
+
+    private func clearQuery() {
+        query = ""
+    }
+}
+
+private struct SourceSearchIdleRow: View {
+    let serviceName: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            RoomSurfaceIconView(
+                systemImage: "music.magnifyingglass",
+                size: 44,
+                cornerRadius: 14,
+                font: .body.weight(.semibold)
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(serviceName) Search")
+                    .font(.body.weight(.medium))
+
+                Text("Catalog browsing is not connected yet")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.secondary)
     }
 }
 

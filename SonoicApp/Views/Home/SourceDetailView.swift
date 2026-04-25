@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SourceDetailView: View {
     @Environment(SonoicModel.self) private var model
+    @State private var catalogSearchText = ""
 
     let source: SonoicSource
 
@@ -13,11 +14,29 @@ struct SourceDetailView: View {
         model.recentSourceItems(for: source)
     }
 
+    private var catalogSearchItems: [SonoicSourceItem] {
+        SonoicSourceItem
+            .catalogSearchPlaceholder(query: catalogSearchText, service: source.service)
+            .map { [$0] } ?? []
+    }
+
+    private var showsCatalogSearch: Bool {
+        source.service.kind == .appleMusic
+    }
+
     var body: some View {
         ScrollView {
             GlassEffectContainer(spacing: 18) {
                 VStack(alignment: .leading, spacing: 28) {
                     SourceHeaderCard(source: source)
+
+                    if showsCatalogSearch {
+                        SourceSearchSection(
+                            serviceName: source.service.name,
+                            query: $catalogSearchText,
+                            items: catalogSearchItems
+                        )
+                    }
 
                     if !favoriteItems.isEmpty {
                         sourceSection(
@@ -39,7 +58,9 @@ struct SourceDetailView: View {
                         SourceEmptyCard(serviceName: source.service.name)
                     }
 
-                    SourceCatalogPlaceholderCard(serviceName: source.service.name)
+                    if !showsCatalogSearch {
+                        SourceCatalogPlaceholderCard(serviceName: source.service.name)
+                    }
                 }
                 .padding(20)
             }
