@@ -8,9 +8,19 @@ struct SonoicAppleMusicCatalogSearchClient {
         var errorDescription: String? {
             switch self {
             case let .unauthorized(status):
-                "Apple Music access is \(status.sonoicDisplayName.lowercased())."
+                let appStatus = SonoicAppleMusicAuthorizationState.Status(status)
+                return "Apple Music access is \(appStatus.sonoicDisplayName.lowercased())."
             }
         }
+    }
+
+    func currentAuthorizationState() -> SonoicAppleMusicAuthorizationState {
+        SonoicAppleMusicAuthorizationState(status: SonoicAppleMusicAuthorizationState.Status(MusicAuthorization.currentStatus))
+    }
+
+    func requestAuthorizationState() async -> SonoicAppleMusicAuthorizationState {
+        let status = await MusicAuthorization.request()
+        return SonoicAppleMusicAuthorizationState(status: SonoicAppleMusicAuthorizationState.Status(status))
     }
 
     func searchCatalog(term: String) async throws -> [SonoicSourceItem] {
@@ -53,17 +63,36 @@ struct SonoicAppleMusicCatalogSearchClient {
     }
 }
 
-private extension MusicAuthorization.Status {
+extension SonoicAppleMusicAuthorizationState.Status {
+    nonisolated init(_ musicAuthorizationStatus: MusicAuthorization.Status) {
+        switch musicAuthorizationStatus {
+        case .notDetermined:
+            self = .notDetermined
+        case .denied:
+            self = .denied
+        case .restricted:
+            self = .restricted
+        case .authorized:
+            self = .authorized
+        @unknown default:
+            self = .unavailable
+        }
+    }
+
     nonisolated var sonoicDisplayName: String {
         switch self {
         case .notDetermined:
             "Not Determined"
+        case .requesting:
+            "Requesting"
         case .denied:
             "Denied"
         case .restricted:
             "Restricted"
         case .authorized:
             "Authorized"
+        case .unavailable:
+            "Unavailable"
         @unknown default:
             "Unavailable"
         }

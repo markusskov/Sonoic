@@ -140,6 +140,8 @@ struct SettingsStatusSection: View {
 }
 
 struct SettingsMusicServicesSection: View {
+    let model: SonoicModel
+
     var body: some View {
         Section {
             ForEach(SonosServiceCatalog.browsableServices) { service in
@@ -147,9 +149,23 @@ struct SettingsMusicServicesSection: View {
                     title: service.name,
                     statusTitle: statusTitle(for: service),
                     detail: detailText(for: service),
-                    systemImage: service.systemImage,
+                    systemImage: systemImage(for: service),
                     tint: tint(for: service)
                 )
+
+                if service.kind == .appleMusic {
+                    Button(action: requestAppleMusicAuthorization) {
+                        if model.appleMusicAuthorizationState.isRequestingAuthorization {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text("Authorizing Apple Music")
+                            }
+                        } else {
+                            Label("Authorize Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                        }
+                    }
+                    .disabled(!model.appleMusicAuthorizationState.canRequestAuthorization)
+                }
             }
         } header: {
             Text("Music Services")
@@ -161,7 +177,7 @@ struct SettingsMusicServicesSection: View {
     private func statusTitle(for service: SonosServiceDescriptor) -> String {
         switch service.kind {
         case .appleMusic:
-            "Search Shell Ready"
+            model.appleMusicAuthorizationState.title
         case .spotify:
             "Coming Later"
         case .sonosRadio, .genericStreaming:
@@ -172,7 +188,7 @@ struct SettingsMusicServicesSection: View {
     private func detailText(for service: SonosServiceDescriptor) -> String {
         switch service.kind {
         case .appleMusic:
-            "Catalog search UI is in place. Authorization is not connected yet."
+            model.appleMusicAuthorizationState.detail
         case .spotify:
             "Spotify account and catalog access are planned after Apple Music."
         case .sonosRadio, .genericStreaming:
@@ -183,9 +199,37 @@ struct SettingsMusicServicesSection: View {
     private func tint(for service: SonosServiceDescriptor) -> Color {
         switch service.kind {
         case .appleMusic:
-            .orange
+            tint(for: model.appleMusicAuthorizationState.status)
         case .spotify, .sonosRadio, .genericStreaming:
             .secondary
+        }
+    }
+
+    private func systemImage(for service: SonosServiceDescriptor) -> String {
+        switch service.kind {
+        case .appleMusic:
+            model.appleMusicAuthorizationState.systemImage
+        case .spotify, .sonosRadio, .genericStreaming:
+            service.systemImage
+        }
+    }
+
+    private func tint(for status: SonoicAppleMusicAuthorizationState.Status) -> Color {
+        switch status {
+        case .authorized:
+            .green
+        case .requesting:
+            .orange
+        case .denied, .restricted, .unavailable:
+            .red
+        case .notDetermined:
+            .orange
+        }
+    }
+
+    private func requestAppleMusicAuthorization() {
+        Task {
+            await model.requestAppleMusicAuthorization()
         }
     }
 }

@@ -15,7 +15,7 @@ struct SettingsView: View {
                 SettingsPlayerPickerSection(model: model)
             }
 
-            SettingsMusicServicesSection()
+            SettingsMusicServicesSection(model: model)
 
             if model.hasManualSonosHost {
                 SettingsSelectedPlayerSection(model: model)
@@ -36,6 +36,9 @@ struct SettingsView: View {
         }
         .miniPlayerContentInset()
         .navigationTitle("Settings")
+        .task {
+            model.refreshAppleMusicAuthorizationState()
+        }
     }
 
     private var discoveryStatusDetail: String? {

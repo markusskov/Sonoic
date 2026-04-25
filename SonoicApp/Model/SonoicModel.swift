@@ -96,6 +96,7 @@ final class SonoicModel {
     var roomVolumeState: SonosRoomVolumeState = .idle
     var recentPlays: [SonoicRecentPlayItem] = []
     var sourceSearchStates: [String: SonoicSourceSearchState] = [:]
+    var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
     var isQueueRefreshing = false
     var isQueueClearing = false
     var isQueueMutating = false
@@ -223,6 +224,7 @@ final class SonoicModel {
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         manualSonosHost = settingsStore.loadManualSonosHost()
         recentPlays = settingsStore.loadRecentPlays()
+        appleMusicAuthorizationState = appleMusicCatalogSearchClient.currentAuthorizationState()
 
         do {
             sharedStore = try SonoicSharedStore()
