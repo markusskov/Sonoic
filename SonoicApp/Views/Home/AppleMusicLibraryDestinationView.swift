@@ -120,6 +120,10 @@ struct AppleMusicLibraryDestinationView: View {
     }
 
     private func loadIfNeeded() async {
+        if state.destination != destination || state.isLoading {
+            state = SonoicAppleMusicLibraryState(destination: destination)
+        }
+
         guard state.status == .idle else {
             return
         }
@@ -166,6 +170,8 @@ struct AppleMusicLibraryDestinationView: View {
                 items: items,
                 status: .loaded
             )
+        } catch is CancellationError {
+            state = SonoicAppleMusicLibraryState(destination: destination)
         } catch {
             state = SonoicAppleMusicLibraryState(
                 destination: destination,
