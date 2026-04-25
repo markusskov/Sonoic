@@ -47,6 +47,22 @@ struct SonosAVTransportClient {
         }
     }
 
+    func fetchCurrentTransportActions(host: String) async throws -> SonosTransportActions {
+        let data = try await transport.performAction(
+            service: .avTransport,
+            named: "GetCurrentTransportActions",
+            body: """
+            <u:GetCurrentTransportActions xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+            </u:GetCurrentTransportActions>
+            """,
+            host: host
+        )
+
+        let value = try SonosSOAPValueParser(expectedElement: "Actions").parse(data)
+        return SonosTransportActions(actionsString: value)
+    }
+
     func play(host: String) async throws {
         _ = try await transport.performAction(
             service: .avTransport,

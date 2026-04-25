@@ -56,6 +56,7 @@ struct SonosNowPlayingSnapshot: Equatable {
     var artworkIdentifier: String? = nil
     var elapsedTime: TimeInterval? = nil
     var duration: TimeInterval? = nil
+    var transportActions: SonosTransportActions? = nil
 
     static let unconfigured = SonosNowPlayingSnapshot(
         title: "No Player Connected",
@@ -84,7 +85,80 @@ struct SonosNowPlayingSnapshot: Equatable {
     }
 
     var supportsTrackNavigation: Bool {
-        sourceName != "TV Audio"
+        guard let transportActions else {
+            return sourceName != "TV Audio"
+        }
+
+        return transportActions.canSkipNext || transportActions.canSkipPrevious
+    }
+
+    var canPlay: Bool {
+        transportActions?.canPlay ?? (playbackState != .playing)
+    }
+
+    var canPause: Bool {
+        transportActions?.canPause ?? (playbackState == .playing || playbackState == .buffering)
+    }
+
+    var canTogglePlayback: Bool {
+        canPlay || canPause
+    }
+
+    var canSkipNext: Bool {
+        transportActions?.canSkipNext ?? supportsTrackNavigation
+    }
+
+    var canSkipPrevious: Bool {
+        transportActions?.canSkipPrevious ?? supportsTrackNavigation
+    }
+
+    var canSeek: Bool {
+        transportActions?.canSeek ?? true
+    }
+}
+
+struct SonosTransportActions: Equatable, Hashable {
+    private var normalizedActions: Set<String>
+
+    init(rawActions: Set<String>) {
+        normalizedActions = Set(rawActions.compactMap { $0.sonoicNonEmptyTrimmed?.lowercased() })
+    }
+
+    init(actionsString: String) {
+        let rawActions = actionsString
+            .split(separator: ",")
+            .map(String.init)
+            .compactMap(\.sonoicNonEmptyTrimmed)
+
+        self.init(rawActions: Set(rawActions))
+    }
+
+    var canPlay: Bool {
+        contains("Play")
+    }
+
+    var canPause: Bool {
+        contains("Pause")
+    }
+
+    var canStop: Bool {
+        contains("Stop")
+    }
+
+    var canSeek: Bool {
+        contains("Seek")
+    }
+
+    var canSkipNext: Bool {
+        contains("Next")
+    }
+
+    var canSkipPrevious: Bool {
+        contains("Previous")
+    }
+
+    private func contains(_ action: String) -> Bool {
+        normalizedActions.contains(action.lowercased())
     }
 }
 

@@ -278,12 +278,12 @@ final class SonoicNowPlayableSessionController: NSObject {
 
     private func updateCommandAvailability(for nowPlaying: SonosNowPlayingSnapshot) {
         let commandCenter = nowPlayingSession.remoteCommandCenter
-        commandCenter.playCommand.isEnabled = nowPlaying.playbackState != .playing
-        commandCenter.pauseCommand.isEnabled = nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering
-        commandCenter.togglePlayPauseCommand.isEnabled = true
-        commandCenter.nextTrackCommand.isEnabled = nowPlaying.supportsTrackNavigation
-        commandCenter.previousTrackCommand.isEnabled = nowPlaying.supportsTrackNavigation
-        commandCenter.changePlaybackPositionCommand.isEnabled = seekHandler != nil && nowPlaying.duration != nil
+        commandCenter.playCommand.isEnabled = nowPlaying.canPlay
+        commandCenter.pauseCommand.isEnabled = nowPlaying.canPause
+        commandCenter.togglePlayPauseCommand.isEnabled = nowPlaying.canTogglePlayback
+        commandCenter.nextTrackCommand.isEnabled = nowPlaying.canSkipNext
+        commandCenter.previousTrackCommand.isEnabled = nowPlaying.canSkipPrevious
+        commandCenter.changePlaybackPositionCommand.isEnabled = seekHandler != nil && nowPlaying.duration != nil && nowPlaying.canSeek
     }
 
     private func updateCommandAvailability(isEnabled: Bool) {

@@ -38,7 +38,7 @@ struct PlayerSheetView: View {
                         PlayerProgressSection(
                             nowPlaying: model.nowPlaying,
                             observedAt: model.nowPlayingObservedAt,
-                            isEnabled: model.hasManualSonosHost,
+                            isEnabled: model.hasManualSonosHost && model.nowPlaying.canSeek,
                             showsTimeLabels: true,
                             showsThumb: false,
                             seek: { timeInterval in

@@ -84,6 +84,7 @@ extension SonoicModel {
             let wasAwaitingConfirmation = isManualPlayTransitionAwaitingConfirmation
             async let refreshedVolume = fetchExternalVolumeForActiveTarget()
             async let refreshedPlaybackState = avTransportClient.fetchPlaybackState(host: manualSonosHost)
+            async let refreshedTransportActions = fetchManualTransportActions()
             let rawPlaybackState = try await refreshedPlaybackState
             let playbackState = resolvedPlaybackState(rawPlaybackState)
             async let refreshedNowPlaying = nowPlayingClient.fetchSnapshot(
@@ -96,6 +97,7 @@ extension SonoicModel {
             var nextNowPlaying = nowPlayingResult.snapshot
             nextNowPlaying = smoothedNowPlayingSnapshot(nextNowPlaying)
             nextNowPlaying.artworkIdentifier = try? await syncArtworkIdentifier(for: nextNowPlaying)
+            nextNowPlaying.transportActions = await refreshedTransportActions ?? nowPlaying.transportActions
 
             if externalVolume != volume {
                 externalVolume = volume
@@ -136,6 +138,10 @@ extension SonoicModel {
             manualHostRefreshStatus = .failed(error.localizedDescription)
             return false
         }
+    }
+
+    private func fetchManualTransportActions() async -> SonosTransportActions? {
+        try? await avTransportClient.fetchCurrentTransportActions(host: manualSonosHost)
     }
 
     private func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {
