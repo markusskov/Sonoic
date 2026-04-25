@@ -61,7 +61,7 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             HomeSectionHeader(
                                 title: "Sources",
-                                subtitle: "Services currently visible through favorites, history, and now playing."
+                                subtitle: "Services visible through Sonos, plus the next integrations."
                             )
 
                             HomeServicesSection(sources: model.homeSources)

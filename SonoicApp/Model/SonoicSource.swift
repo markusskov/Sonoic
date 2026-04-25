@@ -2,6 +2,7 @@ import Foundation
 
 struct SonoicSource: Identifiable, Equatable {
     enum Status: String, Equatable {
+        case availableForSetup
         case visibleThroughSonos
     }
 
@@ -38,6 +39,10 @@ struct SonoicSource: Identifiable, Equatable {
         }
 
         guard !parts.isEmpty else {
+            if status == .availableForSetup {
+                return "Not connected yet"
+            }
+
             return isCurrent ? "Playing now" : "Available in Sonoic"
         }
 

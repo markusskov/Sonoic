@@ -15,18 +15,25 @@ extension SonoicModel {
         let recentPlays = homeRecentPlays
         let recentServices = recentPlays.compactMap(\.service)
         let currentService = SonosServiceCatalog.descriptor(named: nowPlaying.sourceName)
-        let services = orderedUniqueServices(favoriteServices + recentServices + [currentService].compactMap { $0 })
+        let services = orderedUniqueServices(
+            favoriteServices
+                + recentServices
+                + [currentService].compactMap { $0 }
+                + SonosServiceCatalog.browsableServices
+        )
 
         return services.map { service in
             let matchingFavorites = favorites.filter { $0.service?.id == service.id }
             let matchingRecentPlays = recentPlays.filter { $0.service?.id == service.id }
+            let isVisibleThroughSonos = !matchingFavorites.isEmpty || !matchingRecentPlays.isEmpty || currentService?.id == service.id
 
             return SonoicSource(
                 service: service,
                 favoriteCount: matchingFavorites.count,
                 collectionCount: matchingFavorites.filter(\.isCollectionLike).count,
                 recentCount: matchingRecentPlays.count,
-                isCurrent: currentService?.id == service.id
+                isCurrent: currentService?.id == service.id,
+                status: isVisibleThroughSonos ? .visibleThroughSonos : .availableForSetup
             )
         }
     }
