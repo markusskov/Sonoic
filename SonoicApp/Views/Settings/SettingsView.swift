@@ -40,6 +40,10 @@ struct SettingsView: View {
             model.refreshAppleMusicAuthorizationState()
             if model.appleMusicServiceDetails.isLoading {
                 model.appleMusicServiceDetails = .idle
+            } else if model.appleMusicAuthorizationState.allowsCatalogSearch,
+                      model.appleMusicServiceDetails.status == .idle
+            {
+                await model.refreshAppleMusicServiceDetails()
             }
         }
     }

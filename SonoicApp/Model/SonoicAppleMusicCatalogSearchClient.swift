@@ -1,10 +1,11 @@
 import Foundation
-import MusicKit
+@preconcurrency import MusicKit
 
 struct SonoicAppleMusicCatalogSearchClient {
     enum ClientError: LocalizedError {
         case unauthorized(MusicAuthorization.Status)
         case missingDeveloperTokenSetup(MusicKitRequestFailure)
+        case timedOut
 
         var errorDescription: String? {
             switch self {
@@ -17,6 +18,8 @@ struct SonoicAppleMusicCatalogSearchClient {
 
                 \(failure.displayDetail)
                 """
+            case .timedOut:
+                return "Apple Music did not respond. Try again in a moment."
             }
         }
     }
@@ -32,8 +35,12 @@ struct SonoicAppleMusicCatalogSearchClient {
 
     func fetchServiceDetails() async throws -> SonoicAppleMusicServiceDetails {
         do {
-            async let subscription = MusicSubscription.current
-            async let storefrontCountryCode = MusicDataRequest.currentCountryCode
+            async let subscription = withMusicKitTimeout {
+                try await MusicSubscription.current
+            }
+            async let storefrontCountryCode = withMusicKitTimeout {
+                try await MusicDataRequest.currentCountryCode
+            }
 
             let resolvedSubscription = try await subscription
             let resolvedStorefrontCountryCode = try await storefrontCountryCode
@@ -59,10 +66,13 @@ struct SonoicAppleMusicCatalogSearchClient {
             types: [Song.self, Album.self]
         )
         request.limit = 8
+        let configuredRequest = request
 
         let response: MusicCatalogSearchResponse
         do {
-            response = try await request.response()
+            response = try await withMusicKitTimeout {
+                try await configuredRequest.response()
+            }
         } catch {
             throw mappedMusicKitError(error)
         }
@@ -98,10 +108,13 @@ struct SonoicAppleMusicCatalogSearchClient {
 
         var request = MusicLibraryRequest<Album>()
         request.limit = limit
+        let configuredRequest = request
 
         let response: MusicLibraryResponse<Album>
         do {
-            response = try await request.response()
+            response = try await withMusicKitTimeout {
+                try await configuredRequest.response()
+            }
         } catch {
             throw mappedMusicKitError(error)
         }
@@ -125,10 +138,13 @@ struct SonoicAppleMusicCatalogSearchClient {
 
         var request = MusicLibraryRequest<Playlist>()
         request.limit = limit
+        let configuredRequest = request
 
         let response: MusicLibraryResponse<Playlist>
         do {
-            response = try await request.response()
+            response = try await withMusicKitTimeout {
+                try await configuredRequest.response()
+            }
         } catch {
             throw mappedMusicKitError(error)
         }
@@ -152,10 +168,13 @@ struct SonoicAppleMusicCatalogSearchClient {
 
         var request = MusicLibraryRequest<Artist>()
         request.limit = limit
+        let configuredRequest = request
 
         let response: MusicLibraryResponse<Artist>
         do {
-            response = try await request.response()
+            response = try await withMusicKitTimeout {
+                try await configuredRequest.response()
+            }
         } catch {
             throw mappedMusicKitError(error)
         }
@@ -179,10 +198,13 @@ struct SonoicAppleMusicCatalogSearchClient {
 
         var request = MusicLibraryRequest<Song>()
         request.limit = limit
+        let configuredRequest = request
 
         let response: MusicLibraryResponse<Song>
         do {
-            response = try await request.response()
+            response = try await withMusicKitTimeout {
+                try await configuredRequest.response()
+            }
         } catch {
             throw mappedMusicKitError(error)
         }
@@ -205,6 +227,93 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
 
         return error
+    }
+
+    private func withMusicKitTimeout<Value: Sendable>(
+        _ duration: Duration = .seconds(8),
+        operation: @escaping @Sendable () async throws -> Value
+    ) async throws -> Value {
+        let box = MusicKitTimeoutBox<Value>()
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                box.setContinuation(continuation)
+
+                let operationTask = Task {
+                    do {
+                        let value = try await operation()
+                        box.resume(.success(value))
+                    } catch {
+                        box.resume(.failure(error))
+                    }
+                }
+                let timeoutTask = Task {
+                    do {
+                        try await Task.sleep(for: duration)
+                        box.resume(.failure(ClientError.timedOut))
+                    } catch {
+                        // The timeout task is canceled when the operation wins the race.
+                    }
+                }
+                box.setTasks(operationTask: operationTask, timeoutTask: timeoutTask)
+            }
+        } onCancel: {
+            box.cancel()
+        }
+    }
+}
+
+private nonisolated final class MusicKitTimeoutBox<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var hasResolved = false
+    private var continuation: CheckedContinuation<Value, Error>?
+    private var operationTask: Task<Void, Never>?
+    private var timeoutTask: Task<Void, Never>?
+
+    func setContinuation(_ continuation: CheckedContinuation<Value, Error>) {
+        lock.lock()
+        if hasResolved {
+            lock.unlock()
+            continuation.resume(throwing: CancellationError())
+        } else {
+            self.continuation = continuation
+            lock.unlock()
+        }
+    }
+
+    func setTasks(operationTask: Task<Void, Never>, timeoutTask: Task<Void, Never>) {
+        lock.lock()
+        if hasResolved {
+            lock.unlock()
+            operationTask.cancel()
+            timeoutTask.cancel()
+        } else {
+            self.operationTask = operationTask
+            self.timeoutTask = timeoutTask
+            lock.unlock()
+        }
+    }
+
+    func resume(_ result: Result<Value, Error>) {
+        lock.lock()
+        guard !hasResolved else {
+            lock.unlock()
+            return
+        }
+        hasResolved = true
+        let continuation = continuation
+        self.continuation = nil
+        let operationTask = operationTask
+        let timeoutTask = timeoutTask
+        lock.unlock()
+
+        operationTask?.cancel()
+        timeoutTask?.cancel()
+        continuation?.resume(with: result)
+    }
+
+    func cancel() {
+        resume(.failure(CancellationError()))
     }
 }
 

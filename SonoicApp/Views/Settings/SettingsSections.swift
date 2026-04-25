@@ -262,7 +262,23 @@ private struct SettingsAppleMusicServiceDetailsRows: View {
     let details: SonoicAppleMusicServiceDetails
 
     var body: some View {
-        if let failureDetail = details.failureDetail {
+        if details.status == .idle {
+            SettingsStatusRow(
+                title: "Apple Music Details",
+                statusTitle: "Not Refreshed",
+                detail: "Refresh Apple Music details to read storefront, subscription, and cloud library status.",
+                systemImage: "music.note",
+                tint: .secondary
+            )
+        } else if details.isLoading {
+            SettingsStatusRow(
+                title: "Apple Music Details",
+                statusTitle: "Refreshing",
+                detail: "Reading Apple Music account metadata.",
+                systemImage: "arrow.clockwise",
+                tint: .orange
+            )
+        } else if let failureDetail = details.failureDetail {
             SettingsStatusRow(
                 title: "Apple Music Details",
                 statusTitle: "Unavailable",
