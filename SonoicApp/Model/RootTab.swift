@@ -5,6 +5,7 @@ enum RootTab: String, CaseIterable, Identifiable {
     case rooms
     case queue
     case settings
+    case search
 
     var id: String { rawValue }
 
@@ -18,6 +19,8 @@ enum RootTab: String, CaseIterable, Identifiable {
             "Queue"
         case .settings:
             "Settings"
+        case .search:
+            "Search"
         }
     }
 
@@ -31,6 +34,8 @@ enum RootTab: String, CaseIterable, Identifiable {
             "list.triangle"
         case .settings:
             "slider.horizontal.3"
+        case .search:
+            "magnifyingglass"
         }
     }
 }

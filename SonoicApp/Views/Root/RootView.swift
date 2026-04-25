@@ -39,6 +39,14 @@ struct RootView: View {
             } label: {
                 Label(RootTab.settings.title, systemImage: RootTab.settings.systemImage)
             }
+
+            Tab(value: RootTab.search, role: .search) {
+                rootNavigationView {
+                    SearchView()
+                }
+            } label: {
+                Label(RootTab.search.title, systemImage: RootTab.search.systemImage)
+            }
         }
         .tabViewStyle(.sidebarAdaptable)
         .overlay(alignment: .bottom) {
