@@ -34,6 +34,8 @@ final class SonoicModel {
     @ObservationIgnored var isManualTransportCommandInFlight = false
     @ObservationIgnored var isManualVolumeCommandInFlight = false
     @ObservationIgnored var pendingManualVolumeLevel: Int?
+    @ObservationIgnored var pendingGroupRoomVolumeLevels: [String: Int] = [:]
+    @ObservationIgnored var pendingRoomVolumeLevels: [String: Int] = [:]
     @ObservationIgnored var isRoomVolumeRefreshInFlight = false
     @ObservationIgnored var isHomeFavoritesRefreshing = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
@@ -72,6 +74,8 @@ final class SonoicModel {
             isHomeTheaterRefreshing = false
             isHomeTheaterMutating = false
             mutatingRoomVolumeIDs = []
+            pendingRoomVolumeLevels = [:]
+            pendingGroupRoomVolumeLevels = [:]
             queueOperationErrorDetail = nil
             groupControlErrorDetail = nil
             homeTheaterOperationErrorDetail = nil
@@ -98,7 +102,7 @@ final class SonoicModel {
     var isQueueMutating = false
     var isGroupControlRefreshing = false
     var groupControlMutatingPlayerID: String?
-    var roomVolumeMutatingPlayerID: String?
+    var roomVolumeMutatingPlayerIDs: Set<String> = []
     var isHomeTheaterRefreshing = false
     var isHomeTheaterMutating = false
     var mutatingRoomVolumeIDs: Set<String> = []

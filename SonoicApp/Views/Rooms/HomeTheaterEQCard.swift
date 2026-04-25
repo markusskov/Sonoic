@@ -40,7 +40,9 @@ struct HomeTheaterEQCard: View {
                     get: {
                         settings.loudness
                     },
-                    set: setLoudness
+                    set: { isEnabled in
+                        setLoudness(isEnabled)
+                    }
                 )
             ) {
                 Label("Loudness", systemImage: "speaker.wave.3.fill")

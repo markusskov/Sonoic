@@ -22,7 +22,7 @@ extension SonoicModel {
                 isCoordinator: player.id == context.coordinatorID,
                 isActive: player.id == selectedDiscoveredPlayer?.id,
                 isMutatingGroup: groupControlMutatingPlayerID == player.id,
-                isMutatingVolume: roomVolumeMutatingPlayerID == player.id
+                isMutatingVolume: roomVolumeMutatingPlayerIDs.contains(player.id)
             )
         }
     }
@@ -127,49 +127,59 @@ extension SonoicModel {
 
     func toggleRoomMute(_ player: SonosDiscoveredPlayer) async {
         guard let volume = roomVolumes[player.id],
-              roomVolumeMutatingPlayerID == nil
+              !roomVolumeMutatingPlayerIDs.contains(player.id)
         else {
             return
         }
 
-        roomVolumeMutatingPlayerID = player.id
+        roomVolumeMutatingPlayerIDs.insert(player.id)
         groupControlErrorDetail = nil
         let desiredMute = !volume.isMuted
 
         do {
             try await renderingControlClient.setMute(host: player.host, isMuted: desiredMute)
             roomVolumes[player.id]?.isMuted = desiredMute
-            roomVolumeMutatingPlayerID = nil
+            roomVolumeMutatingPlayerIDs.remove(player.id)
         } catch {
-            roomVolumeMutatingPlayerID = nil
+            roomVolumeMutatingPlayerIDs.remove(player.id)
             groupControlErrorDetail = error.localizedDescription
         }
     }
 
     func setRoomVolume(_ player: SonosDiscoveredPlayer, to level: Int) async -> Bool {
-        guard roomVolumeMutatingPlayerID == nil else {
-            roomVolumes[player.id]?.level = min(max(level, 0), 100)
-            return true
-        }
-
         let boundedLevel = min(max(level, 0), 100)
-        let previousVolume = roomVolumes[player.id]
         roomVolumes[player.id]?.level = boundedLevel
-        roomVolumeMutatingPlayerID = player.id
-        groupControlErrorDetail = nil
+        pendingGroupRoomVolumeLevels[player.id] = boundedLevel
 
-        do {
-            try await renderingControlClient.setVolume(host: player.host, level: boundedLevel)
-            roomVolumeMutatingPlayerID = nil
+        guard !roomVolumeMutatingPlayerIDs.contains(player.id) else {
             return true
-        } catch {
-            if let previousVolume {
-                roomVolumes[player.id] = previousVolume
-            }
-            roomVolumeMutatingPlayerID = nil
-            groupControlErrorDetail = error.localizedDescription
-            return false
         }
+
+        roomVolumeMutatingPlayerIDs.insert(player.id)
+        groupControlErrorDetail = nil
+        var latestRequestSucceeded = true
+
+        while let nextLevel = pendingGroupRoomVolumeLevels[player.id] {
+            pendingGroupRoomVolumeLevels[player.id] = nil
+            let previousVolume = roomVolumes[player.id]
+            roomVolumes[player.id]?.level = nextLevel
+
+            do {
+                try await renderingControlClient.setVolume(host: player.host, level: nextLevel)
+                latestRequestSucceeded = true
+            } catch {
+                latestRequestSucceeded = false
+                if pendingGroupRoomVolumeLevels[player.id] == nil {
+                    if let previousVolume {
+                        roomVolumes[player.id] = previousVolume
+                    }
+                    groupControlErrorDetail = error.localizedDescription
+                }
+            }
+        }
+
+        roomVolumeMutatingPlayerIDs.remove(player.id)
+        return latestRequestSucceeded
     }
 
     private var activeGroupControlContext: (

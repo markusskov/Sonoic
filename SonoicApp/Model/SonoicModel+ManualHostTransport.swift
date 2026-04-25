@@ -85,30 +85,22 @@ extension SonoicModel {
     }
 
     func playManualSonosFavorite(_ favorite: SonosFavoriteItem) async -> Bool {
-        guard let playbackURI = favorite.playbackURI.sonoicNonEmptyTrimmed,
-              let queuePlayerID = await manualSonosQueuePlayerID()
-        else {
+        guard let playbackURI = favorite.playbackURI.sonoicNonEmptyTrimmed else {
             return false
         }
 
-        queueState = .idle
+        if let snapshot = queueState.snapshot {
+            queueState = .loaded(SonosQueueSnapshot(items: snapshot.items, currentItemIndex: nil))
+        }
+
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
-        let didStartPlayback = await performManualTransportCommand(
-            syncDelay: Self.manualTransportSyncDelay,
-            refreshQueueAfterSuccess: true
-        ) {
-            let trackNumber = try await avTransportClient.addURIToQueue(
+        let didStartPlayback = await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
+            try await avTransportClient.setTransportURI(
                 host: manualSonosHost,
                 uri: playbackURI,
                 metadataXML: favorite.playbackMetadataXML
             )
-            try await avTransportClient.setTransportURI(
-                host: manualSonosHost,
-                uri: "x-rincon-queue:\(queuePlayerID)#0",
-                metadataXML: nil
-            )
-            try await avTransportClient.seekToTrack(host: manualSonosHost, trackNumber: trackNumber)
             try await avTransportClient.play(host: manualSonosHost)
         }
 

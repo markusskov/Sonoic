@@ -129,6 +129,7 @@ final class SonoicNowPlayableSessionController: NSObject {
         currentNowPlaying = nil
         currentPlaybackState = .paused
         nowPlayingSession.nowPlayingInfoCenter.nowPlayingInfo = nil
+        nowPlayingSession.nowPlayingInfoCenter.playbackState = .stopped
         updateCommandAvailability(isEnabled: false)
 
         do {
@@ -175,6 +176,7 @@ final class SonoicNowPlayableSessionController: NSObject {
         }
 
         nowPlayingSession.nowPlayingInfoCenter.nowPlayingInfo = nowPlayingInfo
+        nowPlayingSession.nowPlayingInfoCenter.playbackState = nowPlayingInfoCenterPlaybackState(for: nowPlaying.playbackState)
     }
 
     private func updateProgressLoop(activeTargetName: String) {
@@ -276,8 +278,8 @@ final class SonoicNowPlayableSessionController: NSObject {
 
     private func updateCommandAvailability(for nowPlaying: SonosNowPlayingSnapshot) {
         let commandCenter = nowPlayingSession.remoteCommandCenter
-        commandCenter.playCommand.isEnabled = true
-        commandCenter.pauseCommand.isEnabled = true
+        commandCenter.playCommand.isEnabled = nowPlaying.playbackState != .playing
+        commandCenter.pauseCommand.isEnabled = nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering
         commandCenter.togglePlayPauseCommand.isEnabled = true
         commandCenter.nextTrackCommand.isEnabled = nowPlaying.supportsTrackNavigation
         commandCenter.previousTrackCommand.isEnabled = nowPlaying.supportsTrackNavigation
@@ -386,6 +388,19 @@ final class SonoicNowPlayableSessionController: NSObject {
             1.0
         case .paused, .buffering:
             0
+        }
+    }
+
+    private func nowPlayingInfoCenterPlaybackState(
+        for playbackState: SonosNowPlayingSnapshot.PlaybackState
+    ) -> MPNowPlayingPlaybackState {
+        switch playbackState {
+        case .playing:
+            .playing
+        case .paused:
+            .paused
+        case .buffering:
+            .interrupted
         }
     }
 

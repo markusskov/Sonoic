@@ -10,8 +10,8 @@ struct PlayerFullscreenArtworkBackground: View {
             if let artworkImage {
                 Image(uiImage: artworkImage)
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: size.width, height: size.height)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size.width, height: size.height, alignment: .top)
                     .clipped()
                     .blur(radius: 56)
                     .saturation(1.25)
@@ -54,8 +54,8 @@ struct PlayerFullscreenHeroArtwork: View {
             if let artworkImage {
                 Image(uiImage: artworkImage)
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: size.width, height: size.height)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size.width, height: size.height, alignment: .top)
             } else {
                 LinearGradient(
                     colors: [.orange.opacity(0.75), .pink.opacity(0.72), .indigo.opacity(0.8)],

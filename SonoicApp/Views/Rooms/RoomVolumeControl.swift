@@ -9,6 +9,7 @@ struct RoomVolumeControl: View {
 
     @State private var level: Double
     @State private var isEditing = false
+    @State private var volumeCommitTask: Task<Void, Never>?
 
     init(
         player: SonosDiscoveredPlayer,
@@ -42,11 +43,13 @@ struct RoomVolumeControl: View {
             PlayerScrubber(
                 value: Binding(
                     get: { level },
-                    set: { level = $0 }
+                    set: { newValue in
+                        updateLevel(newValue)
+                    }
                 ),
                 bounds: 0...100,
                 step: 1,
-                isEnabled: !isMutating,
+                isEnabled: !isMutating || isEditing,
                 showsThumb: true,
                 accessibilityLabel: "\(player.name) volume",
                 onEditingChanged: updateEditing
@@ -62,14 +65,47 @@ struct RoomVolumeControl: View {
                 level = Double(newValue)
             }
         }
+        .onDisappear {
+            volumeCommitTask?.cancel()
+            volumeCommitTask = nil
+        }
     }
 
     private func updateEditing(_ editing: Bool) {
         isEditing = editing
 
-        guard !editing else {
-            return
+        if !editing {
+            commitVolumeImmediately()
         }
+    }
+
+    private func updateLevel(_ newValue: Double) {
+        level = min(max(newValue.rounded(), 0), 100)
+        scheduleVolumeCommit()
+    }
+
+    private func scheduleVolumeCommit() {
+        volumeCommitTask?.cancel()
+
+        let targetLevel = Int(level.rounded())
+        volumeCommitTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(250))
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            await setRoomVolume(player, targetLevel)
+        }
+    }
+
+    private func commitVolumeImmediately() {
+        volumeCommitTask?.cancel()
+        volumeCommitTask = nil
 
         Task {
             await setRoomVolume(player, Int(level.rounded()))

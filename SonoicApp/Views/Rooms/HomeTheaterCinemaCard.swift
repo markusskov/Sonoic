@@ -48,7 +48,9 @@ struct HomeTheaterCinemaCard: View {
                     get: {
                         settings.speechEnhancementEnabled == true
                     },
-                    set: setSpeechEnhancement
+                    set: { isEnabled in
+                        setSpeechEnhancement(isEnabled)
+                    }
                 )
             ) {
                 Label("Speech Enhancement", systemImage: "quote.bubble.fill")
@@ -62,7 +64,9 @@ struct HomeTheaterCinemaCard: View {
                         get: {
                             settings.dialogLevel ?? 2
                         },
-                        set: setDialogLevel
+                        set: { level in
+                            setDialogLevel(level)
+                        }
                     ),
                     isEnabled: isEnabled && settings.speechEnhancementEnabled == true
                 )
@@ -84,7 +88,9 @@ struct HomeTheaterCinemaCard: View {
                     get: {
                         settings.nightSoundEnabled == true
                     },
-                    set: setNightSound
+                    set: { isEnabled in
+                        setNightSound(isEnabled)
+                    }
                 )
             ) {
                 Label("Night Sound", systemImage: "moon.fill")

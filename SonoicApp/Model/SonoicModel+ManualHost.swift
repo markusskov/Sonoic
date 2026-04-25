@@ -25,7 +25,7 @@ extension SonoicModel {
     }
 
     func startManualHostRefreshLoopIfPossible() {
-        guard isSceneActive, hasManualSonosHost else {
+        guard shouldRunManualHostRefreshLoop else {
             stopManualHostRefreshLoop()
             return
         }
@@ -62,6 +62,17 @@ extension SonoicModel {
 
             _ = await syncManualSonosState(showProgress: false)
         }
+    }
+
+    private var shouldRunManualHostRefreshLoop: Bool {
+        guard hasManualSonosHost else {
+            return false
+        }
+
+        return isSceneActive
+            || isManualPlayTransitionAwaitingConfirmation
+            || nowPlaying.playbackState == .playing
+            || nowPlaying.playbackState == .buffering
     }
 
     func syncManualSonosState(showProgress: Bool, forceRoomRefresh: Bool = false) async -> Bool {

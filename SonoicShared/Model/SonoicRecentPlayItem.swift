@@ -118,6 +118,18 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
         playbackURI.sonoicNonEmptyTrimmed != nil
     }
 
+    var isVisibleInHomeHistory: Bool {
+        service != nil
+    }
+
+    var homeHistoryIdentity: String {
+        Self.historyIdentity(
+            title: title,
+            artistName: artistName,
+            albumTitle: albumTitle
+        )
+    }
+
     var replayFavorite: SonosFavoriteItem? {
         guard let playbackURI = playbackURI?.sonoicNonEmptyTrimmed else {
             return nil
@@ -133,6 +145,10 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
             playbackMetadataXML: playbackMetadataXML,
             kind: favoriteKind ?? .item
         )
+    }
+
+    func matchesHomeHistoryIdentity(of otherItem: SonoicRecentPlayItem) -> Bool {
+        homeHistoryIdentity == otherItem.homeHistoryIdentity
     }
 
     func enriched(with newerItem: SonoicRecentPlayItem) -> SonoicRecentPlayItem {
@@ -172,6 +188,19 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
             artistName?.sonoicTrimmed.lowercased() ?? "",
             albumTitle?.sonoicTrimmed.lowercased() ?? "",
             sourceName.sonoicTrimmed.lowercased()
+        ]
+        .joined(separator: "|")
+    }
+
+    private static func historyIdentity(
+        title: String,
+        artistName: String?,
+        albumTitle: String?
+    ) -> String {
+        [
+            title.sonoicTrimmed.lowercased(),
+            artistName?.sonoicTrimmed.lowercased() ?? "",
+            albumTitle?.sonoicTrimmed.lowercased() ?? ""
         ]
         .joined(separator: "|")
     }

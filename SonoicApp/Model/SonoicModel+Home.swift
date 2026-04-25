@@ -5,9 +5,14 @@ extension SonoicModel {
         homeFavoritesState.snapshot?.collectionItems ?? []
     }
 
+    var homeRecentPlays: [SonoicRecentPlayItem] {
+        visibleUniqueRecentPlays(from: recentPlays)
+    }
+
     var homeSourceSummaries: [SonoicHomeSourceSummary] {
         let favorites = homeFavoritesState.snapshot?.items ?? []
         let favoriteServices = favorites.compactMap(\.service)
+        let recentPlays = homeRecentPlays
         let recentServices = recentPlays.compactMap(\.service)
         let currentService = SonosServiceCatalog.descriptor(named: nowPlaying.sourceName)
         let services = orderedUniqueServices(favoriteServices + recentServices + [currentService].compactMap { $0 })
@@ -95,21 +100,22 @@ extension SonoicModel {
     }
 
     private func upsertRecentPlay(_ recentPlay: SonoicRecentPlayItem) {
-        if let firstRecentPlay = recentPlays.first,
-           firstRecentPlay.id == recentPlay.id
-        {
-            let enrichedRecentPlay = firstRecentPlay.enriched(with: recentPlay)
-            guard enrichedRecentPlay != firstRecentPlay else {
-                return
-            }
-
-            recentPlays[0] = enrichedRecentPlay
-            settingsStore.saveRecentPlays(recentPlays)
+        guard recentPlay.isVisibleInHomeHistory else {
             return
         }
 
-        var nextRecentPlays = recentPlays.filter { $0.id != recentPlay.id }
-        nextRecentPlays.insert(recentPlay, at: 0)
+        let existingRecentPlay = recentPlays.first {
+            $0.isVisibleInHomeHistory
+                && ($0.id == recentPlay.id || $0.matchesHomeHistoryIdentity(of: recentPlay))
+        }
+        let resolvedRecentPlay = existingRecentPlay?.enriched(with: recentPlay) ?? recentPlay
+
+        var nextRecentPlays = recentPlays.filter {
+            $0.isVisibleInHomeHistory
+                && $0.id != resolvedRecentPlay.id
+                && !$0.matchesHomeHistoryIdentity(of: resolvedRecentPlay)
+        }
+        nextRecentPlays.insert(resolvedRecentPlay, at: 0)
 
         if nextRecentPlays.count > Self.homeRecentPlayLimit {
             nextRecentPlays = Array(nextRecentPlays.prefix(Self.homeRecentPlayLimit))
@@ -121,6 +127,20 @@ extension SonoicModel {
 
         recentPlays = nextRecentPlays
         settingsStore.saveRecentPlays(nextRecentPlays)
+    }
+
+    private func visibleUniqueRecentPlays(from recentPlays: [SonoicRecentPlayItem]) -> [SonoicRecentPlayItem] {
+        var seenIdentities: Set<String> = []
+
+        return recentPlays.compactMap { recentPlay in
+            guard recentPlay.isVisibleInHomeHistory,
+                  seenIdentities.insert(recentPlay.homeHistoryIdentity).inserted
+            else {
+                return nil
+            }
+
+            return recentPlay
+        }
     }
 
     private func orderedUniqueServices(_ services: [SonosServiceDescriptor]) -> [SonosServiceDescriptor] {

@@ -4,6 +4,8 @@ struct HomeView: View {
     @Environment(SonoicModel.self) private var model
 
     var body: some View {
+        let recentPlays = model.homeRecentPlays
+
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 if model.hasManualSonosHost {
@@ -16,7 +18,7 @@ struct HomeView: View {
                         openQueue: openQueue
                     )
 
-                    if !model.recentPlays.isEmpty {
+                    if !recentPlays.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
                             HomeSectionHeader(
                                 title: "Recently Played",
@@ -24,7 +26,7 @@ struct HomeView: View {
                             )
 
                             HomeRecentlyPlayedSection(
-                                items: model.recentPlays,
+                                items: recentPlays,
                                 playRecentItem: playRecentItem
                             )
                         }
