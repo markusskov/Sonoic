@@ -280,16 +280,19 @@ struct SonoicSourceSearchState: Equatable {
     }
 
     var query: String
+    var scope: SonoicSourceSearchScope
     var items: [SonoicSourceItem]
     var status: Status
 
     init(
         query: String = "",
         service: SonosServiceDescriptor,
+        scope: SonoicSourceSearchScope = .all,
         items: [SonoicSourceItem]? = nil,
         status: Status = .idle
     ) {
         self.query = query
+        self.scope = scope
         self.items = items ?? []
         self.status = status
     }
@@ -307,6 +310,63 @@ struct SonoicSourceSearchState: Equatable {
             detail
         } else {
             nil
+        }
+    }
+}
+
+enum SonoicSourceSearchScope: String, CaseIterable, Identifiable, Equatable, Sendable {
+    case all
+    case songs
+    case artists
+    case albums
+    case playlists
+
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .all:
+            "All"
+        case .songs:
+            "Songs"
+        case .artists:
+            "Artists"
+        case .albums:
+            "Albums"
+        case .playlists:
+            "Playlists"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all:
+            "magnifyingglass"
+        case .songs:
+            "music.note"
+        case .artists:
+            "music.mic"
+        case .albums:
+            "rectangle.stack"
+        case .playlists:
+            "music.note.list"
+        }
+    }
+
+    var resultSubtitle: String {
+        switch self {
+        case .all:
+            "Apple Music metadata only. Sonoic still needs Sonos-native payloads before playback."
+        case .songs:
+            "Song metadata only. Sonoic enables playback only when it finds a Sonos-native payload."
+        case .artists:
+            "Artist metadata only. Use artist pages to browse related songs and albums."
+        case .albums:
+            "Album metadata only. Open an album to inspect tracks."
+        case .playlists:
+            "Playlist metadata only. Open a playlist to inspect tracks."
         }
     }
 }

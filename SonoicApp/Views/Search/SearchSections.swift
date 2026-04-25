@@ -134,7 +134,7 @@ struct SearchResultsSection: View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: "Results",
-                subtitle: "Apple Music metadata only. Sonoic still needs Sonos-native payloads before playback."
+                subtitle: state.scope.resultSubtitle
             )
 
             RoomSurfaceCard {
@@ -145,7 +145,7 @@ struct SearchResultsSection: View {
                         SearchMessageRow(
                             message: SearchMessage(
                                 title: "\(service.name) Search",
-                                detail: "Search the Apple Music catalog for songs and albums.",
+                                detail: "Search the Apple Music catalog for \(state.scope.title.lowercased()).",
                                 systemImage: "music.magnifyingglass"
                             )
                         )
@@ -217,27 +217,25 @@ private struct SearchMessageRow: View {
 
 struct SearchScopeSection: View {
     let service: SonosServiceDescriptor
-
-    private let scopes: [(title: String, systemImage: String)] = [
-        ("Songs", "music.note"),
-        ("Artists", "music.mic"),
-        ("Albums", "rectangle.stack"),
-        ("Playlists", "music.note.list")
-    ]
+    let selectedScope: SonoicSourceSearchScope
+    let selectScope: (SonoicSourceSearchScope) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: "Find",
-                subtitle: "These scopes will become filters as service search expands."
+                subtitle: "Filter \(service.name) results before searching."
             )
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(scopes, id: \.title) { scope in
+                ForEach(SonoicSourceSearchScope.allCases) { scope in
                     SearchScopeCard(
-                        title: scope.title,
-                        systemImage: scope.systemImage,
-                        service: service
+                        service: service,
+                        scope: scope,
+                        isSelected: selectedScope == scope,
+                        select: {
+                            selectScope(scope)
+                        }
                     )
                 }
             }
@@ -246,26 +244,33 @@ struct SearchScopeSection: View {
 }
 
 private struct SearchScopeCard: View {
-    let title: String
-    let systemImage: String
     let service: SonosServiceDescriptor
+    let scope: SonoicSourceSearchScope
+    let isSelected: Bool
+    let select: () -> Void
 
     var body: some View {
-        RoomSurfaceCard {
-            Image(systemName: systemImage)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.pink)
+        Button(action: select) {
+            RoomSurfaceCard(isInteractive: isSelected) {
+                Image(systemName: scope.systemImage)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(isSelected ? .pink : .secondary)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(scope.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
 
-                Text(service.name)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    Text(service.name)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Search \(service.name) \(scope.title)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityElement(children: .combine)
     }
 }

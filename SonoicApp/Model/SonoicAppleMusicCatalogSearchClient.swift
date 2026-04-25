@@ -47,13 +47,16 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
     }
 
-    func searchCatalog(term: String) async throws -> [SonoicSourceItem] {
+    func searchCatalog(
+        term: String,
+        scope: SonoicSourceSearchScope = .all
+    ) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)
         }
 
         do {
-            return try await requestGate.searchCatalog(term: term, limit: 8).map(sourceItem)
+            return try await requestGate.searchCatalog(term: term, scope: scope, limit: 12).map(sourceItem)
         } catch {
             throw mappedMusicKitError(error)
         }
@@ -236,10 +239,14 @@ private actor SonoicMusicKitRequestGate {
         )
     }
 
-    func searchCatalog(term: String, limit: Int) async throws -> [AppleMusicItemMetadata] {
+    func searchCatalog(
+        term: String,
+        scope: SonoicSourceSearchScope = .all,
+        limit: Int
+    ) async throws -> [AppleMusicItemMetadata] {
         var request = MusicCatalogSearchRequest(
             term: term,
-            types: [Song.self, Album.self, Artist.self, Playlist.self]
+            types: musicCatalogSearchTypes(for: scope)
         )
         request.limit = limit
 
@@ -286,6 +293,21 @@ private actor SonoicMusicKitRequestGate {
         }
 
         return Array((songs + albums + artists + playlists).prefix(limit))
+    }
+
+    private func musicCatalogSearchTypes(for scope: SonoicSourceSearchScope) -> [any MusicCatalogSearchable.Type] {
+        switch scope {
+        case .all:
+            [Song.self, Album.self, Artist.self, Playlist.self]
+        case .songs:
+            [Song.self]
+        case .artists:
+            [Artist.self]
+        case .albums:
+            [Album.self]
+        case .playlists:
+            [Playlist.self]
+        }
     }
 
     func fetchLibraryAlbums(limit: Int) async throws -> [AppleMusicItemMetadata] {

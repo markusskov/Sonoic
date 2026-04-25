@@ -56,9 +56,22 @@ extension SonoicModel {
     }
 
     func updateSourceSearchQuery(_ query: String, for source: SonoicSource) {
+        let currentState = sourceSearchState(for: source)
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
             query: query,
-            service: source.service
+            service: source.service,
+            scope: currentState.scope
+        )
+    }
+
+    func updateSourceSearchScope(_ scope: SonoicSourceSearchScope, for source: SonoicSource) {
+        let currentState = sourceSearchState(for: source)
+        sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+            query: currentState.query,
+            service: source.service,
+            scope: scope,
+            items: scope == currentState.scope ? currentState.items : [],
+            status: scope == currentState.scope ? currentState.status : .idle
         )
     }
 
@@ -72,6 +85,7 @@ extension SonoicModel {
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
             query: query,
             service: source.service,
+            scope: currentState.scope,
             status: .loading
         )
 
@@ -89,7 +103,10 @@ extension SonoicModel {
                     return
                 }
 
-                items = try await appleMusicCatalogSearchClient.searchCatalog(term: query)
+                items = try await appleMusicCatalogSearchClient.searchCatalog(
+                    term: query,
+                    scope: currentState.scope
+                )
             case .spotify, .sonosRadio, .genericStreaming:
                 items = []
             }
@@ -97,6 +114,7 @@ extension SonoicModel {
             sourceSearchStates[source.service.id] = SonoicSourceSearchState(
                 query: query,
                 service: source.service,
+                scope: currentState.scope,
                 items: items,
                 status: .loaded
             )
@@ -104,6 +122,7 @@ extension SonoicModel {
             sourceSearchStates[source.service.id] = SonoicSourceSearchState(
                 query: query,
                 service: source.service,
+                scope: currentState.scope,
                 status: .failed(error.localizedDescription)
             )
         }

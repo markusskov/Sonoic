@@ -50,7 +50,11 @@ struct SearchView: View {
                         submit: searchCatalog
                     )
 
-                    SearchScopeSection(service: selectedService)
+                    SearchScopeSection(
+                        service: selectedService,
+                        selectedScope: searchState.scope,
+                        selectScope: selectScope
+                    )
 
                     if supportsCatalogSearch {
                         SearchResultsSection(
@@ -97,6 +101,10 @@ struct SearchView: View {
         Task {
             await model.searchSourceCatalog(for: selectedSource)
         }
+    }
+
+    private func selectScope(_ scope: SonoicSourceSearchScope) {
+        model.updateSourceSearchScope(scope, for: selectedSource)
     }
 
     private var appleMusicAvailabilityMessage: SearchMessage? {
