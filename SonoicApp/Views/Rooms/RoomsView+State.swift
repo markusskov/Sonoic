@@ -55,12 +55,12 @@ extension RoomsView {
         _ = await model.removePlayerFromActiveGroup(player)
     }
 
-    func setRoomVolume(_ player: SonosDiscoveredPlayer, _ level: Int) async {
-        _ = await model.setRoomVolume(player, to: level)
+    func setRoomVolume(_ item: SonosRoomVolumeItem, _ level: Int) async -> Bool {
+        await model.setRoomVolume(item, to: level)
     }
 
-    func toggleRoomMute(_ player: SonosDiscoveredPlayer) async {
-        await model.toggleRoomMute(player)
+    func toggleRoomMute(_ item: SonosRoomVolumeItem) async {
+        await model.toggleRoomMute(item)
     }
 
     var currentRoomSubtitle: String {

@@ -34,7 +34,6 @@ final class SonoicModel {
     @ObservationIgnored var isManualTransportCommandInFlight = false
     @ObservationIgnored var isManualVolumeCommandInFlight = false
     @ObservationIgnored var pendingManualVolumeLevel: Int?
-    @ObservationIgnored var pendingGroupRoomVolumeLevels: [String: Int] = [:]
     @ObservationIgnored var pendingRoomVolumeLevels: [String: Int] = [:]
     @ObservationIgnored var isRoomVolumeRefreshInFlight = false
     @ObservationIgnored var isHomeFavoritesRefreshing = false
@@ -75,13 +74,11 @@ final class SonoicModel {
             isHomeTheaterMutating = false
             mutatingRoomVolumeIDs = []
             pendingRoomVolumeLevels = [:]
-            pendingGroupRoomVolumeLevels = [:]
             queueOperationErrorDetail = nil
             groupControlErrorDetail = nil
             homeTheaterOperationErrorDetail = nil
             roomVolumeOperationErrorDetail = nil
             nowPlayingDiagnostics = .empty
-            roomVolumes = [:]
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
@@ -102,14 +99,12 @@ final class SonoicModel {
     var isQueueMutating = false
     var isGroupControlRefreshing = false
     var groupControlMutatingPlayerID: String?
-    var roomVolumeMutatingPlayerIDs: Set<String> = []
     var isHomeTheaterRefreshing = false
     var isHomeTheaterMutating = false
     var mutatingRoomVolumeIDs: Set<String> = []
     var queueOperationErrorDetail: String?
     var groupControlErrorDetail: String?
     var homeTheaterOperationErrorDetail: String?
-    var roomVolumes: [String: SonoicExternalControlState.Volume] = [:]
     var roomVolumeOperationErrorDetail: String?
     var discoveredBonjourServices: [SonosBonjourBrowser.Service] = []
     var discoveredPlayers: [SonosDiscoveredPlayer] = []

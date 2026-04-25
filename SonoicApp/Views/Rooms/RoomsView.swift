@@ -42,18 +42,19 @@ struct RoomsView: View {
             "Couldn't Update Group",
             isPresented: Binding(
                 get: {
-                    model.groupControlErrorDetail != nil
+                    model.groupControlErrorDetail != nil || model.roomVolumeOperationErrorDetail != nil
                 },
                 set: { isPresented in
                     if !isPresented {
                         model.groupControlErrorDetail = nil
+                        model.roomVolumeOperationErrorDetail = nil
                     }
                 }
             )
         ) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(model.groupControlErrorDetail ?? "")
+            Text(model.groupControlErrorDetail ?? model.roomVolumeOperationErrorDetail ?? "")
         }
         .navigationTitle("Rooms")
     }

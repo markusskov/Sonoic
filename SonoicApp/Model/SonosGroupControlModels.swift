@@ -2,7 +2,7 @@ import Foundation
 
 struct SonosGroupControlMember: Identifiable, Equatable {
     var player: SonosDiscoveredPlayer
-    var volume: SonoicExternalControlState.Volume?
+    var volumeItem: SonosRoomVolumeItem?
     var isCoordinator: Bool
     var isActive: Bool
     var isMutatingGroup: Bool
@@ -10,6 +10,10 @@ struct SonosGroupControlMember: Identifiable, Equatable {
 
     var id: String {
         player.id
+    }
+
+    var volume: SonoicExternalControlState.Volume? {
+        volumeItem?.volume
     }
 }
 

@@ -4,6 +4,7 @@ extension SonoicModel {
     var groupControlMembers: [SonosGroupControlMember] {
         let context = activeGroupControlContext
         let memberIDs = context.memberIDs
+        let volumeItemsByPlayerID = activeRoomVolumeItemsByPlayerID
         let orderedPlayers = discoveredPlayers
             .filter { memberIDs.contains($0.id) }
             .sorted { lhs, rhs in
@@ -18,11 +19,11 @@ extension SonoicModel {
         return orderedPlayers.map { player in
             SonosGroupControlMember(
                 player: player,
-                volume: roomVolumes[player.id],
+                volumeItem: volumeItemsByPlayerID[player.id],
                 isCoordinator: player.id == context.coordinatorID,
                 isActive: player.id == selectedDiscoveredPlayer?.id,
                 isMutatingGroup: groupControlMutatingPlayerID == player.id,
-                isMutatingVolume: roomVolumeMutatingPlayerIDs.contains(player.id)
+                isMutatingVolume: mutatingRoomVolumeIDs.contains(player.id)
             )
         }
     }
@@ -41,9 +42,8 @@ extension SonoicModel {
     }
 
     func refreshActiveGroupVolumes() async {
-        let players = groupControlMembers.map(\.player)
-        guard !players.isEmpty else {
-            roomVolumes = [:]
+        guard hasManualSonosHost else {
+            roomVolumeState = .idle
             return
         }
 
@@ -52,29 +52,7 @@ extension SonoicModel {
             isGroupControlRefreshing = false
         }
 
-        let fetchedVolumes = await withTaskGroup(
-            of: (String, SonoicExternalControlState.Volume?).self,
-            returning: [String: SonoicExternalControlState.Volume].self
-        ) { group in
-            for player in players {
-                group.addTask { [renderingControlClient] in
-                    let volume = try? await renderingControlClient.fetchVolume(host: player.host)
-                    return (player.id, volume)
-                }
-            }
-
-            var volumes: [String: SonoicExternalControlState.Volume] = [:]
-            for await (playerID, volume) in group {
-                if let volume {
-                    volumes[playerID] = volume
-                }
-            }
-            return volumes
-        }
-
-        for (playerID, volume) in fetchedVolumes {
-            roomVolumes[playerID] = volume
-        }
+        await refreshRoomVolumes(showLoading: roomVolumeState.snapshot?.targetID != activeTarget.id)
     }
 
     func addPlayerToActiveGroup(_ player: SonosDiscoveredPlayer) async -> Bool {
@@ -125,63 +103,6 @@ extension SonoicModel {
         }
     }
 
-    func toggleRoomMute(_ player: SonosDiscoveredPlayer) async {
-        guard let volume = roomVolumes[player.id],
-              !roomVolumeMutatingPlayerIDs.contains(player.id)
-        else {
-            return
-        }
-
-        roomVolumeMutatingPlayerIDs.insert(player.id)
-        groupControlErrorDetail = nil
-        let desiredMute = !volume.isMuted
-
-        do {
-            try await renderingControlClient.setMute(host: player.host, isMuted: desiredMute)
-            roomVolumes[player.id]?.isMuted = desiredMute
-            roomVolumeMutatingPlayerIDs.remove(player.id)
-        } catch {
-            roomVolumeMutatingPlayerIDs.remove(player.id)
-            groupControlErrorDetail = error.localizedDescription
-        }
-    }
-
-    func setRoomVolume(_ player: SonosDiscoveredPlayer, to level: Int) async -> Bool {
-        let boundedLevel = min(max(level, 0), 100)
-        roomVolumes[player.id]?.level = boundedLevel
-        pendingGroupRoomVolumeLevels[player.id] = boundedLevel
-
-        guard !roomVolumeMutatingPlayerIDs.contains(player.id) else {
-            return true
-        }
-
-        roomVolumeMutatingPlayerIDs.insert(player.id)
-        groupControlErrorDetail = nil
-        var latestRequestSucceeded = true
-
-        while let nextLevel = pendingGroupRoomVolumeLevels[player.id] {
-            pendingGroupRoomVolumeLevels[player.id] = nil
-            let previousVolume = roomVolumes[player.id]
-            roomVolumes[player.id]?.level = nextLevel
-
-            do {
-                try await renderingControlClient.setVolume(host: player.host, level: nextLevel)
-                latestRequestSucceeded = true
-            } catch {
-                latestRequestSucceeded = false
-                if pendingGroupRoomVolumeLevels[player.id] == nil {
-                    if let previousVolume {
-                        roomVolumes[player.id] = previousVolume
-                    }
-                    groupControlErrorDetail = error.localizedDescription
-                }
-            }
-        }
-
-        roomVolumeMutatingPlayerIDs.remove(player.id)
-        return latestRequestSucceeded
-    }
-
     private var activeGroupControlContext: (
         coordinatorID: String?,
         memberIDs: Set<String>,
@@ -209,6 +130,16 @@ extension SonoicModel {
             memberIDs: [activeID],
             orderedMemberIDs: [activeID]
         )
+    }
+
+    private var activeRoomVolumeItemsByPlayerID: [String: SonosRoomVolumeItem] {
+        guard let snapshot = roomVolumeState.snapshot,
+              snapshot.targetID == activeTarget.id
+        else {
+            return [:]
+        }
+
+        return Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
     }
 
     private func refreshAfterGroupMembershipChange() async {
