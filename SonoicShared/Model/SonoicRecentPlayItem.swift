@@ -96,6 +96,30 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
         )
     }
 
+    init(payload: SonosPlayablePayload, playedAt: Date) {
+        let sourceName = payload.service?.name ?? "Sonos Playback"
+
+        self.init(
+            id: Self.fingerprint(
+                title: payload.title,
+                artistName: payload.subtitle,
+                albumTitle: nil,
+                sourceName: sourceName
+            ),
+            title: payload.title,
+            artistName: payload.subtitle,
+            albumTitle: nil,
+            sourceName: sourceName,
+            artworkURL: payload.artworkURL?.sonoicNonEmptyTrimmed,
+            artworkIdentifier: nil,
+            service: payload.service,
+            lastPlayedAt: playedAt,
+            playbackURI: payload.uri,
+            playbackMetadataXML: payload.metadataXML,
+            favoriteKind: SonosFavoriteItem.Kind(payloadKind: payload.kind)
+        )
+    }
+
     var subtitle: String? {
         var parts: [String] = []
 
@@ -203,5 +227,16 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
             albumTitle?.sonoicTrimmed.lowercased() ?? ""
         ]
         .joined(separator: "|")
+    }
+}
+
+private extension SonosFavoriteItem.Kind {
+    init(payloadKind: SonosPlayablePayload.Kind) {
+        switch payloadKind {
+        case .item:
+            self = .item
+        case .collection:
+            self = .collection
+        }
     }
 }

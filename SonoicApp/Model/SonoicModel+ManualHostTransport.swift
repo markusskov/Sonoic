@@ -85,10 +85,14 @@ extension SonoicModel {
     }
 
     func playManualSonosFavorite(_ favorite: SonosFavoriteItem) async -> Bool {
-        guard let playbackURI = favorite.playbackURI.sonoicNonEmptyTrimmed else {
+        guard let payload = favorite.playablePayload else {
             return false
         }
 
+        return await playManualSonosPayload(payload)
+    }
+
+    func playManualSonosPayload(_ payload: SonosPlayablePayload) async -> Bool {
         if let snapshot = queueState.snapshot {
             queueState = .loaded(SonosQueueSnapshot(items: snapshot.items, currentItemIndex: nil))
         }
@@ -98,14 +102,14 @@ extension SonoicModel {
         let didStartPlayback = await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
             try await avTransportClient.setTransportURI(
                 host: manualSonosHost,
-                uri: playbackURI,
-                metadataXML: favorite.playbackMetadataXML
+                uri: payload.uri,
+                metadataXML: payload.metadataXML
             )
             try await avTransportClient.play(host: manualSonosHost)
         }
 
         if didStartPlayback {
-            recordRecentFavoritePlayback(favorite)
+            recordRecentPlayablePayload(payload)
         }
 
         return didStartPlayback

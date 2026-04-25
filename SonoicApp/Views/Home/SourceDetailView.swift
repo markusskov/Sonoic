@@ -96,11 +96,11 @@ struct SourceDetailView: View {
     }
 
     private func play(_ item: SonoicSourceItem) async {
-        guard case let .sonosNative(favorite) = item.playbackCapability else {
+        guard case let .sonosNative(payload) = item.playbackCapability else {
             return
         }
 
-        _ = await model.playManualSonosFavorite(favorite)
+        _ = await model.playManualSonosPayload(payload)
     }
 }
 

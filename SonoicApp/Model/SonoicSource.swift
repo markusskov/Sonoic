@@ -51,7 +51,7 @@ struct SonoicSource: Identifiable, Equatable {
 }
 
 enum SonoicPlaybackCapability: Equatable {
-    case sonosNative(SonosFavoriteItem)
+    case sonosNative(SonosPlayablePayload)
     case metadataOnly
     case unsupported
 
@@ -101,19 +101,6 @@ struct SonoicSourceItem: Identifiable, Equatable {
     }
 
     init(favorite: SonosFavoriteItem) {
-        let playableFavorite = favorite.playbackURI.sonoicNonEmptyTrimmed.map { playbackURI in
-            SonosFavoriteItem(
-                id: favorite.id,
-                title: favorite.title,
-                subtitle: favorite.subtitle,
-                artworkURL: favorite.artworkURL,
-                service: favorite.service,
-                playbackURI: playbackURI,
-                playbackMetadataXML: favorite.playbackMetadataXML,
-                kind: favorite.kind
-            )
-        }
-
         self.init(
             id: "favorite-\(favorite.id)",
             title: favorite.title,
@@ -122,11 +109,13 @@ struct SonoicSourceItem: Identifiable, Equatable {
             artworkIdentifier: nil,
             service: favorite.service ?? .genericStreaming,
             origin: .favorite,
-            playbackCapability: playableFavorite.map(SonoicPlaybackCapability.sonosNative) ?? .unsupported
+            playbackCapability: favorite.playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .unsupported
         )
     }
 
     init(recentPlay: SonoicRecentPlayItem) {
+        let playablePayload = recentPlay.replayFavorite?.playablePayload
+
         self.init(
             id: "recent-\(recentPlay.id)",
             title: recentPlay.title,
@@ -135,7 +124,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
             artworkIdentifier: recentPlay.artworkIdentifier,
             service: recentPlay.service ?? .genericStreaming,
             origin: .recentPlay,
-            playbackCapability: recentPlay.replayFavorite.map(SonoicPlaybackCapability.sonosNative) ?? .metadataOnly
+            playbackCapability: playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .metadataOnly
         )
     }
 

@@ -103,9 +103,17 @@ extension SonoicModel {
     }
 
     func recordRecentFavoritePlayback(_ favorite: SonosFavoriteItem) {
+        guard let payload = favorite.playablePayload else {
+            return
+        }
+
+        recordRecentPlayablePayload(payload)
+    }
+
+    func recordRecentPlayablePayload(_ payload: SonosPlayablePayload) {
         upsertRecentPlay(
             SonoicRecentPlayItem(
-                favorite: favorite,
+                payload: payload,
                 playedAt: .now
             )
         )
