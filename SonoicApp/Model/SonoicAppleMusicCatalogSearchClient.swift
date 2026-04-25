@@ -171,67 +171,78 @@ private actor SonoicMusicKitRequestGate {
     }
 
     func fetchLibraryAlbums(limit: Int) async throws -> [AppleMusicItemMetadata] {
-        var request = MusicLibraryRequest<Album>()
-        request.limit = limit
-
-        let response = try await request.response()
-        return response.items.map { album in
+        let response = try await fetchLibraryResponse(path: "albums", limit: limit)
+        return response.data.map { album in
             AppleMusicItemMetadata(
                 id: "library-album-\(album.id)",
-                title: album.title,
-                subtitle: album.artistName,
-                artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
+                title: album.attributes?.name ?? "Unknown Album",
+                subtitle: album.attributes?.artistName,
+                artworkURL: album.attributes?.artwork?.sizedURL(width: 400, height: 400),
                 kind: .album
             )
         }
     }
 
     func fetchLibraryPlaylists(limit: Int) async throws -> [AppleMusicItemMetadata] {
-        var request = MusicLibraryRequest<Playlist>()
-        request.limit = limit
-
-        let response = try await request.response()
-        return response.items.map { playlist in
+        let response = try await fetchLibraryResponse(path: "playlists", limit: limit)
+        return response.data.map { playlist in
             AppleMusicItemMetadata(
                 id: "library-playlist-\(playlist.id)",
-                title: playlist.name,
-                subtitle: playlist.curatorName,
-                artworkURL: playlist.artwork?.url(width: 400, height: 400)?.absoluteString,
+                title: playlist.attributes?.name ?? "Unknown Playlist",
+                subtitle: playlist.attributes?.curatorName,
+                artworkURL: playlist.attributes?.artwork?.sizedURL(width: 400, height: 400),
                 kind: .playlist
             )
         }
     }
 
     func fetchLibraryArtists(limit: Int) async throws -> [AppleMusicItemMetadata] {
-        var request = MusicLibraryRequest<Artist>()
-        request.limit = limit
-
-        let response = try await request.response()
-        return response.items.map { artist in
+        let response = try await fetchLibraryResponse(path: "artists", limit: limit)
+        return response.data.map { artist in
             AppleMusicItemMetadata(
                 id: "library-artist-\(artist.id)",
-                title: artist.name,
+                title: artist.attributes?.name ?? "Unknown Artist",
                 subtitle: "Artist",
-                artworkURL: artist.artwork?.url(width: 400, height: 400)?.absoluteString,
+                artworkURL: artist.attributes?.artwork?.sizedURL(width: 400, height: 400),
                 kind: .artist
             )
         }
     }
 
     func fetchLibrarySongs(limit: Int) async throws -> [AppleMusicItemMetadata] {
-        var request = MusicLibraryRequest<Song>()
-        request.limit = limit
+        let response = try await fetchLibraryResponse(path: "songs", limit: limit)
+        return response.data.map { song in
+            let artistName = song.attributes?.artistName
+            let albumName = song.attributes?.albumName
 
-        let response = try await request.response()
-        return response.items.map { song in
-            AppleMusicItemMetadata(
+            return AppleMusicItemMetadata(
                 id: "library-song-\(song.id)",
-                title: song.title,
-                subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
-                artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
+                title: song.attributes?.name ?? "Unknown Song",
+                subtitle: albumName.map { albumName in
+                    [artistName, albumName].compactMap(\.self).joined(separator: " • ")
+                } ?? artistName,
+                artworkURL: song.attributes?.artwork?.sizedURL(width: 400, height: 400),
                 kind: .song
             )
         }
+    }
+
+    private func fetchLibraryResponse(path: String, limit: Int) async throws -> AppleMusicLibraryResponse {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "api.music.apple.com"
+        components.path = "/v1/me/library/\(path)"
+        components.queryItems = [
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+
+        guard let url = components.url else {
+            throw URLError(.badURL)
+        }
+
+        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
+        let response = try await request.response()
+        return try JSONDecoder().decode(AppleMusicLibraryResponse.self, from: response.data)
     }
 }
 
@@ -267,6 +278,33 @@ private enum AppleMusicItemKind: Sendable {
         case .song:
             .song
         }
+    }
+}
+
+private nonisolated struct AppleMusicLibraryResponse: Decodable {
+    var data: [AppleMusicLibraryResource]
+}
+
+private nonisolated struct AppleMusicLibraryResource: Decodable {
+    var id: String
+    var attributes: AppleMusicLibraryAttributes?
+}
+
+private nonisolated struct AppleMusicLibraryAttributes: Decodable {
+    var name: String?
+    var artistName: String?
+    var albumName: String?
+    var curatorName: String?
+    var artwork: AppleMusicLibraryArtwork?
+}
+
+private nonisolated struct AppleMusicLibraryArtwork: Decodable {
+    var url: String?
+
+    func sizedURL(width: Int, height: Int) -> String? {
+        url?
+            .replacingOccurrences(of: "{w}", with: "\(width)")
+            .replacingOccurrences(of: "{h}", with: "\(height)")
     }
 }
 
