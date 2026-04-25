@@ -98,6 +98,7 @@ final class SonoicModel {
     var sourceSearchStates: [String: SonoicSourceSearchState] = [:]
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
     var appleMusicServiceDetails = SonoicAppleMusicServiceDetails.idle
+    var musicKitDiagnostics = SonoicMusicKitDiagnostics.current
     var isQueueRefreshing = false
     var isQueueClearing = false
     var isQueueMutating = false

@@ -2,6 +2,7 @@ import Foundation
 
 extension SonoicModel {
     func refreshAppleMusicAuthorizationState() {
+        musicKitDiagnostics = .current
         appleMusicAuthorizationState = appleMusicCatalogSearchClient.currentAuthorizationState()
     }
 

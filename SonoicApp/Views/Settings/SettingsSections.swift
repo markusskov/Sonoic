@@ -181,6 +181,8 @@ struct SettingsMusicServicesSection: View {
                         }
                         .disabled(model.appleMusicServiceDetails.isLoading)
                     }
+
+                    SettingsMusicKitDiagnosticsRows(diagnostics: model.musicKitDiagnostics)
                 }
             }
         } header: {
@@ -282,5 +284,15 @@ private struct SettingsAppleMusicServiceDetailsRows: View {
         }
 
         return value ? "Available" : "Unavailable"
+    }
+}
+
+private struct SettingsMusicKitDiagnosticsRows: View {
+    let diagnostics: SonoicMusicKitDiagnostics
+
+    var body: some View {
+        LabeledContent("Bundle ID", value: diagnostics.bundleIdentifier)
+        LabeledContent("MusicKit Entitlement", value: diagnostics.expectsMusicUserTokenEntitlement ? "Configured" : "Missing")
+        LabeledContent("Usage Description", value: diagnostics.hasUsageDescription ? "Present" : "Missing")
     }
 }
