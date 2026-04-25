@@ -561,6 +561,53 @@ struct SonoicAppleMusicRecentlyAddedState: Equatable {
     }
 }
 
+struct SonoicAppleMusicBrowseState: Equatable {
+    enum Status: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed(String)
+    }
+
+    var destination: SonoicAppleMusicBrowseDestination
+    var sections: [SonoicAppleMusicItemDetailSection]
+    var genres: [SonoicAppleMusicGenreItem]
+    var status: Status
+
+    init(
+        destination: SonoicAppleMusicBrowseDestination,
+        sections: [SonoicAppleMusicItemDetailSection] = [],
+        genres: [SonoicAppleMusicGenreItem] = [],
+        status: Status = .idle
+    ) {
+        self.destination = destination
+        self.sections = sections
+        self.genres = genres
+        self.status = status
+    }
+
+    var isLoading: Bool {
+        status == .loading
+    }
+
+    var failureDetail: String? {
+        if case let .failed(detail) = status {
+            detail
+        } else {
+            nil
+        }
+    }
+}
+
+struct SonoicAppleMusicGenreItem: Identifiable, Equatable {
+    var id: String
+    var title: String
+
+    var subtitle: String {
+        "Apple Music category"
+    }
+}
+
 struct SonoicAppleMusicItemDetailState: Equatable {
     enum Status: Equatable {
         case idle

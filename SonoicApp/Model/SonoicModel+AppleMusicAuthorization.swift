@@ -40,6 +40,10 @@ extension SonoicModel {
         appleMusicLibraryStates[destination] ?? SonoicAppleMusicLibraryState(destination: destination)
     }
 
+    func appleMusicBrowseState(for destination: SonoicAppleMusicBrowseDestination) -> SonoicAppleMusicBrowseState {
+        appleMusicBrowseStates[destination] ?? SonoicAppleMusicBrowseState(destination: destination)
+    }
+
     func appleMusicItemDetailState(for item: SonoicSourceItem) -> SonoicAppleMusicItemDetailState {
         appleMusicItemDetailStates[item.id] ?? SonoicAppleMusicItemDetailState(item: item)
     }
@@ -93,6 +97,55 @@ extension SonoicModel {
             }
 
             self.appleMusicRecentlyAddedLoadTask = nil
+        }
+    }
+
+    func loadAppleMusicBrowseDestination(
+        _ destination: SonoicAppleMusicBrowseDestination,
+        force: Bool = false
+    ) {
+        let currentState = appleMusicBrowseState(for: destination)
+
+        if currentState.isLoading || (!force && currentState.status == .loaded) {
+            return
+        }
+
+        refreshAppleMusicAuthorizationState()
+        guard appleMusicAuthorizationState.allowsCatalogSearch else {
+            appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(
+                destination: destination,
+                status: .failed(appleMusicAuthorizationState.detail)
+            )
+            return
+        }
+
+        appleMusicBrowseLoadTasks[destination]?.cancel()
+        appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(destination: destination, status: .loading)
+
+        appleMusicBrowseLoadTasks[destination] = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let state = try await self.appleMusicCatalogSearchClient.fetchBrowseState(for: destination)
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                self.appleMusicBrowseStates[destination] = state
+            } catch is CancellationError {
+                if self.appleMusicBrowseState(for: destination).isLoading {
+                    self.appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(destination: destination)
+                }
+            } catch {
+                self.appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(
+                    destination: destination,
+                    status: .failed(error.localizedDescription)
+                )
+            }
+
+            self.appleMusicBrowseLoadTasks[destination] = nil
         }
     }
 

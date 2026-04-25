@@ -122,6 +122,44 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
     }
 
+    func fetchBrowseState(for destination: SonoicAppleMusicBrowseDestination) async throws -> SonoicAppleMusicBrowseState {
+        guard MusicAuthorization.currentStatus == .authorized else {
+            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+        }
+
+        do {
+            switch destination {
+            case .popularRecommendations, .appleMusicPlaylists:
+                let sections = try await requestGate.fetchTopCharts(for: destination).map { section in
+                    SonoicAppleMusicItemDetailSection(
+                        id: section.id,
+                        title: section.title,
+                        subtitle: section.subtitle,
+                        items: section.items.map(sourceItem)
+                    )
+                }
+                return SonoicAppleMusicBrowseState(
+                    destination: destination,
+                    sections: sections,
+                    status: .loaded
+                )
+            case .categories:
+                let genres = try await requestGate.fetchCatalogGenres(limit: 24).map { genre in
+                    SonoicAppleMusicGenreItem(id: genre.id, title: genre.title)
+                }
+                return SonoicAppleMusicBrowseState(
+                    destination: destination,
+                    genres: genres,
+                    status: .loaded
+                )
+            case .playlistsForYou, .newReleases, .radioShows:
+                return SonoicAppleMusicBrowseState(destination: destination, status: .loaded)
+            }
+        } catch {
+            throw mappedMusicKitError(error)
+        }
+    }
+
     func fetchItemDetailSections(for item: SonoicSourceItem) async throws -> [SonoicAppleMusicItemDetailSection] {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)
@@ -388,6 +426,62 @@ private actor SonoicMusicKitRequestGate {
         }.prefix(limit))
     }
 
+    func fetchTopCharts(for destination: SonoicAppleMusicBrowseDestination) async throws -> [AppleMusicItemMetadataSection] {
+        let types: String
+        switch destination {
+        case .appleMusicPlaylists:
+            types = "playlists"
+        case .popularRecommendations:
+            types = "songs,albums,playlists"
+        case .categories, .playlistsForYou, .newReleases, .radioShows:
+            types = "songs,albums,playlists"
+        }
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "api.music.apple.com"
+        components.path = "/v1/catalog/\(try await storefrontCountryCode())/charts"
+        components.queryItems = [
+            URLQueryItem(name: "types", value: types),
+            URLQueryItem(name: "chart", value: "most-played"),
+            URLQueryItem(name: "limit", value: "10")
+        ]
+
+        guard let url = components.url else {
+            throw URLError(.badURL)
+        }
+
+        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
+        let response = try await request.response()
+        let chartResponse = try JSONDecoder().decode(AppleMusicChartResponse.self, from: response.data)
+        return chartResponse.results.sections()
+    }
+
+    func fetchCatalogGenres(limit: Int) async throws -> [AppleMusicGenreMetadata] {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "api.music.apple.com"
+        components.path = "/v1/catalog/\(try await storefrontCountryCode())/genres"
+        components.queryItems = [
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+
+        guard let url = components.url else {
+            throw URLError(.badURL)
+        }
+
+        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
+        let response = try await request.response()
+        let genreResponse = try JSONDecoder().decode(AppleMusicGenreResponse.self, from: response.data)
+        return genreResponse.data.compactMap { genre in
+            guard let name = genre.attributes?.name else {
+                return nil
+            }
+
+            return AppleMusicGenreMetadata(id: genre.id, title: name)
+        }
+    }
+
     func fetchItemDetailSections(for lookup: AppleMusicItemLookup) async throws -> [AppleMusicItemMetadataSection] {
         switch lookup.kind {
         case .album:
@@ -509,20 +603,7 @@ private actor SonoicMusicKitRequestGate {
         from resource: AppleMusicLibraryResource,
         origin: AppleMusicItemOrigin
     ) -> AppleMusicItemMetadata? {
-        guard let kind = AppleMusicItemKind(resourceType: resource.type) else {
-            return nil
-        }
-
-        return AppleMusicItemMetadata(
-            serviceItemID: resource.id,
-            title: resource.attributes?.name ?? "Unknown",
-            subtitle: resource.attributes?.albumName.map { albumName in
-                [resource.attributes?.artistName, albumName].compactMap(\.self).joined(separator: " • ")
-            } ?? resource.attributes?.artistName ?? resource.attributes?.curatorName,
-            artworkURL: resource.attributes?.artwork?.sizedURL(width: 400, height: 400),
-            kind: kind,
-            origin: origin
-        )
+        AppleMusicItemMetadata.metadata(from: resource, origin: origin)
     }
 
     private func fetchCatalogRelationshipResponse(
@@ -604,104 +685,6 @@ private actor SonoicMusicKitRequestGate {
         cachedStorefrontCountryCode = storefrontCountryCode
         return storefrontCountryCode
     }
-}
-
-private struct AppleMusicServiceMetadata: Sendable {
-    var storefrontCountryCode: String
-    var canPlayCatalogContent: Bool
-    var canBecomeSubscriber: Bool
-    var hasCloudLibraryEnabled: Bool
-}
-
-private nonisolated struct AppleMusicItemMetadata: Sendable {
-    var serviceItemID: String
-    var title: String
-    var subtitle: String?
-    var artworkURL: String?
-    var kind: AppleMusicItemKind
-    var origin: AppleMusicItemOrigin
-}
-
-private nonisolated struct AppleMusicItemMetadataSection: Sendable {
-    var id: String
-    var title: String
-    var subtitle: String?
-    var items: [AppleMusicItemMetadata]
-}
-
-private nonisolated struct AppleMusicItemLookup: Sendable {
-    var serviceItemID: String
-    var title: String
-    var kind: AppleMusicItemKind
-    var origin: AppleMusicItemOrigin
-}
-
-private nonisolated enum AppleMusicItemOrigin: Sendable {
-    case catalogSearch
-    case library
-}
-
-private nonisolated enum AppleMusicItemKind: Sendable {
-    case album
-    case artist
-    case playlist
-    case song
-
-    init?(resourceType: String?) {
-        switch resourceType {
-        case "albums", "library-albums":
-            self = .album
-        case "artists", "library-artists":
-            self = .artist
-        case "playlists", "library-playlists":
-            self = .playlist
-        case "songs", "library-songs":
-            self = .song
-        default:
-            return nil
-        }
-    }
-
-}
-
-private nonisolated struct AppleMusicLibraryResponse: Decodable {
-    var data: [AppleMusicLibraryResource]
-}
-
-private nonisolated struct AppleMusicLibraryResource: Decodable {
-    var id: String
-    var type: String?
-    var attributes: AppleMusicLibraryAttributes?
-}
-
-private nonisolated struct AppleMusicLibraryAttributes: Decodable {
-    var name: String?
-    var artistName: String?
-    var albumName: String?
-    var curatorName: String?
-    var artwork: AppleMusicLibraryArtwork?
-}
-
-private nonisolated struct AppleMusicLibraryArtwork: Decodable {
-    var url: String?
-
-    func sizedURL(width: Int, height: Int) -> String? {
-        url?
-            .replacingOccurrences(of: "{w}", with: "\(width)")
-            .replacingOccurrences(of: "{h}", with: "\(height)")
-    }
-}
-
-private nonisolated struct AppleMusicCatalogSearchResponse: Decodable {
-    var results: AppleMusicCatalogSearchResults
-}
-
-private nonisolated struct AppleMusicCatalogSearchResults: Decodable {
-    var artists: AppleMusicCatalogResourceCollection?
-}
-
-private nonisolated struct AppleMusicCatalogResourceCollection: Decodable {
-    var data: [AppleMusicLibraryResource]
 }
 
 struct MusicKitRequestFailure: Equatable {

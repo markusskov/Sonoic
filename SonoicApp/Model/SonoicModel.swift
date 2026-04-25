@@ -32,6 +32,7 @@ final class SonoicModel {
     @ObservationIgnored var lastPersistedSharedWidgetPresentation: SonoicExternalControlState.WidgetPresentation?
     @ObservationIgnored var lastSharedStorePersistAt: Date?
     @ObservationIgnored var appleMusicLibraryLoadTasks: [SonoicAppleMusicLibraryDestination: Task<Void, Never>] = [:]
+    @ObservationIgnored var appleMusicBrowseLoadTasks: [SonoicAppleMusicBrowseDestination: Task<Void, Never>] = [:]
     @ObservationIgnored var appleMusicItemDetailLoadTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored var appleMusicRecentlyAddedLoadTask: Task<Void, Never>?
     @ObservationIgnored var isManualTransportCommandInFlight = false
@@ -100,6 +101,7 @@ final class SonoicModel {
     var recentPlays: [SonoicRecentPlayItem] = []
     var sourceSearchStates: [String: SonoicSourceSearchState] = [:]
     var appleMusicLibraryStates: [SonoicAppleMusicLibraryDestination: SonoicAppleMusicLibraryState] = [:]
+    var appleMusicBrowseStates: [SonoicAppleMusicBrowseDestination: SonoicAppleMusicBrowseState] = [:]
     var appleMusicItemDetailStates: [String: SonoicAppleMusicItemDetailState] = [:]
     var appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
