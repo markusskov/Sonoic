@@ -62,6 +62,43 @@ extension SonoicModel {
         )
     }
 
+    func searchSourceCatalog(for source: SonoicSource) async {
+        let currentState = sourceSearchState(for: source)
+        guard let query = currentState.query.sonoicNonEmptyTrimmed else {
+            updateSourceSearchQuery("", for: source)
+            return
+        }
+
+        sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+            query: query,
+            service: source.service,
+            status: .loading
+        )
+
+        do {
+            let items: [SonoicSourceItem]
+            switch source.service.kind {
+            case .appleMusic:
+                items = try await appleMusicCatalogSearchClient.searchCatalog(term: query)
+            case .spotify, .sonosRadio, .genericStreaming:
+                items = []
+            }
+
+            sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+                query: query,
+                service: source.service,
+                items: items,
+                status: .loaded
+            )
+        } catch {
+            sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+                query: query,
+                service: source.service,
+                status: .failed(error.localizedDescription)
+            )
+        }
+    }
+
     func refreshHomeFavorites(showLoading: Bool = true) async {
         guard hasManualSonosHost else {
             homeFavoritesState = .idle

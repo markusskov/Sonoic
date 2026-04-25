@@ -35,6 +35,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Sonoic needs local network access to discover your Sonos speakers and control playback, volume, queue, and room state.</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Sonoic uses Apple Music access to search catalog metadata while keeping Sonos as the playback owner.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -70,6 +70,7 @@ struct SourceSearchSection: View {
     let serviceName: String
     @Binding var query: String
     let state: SonoicSourceSearchState
+    let search: () async -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -80,10 +81,44 @@ struct SourceSearchSection: View {
 
             RoomSurfaceCard {
                 VStack(alignment: .leading, spacing: 14) {
-                    SourceSearchField(query: $query, serviceName: serviceName)
+                    HStack(spacing: 10) {
+                        SourceSearchField(
+                            query: $query,
+                            serviceName: serviceName,
+                            submit: searchTapped
+                        )
+
+                        Button(action: searchTapped) {
+                            if state.isSearching {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .frame(width: 20, height: 20)
+                            } else {
+                                Image(systemName: "arrow.right")
+                                    .font(.body.weight(.semibold))
+                                    .frame(width: 20, height: 20)
+                            }
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+                        .disabled(!state.hasQuery || state.isSearching)
+                        .accessibilityLabel("Search \(serviceName)")
+                    }
 
                     if !state.hasQuery {
                         SourceSearchIdleRow(serviceName: serviceName)
+                    } else if let failureDetail = state.failureDetail {
+                        SourceSearchMessageRow(
+                            title: "Search Failed",
+                            detail: failureDetail,
+                            systemImage: "exclamationmark.triangle"
+                        )
+                    } else if state.status == .loaded && state.items.isEmpty {
+                        SourceSearchMessageRow(
+                            title: "No Results",
+                            detail: "Apple Music did not return catalog matches for this search.",
+                            systemImage: "magnifyingglass"
+                        )
                     } else {
                         ForEach(state.items) { item in
                             SourceItemRow(item: item) {}
@@ -93,11 +128,18 @@ struct SourceSearchSection: View {
             }
         }
     }
+
+    private func searchTapped() {
+        Task {
+            await search()
+        }
+    }
 }
 
 private struct SourceSearchField: View {
     @Binding var query: String
     let serviceName: String
+    let submit: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -108,6 +150,7 @@ private struct SourceSearchField: View {
             TextField("Search \(serviceName)", text: $query)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled(false)
+                .onSubmit(submit)
 
             if query.sonoicNonEmptyTrimmed != nil {
                 Button(action: clearQuery) {
@@ -122,10 +165,40 @@ private struct SourceSearchField: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .background(.quaternary.opacity(0.35), in: Capsule())
+        .frame(maxWidth: .infinity)
     }
 
     private func clearQuery() {
         query = ""
+    }
+}
+
+private struct SourceSearchMessageRow: View {
+    let title: String
+    let detail: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            RoomSurfaceIconView(
+                systemImage: systemImage,
+                size: 44,
+                cornerRadius: 14,
+                font: .body.weight(.semibold)
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.body.weight(.medium))
+
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.secondary)
     }
 }
 

@@ -147,20 +147,65 @@ struct SonoicSourceItem: Identifiable, Equatable {
             playbackCapability: .metadataOnly
         )
     }
+
+    static func catalogMetadata(
+        id: String,
+        title: String,
+        subtitle: String?,
+        artworkURL: String?,
+        service: SonosServiceDescriptor
+    ) -> SonoicSourceItem {
+        SonoicSourceItem(
+            id: "catalog-\(service.id)-\(id)",
+            title: title,
+            subtitle: subtitle,
+            artworkURL: artworkURL,
+            artworkIdentifier: nil,
+            service: service,
+            origin: .catalogSearch,
+            playbackCapability: .metadataOnly
+        )
+    }
 }
 
 struct SonoicSourceSearchState: Equatable {
+    enum Status: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed(String)
+    }
+
     var query: String
     var items: [SonoicSourceItem]
+    var status: Status
 
-    init(query: String = "", service: SonosServiceDescriptor) {
+    init(
+        query: String = "",
+        service: SonosServiceDescriptor,
+        items: [SonoicSourceItem]? = nil,
+        status: Status = .idle
+    ) {
         self.query = query
-        items = SonoicSourceItem
+        self.items = items ?? SonoicSourceItem
             .catalogSearchPlaceholder(query: query, service: service)
             .map { [$0] } ?? []
+        self.status = status
     }
 
     var hasQuery: Bool {
         query.sonoicNonEmptyTrimmed != nil
+    }
+
+    var isSearching: Bool {
+        status == .loading
+    }
+
+    var failureDetail: String? {
+        if case let .failed(detail) = status {
+            detail
+        } else {
+            nil
+        }
     }
 }

@@ -31,7 +31,8 @@ struct SourceDetailView: View {
                         SourceSearchSection(
                             serviceName: source.service.name,
                             query: catalogSearchBinding,
-                            state: catalogSearchState
+                            state: catalogSearchState,
+                            search: searchCatalog
                         )
                     }
 
@@ -109,6 +110,10 @@ struct SourceDetailView: View {
                 model.updateSourceSearchQuery(query, for: source)
             }
         )
+    }
+
+    private func searchCatalog() async {
+        await model.searchSourceCatalog(for: source)
     }
 }
 

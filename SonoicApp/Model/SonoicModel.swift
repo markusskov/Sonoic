@@ -53,6 +53,7 @@ final class SonoicModel {
     @ObservationIgnored let nowPlayingClient: SonosNowPlayingClient
     @ObservationIgnored let queueClient: SonosQueueClient
     @ObservationIgnored let favoritesClient: SonosFavoritesClient
+    @ObservationIgnored let appleMusicCatalogSearchClient: SonoicAppleMusicCatalogSearchClient
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
 
     var selectedTab: RootTab = .home
@@ -218,6 +219,7 @@ final class SonoicModel {
         nowPlayingClient = SonosNowPlayingClient(transport: sonosControlTransport)
         queueClient = SonosQueueClient(transport: sonosControlTransport)
         favoritesClient = SonosFavoritesClient(transport: sonosControlTransport)
+        appleMusicCatalogSearchClient = SonoicAppleMusicCatalogSearchClient()
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         manualSonosHost = settingsStore.loadManualSonosHost()
         recentPlays = settingsStore.loadRecentPlays()
