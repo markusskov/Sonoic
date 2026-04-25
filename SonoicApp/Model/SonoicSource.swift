@@ -86,6 +86,30 @@ enum SonoicPlaybackCapability: Equatable {
     }
 }
 
+struct SonoicSonosPlaybackCandidate: Identifiable, Equatable {
+    enum Confidence: String, Equatable {
+        case exact
+        case likely
+
+        var title: String {
+            switch self {
+            case .exact:
+                "Exact Favorite Match"
+            case .likely:
+                "Likely Favorite Match"
+            }
+        }
+    }
+
+    var payload: SonosPlayablePayload
+    var confidence: Confidence
+    var detail: String
+
+    var id: String {
+        payload.id
+    }
+}
+
 struct SonoicSourceItem: Identifiable, Equatable {
     enum Origin: String, Equatable, Sendable {
         case catalogSearch

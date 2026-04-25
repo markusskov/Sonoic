@@ -9,12 +9,20 @@ struct AppleMusicItemDetailView: View {
         model.appleMusicItemDetailState(for: item)
     }
 
+    private var playbackCandidate: SonoicSonosPlaybackCandidate? {
+        model.appleMusicPlaybackCandidate(for: item)
+    }
+
     var body: some View {
         ScrollView {
             GlassEffectContainer(spacing: 18) {
                 VStack(alignment: .leading, spacing: 24) {
                     AppleMusicItemDetailHeader(item: item)
-                    AppleMusicItemCapabilityCard(item: item)
+                    AppleMusicItemCapabilityCard(
+                        item: item,
+                        playbackCandidate: playbackCandidate,
+                        play: playCandidate
+                    )
                     content
                 }
                 .padding(20)
@@ -70,6 +78,10 @@ struct AppleMusicItemDetailView: View {
 
     private func refreshTapped() {
         model.loadAppleMusicItemDetail(for: item, force: true)
+    }
+
+    private func playCandidate(_ candidate: SonoicSonosPlaybackCandidate) async {
+        _ = await model.playManualSonosPayload(candidate.payload)
     }
 }
 
@@ -141,15 +153,50 @@ private struct AppleMusicItemDetailHeader: View {
 
 private struct AppleMusicItemCapabilityCard: View {
     let item: SonoicSourceItem
+    let playbackCandidate: SonoicSonosPlaybackCandidate?
+    let play: (SonoicSonosPlaybackCandidate) async -> Void
 
     var body: some View {
         RoomSurfaceCard {
-            Label("Metadata Only", systemImage: "lock.circle")
-                .font(.headline)
+            if let playbackCandidate {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label(playbackCandidate.confidence.title, systemImage: "play.circle")
+                        .font(.headline)
 
-            Text("Sonoic can browse this Apple Music item, but still needs a Sonos-native playback payload before it can start playback on your speakers.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                    Text(playbackCandidate.detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Button {
+                        Task {
+                            await play(playbackCandidate)
+                        }
+                    } label: {
+                        Label("Play with Sonos", systemImage: "play.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Metadata Only", systemImage: "lock.circle")
+                        .font(.headline)
+
+                    Text("Sonoic can browse this Apple Music item, but still needs a Sonos-native playback payload before it can start playback on your speakers.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let serviceItemID = item.serviceItemID {
+                        Text("MusicKit ID: \(serviceItemID)")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+            }
         }
     }
 }
