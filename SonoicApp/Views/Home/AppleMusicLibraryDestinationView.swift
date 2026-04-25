@@ -134,7 +134,13 @@ private struct AppleMusicLibraryGrid: View {
 }
 
 private struct AppleMusicLibraryGridCard: View {
+    @Environment(SonoicModel.self) private var model
+
     let item: SonoicSourceItem
+
+    private var playbackCandidate: SonoicSonosPlaybackCandidate? {
+        model.appleMusicPlaybackCandidate(for: item)
+    }
 
     var body: some View {
         NavigationLink {
@@ -161,6 +167,13 @@ private struct AppleMusicLibraryGridCard: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
+                    }
+
+                    if let playbackCandidate {
+                        Label(playbackCandidate.confidence.badgeTitle, systemImage: "checkmark.circle")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(playbackCandidate.confidence == .exact ? .green : .secondary)
+                            .lineLimit(1)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

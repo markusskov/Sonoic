@@ -99,6 +99,15 @@ struct SonoicSonosPlaybackCandidate: Identifiable, Equatable {
                 "Likely Favorite Match"
             }
         }
+
+        var badgeTitle: String {
+            switch self {
+            case .exact:
+                "Favorite match"
+            case .likely:
+                "Possible favorite match"
+            }
+        }
     }
 
     var payload: SonosPlayablePayload

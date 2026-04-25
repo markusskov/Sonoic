@@ -482,20 +482,57 @@ struct SourceItemRow: View {
 }
 
 struct SourceItemNavigationRow: View {
+    @Environment(SonoicModel.self) private var model
+
     let item: SonoicSourceItem
 
-    var body: some View {
-        NavigationLink {
-            AppleMusicItemDetailView(item: item)
-        } label: {
-            SourceItemMetadataRow(item: item)
+    private var playbackCandidate: SonoicSonosPlaybackCandidate? {
+        model.appleMusicPlaybackCandidate(for: item)
+    }
+
+    private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
+        guard playbackCandidate?.confidence == .exact else {
+            return nil
         }
-        .buttonStyle(.plain)
+
+        return playbackCandidate
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            NavigationLink {
+                AppleMusicItemDetailView(item: item)
+            } label: {
+                SourceItemMetadataRow(item: item, playbackCandidate: playbackCandidate)
+            }
+            .buttonStyle(.plain)
+
+            if let exactPlaybackCandidate {
+                Button {
+                    Task {
+                        _ = await model.playManualSonosPayload(exactPlaybackCandidate.payload)
+                    }
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 34, height: 34)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Play \(item.title)")
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 12)
     }
 }
 
 private struct SourceItemMetadataRow: View {
     let item: SonoicSourceItem
+    let playbackCandidate: SonoicSonosPlaybackCandidate?
 
     var body: some View {
         HStack(spacing: 14) {
@@ -523,16 +560,19 @@ private struct SourceItemMetadataRow: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+
+                if let playbackCandidate {
+                    Label(playbackCandidate.confidence.badgeTitle, systemImage: "checkmark.circle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(playbackCandidate.confidence == .exact ? .green : .secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 0)
-
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 12)
         .contentShape(Rectangle())
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var originTitle: String {
