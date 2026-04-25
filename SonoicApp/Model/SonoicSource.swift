@@ -148,3 +148,19 @@ struct SonoicSourceItem: Identifiable, Equatable {
         )
     }
 }
+
+struct SonoicSourceSearchState: Equatable {
+    var query: String
+    var items: [SonoicSourceItem]
+
+    init(query: String = "", service: SonosServiceDescriptor) {
+        self.query = query
+        items = SonoicSourceItem
+            .catalogSearchPlaceholder(query: query, service: service)
+            .map { [$0] } ?? []
+    }
+
+    var hasQuery: Bool {
+        query.sonoicNonEmptyTrimmed != nil
+    }
+}

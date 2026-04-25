@@ -51,6 +51,17 @@ extension SonoicModel {
             .map(SonoicSourceItem.init(recentPlay:))
     }
 
+    func sourceSearchState(for source: SonoicSource) -> SonoicSourceSearchState {
+        sourceSearchStates[source.service.id] ?? SonoicSourceSearchState(service: source.service)
+    }
+
+    func updateSourceSearchQuery(_ query: String, for source: SonoicSource) {
+        sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+            query: query,
+            service: source.service
+        )
+    }
+
     func refreshHomeFavorites(showLoading: Bool = true) async {
         guard hasManualSonosHost else {
             homeFavoritesState = .idle

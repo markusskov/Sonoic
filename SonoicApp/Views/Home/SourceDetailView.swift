@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SourceDetailView: View {
     @Environment(SonoicModel.self) private var model
-    @State private var catalogSearchText = ""
 
     let source: SonoicSource
 
@@ -14,10 +13,8 @@ struct SourceDetailView: View {
         model.recentSourceItems(for: source)
     }
 
-    private var catalogSearchItems: [SonoicSourceItem] {
-        SonoicSourceItem
-            .catalogSearchPlaceholder(query: catalogSearchText, service: source.service)
-            .map { [$0] } ?? []
+    private var catalogSearchState: SonoicSourceSearchState {
+        model.sourceSearchState(for: source)
     }
 
     private var showsCatalogSearch: Bool {
@@ -33,8 +30,8 @@ struct SourceDetailView: View {
                     if showsCatalogSearch {
                         SourceSearchSection(
                             serviceName: source.service.name,
-                            query: $catalogSearchText,
-                            items: catalogSearchItems
+                            query: catalogSearchBinding,
+                            state: catalogSearchState
                         )
                     }
 
@@ -101,6 +98,17 @@ struct SourceDetailView: View {
         }
 
         _ = await model.playManualSonosPayload(payload)
+    }
+
+    private var catalogSearchBinding: Binding<String> {
+        Binding(
+            get: {
+                model.sourceSearchState(for: source).query
+            },
+            set: { query in
+                model.updateSourceSearchQuery(query, for: source)
+            }
+        )
     }
 }
 

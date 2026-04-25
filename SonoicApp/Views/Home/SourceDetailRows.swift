@@ -69,7 +69,7 @@ struct SourceItemRow: View {
 struct SourceSearchSection: View {
     let serviceName: String
     @Binding var query: String
-    let items: [SonoicSourceItem]
+    let state: SonoicSourceSearchState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -82,10 +82,10 @@ struct SourceSearchSection: View {
                 VStack(alignment: .leading, spacing: 14) {
                     SourceSearchField(query: $query, serviceName: serviceName)
 
-                    if query.sonoicNonEmptyTrimmed == nil {
+                    if !state.hasQuery {
                         SourceSearchIdleRow(serviceName: serviceName)
                     } else {
-                        ForEach(items) { item in
+                        ForEach(state.items) { item in
                             SourceItemRow(item: item) {}
                         }
                     }

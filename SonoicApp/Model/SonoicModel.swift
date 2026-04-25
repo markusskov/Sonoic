@@ -94,6 +94,7 @@ final class SonoicModel {
     var homeTheaterTVDiagnostics = SonosHomeTheaterTVDiagnostics.empty
     var roomVolumeState: SonosRoomVolumeState = .idle
     var recentPlays: [SonoicRecentPlayItem] = []
+    var sourceSearchStates: [String: SonoicSourceSearchState] = [:]
     var isQueueRefreshing = false
     var isQueueClearing = false
     var isQueueMutating = false
