@@ -2,36 +2,128 @@ import SwiftUI
 
 struct AppleMusicSourceHeader: View {
     let source: SonoicSource
+    let authorizationState: SonoicAppleMusicAuthorizationState
+    let serviceDetails: SonoicAppleMusicServiceDetails
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
             Label("Apple Music", systemImage: source.service.systemImage)
                 .font(.largeTitle.weight(.bold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
 
-            Text(source.detailText)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(authorizationState.detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                AppleMusicStatusChips(
+                    authorizationState: authorizationState,
+                    serviceDetails: serviceDetails
+                )
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
+private struct AppleMusicStatusChips: View {
+    let authorizationState: SonoicAppleMusicAuthorizationState
+    let serviceDetails: SonoicAppleMusicServiceDetails
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                AppleMusicStatusChip(
+                    title: authorizationState.title,
+                    systemImage: authorizationState.systemImage,
+                    tint: authorizationState.allowsCatalogSearch ? .green : .secondary
+                )
+
+                AppleMusicStatusChip(
+                    title: storefrontTitle,
+                    systemImage: "globe",
+                    tint: .secondary
+                )
+
+                AppleMusicStatusChip(
+                    title: catalogPlaybackTitle,
+                    systemImage: "music.note",
+                    tint: .secondary
+                )
+
+                AppleMusicStatusChip(
+                    title: cloudLibraryTitle,
+                    systemImage: "icloud",
+                    tint: .secondary
+                )
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var storefrontTitle: String {
+        if serviceDetails.isLoading {
+            return "Loading"
+        }
+
+        return serviceDetails.storefrontCountryCode ?? "Storefront"
+    }
+
+    private var catalogPlaybackTitle: String {
+        switch serviceDetails.canPlayCatalogContent {
+        case .some(true):
+            "Catalog"
+        case .some(false):
+            "Preview Only"
+        case .none:
+            "Catalog"
+        }
+    }
+
+    private var cloudLibraryTitle: String {
+        switch serviceDetails.hasCloudLibraryEnabled {
+        case .some(true):
+            "Library"
+        case .some(false):
+            "No Library"
+        case .none:
+            "Library"
+        }
+    }
+}
+
+private struct AppleMusicStatusChip: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tint)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.quaternary.opacity(0.45), in: Capsule())
+    }
+}
+
 struct AppleMusicLibrarySection: View {
     private let rows: [AppleMusicSourceNavigationRow.Model] = [
-        .init(title: "Playlists", subtitle: "Saved Apple Music playlists", systemImage: "music.note.list"),
-        .init(title: "Artists", subtitle: "Saved artists from your library", systemImage: "music.mic"),
-        .init(title: "Albums", subtitle: "Saved albums and releases", systemImage: "rectangle.stack"),
-        .init(title: "Songs", subtitle: "Saved songs in your library", systemImage: "music.note")
+        .init(title: "Playlists", subtitle: nil, systemImage: "music.note.list"),
+        .init(title: "Artists", subtitle: nil, systemImage: "music.mic"),
+        .init(title: "Albums", subtitle: nil, systemImage: "rectangle.stack"),
+        .init(title: "Songs", subtitle: nil, systemImage: "music.note")
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: "Library",
-                subtitle: "Apple Music destinations that will connect to user-library browsing next."
+                subtitle: "Saved Apple Music content will live here as library browsing comes online."
             )
 
             RoomSurfaceCard {
@@ -55,7 +147,7 @@ struct AppleMusicDiscoverySection: View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: "Browse",
-                subtitle: "Catalog surfaces for the service path. Metadata first, Sonos playback later."
+                subtitle: "Discovery surfaces for catalog metadata and future Sonos-native starts."
             )
 
             RoomSurfaceCard {
@@ -85,7 +177,7 @@ private struct AppleMusicSourceRows: View {
 private struct AppleMusicSourceNavigationRow: View {
     struct Model: Identifiable, Equatable {
         var title: String
-        var subtitle: String
+        var subtitle: String?
         var systemImage: String
 
         var id: String {
@@ -108,13 +200,22 @@ private struct AppleMusicSourceNavigationRow: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
-                Text(row.subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                if let subtitle = row.subtitle {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 0)
+
+            Text("Soon")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(.quaternary.opacity(0.45), in: Capsule())
 
             Image(systemName: "chevron.right")
                 .font(.footnote.weight(.semibold))

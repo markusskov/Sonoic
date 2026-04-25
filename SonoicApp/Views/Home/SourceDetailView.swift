@@ -30,7 +30,11 @@ struct SourceDetailView: View {
             GlassEffectContainer(spacing: 18) {
                 VStack(alignment: .leading, spacing: 28) {
                     if isAppleMusic {
-                        AppleMusicSourceHeader(source: source)
+                        AppleMusicSourceHeader(
+                            source: source,
+                            authorizationState: model.appleMusicAuthorizationState,
+                            serviceDetails: model.appleMusicServiceDetails
+                        )
                         AppleMusicLibrarySection()
                         AppleMusicDiscoverySection()
                     } else {
@@ -77,6 +81,11 @@ struct SourceDetailView: View {
         .miniPlayerContentInset()
         .scrollIndicators(.hidden)
         .navigationTitle(source.service.name)
+        .task(id: source.id) {
+            if isAppleMusic {
+                await model.refreshAppleMusicServiceDetails()
+            }
+        }
     }
 
     private func sourceSection(
