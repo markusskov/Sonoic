@@ -107,6 +107,18 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
     }
 
+    func fetchRecentlyAdded(limit: Int = 10) async throws -> [SonoicSourceItem] {
+        guard MusicAuthorization.currentStatus == .authorized else {
+            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+        }
+
+        do {
+            return try await requestGate.fetchRecentlyAdded(limit: limit).map(sourceItem)
+        } catch {
+            throw mappedMusicKitError(error)
+        }
+    }
+
     func fetchItemDetailSections(for item: SonoicSourceItem) async throws -> [SonoicAppleMusicItemDetailSection] {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw ClientError.unauthorized(MusicAuthorization.currentStatus)
@@ -347,6 +359,13 @@ private actor SonoicMusicKitRequestGate {
         }
     }
 
+    func fetchRecentlyAdded(limit: Int) async throws -> [AppleMusicItemMetadata] {
+        let response = try await fetchRecentlyAddedResponse()
+        return Array(response.data.compactMap { resource in
+            metadata(from: resource, origin: .library)
+        }.prefix(limit))
+    }
+
     func fetchItemDetailSections(for lookup: AppleMusicItemLookup) async throws -> [AppleMusicItemMetadataSection] {
         switch lookup.kind {
         case .album:
@@ -459,18 +478,29 @@ private actor SonoicMusicKitRequestGate {
             )
         }
 
-        return response.data.map { resource in
-            AppleMusicItemMetadata(
-                serviceItemID: resource.id,
-                title: resource.attributes?.name ?? "Unknown",
-                subtitle: resource.attributes?.albumName.map { albumName in
-                    [resource.attributes?.artistName, albumName].compactMap(\.self).joined(separator: " • ")
-                } ?? resource.attributes?.artistName ?? resource.attributes?.curatorName,
-                artworkURL: resource.attributes?.artwork?.sizedURL(width: 400, height: 400),
-                kind: AppleMusicItemKind(resourceType: resource.type),
-                origin: origin
-            )
+        return response.data.compactMap { resource in
+            metadata(from: resource, origin: origin)
         }
+    }
+
+    private func metadata(
+        from resource: AppleMusicLibraryResource,
+        origin: AppleMusicItemOrigin
+    ) -> AppleMusicItemMetadata? {
+        guard let kind = AppleMusicItemKind(resourceType: resource.type) else {
+            return nil
+        }
+
+        return AppleMusicItemMetadata(
+            serviceItemID: resource.id,
+            title: resource.attributes?.name ?? "Unknown",
+            subtitle: resource.attributes?.albumName.map { albumName in
+                [resource.attributes?.artistName, albumName].compactMap(\.self).joined(separator: " • ")
+            } ?? resource.attributes?.artistName ?? resource.attributes?.curatorName,
+            artworkURL: resource.attributes?.artwork?.sizedURL(width: 400, height: 400),
+            kind: kind,
+            origin: origin
+        )
     }
 
     private func fetchCatalogRelationshipResponse(
@@ -498,14 +528,16 @@ private actor SonoicMusicKitRequestGate {
         )
     }
 
-    private func fetchResourceResponse(path: String, limit: Int) async throws -> AppleMusicLibraryResponse {
+    private func fetchRecentlyAddedResponse() async throws -> AppleMusicLibraryResponse {
+        try await fetchResourceResponse(path: "/v1/me/library/recently-added")
+    }
+
+    private func fetchResourceResponse(path: String, limit: Int? = nil) async throws -> AppleMusicLibraryResponse {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "api.music.apple.com"
         components.path = path
-        components.queryItems = [
-            URLQueryItem(name: "limit", value: "\(limit)")
-        ]
+        components.queryItems = limit.map { [URLQueryItem(name: "limit", value: "\($0)")] }
 
         guard let url = components.url else {
             throw URLError(.badURL)
@@ -593,7 +625,7 @@ private nonisolated enum AppleMusicItemKind: Sendable {
     case playlist
     case song
 
-    init(resourceType: String?) {
+    init?(resourceType: String?) {
         switch resourceType {
         case "albums", "library-albums":
             self = .album
@@ -604,7 +636,7 @@ private nonisolated enum AppleMusicItemKind: Sendable {
         case "songs", "library-songs":
             self = .song
         default:
-            self = .song
+            return nil
         }
     }
 

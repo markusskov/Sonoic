@@ -44,6 +44,58 @@ extension SonoicModel {
         appleMusicItemDetailStates[item.id] ?? SonoicAppleMusicItemDetailState(item: item)
     }
 
+    func loadAppleMusicRecentlyAdded(force: Bool = false) {
+        if appleMusicRecentlyAddedState.isLoading || (!force && appleMusicRecentlyAddedState.status == .loaded) {
+            return
+        }
+
+        refreshAppleMusicAuthorizationState()
+        guard appleMusicAuthorizationState.allowsCatalogSearch else {
+            appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(
+                status: .failed(appleMusicAuthorizationState.detail)
+            )
+            return
+        }
+
+        if appleMusicServiceDetails.hasCloudLibraryEnabled == .some(false) {
+            appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(
+                status: .failed("iCloud Music Library is not enabled for this Apple Music account.")
+            )
+            return
+        }
+
+        appleMusicRecentlyAddedLoadTask?.cancel()
+        appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(status: .loading)
+
+        appleMusicRecentlyAddedLoadTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let items = try await self.appleMusicCatalogSearchClient.fetchRecentlyAdded()
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                self.appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(
+                    items: items,
+                    status: .loaded
+                )
+            } catch is CancellationError {
+                if self.appleMusicRecentlyAddedState.isLoading {
+                    self.appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
+                }
+            } catch {
+                self.appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(
+                    status: .failed(error.localizedDescription)
+                )
+            }
+
+            self.appleMusicRecentlyAddedLoadTask = nil
+        }
+    }
+
     func loadAppleMusicItemDetail(
         for item: SonoicSourceItem,
         force: Bool = false

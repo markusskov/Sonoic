@@ -37,6 +37,7 @@ struct SourceDetailView: View {
                             serviceDetails: model.appleMusicServiceDetails
                         )
                         AppleMusicLibrarySection()
+                        AppleMusicRecentlyAddedSection()
                         AppleMusicDiscoverySection()
                     } else {
                         SourceHeaderCard(source: source)
@@ -85,6 +86,7 @@ struct SourceDetailView: View {
         .task(id: source.id) {
             if isAppleMusic {
                 await model.refreshAppleMusicServiceDetails()
+                model.loadAppleMusicRecentlyAdded()
             }
         }
         .sheet(item: $selectedItem) { item in

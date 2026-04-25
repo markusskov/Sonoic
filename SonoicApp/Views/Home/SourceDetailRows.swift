@@ -194,6 +194,126 @@ struct AppleMusicDiscoverySection: View {
     }
 }
 
+struct AppleMusicRecentlyAddedSection: View {
+    @Environment(SonoicModel.self) private var model
+
+    private var state: SonoicAppleMusicRecentlyAddedState {
+        model.appleMusicRecentlyAddedState
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HomeSectionHeader(
+                title: "Recently Added",
+                subtitle: "Fresh Apple Music library metadata from your account."
+            )
+
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if state.isLoading {
+            AppleMusicRecentlyAddedMessageRow(
+                title: "Loading Library",
+                detail: "Reading recently added Apple Music items.",
+                systemImage: "icloud.and.arrow.down"
+            )
+        } else if let failureDetail = state.failureDetail {
+            AppleMusicRecentlyAddedMessageRow(
+                title: "Could Not Load Recently Added",
+                detail: failureDetail,
+                systemImage: "exclamationmark.triangle"
+            )
+        } else if state.status == .loaded && state.items.isEmpty {
+            AppleMusicRecentlyAddedMessageRow(
+                title: "No Recently Added Items",
+                detail: "Apple Music did not return recent library additions for this account.",
+                systemImage: "music.note.list"
+            )
+        } else if state.status == .loaded {
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: 14) {
+                    ForEach(state.items) { item in
+                        AppleMusicRecentlyAddedCard(item: item)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.viewAligned)
+            .scrollIndicators(.hidden)
+        }
+    }
+}
+
+private struct AppleMusicRecentlyAddedCard: View {
+    let item: SonoicSourceItem
+
+    var body: some View {
+        NavigationLink {
+            AppleMusicItemDetailView(item: item)
+        } label: {
+            VStack(alignment: .leading, spacing: 9) {
+                HomeFavoriteArtworkView(
+                    artworkURL: item.artworkURL,
+                    artworkIdentifier: item.artworkIdentifier,
+                    maximumDisplayDimension: 160
+                )
+                .frame(width: 154, height: 154)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                Text(item.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(width: 154, alignment: .leading)
+
+                if let subtitle = item.subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(width: 154, alignment: .leading)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.title)
+    }
+}
+
+private struct AppleMusicRecentlyAddedMessageRow: View {
+    let title: String
+    let detail: String
+    let systemImage: String
+
+    var body: some View {
+        RoomSurfaceCard {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+}
+
 private struct AppleMusicSourceRows: View {
     let rows: [AppleMusicSourceNavigationRow.Model]
 

@@ -372,6 +372,38 @@ struct SonoicAppleMusicLibraryState: Equatable {
     }
 }
 
+struct SonoicAppleMusicRecentlyAddedState: Equatable {
+    enum Status: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed(String)
+    }
+
+    var items: [SonoicSourceItem]
+    var status: Status
+
+    init(
+        items: [SonoicSourceItem] = [],
+        status: Status = .idle
+    ) {
+        self.items = items
+        self.status = status
+    }
+
+    var isLoading: Bool {
+        status == .loading
+    }
+
+    var failureDetail: String? {
+        if case let .failed(detail) = status {
+            detail
+        } else {
+            nil
+        }
+    }
+}
+
 struct SonoicAppleMusicItemDetailState: Equatable {
     enum Status: Equatable {
         case idle
