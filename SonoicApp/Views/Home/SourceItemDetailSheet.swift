@@ -11,7 +11,10 @@ struct SourceItemDetailSheet: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 capabilityCard
-                actionGrid
+
+                if item.playbackCapability.canPlay {
+                    primaryActionButton
+                }
             }
             .padding(20)
         }
@@ -49,6 +52,8 @@ struct SourceItemDetailSheet: View {
                 Label(item.service.name, systemImage: item.service.systemImage)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
+
+                itemChips
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -65,37 +70,19 @@ struct SourceItemDetailSheet: View {
         }
     }
 
-    private var actionGrid: some View {
-        Grid(horizontalSpacing: 12, verticalSpacing: 12) {
-            GridRow {
-                SourceItemDetailActionButton(
-                    title: "Play on Sonos",
-                    systemImage: "play.fill",
-                    isEnabled: item.playbackCapability.canPlay,
-                    action: playTapped
-                )
-
-                SourceItemDetailActionButton(
-                    title: "Play Next",
-                    systemImage: "text.line.first.and.arrowtriangle.forward",
-                    isEnabled: false
-                ) {}
-            }
-
-            GridRow {
-                SourceItemDetailActionButton(
-                    title: "Add to Queue",
-                    systemImage: "text.badge.plus",
-                    isEnabled: false
-                ) {}
-
-                SourceItemDetailActionButton(
-                    title: "Save",
-                    systemImage: "plus.circle",
-                    isEnabled: false
-                ) {}
-            }
+    private var itemChips: some View {
+        HStack(spacing: 8) {
+            SourceItemDetailChip(title: originTitle, systemImage: originSystemImage)
+            SourceItemDetailChip(title: item.kind.title, systemImage: item.kind.systemImage)
         }
+    }
+
+    private var primaryActionButton: some View {
+        SourceItemDetailActionButton(
+            title: "Play on Sonos",
+            systemImage: "play.fill",
+            action: playTapped
+        )
     }
 
     private var capabilitySystemImage: String {
@@ -106,6 +93,28 @@ struct SourceItemDetailSheet: View {
         item.playbackCapability.disabledReason ?? "This item includes a Sonos-native payload and can start playback."
     }
 
+    private var originTitle: String {
+        switch item.origin {
+        case .catalogSearch:
+            "Catalog"
+        case .favorite:
+            "Favorite"
+        case .recentPlay:
+            "Recent"
+        }
+    }
+
+    private var originSystemImage: String {
+        switch item.origin {
+        case .catalogSearch:
+            "magnifyingglass"
+        case .favorite:
+            "star"
+        case .recentPlay:
+            "clock"
+        }
+    }
+
     private func playTapped() {
         Task {
             await playAction()
@@ -114,31 +123,41 @@ struct SourceItemDetailSheet: View {
     }
 }
 
+private struct SourceItemDetailChip: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.quaternary.opacity(0.45), in: Capsule())
+    }
+}
+
 private struct SourceItemDetailActionButton: View {
     let title: String
     let systemImage: String
-    let isEnabled: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 9) {
-                Image(systemName: systemImage)
-                    .font(.title3.weight(.semibold))
-
+            Label {
                 Text(title)
-                    .font(.caption.weight(.semibold))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
+                    .font(.headline)
+            } icon: {
+                Image(systemName: systemImage)
+                    .font(.body.weight(.semibold))
             }
-            .foregroundStyle(isEnabled ? .primary : .secondary)
+            .foregroundStyle(.primary)
             .frame(maxWidth: .infinity)
-            .frame(height: 86)
-            .glassEffect(isEnabled ? .regular.interactive() : .regular, in: .rect(cornerRadius: 22))
+            .frame(height: 58)
+            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 22))
         }
         .buttonStyle(.plain)
-        .disabled(!isEnabled)
         .accessibilityLabel(title)
     }
 }
