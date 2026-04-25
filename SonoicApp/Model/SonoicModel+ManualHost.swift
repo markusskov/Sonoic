@@ -166,16 +166,4 @@ extension SonoicModel {
         }.value
     }
 
-    private func fetchExternalVolumeForActiveTarget() async throws -> SonoicExternalControlState.Volume {
-        guard activeTarget.kind == .group else {
-            return try await renderingControlClient.fetchVolume(host: manualSonosHost)
-        }
-
-        do {
-            let groupHost = await manualSonosCoordinatorHost() ?? manualSonosHost
-            return try await groupRenderingControlClient.fetchVolume(host: groupHost)
-        } catch {
-            return try await renderingControlClient.fetchVolume(host: manualSonosHost)
-        }
-    }
 }
