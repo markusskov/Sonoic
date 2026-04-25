@@ -145,7 +145,7 @@ private actor SonoicMusicKitRequestGate {
     func searchCatalog(term: String, limit: Int) async throws -> [AppleMusicItemMetadata] {
         var request = MusicCatalogSearchRequest(
             term: term,
-            types: [Song.self, Album.self]
+            types: [Song.self, Album.self, Artist.self, Playlist.self]
         )
         request.limit = limit
 
@@ -168,8 +168,26 @@ private actor SonoicMusicKitRequestGate {
                 kind: .album
             )
         }
+        let artists = response.artists.map { artist in
+            AppleMusicItemMetadata(
+                id: "artist-\(artist.id)",
+                title: artist.name,
+                subtitle: "Artist",
+                artworkURL: artist.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .artist
+            )
+        }
+        let playlists = response.playlists.map { playlist in
+            AppleMusicItemMetadata(
+                id: "playlist-\(playlist.id)",
+                title: playlist.name,
+                subtitle: playlist.curatorName,
+                artworkURL: playlist.artwork?.url(width: 400, height: 400)?.absoluteString,
+                kind: .playlist
+            )
+        }
 
-        return Array((songs + albums).prefix(limit))
+        return Array((songs + albums + artists + playlists).prefix(limit))
     }
 
     func fetchLibraryAlbums(limit: Int) async throws -> [AppleMusicItemMetadata] {
