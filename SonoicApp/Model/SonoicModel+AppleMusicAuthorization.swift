@@ -36,6 +36,8 @@ extension SonoicModel {
         do {
             appleMusicServiceDetails = try await appleMusicCatalogSearchClient.fetchServiceDetails()
             recordAppleMusicRequestSuccess()
+        } catch where SonoicAppleMusicCatalogSearchClient.isCancellation(error) {
+            return
         } catch {
             appleMusicServiceDetails = .failed(
                 appleMusicFailureDetail(from: error, endpointFamily: .serviceDetails)
@@ -99,10 +101,8 @@ extension SonoicModel {
                     lastUpdatedAt: .now
                 )
                 self.recordAppleMusicRequestSuccess()
-            } catch is CancellationError {
-                if self.appleMusicRecentlyAddedState.isLoading {
-                    self.appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
-                }
+            } catch where SonoicAppleMusicCatalogSearchClient.isCancellation(error) {
+                return
             } catch {
                 self.appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(
                     items: self.appleMusicRecentlyAddedState.items,
@@ -164,10 +164,8 @@ extension SonoicModel {
                     lastUpdatedAt: .now
                 )
                 self.recordAppleMusicRequestSuccess()
-            } catch is CancellationError {
-                if self.appleMusicBrowseState(for: destination).isLoading {
-                    self.appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(destination: destination)
-                }
+            } catch where SonoicAppleMusicCatalogSearchClient.isCancellation(error) {
+                return
             } catch {
                 self.appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(
                     destination: destination,
@@ -240,10 +238,8 @@ extension SonoicModel {
                     lastUpdatedAt: .now
                 )
                 self.recordAppleMusicRequestSuccess()
-            } catch is CancellationError {
-                if self.appleMusicItemDetailState(for: item).isLoading {
-                    self.appleMusicItemDetailStates[detailCacheKey] = SonoicAppleMusicItemDetailState(item: item)
-                }
+            } catch where SonoicAppleMusicCatalogSearchClient.isCancellation(error) {
+                return
             } catch {
                 self.appleMusicItemDetailStates[detailCacheKey] = SonoicAppleMusicItemDetailState(
                     item: item,
@@ -330,10 +326,8 @@ extension SonoicModel {
                     nextOffset: page.nextOffset
                 )
                 self.recordAppleMusicRequestSuccess()
-            } catch is CancellationError {
-                if self.appleMusicLibraryState(for: destination).isLoading {
-                    self.appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(destination: destination)
-                }
+            } catch where SonoicAppleMusicCatalogSearchClient.isCancellation(error) {
+                return
             } catch {
                 self.appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(
                     destination: destination,

@@ -229,6 +229,15 @@ struct SonoicAppleMusicCatalogSearchClient {
         )
     }
 
+    static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+    }
+
     private func unauthorizedError(endpointFamily: SonoicAppleMusicEndpointFamily) -> Error {
         ClientError.requestFailed(
             Self.appleMusicRequestFailure(
@@ -242,7 +251,11 @@ struct SonoicAppleMusicCatalogSearchClient {
         _ error: Error,
         endpointFamily: SonoicAppleMusicEndpointFamily
     ) -> Error {
-        ClientError.requestFailed(Self.appleMusicRequestFailure(from: error, endpointFamily: endpointFamily))
+        if Self.isCancellation(error) {
+            return error
+        }
+
+        return ClientError.requestFailed(Self.appleMusicRequestFailure(from: error, endpointFamily: endpointFamily))
     }
 
     private func sourceItem(from metadata: AppleMusicItemMetadata) -> SonoicSourceItem {

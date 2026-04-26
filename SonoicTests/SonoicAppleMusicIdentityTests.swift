@@ -161,4 +161,14 @@ struct SonoicAppleMusicIdentityTests {
         #expect(failure.kind == .networkUnavailable)
         #expect(failure.endpointFamily == .library)
     }
+
+    @Test
+    func identifiesCancelledAppleMusicRequests() {
+        #expect(SonoicAppleMusicCatalogSearchClient.isCancellation(CancellationError()))
+        #expect(
+            SonoicAppleMusicCatalogSearchClient.isCancellation(
+                NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)
+            )
+        )
+    }
 }

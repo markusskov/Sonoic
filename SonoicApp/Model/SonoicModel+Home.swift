@@ -158,6 +158,23 @@ extension SonoicModel {
                 lastUpdatedAt: .now
             )
             recordRecentSourceSearch(query, for: source)
+        } catch where SonoicAppleMusicCatalogSearchClient.isCancellation(error) {
+            guard shouldApplySourceSearchResponse(
+                serviceID: source.service.id,
+                query: query,
+                scope: searchScope
+            ) else {
+                return
+            }
+
+            sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+                query: query,
+                service: source.service,
+                scope: searchScope,
+                items: sourceSearchStates[source.service.id]?.items ?? currentState.items,
+                status: .idle,
+                lastUpdatedAt: sourceSearchStates[source.service.id]?.lastUpdatedAt ?? currentState.lastUpdatedAt
+            )
         } catch {
             guard shouldApplySourceSearchResponse(
                 serviceID: source.service.id,
