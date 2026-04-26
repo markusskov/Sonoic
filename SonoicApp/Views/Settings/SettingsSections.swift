@@ -137,7 +137,7 @@ struct SettingsMusicServicesSection: View {
 
     var body: some View {
         Section {
-            ForEach(SonosServiceCatalog.browsableServices) { service in
+            ForEach(liveServices) { service in
                 SettingsStatusRow(
                     title: service.name,
                     statusTitle: statusTitle(for: service),
@@ -161,16 +161,27 @@ struct SettingsMusicServicesSection: View {
                 }
             }
         } header: {
-            Text("Music Services")
+            Text("Music")
         }
+    }
+
+    private var liveServices: [SonosServiceDescriptor] {
+        [.appleMusic]
     }
 
     private func statusTitle(for service: SonosServiceDescriptor) -> String {
         switch service.kind {
         case .appleMusic:
-            model.appleMusicAuthorizationState.title
+            switch model.appleMusicAuthorizationState.status {
+            case .authorized:
+                "Connected"
+            case .requesting:
+                "Connecting"
+            default:
+                model.appleMusicAuthorizationState.title
+            }
         case .spotify:
-            "Coming Later"
+            "Unavailable"
         case .sonosRadio, .genericStreaming:
             "Available"
         }

@@ -31,9 +31,9 @@ struct SonoicAppleMusicAuthorizationState: Equatable {
         case .notDetermined:
             "Not Connected"
         case .requesting:
-            "Requesting Access"
+            "Connecting"
         case .authorized:
-            "Authorized"
+            "Connected"
         case .denied:
             "Denied"
         case .restricted:
@@ -46,13 +46,13 @@ struct SonoicAppleMusicAuthorizationState: Equatable {
     var detail: String {
         switch status {
         case .notDetermined:
-            "Authorize Apple Music before searching the catalog."
+            "Connect Apple Music to search."
         case .requesting:
-            "Waiting for Apple Music permission."
+            "Waiting for Apple Music."
         case .authorized:
-            "Catalog metadata search is available. Playback still stays on Sonos."
+            "Apple Music is connected."
         case .denied:
-            "Enable Apple Music access in iOS Settings to search catalog metadata."
+            "Enable Apple Music in iOS Settings."
         case .restricted:
             "This device does not allow Apple Music access."
         case .unavailable:
