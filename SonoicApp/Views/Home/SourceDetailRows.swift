@@ -444,11 +444,6 @@ struct SourceItemRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-
-                Label(originTitle, systemImage: item.service.systemImage)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
 
             Spacer(minLength: 0)
@@ -466,19 +461,6 @@ struct SourceItemRow: View {
         }
     }
 
-    private var originTitle: String {
-        switch item.origin {
-        case .catalogSearch:
-            "Catalog"
-        case .favorite:
-            "Favorite"
-        case .library:
-            "Library"
-        case .recentPlay:
-            "Recent Play"
-        }
-    }
-
     private func playTapped() {
         Task {
             await playAction()
@@ -491,10 +473,6 @@ struct SourceItemNavigationRow: View {
 
     let item: SonoicSourceItem
 
-    private var playbackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicPlaybackCandidate(for: item)
-    }
-
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
         model.appleMusicExactPlaybackCandidate(for: item)
     }
@@ -504,7 +482,7 @@ struct SourceItemNavigationRow: View {
             NavigationLink {
                 AppleMusicItemDetailView(item: item)
             } label: {
-                SourceItemMetadataRow(item: item, playbackCandidate: playbackCandidate)
+                SourceItemMetadataRow(item: item)
             }
             .buttonStyle(.plain)
 
@@ -609,7 +587,6 @@ private extension SonoicSourceItem.Kind {
 
 private struct SourceItemMetadataRow: View {
     let item: SonoicSourceItem
-    let playbackCandidate: SonoicSonosPlaybackCandidate?
 
     var body: some View {
         HStack(spacing: 14) {
@@ -632,18 +609,6 @@ private struct SourceItemMetadataRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-
-                Label(originTitle, systemImage: item.service.systemImage)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if let playbackCandidate {
-                    Label(playbackCandidate.confidence.badgeTitle, systemImage: "checkmark.circle")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(playbackCandidate.confidence == .exact ? .green : .secondary)
-                        .lineLimit(1)
-                }
             }
 
             Spacer(minLength: 0)
@@ -652,18 +617,6 @@ private struct SourceItemMetadataRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var originTitle: String {
-        switch item.origin {
-        case .catalogSearch:
-            "Catalog"
-        case .favorite:
-            "Favorite"
-        case .library:
-            "Library"
-        case .recentPlay:
-            "Recent Play"
-        }
-    }
 }
 
 struct SourceEmptyCard: View {

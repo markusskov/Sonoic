@@ -168,10 +168,6 @@ private struct AppleMusicLibraryGridCard: View {
 
     let item: SonoicSourceItem
 
-    private var playbackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicPlaybackCandidate(for: item)
-    }
-
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
         model.appleMusicExactPlaybackCandidate(for: item)
     }
@@ -204,12 +200,6 @@ private struct AppleMusicLibraryGridCard: View {
                                 .multilineTextAlignment(.leading)
                         }
 
-                        if let playbackCandidate {
-                            Label(playbackCandidate.confidence.badgeTitle, systemImage: "checkmark.circle")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(playbackCandidate.confidence == .exact ? .green : .secondary)
-                                .lineLimit(1)
-                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
