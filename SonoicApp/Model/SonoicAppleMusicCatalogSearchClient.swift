@@ -149,6 +149,9 @@ struct SonoicAppleMusicCatalogSearchClient {
                     sections: sections,
                     status: .loaded
                 )
+            case .playlistsForYou:
+                let sections = try await requestGate.fetchDefaultRecommendations(limit: 6)
+                return browseState(destination: destination, sections: sections)
             case .categories:
                 let genres = try await requestGate.fetchCatalogGenres(limit: 24).map { genre in
                     SonoicAppleMusicGenreItem(id: genre.id, title: genre.title)
@@ -158,7 +161,10 @@ struct SonoicAppleMusicCatalogSearchClient {
                     genres: genres,
                     status: .loaded
                 )
-            case .playlistsForYou, .newReleases, .radioShows:
+            case .radioShows:
+                let sections = try await requestGate.fetchLiveRadioStations()
+                return browseState(destination: destination, sections: sections)
+            case .newReleases:
                 return SonoicAppleMusicBrowseState(destination: destination, status: .loaded)
             }
         } catch {
@@ -307,6 +313,24 @@ struct SonoicAppleMusicCatalogSearchClient {
         )
     }
 
+    private func browseState(
+        destination: SonoicAppleMusicBrowseDestination,
+        sections: [AppleMusicItemMetadataSection]
+    ) -> SonoicAppleMusicBrowseState {
+        SonoicAppleMusicBrowseState(
+            destination: destination,
+            sections: sections.map { section in
+                SonoicAppleMusicItemDetailSection(
+                    id: section.id,
+                    title: section.title,
+                    subtitle: section.subtitle,
+                    items: section.items.map(sourceItem)
+                )
+            },
+            status: .loaded
+        )
+    }
+
     private func appleMusicKind(for sourceKind: SonoicSourceItem.Kind) -> AppleMusicItemKind? {
         switch sourceKind {
         case .album:
@@ -343,6 +367,8 @@ struct SonoicAppleMusicCatalogSearchClient {
             .playlist
         case .song:
             .song
+        case .station:
+            .station
         }
     }
 

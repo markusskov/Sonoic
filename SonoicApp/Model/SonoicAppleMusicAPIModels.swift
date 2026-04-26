@@ -140,6 +140,7 @@ nonisolated enum AppleMusicItemKind: Sendable {
     case artist
     case playlist
     case song
+    case station
 
     init?(resourceType: String?) {
         switch resourceType {
@@ -151,6 +152,8 @@ nonisolated enum AppleMusicItemKind: Sendable {
             self = .playlist
         case "songs", "library-songs":
             self = .song
+        case "stations":
+            self = .station
         default:
             return nil
         }
@@ -226,6 +229,49 @@ nonisolated struct AppleMusicCatalogSearchResults: Decodable {
 
 nonisolated struct AppleMusicCatalogResourceCollection: Decodable {
     var data: [AppleMusicLibraryResource]
+}
+
+nonisolated struct AppleMusicRecommendationResponse: Decodable {
+    var data: [AppleMusicRecommendationResource]
+
+    func sections() -> [AppleMusicItemMetadataSection] {
+        data.compactMap(\.section)
+    }
+}
+
+nonisolated struct AppleMusicRecommendationResource: Decodable {
+    var id: String
+    var attributes: AppleMusicRecommendationAttributes?
+    var relationships: AppleMusicRecommendationRelationships?
+
+    var section: AppleMusicItemMetadataSection? {
+        let items = relationships?.contents?.data.compactMap { resource in
+            AppleMusicItemMetadata.metadata(from: resource, origin: .catalogSearch)
+        } ?? []
+
+        guard !items.isEmpty else {
+            return nil
+        }
+
+        return AppleMusicItemMetadataSection(
+            id: id,
+            title: attributes?.title?.stringForDisplay ?? "For You",
+            subtitle: nil,
+            items: items
+        )
+    }
+}
+
+nonisolated struct AppleMusicRecommendationAttributes: Decodable {
+    var title: AppleMusicDisplayString?
+}
+
+nonisolated struct AppleMusicDisplayString: Decodable {
+    var stringForDisplay: String?
+}
+
+nonisolated struct AppleMusicRecommendationRelationships: Decodable {
+    var contents: AppleMusicCatalogResourceCollection?
 }
 
 nonisolated struct AppleMusicChartResponse: Decodable {

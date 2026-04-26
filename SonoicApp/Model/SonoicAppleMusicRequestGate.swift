@@ -218,6 +218,43 @@ actor SonoicMusicKitRequestGate {
         return chartResponse.results.sections()
     }
 
+    func fetchDefaultRecommendations(limit: Int) async throws -> [AppleMusicItemMetadataSection] {
+        let response: AppleMusicRecommendationResponse = try await fetchDecoded(
+            path: "/v1/me/recommendations",
+            queryItems: [
+                URLQueryItem(name: "limit", value: "\(limit)"),
+                URLQueryItem(name: "include", value: "contents")
+            ]
+        )
+        return response.sections()
+    }
+
+    func fetchLiveRadioStations() async throws -> [AppleMusicItemMetadataSection] {
+        let response: AppleMusicLibraryResponse = try await fetchDecoded(
+            path: "/v1/catalog/\(try await storefrontCountryCode())/stations",
+            queryItems: [
+                URLQueryItem(name: "filter[featured]", value: "apple-music-live-radio"),
+                URLQueryItem(name: "limit", value: "1")
+            ]
+        )
+        let items = response.data.compactMap { resource in
+            AppleMusicItemMetadata.metadata(from: resource, origin: .catalogSearch)
+        }
+
+        guard !items.isEmpty else {
+            return []
+        }
+
+        return [
+            AppleMusicItemMetadataSection(
+                id: "live-radio",
+                title: "Live Radio",
+                subtitle: nil,
+                items: items
+            )
+        ]
+    }
+
     func fetchCatalogGenres(limit: Int) async throws -> [AppleMusicGenreMetadata] {
         let genreResponse: AppleMusicGenreResponse = try await fetchDecoded(
             path: "/v1/catalog/\(try await storefrontCountryCode())/genres",
@@ -272,7 +309,7 @@ actor SonoicMusicKitRequestGate {
             ]
         case .artist:
             return try await fetchArtistDetailSections(for: lookup)
-        case .song:
+        case .song, .station:
             return []
         }
     }

@@ -132,6 +132,75 @@ struct SonoicAppleMusicIdentityTests {
     }
 
     @Test
+    func decodesStationResources() throws {
+        let json = """
+        {
+          "data": [
+            {
+              "id": "ra.1",
+              "type": "stations",
+              "attributes": {
+                "name": "Apple Music 1",
+                "url": "https://music.apple.com/us/station/apple-music-1/ra.1"
+              }
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(AppleMusicLibraryResponse.self, from: json)
+        let resource = try #require(response.data.first)
+        let metadata = try #require(AppleMusicItemMetadata.metadata(from: resource, origin: .catalogSearch))
+
+        #expect(metadata.serviceItemID == "ra.1")
+        #expect(metadata.kind == .station)
+        #expect(metadata.title == "Apple Music 1")
+        #expect(metadata.externalURL == "https://music.apple.com/us/station/apple-music-1/ra.1")
+    }
+
+    @Test
+    func decodesRecommendationSections() throws {
+        let json = """
+        {
+          "data": [
+            {
+              "id": "rec-1",
+              "type": "personal-recommendation",
+              "attributes": {
+                "title": {
+                  "stringForDisplay": "Made for You"
+                }
+              },
+              "relationships": {
+                "contents": {
+                  "data": [
+                    {
+                      "id": "pl.1",
+                      "type": "playlists",
+                      "attributes": {
+                        "name": "Replay",
+                        "curatorName": "Apple Music"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(AppleMusicRecommendationResponse.self, from: json)
+        let section = try #require(response.sections().first)
+        let item = try #require(section.items.first)
+
+        #expect(section.id == "rec-1")
+        #expect(section.title == "Made for You")
+        #expect(item.kind == .playlist)
+        #expect(item.title == "Replay")
+    }
+
+    @Test
     func mapsDeveloperTokenFailuresToFriendlyDiagnostics() {
         let error = NSError(
             domain: "MusicKit.MusicDataRequest.Error",
