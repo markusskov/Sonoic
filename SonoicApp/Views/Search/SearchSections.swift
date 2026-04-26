@@ -125,6 +125,53 @@ struct SearchInputCard: View {
     }
 }
 
+struct SearchRecentQueriesSection: View {
+    let service: SonosServiceDescriptor
+    let recentSearches: [SonoicRecentSourceSearch]
+    let select: (SonoicRecentSourceSearch) -> Void
+    let clear: () -> Void
+
+    var body: some View {
+        if !recentSearches.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    HomeSectionHeader(
+                        title: "Recent Searches",
+                        subtitle: "Quickly rerun \(service.name) searches."
+                    )
+
+                    Spacer(minLength: 0)
+
+                    Button("Clear", action: clear)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                ScrollView(.horizontal) {
+                    HStack(spacing: 10) {
+                        ForEach(recentSearches) { recentSearch in
+                            Button {
+                                select(recentSearch)
+                            } label: {
+                                Label(recentSearch.query, systemImage: "clock")
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 13)
+                                    .padding(.vertical, 9)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.capsule)
+                            .accessibilityLabel("Search \(recentSearch.query)")
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+    }
+}
+
 struct SearchResultsSection: View {
     let service: SonosServiceDescriptor
     let state: SonoicSourceSearchState

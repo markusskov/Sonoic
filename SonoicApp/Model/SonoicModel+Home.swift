@@ -55,6 +55,20 @@ extension SonoicModel {
         sourceSearchStates[source.service.id] ?? SonoicSourceSearchState(service: source.service)
     }
 
+    func recentSourceSearches(for source: SonoicSource) -> [SonoicRecentSourceSearch] {
+        recentSourceSearches.filter { $0.serviceID == source.service.id }
+    }
+
+    func clearRecentSourceSearches(for source: SonoicSource) {
+        let nextSearches = recentSourceSearches.filter { $0.serviceID != source.service.id }
+        guard nextSearches != recentSourceSearches else {
+            return
+        }
+
+        recentSourceSearches = nextSearches
+        settingsStore.saveRecentSourceSearches(nextSearches)
+    }
+
     func updateSourceSearchQuery(_ query: String, for source: SonoicSource) {
         let currentState = sourceSearchState(for: source)
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
@@ -142,6 +156,7 @@ extension SonoicModel {
                 status: .loaded,
                 lastUpdatedAt: .now
             )
+            recordRecentSourceSearch(query, for: source)
         } catch {
             guard shouldApplySourceSearchResponse(
                 serviceID: source.service.id,
@@ -171,6 +186,31 @@ extension SonoicModel {
     ) -> Bool {
         let state = sourceSearchStates[serviceID]
         return state?.query.sonoicNonEmptyTrimmed == query && state?.scope == scope
+    }
+
+    private func recordRecentSourceSearch(_ query: String, for source: SonoicSource) {
+        guard let trimmedQuery = query.sonoicNonEmptyTrimmed else {
+            return
+        }
+
+        let recentSearch = SonoicRecentSourceSearch(
+            serviceID: source.service.id,
+            query: trimmedQuery,
+            searchedAt: .now
+        )
+        var nextSearches = recentSourceSearches.filter { $0.id != recentSearch.id }
+        nextSearches.insert(recentSearch, at: 0)
+
+        if nextSearches.count > Self.recentSourceSearchLimit {
+            nextSearches = Array(nextSearches.prefix(Self.recentSourceSearchLimit))
+        }
+
+        guard nextSearches != recentSourceSearches else {
+            return
+        }
+
+        recentSourceSearches = nextSearches
+        settingsStore.saveRecentSourceSearches(nextSearches)
     }
 
     func refreshHomeFavorites(showLoading: Bool = true) async {

@@ -628,8 +628,11 @@ struct SourceSearchSection: View {
     let serviceName: String
     @Binding var query: String
     let state: SonoicSourceSearchState
+    let recentSearches: [SonoicRecentSourceSearch]
     let availabilityMessage: SourceSearchAvailabilityMessage?
     let search: () async -> Void
+    let selectRecentSearch: (SonoicRecentSourceSearch) -> Void
+    let clearRecentSearches: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -664,6 +667,12 @@ struct SourceSearchSection: View {
                         .accessibilityLabel("Search \(serviceName)")
                     }
 
+                    SourceRecentSearchChips(
+                        recentSearches: recentSearches,
+                        select: selectRecentSearch,
+                        clear: clearRecentSearches
+                    )
+
                     if let availabilityMessage {
                         SourceSearchMessageRow(
                             title: availabilityMessage.title,
@@ -697,6 +706,51 @@ struct SourceSearchSection: View {
     private func searchTapped() {
         Task {
             await search()
+        }
+    }
+}
+
+private struct SourceRecentSearchChips: View {
+    let recentSearches: [SonoicRecentSourceSearch]
+    let select: (SonoicRecentSourceSearch) -> Void
+    let clear: () -> Void
+
+    var body: some View {
+        if !recentSearches.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Recent")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 0)
+
+                    Button("Clear", action: clear)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(recentSearches) { recentSearch in
+                            Button {
+                                select(recentSearch)
+                            } label: {
+                                Label(recentSearch.query, systemImage: "clock")
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 11)
+                                    .padding(.vertical, 7)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.capsule)
+                            .accessibilityLabel("Search \(recentSearch.query)")
+                        }
+                    }
+                    .padding(.vertical, 1)
+                }
+                .scrollIndicators(.hidden)
+            }
         }
     }
 }

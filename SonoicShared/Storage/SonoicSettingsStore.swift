@@ -3,6 +3,7 @@ import Foundation
 struct SonoicSettingsStore {
     static let manualSonosHostKey = "manualSonosHost"
     static let recentPlaysKey = "recentPlays"
+    static let recentSourceSearchesKey = "recentSourceSearches"
 
     private let userDefaults: UserDefaults
 
@@ -34,5 +35,23 @@ struct SonoicSettingsStore {
         }
 
         userDefaults.set(data, forKey: Self.recentPlaysKey)
+    }
+
+    func loadRecentSourceSearches() -> [SonoicRecentSourceSearch] {
+        guard let data = userDefaults.data(forKey: Self.recentSourceSearchesKey),
+              let recentSearches = try? JSONDecoder().decode([SonoicRecentSourceSearch].self, from: data)
+        else {
+            return []
+        }
+
+        return recentSearches
+    }
+
+    func saveRecentSourceSearches(_ recentSearches: [SonoicRecentSourceSearch]) {
+        guard let data = try? JSONEncoder().encode(recentSearches) else {
+            return
+        }
+
+        userDefaults.set(data, forKey: Self.recentSourceSearchesKey)
     }
 }

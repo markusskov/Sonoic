@@ -50,6 +50,13 @@ struct SearchView: View {
                         submit: searchCatalog
                     )
 
+                    SearchRecentQueriesSection(
+                        service: selectedService,
+                        recentSearches: model.recentSourceSearches(for: selectedSource),
+                        select: selectRecentSearch,
+                        clear: clearRecentSearches
+                    )
+
                     SearchScopeSection(
                         service: selectedService,
                         selectedScope: searchState.scope,
@@ -105,6 +112,15 @@ struct SearchView: View {
 
     private func selectScope(_ scope: SonoicSourceSearchScope) {
         model.updateSourceSearchScope(scope, for: selectedSource)
+    }
+
+    private func selectRecentSearch(_ recentSearch: SonoicRecentSourceSearch) {
+        model.updateSourceSearchQuery(recentSearch.query, for: selectedSource)
+        searchCatalog()
+    }
+
+    private func clearRecentSearches() {
+        model.clearRecentSourceSearches(for: selectedSource)
     }
 
     private var appleMusicAvailabilityMessage: SearchMessage? {

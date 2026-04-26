@@ -48,8 +48,11 @@ struct SourceDetailView: View {
                             serviceName: source.service.name,
                             query: catalogSearchBinding,
                             state: catalogSearchState,
+                            recentSearches: model.recentSourceSearches(for: source),
                             availabilityMessage: appleMusicAvailabilityMessage,
-                            search: searchCatalog
+                            search: searchCatalog,
+                            selectRecentSearch: selectRecentSearch,
+                            clearRecentSearches: clearRecentSearches
                         )
                     }
 
@@ -146,6 +149,17 @@ struct SourceDetailView: View {
 
     private func searchCatalog() async {
         await model.searchSourceCatalog(for: source)
+    }
+
+    private func selectRecentSearch(_ recentSearch: SonoicRecentSourceSearch) {
+        model.updateSourceSearchQuery(recentSearch.query, for: source)
+        Task {
+            await model.searchSourceCatalog(for: source)
+        }
+    }
+
+    private func clearRecentSearches() {
+        model.clearRecentSourceSearches(for: source)
     }
 
     private var appleMusicAvailabilityMessage: SourceSearchAvailabilityMessage? {

@@ -7,6 +7,7 @@ import UIKit
 final class SonoicModel {
     @ObservationIgnored static let manualPlayTransitionGraceInterval: TimeInterval = 3
     @ObservationIgnored static let homeRecentPlayLimit = 12
+    @ObservationIgnored static let recentSourceSearchLimit = 8
     @ObservationIgnored static let unconfiguredTarget = SonosActiveTarget(
         id: "unconfigured-room",
         name: "No Room Loaded",
@@ -99,6 +100,7 @@ final class SonoicModel {
     var homeTheaterTVDiagnostics = SonosHomeTheaterTVDiagnostics.empty
     var roomVolumeState: SonosRoomVolumeState = .idle
     var recentPlays: [SonoicRecentPlayItem] = []
+    var recentSourceSearches: [SonoicRecentSourceSearch] = []
     var sourceSearchStates: [String: SonoicSourceSearchState] = [:]
     var appleMusicLibraryStates: [SonoicAppleMusicLibraryDestination: SonoicAppleMusicLibraryState] = [:]
     var appleMusicBrowseStates: [SonoicAppleMusicBrowseDestination: SonoicAppleMusicBrowseState] = [:]
@@ -235,6 +237,7 @@ final class SonoicModel {
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         manualSonosHost = settingsStore.loadManualSonosHost()
         recentPlays = settingsStore.loadRecentPlays()
+        recentSourceSearches = settingsStore.loadRecentSourceSearches()
         appleMusicAuthorizationState = appleMusicCatalogSearchClient.currentAuthorizationState()
 
         do {
