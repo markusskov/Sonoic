@@ -85,7 +85,8 @@ extension SonoicModel {
             service: source.service,
             scope: scope,
             items: scope == currentState.scope ? currentState.items : [],
-            status: scope == currentState.scope ? currentState.status : .idle
+            status: scope == currentState.scope ? currentState.status : .idle,
+            lastUpdatedAt: scope == currentState.scope ? currentState.lastUpdatedAt : nil
         )
     }
 

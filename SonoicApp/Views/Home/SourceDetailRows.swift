@@ -681,7 +681,7 @@ struct SourceSearchSection: View {
                         )
                     } else if !state.hasQuery || state.status == .idle {
                         SourceSearchIdleRow(serviceName: serviceName)
-                    } else if let failureDetail = state.failureDetail {
+                    } else if let failureDetail = state.failureDetail, state.items.isEmpty {
                         SourceSearchMessageRow(
                             title: "Search Failed",
                             detail: failureDetail,
@@ -694,8 +694,21 @@ struct SourceSearchSection: View {
                             systemImage: "magnifyingglass"
                         )
                     } else {
-                        ForEach(state.items) { item in
+                        if let failureDetail = state.failureDetail {
+                            SourceSearchMessageRow(
+                                title: "Showing Cached Results",
+                                detail: staleDetail(failureDetail),
+                                systemImage: "exclamationmark.triangle"
+                            )
+                        }
+
+                        ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
                             SourceItemNavigationRow(item: item)
+
+                            if index < state.items.count - 1 {
+                                Divider()
+                                    .padding(.leading, 76)
+                            }
                         }
                     }
                 }
@@ -707,6 +720,14 @@ struct SourceSearchSection: View {
         Task {
             await search()
         }
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return failureDetail
+        }
+
+        return "Showing previous results from \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 }
 
