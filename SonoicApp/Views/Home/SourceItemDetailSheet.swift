@@ -63,10 +63,6 @@ struct SourceItemDetailSheet: View {
         RoomSurfaceCard {
             Label(item.playbackCapability.displayTitle, systemImage: capabilitySystemImage)
                 .font(.headline)
-
-            Text(capabilityDetail)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -79,7 +75,7 @@ struct SourceItemDetailSheet: View {
 
     private var primaryActionButton: some View {
         SourceItemDetailActionButton(
-            title: "Play on Sonos",
+            title: "Play",
             systemImage: "play.fill",
             action: playTapped
         )
@@ -87,10 +83,6 @@ struct SourceItemDetailSheet: View {
 
     private var capabilitySystemImage: String {
         item.playbackCapability.canPlay ? "checkmark.circle.fill" : "lock.circle"
-    }
-
-    private var capabilityDetail: String {
-        item.playbackCapability.disabledReason ?? "This item includes a Sonos-native payload and can start playback."
     }
 
     private var originTitle: String {

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AppleMusicItemCollectionView: View {
     let title: String
-    let subtitle: String
+    let subtitle: String?
     let items: [SonoicSourceItem]
 
     var body: some View {
@@ -40,10 +40,12 @@ struct AppleMusicItemCollectionView: View {
                 .foregroundStyle(.primary)
                 .lineLimit(2)
 
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -53,7 +55,7 @@ struct AppleMusicItemCollectionView: View {
     NavigationStack {
         AppleMusicItemCollectionView(
             title: "Tracks",
-            subtitle: "Apple Music metadata",
+            subtitle: nil,
             items: [
                 SonoicSourceItem.appleMusicMetadata(
                     id: "preview-song",

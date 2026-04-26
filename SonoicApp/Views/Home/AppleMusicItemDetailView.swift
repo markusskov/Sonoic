@@ -54,7 +54,7 @@ struct AppleMusicItemDetailView: View {
         if state.isLoading && state.sections.isEmpty {
             AppleMusicItemDetailMessageCard(
                 title: "Loading \(item.kind.title)",
-                detail: "Reading Apple Music metadata.",
+                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.sections.isEmpty {
@@ -65,15 +65,15 @@ struct AppleMusicItemDetailView: View {
             )
         } else if state.sections.isEmpty {
             AppleMusicItemDetailMessageCard(
-                title: "No More Metadata",
-                detail: "Apple Music did not return extra detail sections for this item yet.",
+                title: "No Details",
+                detail: "Nothing else here yet.",
                 systemImage: item.kind.systemImage
             )
         } else {
             if state.isLoading {
                 AppleMusicItemDetailMessageCard(
-                    title: "Refreshing Details",
-                    detail: "Keeping the last Apple Music metadata visible while Sonoic checks for updates.",
+                    title: "Refreshing",
+                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }
@@ -197,13 +197,8 @@ private struct AppleMusicItemCapabilityCard: View {
     @ViewBuilder
     private var capabilityContent: some View {
         if let playbackCandidate {
-            Label(playbackCandidate.confidence.title, systemImage: playbackCandidate.confidence == .exact ? "play.circle" : "checkmark.circle")
+            Label(playbackCandidate.confidence.shortTitle, systemImage: playbackCandidate.confidence == .exact ? "play.circle" : "checkmark.circle")
                 .font(.headline)
-
-            Text(playbackCandidate.detail)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
 
             if playbackCandidate.confidence == .exact {
                 Button {
@@ -211,32 +206,19 @@ private struct AppleMusicItemCapabilityCard: View {
                         await play(playbackCandidate)
                     }
                 } label: {
-                    Label("Play with Sonos", systemImage: "play.fill")
+                    Label("Play", systemImage: "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
             } else {
-                Text("This looks related to a saved Sonos favorite, but Sonoic needs a stronger match before it starts playback.")
+                Text("Possible favorite.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } else {
-            Label("Metadata Only", systemImage: "lock.circle")
+            Label("Not Playable", systemImage: "lock.circle")
                 .font(.headline)
-
-            Text("Sonoic can browse this Apple Music item, but still needs a Sonos-native playback payload before it can start playback on your speakers.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let serviceItemID = item.serviceItemID {
-                Text("MusicKit ID: \(serviceItemID)")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
         }
     }
 
@@ -274,7 +256,7 @@ private struct AppleMusicItemDetailSectionView: View {
             HStack(alignment: .top, spacing: 12) {
                 HomeSectionHeader(
                     title: section.title,
-                    subtitle: section.subtitle ?? "Apple Music metadata"
+                    subtitle: section.subtitle
                 )
 
                 Spacer(minLength: 0)
@@ -283,7 +265,7 @@ private struct AppleMusicItemDetailSectionView: View {
                     NavigationLink {
                         AppleMusicItemCollectionView(
                             title: section.title,
-                            subtitle: section.subtitle ?? "Apple Music metadata",
+                            subtitle: section.subtitle,
                             items: section.items
                         )
                     } label: {

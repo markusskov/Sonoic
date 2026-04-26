@@ -66,11 +66,11 @@ enum SonoicPlaybackCapability: Equatable {
     var displayTitle: String {
         switch self {
         case .sonosNative:
-            "Playable on Sonos"
+            "Playable"
         case .metadataOnly:
-            "Metadata Only"
+            "Not Playable"
         case .unsupported:
-            "Unsupported"
+            "Not Playable"
         }
     }
 
@@ -90,6 +90,15 @@ struct SonoicSonosPlaybackCandidate: Identifiable, Equatable {
     enum Confidence: String, Equatable {
         case exact
         case likely
+
+        var shortTitle: String {
+            switch self {
+            case .exact:
+                "Favorite Match"
+            case .likely:
+                "Possible Match"
+            }
+        }
 
         var title: String {
             switch self {

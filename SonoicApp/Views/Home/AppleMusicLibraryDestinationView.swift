@@ -40,16 +40,9 @@ struct AppleMusicLibraryDestinationView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(destination.title, systemImage: destination.systemImage)
-                .font(.largeTitle.weight(.bold))
-                .foregroundStyle(.primary)
-
-            Text(destination.subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Label(destination.title, systemImage: destination.systemImage)
+            .font(.largeTitle.weight(.bold))
+            .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -58,7 +51,7 @@ struct AppleMusicLibraryDestinationView: View {
         if state.isLoading && state.items.isEmpty {
             AppleMusicLibraryMessageCard(
                 title: "Loading \(destination.title)",
-                detail: "Reading your Apple Music library metadata.",
+                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.items.isEmpty {
@@ -70,15 +63,15 @@ struct AppleMusicLibraryDestinationView: View {
         } else if state.status == .loaded && state.items.isEmpty {
             AppleMusicLibraryMessageCard(
                 title: "No \(destination.title)",
-                detail: "Apple Music did not return saved \(destination.title.lowercased()) for this library.",
+                detail: "Nothing here yet.",
                 systemImage: "music.note.list"
             )
         } else if state.status == .loaded || !state.items.isEmpty {
             libraryItemsSection
         } else {
             AppleMusicLibraryMessageCard(
-                title: "\(destination.title) Ready",
-                detail: "Tap refresh to load this Apple Music library lane.",
+                title: destination.title,
+                detail: "Pull to refresh.",
                 systemImage: destination.systemImage
             )
         }
@@ -88,8 +81,7 @@ struct AppleMusicLibraryDestinationView: View {
     private var libraryItemsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: destination.title,
-                subtitle: sectionSubtitle
+                title: destination.title
             )
 
             if let failureDetail = state.failureDetail {
@@ -135,19 +127,6 @@ struct AppleMusicLibraryDestinationView: View {
                 .accessibilityLabel("Load more \(destination.title)")
             }
         }
-    }
-
-    private var sectionSubtitle: String {
-        let base = [
-            "Showing \(state.items.count) Apple Music library items.",
-            "Sonoic still needs Sonos-native payloads before playback."
-        ].joined(separator: " ")
-
-        guard let lastUpdatedAt = state.lastUpdatedAt else {
-            return base
-        }
-
-        return "\(base) Updated \(lastUpdatedAt.formatted(.dateTime.hour().minute()))."
     }
 
     private func staleDetail(_ failureDetail: String) -> String {

@@ -40,16 +40,9 @@ struct AppleMusicBrowseDestinationView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(destination.title, systemImage: destination.systemImage)
-                .font(.largeTitle.weight(.bold))
-                .foregroundStyle(.primary)
-
-            Text(destination.subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Label(destination.title, systemImage: destination.systemImage)
+            .font(.largeTitle.weight(.bold))
+            .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -58,7 +51,7 @@ struct AppleMusicBrowseDestinationView: View {
         if state.isLoading && state.sections.isEmpty && state.genres.isEmpty {
             AppleMusicBrowseMessageCard(
                 title: "Loading \(destination.title)",
-                detail: "Reading Apple Music catalog metadata.",
+                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.sections.isEmpty && state.genres.isEmpty {
@@ -70,8 +63,8 @@ struct AppleMusicBrowseDestinationView: View {
         } else if !state.sections.isEmpty {
             if state.isLoading {
                 AppleMusicBrowseMessageCard(
-                    title: "Refreshing \(destination.title)",
-                    detail: "Keeping the last Apple Music results visible while Sonoic checks for updates.",
+                    title: "Refreshing",
+                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }
@@ -91,7 +84,7 @@ struct AppleMusicBrowseDestinationView: View {
             if state.isLoading {
                 AppleMusicBrowseMessageCard(
                     title: "Refreshing Categories",
-                    detail: "Keeping the last Apple Music genres visible while Sonoic checks for updates.",
+                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }
@@ -107,8 +100,8 @@ struct AppleMusicBrowseDestinationView: View {
             AppleMusicBrowseGenreSection(genres: state.genres)
         } else {
             AppleMusicBrowseMessageCard(
-                title: "\(destination.title) Is Coming Soon",
-                detail: "This Apple Music lane is planned, but it is not wired to a catalog endpoint yet.",
+                title: "Coming Soon",
+                detail: destination.title,
                 systemImage: destination.systemImage
             )
         }
@@ -144,7 +137,7 @@ private struct AppleMusicBrowseSectionView: View {
             HStack(alignment: .top, spacing: 12) {
                 HomeSectionHeader(
                     title: section.title,
-                    subtitle: section.subtitle ?? "Apple Music catalog metadata"
+                    subtitle: section.subtitle
                 )
 
                 Spacer(minLength: 0)
@@ -153,7 +146,7 @@ private struct AppleMusicBrowseSectionView: View {
                     NavigationLink {
                         AppleMusicItemCollectionView(
                             title: section.title,
-                            subtitle: section.subtitle ?? "Apple Music catalog metadata",
+                            subtitle: section.subtitle,
                             items: section.items
                         )
                     } label: {
@@ -188,8 +181,7 @@ private struct AppleMusicBrowseGenreSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Categories",
-                subtitle: "Apple Music genres used by catalog charts."
+                title: "Categories"
             )
 
             RoomSurfaceCard {
