@@ -74,6 +74,34 @@ struct SonoicAppleMusicPlaybackPayloadResolverTests {
     }
 
     @Test
+    func rejectsSongWhenSubtitleIsMissing() {
+        let item = appleMusicItem(title: "Intro", subtitle: nil, kind: .song)
+        let favorite = favorite(
+            title: "Intro",
+            subtitle: "Artist One",
+            service: .appleMusic,
+            uri: "x-sonosapi-hls:song%3a456?sid=204",
+            kind: .item
+        )
+
+        #expect(resolver.candidates(for: item, favorites: [favorite]).isEmpty)
+    }
+
+    @Test
+    func rejectsSongFavoriteWhenFavoriteSubtitleIsMissing() {
+        let item = appleMusicItem(title: "Intro", subtitle: "Artist One • Album One", kind: .song)
+        let favorite = favorite(
+            title: "Intro",
+            subtitle: nil,
+            service: .appleMusic,
+            uri: "x-sonosapi-hls:song%3a456?sid=204",
+            kind: .item
+        )
+
+        #expect(resolver.candidates(for: item, favorites: [favorite]).isEmpty)
+    }
+
+    @Test
     func avoidsExactSongMatchWhenOnlyAlbumOverlaps() throws {
         let item = appleMusicItem(
             title: "Intro",

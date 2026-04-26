@@ -46,7 +46,13 @@ struct SonoicAppleMusicPlaybackPayloadResolver {
                 favoriteParts: favoriteSubtitleSet
             )
 
-            guard hasSubtitleOverlap || hasKindMatch || favoriteSubtitleParts.isEmpty || itemSubtitleParts.isEmpty else {
+            guard appleMusicItem(
+                item,
+                hasPlayableMatchWithKindMatch: hasKindMatch,
+                subtitleOverlap: hasSubtitleOverlap,
+                itemParts: itemSubtitleParts,
+                favoriteParts: favoriteSubtitleParts
+            ) else {
                 return nil
             }
 
@@ -103,6 +109,23 @@ struct SonoicAppleMusicPlaybackPayloadResolver {
             return !Set(itemParts).isDisjoint(with: favoriteParts)
         case .artist, .unknown:
             return false
+        }
+    }
+
+    private func appleMusicItem(
+        _ item: SonoicSourceItem,
+        hasPlayableMatchWithKindMatch hasKindMatch: Bool,
+        subtitleOverlap: Bool,
+        itemParts: [String],
+        favoriteParts: [String]
+    ) -> Bool {
+        switch item.kind {
+        case .song:
+            hasKindMatch && subtitleOverlap && !itemParts.isEmpty && !favoriteParts.isEmpty
+        case .album, .playlist, .station:
+            subtitleOverlap || hasKindMatch || favoriteParts.isEmpty || itemParts.isEmpty
+        case .artist, .unknown:
+            subtitleOverlap || hasKindMatch
         }
     }
 
