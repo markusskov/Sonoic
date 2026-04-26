@@ -638,7 +638,9 @@ struct SourceSearchSection: View {
     let state: SonoicSourceSearchState
     let recentSearches: [SonoicRecentSourceSearch]
     let availabilityMessage: SourceSearchAvailabilityMessage?
+    let selectedScope: SonoicSourceSearchScope
     let search: () async -> Void
+    let selectScope: (SonoicSourceSearchScope) -> Void
     let selectRecentSearch: (SonoicRecentSourceSearch) -> Void
     let clearRecentSearches: () -> Void
 
@@ -674,6 +676,11 @@ struct SourceSearchSection: View {
                         .disabled(!state.hasQuery || state.isSearching)
                         .accessibilityLabel("Search \(serviceName)")
                     }
+
+                    SourceSearchScopeChips(
+                        selectedScope: selectedScope,
+                        select: selectScope
+                    )
 
                     SourceRecentSearchChips(
                         recentSearches: recentSearches,
@@ -736,6 +743,39 @@ struct SourceSearchSection: View {
         }
 
         return "Showing previous results from \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
+    }
+}
+
+private struct SourceSearchScopeChips: View {
+    let selectedScope: SonoicSourceSearchScope
+    let select: (SonoicSourceSearchScope) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 9) {
+                ForEach(SonoicSourceSearchScope.allCases) { scope in
+                    Button {
+                        select(scope)
+                    } label: {
+                        Label(scope.title, systemImage: scope.systemImage)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(selectedScope == scope ? .primary : .secondary)
+                            .lineLimit(1)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(
+                        selectedScope == scope ? .regular.interactive() : .regular,
+                        in: .capsule
+                    )
+                    .accessibilityLabel("Search \(scope.title)")
+                    .accessibilityAddTraits(selectedScope == scope ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollIndicators(.hidden)
     }
 }
 

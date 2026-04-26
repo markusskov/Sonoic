@@ -50,7 +50,9 @@ struct SourceDetailView: View {
                             state: catalogSearchState,
                             recentSearches: model.recentSourceSearches(for: source),
                             availabilityMessage: appleMusicAvailabilityMessage,
+                            selectedScope: catalogSearchState.scope,
                             search: searchCatalog,
+                            selectScope: selectSourceSearchScope,
                             selectRecentSearch: selectRecentSearch,
                             clearRecentSearches: clearRecentSearches
                         )
@@ -149,6 +151,10 @@ struct SourceDetailView: View {
 
     private func searchCatalog() async {
         await model.searchSourceCatalog(for: source)
+    }
+
+    private func selectSourceSearchScope(_ scope: SonoicSourceSearchScope) {
+        model.updateSourceSearchScope(scope, for: source)
     }
 
     private func selectRecentSearch(_ recentSearch: SonoicRecentSourceSearch) {
