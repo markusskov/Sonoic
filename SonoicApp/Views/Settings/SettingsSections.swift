@@ -168,6 +168,7 @@ struct SettingsMusicServicesSection: View {
 
                     if model.appleMusicAuthorizationState.allowsCatalogSearch {
                         SettingsAppleMusicServiceDetailsRows(details: model.appleMusicServiceDetails)
+                        SettingsAppleMusicRequestReadinessRows(readiness: model.appleMusicRequestReadiness)
 
                         Button(action: refreshAppleMusicDetails) {
                             if model.appleMusicServiceDetails.isLoading {
@@ -303,12 +304,53 @@ private struct SettingsAppleMusicServiceDetailsRows: View {
     }
 }
 
+private struct SettingsAppleMusicRequestReadinessRows: View {
+    let readiness: SonoicAppleMusicRequestReadiness
+
+    var body: some View {
+        SettingsStatusRow(
+            title: "MusicKit Requests",
+            statusTitle: readiness.title,
+            detail: readiness.detail,
+            systemImage: systemImage,
+            tint: tint
+        )
+
+        if let lastFailure = readiness.lastFailure {
+            LabeledContent("Last Failed Area", value: lastFailure.endpointFamily.title)
+            LabeledContent("Last Failed At", value: lastFailure.occurredAt.formatted(.dateTime.hour().minute().second()))
+        }
+    }
+
+    private var systemImage: String {
+        switch readiness.status {
+        case .idle:
+            "clock"
+        case .ready:
+            "checkmark.circle.fill"
+        case .failed:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch readiness.status {
+        case .idle:
+            .secondary
+        case .ready:
+            .green
+        case .failed:
+            .red
+        }
+    }
+}
+
 private struct SettingsMusicKitDiagnosticsRows: View {
     let diagnostics: SonoicMusicKitDiagnostics
 
     var body: some View {
         LabeledContent("Bundle ID", value: diagnostics.bundleIdentifier)
-        LabeledContent("MusicKit App Service", value: "Developer Portal")
+        LabeledContent("MusicKit App Service", value: "Automatic token service")
         LabeledContent("Developer Token", value: diagnostics.usesAutomaticDeveloperTokenGeneration ? "Automatic" : "Manual")
         LabeledContent("Usage Description", value: diagnostics.hasUsageDescription ? "Present" : "Missing")
     }

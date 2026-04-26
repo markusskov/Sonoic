@@ -117,6 +117,7 @@ extension SonoicModel {
                     term: query,
                     scope: searchScope
                 )
+                recordAppleMusicRequestSuccess()
             case .spotify, .sonosRadio, .genericStreaming:
                 items = []
             }
@@ -149,7 +150,9 @@ extension SonoicModel {
                 query: query,
                 service: source.service,
                 scope: searchScope,
-                status: .failed(error.localizedDescription)
+                status: .failed(
+                    appleMusicFailureDetail(from: error, endpointFamily: .search)
+                )
             )
         }
     }

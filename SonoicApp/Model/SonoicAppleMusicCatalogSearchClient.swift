@@ -4,19 +4,15 @@ import Foundation
 struct SonoicAppleMusicCatalogSearchClient {
     enum ClientError: LocalizedError {
         case unauthorized(MusicAuthorization.Status)
-        case missingDeveloperTokenSetup(MusicKitRequestFailure)
+        case requestFailed(SonoicAppleMusicRequestFailure)
 
         var errorDescription: String? {
             switch self {
             case let .unauthorized(status):
                 let appStatus = SonoicAppleMusicAuthorizationState.Status(status)
                 return "Apple Music access is \(appStatus.sonoicDisplayName.lowercased())."
-            case let .missingDeveloperTokenSetup(failure):
-                return """
-                MusicKit could not receive Apple's automatic developer token for this bundle. Confirm MusicKit is enabled for com.markusskov.Sonoic in Apple Developer, then rebuild after the App ID has propagated.
-
-                \(failure.displayDetail)
-                """
+            case let .requestFailed(failure):
+                return failure.displayDetail
             }
         }
     }
@@ -43,7 +39,7 @@ struct SonoicAppleMusicCatalogSearchClient {
                 hasCloudLibraryEnabled: metadata.hasCloudLibraryEnabled
             )
         } catch {
-            throw mappedMusicKitError(error)
+            throw mappedMusicKitError(error, endpointFamily: .serviceDetails)
         }
     }
 
@@ -52,79 +48,79 @@ struct SonoicAppleMusicCatalogSearchClient {
         scope: SonoicSourceSearchScope = .all
     ) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
-            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+            throw unauthorizedError(endpointFamily: .search)
         }
 
         do {
             return try await requestGate.searchCatalog(term: term, scope: scope, limit: 12).map(sourceItem)
         } catch {
-            throw mappedMusicKitError(error)
+            throw mappedMusicKitError(error, endpointFamily: .search)
         }
     }
 
     func fetchLibraryAlbums(limit: Int = 24) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
-            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+            throw unauthorizedError(endpointFamily: .library)
         }
 
         do {
             return try await requestGate.fetchLibraryAlbums(limit: limit).map(sourceItem)
         } catch {
-            throw mappedMusicKitError(error)
+            throw mappedMusicKitError(error, endpointFamily: .library)
         }
     }
 
     func fetchLibraryPlaylists(limit: Int = 24) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
-            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+            throw unauthorizedError(endpointFamily: .library)
         }
 
         do {
             return try await requestGate.fetchLibraryPlaylists(limit: limit).map(sourceItem)
         } catch {
-            throw mappedMusicKitError(error)
+            throw mappedMusicKitError(error, endpointFamily: .library)
         }
     }
 
     func fetchLibraryArtists(limit: Int = 50) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
-            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+            throw unauthorizedError(endpointFamily: .library)
         }
 
         do {
             return try await requestGate.fetchLibraryArtists(limit: limit).map(sourceItem)
         } catch {
-            throw mappedMusicKitError(error)
+            throw mappedMusicKitError(error, endpointFamily: .library)
         }
     }
 
     func fetchLibrarySongs(limit: Int = 50) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
-            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+            throw unauthorizedError(endpointFamily: .library)
         }
 
         do {
             return try await requestGate.fetchLibrarySongs(limit: limit).map(sourceItem)
         } catch {
-            throw mappedMusicKitError(error)
+            throw mappedMusicKitError(error, endpointFamily: .library)
         }
     }
 
     func fetchRecentlyAdded(limit: Int = 10) async throws -> [SonoicSourceItem] {
         guard MusicAuthorization.currentStatus == .authorized else {
-            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+            throw unauthorizedError(endpointFamily: .recentlyAdded)
         }
 
         do {
             return try await requestGate.fetchRecentlyAdded(limit: limit).map(sourceItem)
         } catch {
-            throw mappedMusicKitError(error)
+            throw mappedMusicKitError(error, endpointFamily: .recentlyAdded)
         }
     }
 
     func fetchBrowseState(for destination: SonoicAppleMusicBrowseDestination) async throws -> SonoicAppleMusicBrowseState {
         guard MusicAuthorization.currentStatus == .authorized else {
-            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+            throw unauthorizedError(endpointFamily: .browse)
         }
 
         do {
@@ -156,20 +152,18 @@ struct SonoicAppleMusicCatalogSearchClient {
                 return SonoicAppleMusicBrowseState(destination: destination, status: .loaded)
             }
         } catch {
-            throw mappedMusicKitError(error)
+            throw mappedMusicKitError(error, endpointFamily: .browse)
         }
     }
 
     func fetchItemDetailSections(for item: SonoicSourceItem) async throws -> [SonoicAppleMusicItemDetailSection] {
         guard MusicAuthorization.currentStatus == .authorized else {
-            throw ClientError.unauthorized(MusicAuthorization.currentStatus)
+            throw unauthorizedError(endpointFamily: .itemDetail)
         }
 
-        guard let serviceItemID = item.serviceItemID else {
-            return []
-        }
         guard let kind = appleMusicKind(for: item.kind),
-              let origin = appleMusicOrigin(for: item.origin)
+              let origin = appleMusicOrigin(for: item.origin),
+              let serviceItemID = item.appleMusicIdentity?.routedID(for: item.origin) ?? item.serviceItemID
         else {
             return []
         }
@@ -192,16 +186,63 @@ struct SonoicAppleMusicCatalogSearchClient {
                 )
             }
         } catch {
-            throw mappedMusicKitError(error)
+            throw mappedMusicKitError(error, endpointFamily: .itemDetail)
         }
     }
 
-    private func mappedMusicKitError(_ error: Error) -> Error {
-        if error.localizedDescription.localizedCaseInsensitiveContains("developer token") {
-            return ClientError.missingDeveloperTokenSetup(MusicKitRequestFailure(error))
+    static func appleMusicRequestFailure(
+        from error: Error,
+        endpointFamily: SonoicAppleMusicEndpointFamily
+    ) -> SonoicAppleMusicRequestFailure {
+        let requestFailure = MusicKitRequestFailure(error)
+        let message = requestFailure.message.lowercased()
+        let kind: SonoicAppleMusicRequestFailureKind
+
+        if case let ClientError.requestFailed(failure) = error {
+            return failure
         }
 
-        return error
+        if case let ClientError.unauthorized(status) = error {
+            return SonoicAppleMusicRequestFailure(
+                kind: .unauthorized,
+                endpointFamily: endpointFamily,
+                rawDetail: SonoicAppleMusicAuthorizationState.Status(status).sonoicDisplayName
+            )
+        }
+
+        if message.contains("developer token") || message.contains("musickit app service") {
+            kind = .missingDeveloperTokenSetup
+        } else if requestFailure.domain == NSURLErrorDomain {
+            kind = .networkUnavailable
+        } else if requestFailure.code == 429 || message.contains("rate limit") || message.contains("too many requests") {
+            kind = .rateLimited
+        } else if message.contains("storefront") || message.contains("country code") {
+            kind = .storefrontUnavailable
+        } else {
+            kind = .unknown
+        }
+
+        return SonoicAppleMusicRequestFailure(
+            kind: kind,
+            endpointFamily: endpointFamily,
+            rawDetail: requestFailure.displayDetail
+        )
+    }
+
+    private func unauthorizedError(endpointFamily: SonoicAppleMusicEndpointFamily) -> Error {
+        ClientError.requestFailed(
+            Self.appleMusicRequestFailure(
+                from: ClientError.unauthorized(MusicAuthorization.currentStatus),
+                endpointFamily: endpointFamily
+            )
+        )
+    }
+
+    private func mappedMusicKitError(
+        _ error: Error,
+        endpointFamily: SonoicAppleMusicEndpointFamily
+    ) -> Error {
+        ClientError.requestFailed(Self.appleMusicRequestFailure(from: error, endpointFamily: endpointFamily))
     }
 
     private func sourceItem(from metadata: AppleMusicItemMetadata) -> SonoicSourceItem {

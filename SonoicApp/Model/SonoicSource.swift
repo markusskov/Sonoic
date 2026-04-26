@@ -119,13 +119,34 @@ struct SonoicSonosPlaybackCandidate: Identifiable, Equatable {
     }
 }
 
-struct SonoicAppleMusicItemIdentity: Equatable, Sendable {
+struct SonoicAppleMusicItemIdentity: Hashable, Sendable {
     var catalogID: String?
     var libraryID: String?
     var kind: SonoicSourceItem.Kind
 
     var primaryID: String? {
         catalogID ?? libraryID
+    }
+
+    func routedID(for origin: SonoicSourceItem.Origin) -> String? {
+        switch origin {
+        case .catalogSearch:
+            catalogID ?? libraryID
+        case .library:
+            libraryID ?? catalogID
+        case .favorite, .recentPlay:
+            primaryID
+        }
+    }
+
+    func detailCacheKey(for origin: SonoicSourceItem.Origin) -> String {
+        [
+            "apple-music",
+            origin.rawValue,
+            kind.rawValue,
+            catalogID ?? "no-catalog-id",
+            libraryID ?? "no-library-id"
+        ].joined(separator: ":")
     }
 }
 
@@ -191,6 +212,10 @@ struct SonoicSourceItem: Identifiable, Equatable {
     var origin: Origin
     var kind: Kind
     var playbackCapability: SonoicPlaybackCapability
+
+    var appleMusicDetailCacheKey: String {
+        appleMusicIdentity?.detailCacheKey(for: origin) ?? id
+    }
 
     init(
         id: String,

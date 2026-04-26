@@ -106,6 +106,7 @@ final class SonoicModel {
     var appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
     var appleMusicServiceDetails = SonoicAppleMusicServiceDetails.idle
+    var appleMusicRequestReadiness = SonoicAppleMusicRequestReadiness.idle
     var musicKitDiagnostics = SonoicMusicKitDiagnostics.current
     var isQueueRefreshing = false
     var isQueueClearing = false

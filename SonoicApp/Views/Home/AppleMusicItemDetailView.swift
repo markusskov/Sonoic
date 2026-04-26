@@ -32,7 +32,7 @@ struct AppleMusicItemDetailView: View {
         .scrollIndicators(.hidden)
         .navigationTitle(item.kind.title)
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: item.id) {
+        .task(id: item.appleMusicDetailCacheKey) {
             model.loadAppleMusicItemDetail(for: item)
         }
         .toolbar {
