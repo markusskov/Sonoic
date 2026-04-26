@@ -274,35 +274,88 @@ actor SonoicMusicKitRequestGate {
                 )
             ]
         case .artist:
-            let results = try await searchCatalog(term: lookup.title, limit: 16)
-            let songs = Array(results.filter { $0.kind == .song }.prefix(8))
-            let albums = Array(results.filter { $0.kind == .album }.prefix(8))
-            var sections: [AppleMusicItemMetadataSection] = []
-
-            if !songs.isEmpty {
-                sections.append(
-                    AppleMusicItemMetadataSection(
-                        id: "songs",
-                        title: "Songs",
-                        items: songs
-                    )
-                )
-            }
-
-            if !albums.isEmpty {
-                sections.append(
-                    AppleMusicItemMetadataSection(
-                        id: "albums",
-                        title: "Albums",
-                        items: albums
-                    )
-                )
-            }
-
-            return sections
+            return try await fetchArtistDetailSections(for: lookup)
         case .song:
             return []
         }
+    }
+
+    private func fetchArtistDetailSections(
+        for lookup: AppleMusicItemLookup
+    ) async throws -> [AppleMusicItemMetadataSection] {
+        if let catalogID = lookup.catalogItemID ?? (lookup.origin == .catalogSearch ? lookup.serviceItemID : nil),
+           let section = try? await fetchArtistAlbumsSection(
+            origin: .catalogSearch,
+            id: catalogID
+           ) {
+            return [section]
+        }
+
+        if let libraryID = lookup.libraryItemID ?? (lookup.origin == .library ? lookup.serviceItemID : nil),
+           let section = try? await fetchArtistAlbumsSection(
+            origin: .library,
+            id: libraryID
+           ) {
+            return [section]
+        }
+
+        return try await fetchArtistSearchFallbackSections(for: lookup.title)
+    }
+
+    private func fetchArtistAlbumsSection(
+        origin: AppleMusicItemOrigin,
+        id: String
+    ) async throws -> AppleMusicItemMetadataSection? {
+        let albums = try await fetchRelatedItems(
+            origin: origin,
+            path: "artists",
+            id: id,
+            relation: "albums",
+            limit: 24
+        )
+        guard !albums.isEmpty else {
+            return nil
+        }
+
+        return AppleMusicItemMetadataSection(
+            id: "albums",
+            title: "Albums",
+            subtitle: "\(albums.count) albums",
+            items: albums
+        )
+    }
+
+    private func fetchArtistSearchFallbackSections(
+        for artistName: String
+    ) async throws -> [AppleMusicItemMetadataSection] {
+        let results = try await searchCatalog(term: artistName, limit: 16)
+        let songs = Array(results.filter { $0.kind == .song }.prefix(8))
+        let albums = Array(results.filter { $0.kind == .album }.prefix(8))
+        var sections: [AppleMusicItemMetadataSection] = []
+
+        if !songs.isEmpty {
+            sections.append(
+                AppleMusicItemMetadataSection(
+                    id: "songs",
+                    title: "Songs",
+                    subtitle: "Search matches",
+                    items: songs
+                )
+            )
+        }
+
+        if !albums.isEmpty {
+            sections.append(
+                AppleMusicItemMetadataSection(
+                    id: "albums",
+                    title: "Albums",
+                    subtitle: "Search matches",
+                    items: albums
+                )
+            )
+        }
+
+        return sections
     }
 
     private func musicCatalogSearchTypes(for scope: SonoicSourceSearchScope) -> [any MusicCatalogSearchable.Type] {
