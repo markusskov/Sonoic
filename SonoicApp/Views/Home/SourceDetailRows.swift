@@ -95,6 +95,38 @@ struct AppleMusicLibrarySection: View {
     }
 }
 
+struct AppleMusicSearchEntrySection: View {
+    let openSearch: () -> Void
+
+    var body: some View {
+        Button(action: openSearch) {
+            RoomSurfaceCard(isInteractive: true) {
+                HStack(spacing: 14) {
+                    RoomSurfaceIconView(
+                        systemImage: "magnifyingglass",
+                        size: 44,
+                        cornerRadius: 14,
+                        font: .body.weight(.semibold)
+                    )
+
+                    Text("Search Apple Music")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Search Apple Music")
+    }
+}
+
 struct AppleMusicDiscoverySection: View {
     @Environment(SonoicModel.self) private var model
 
@@ -629,247 +661,6 @@ private struct SourceItemMetadataRow: View {
         case .recentPlay:
             "Recent Play"
         }
-    }
-}
-
-struct SourceSearchSection: View {
-    let serviceName: String
-    @Binding var query: String
-    let state: SonoicSourceSearchState
-    let recentSearches: [SonoicRecentSourceSearch]
-    let availabilityMessage: SourceSearchAvailabilityMessage?
-    let search: () async -> Void
-    let selectRecentSearch: (SonoicRecentSourceSearch) -> Void
-    let clearRecentSearches: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(title: "Search")
-
-            RoomSurfaceCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 10) {
-                        SourceSearchField(
-                            query: $query,
-                            serviceName: serviceName,
-                            submit: searchTapped
-                        )
-
-                        Button(action: searchTapped) {
-                            if state.isSearching {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .frame(width: 20, height: 20)
-                            } else {
-                                Image(systemName: "arrow.right")
-                                    .font(.body.weight(.semibold))
-                                    .frame(width: 20, height: 20)
-                            }
-                        }
-                        .buttonStyle(.glass)
-                        .buttonBorderShape(.circle)
-                        .disabled(!state.hasQuery || state.isSearching)
-                        .accessibilityLabel("Search \(serviceName)")
-                    }
-
-                    SourceRecentSearchChips(
-                        recentSearches: recentSearches,
-                        select: selectRecentSearch,
-                        clear: clearRecentSearches
-                    )
-
-                    if let availabilityMessage {
-                        SourceSearchMessageRow(
-                            title: availabilityMessage.title,
-                            detail: availabilityMessage.detail,
-                            systemImage: availabilityMessage.systemImage
-                        )
-                    } else if !state.hasQuery || state.status == .idle {
-                        SourceSearchIdleRow(serviceName: serviceName)
-                    } else if let failureDetail = state.failureDetail, state.items.isEmpty {
-                        SourceSearchMessageRow(
-                            title: "Search Failed",
-                            detail: failureDetail,
-                            systemImage: "exclamationmark.triangle"
-                        )
-                    } else if state.status == .loaded && state.items.isEmpty {
-                        SourceSearchMessageRow(
-                            title: "No Results",
-                            detail: "No matches.",
-                            systemImage: "magnifyingglass"
-                        )
-                    } else {
-                        if let failureDetail = state.failureDetail {
-                            SourceSearchMessageRow(
-                                title: "Showing Cached Results",
-                                detail: staleDetail(failureDetail),
-                                systemImage: "exclamationmark.triangle"
-                            )
-                        }
-
-                        SourceGroupedItemRows(items: state.items)
-                    }
-                }
-            }
-        }
-    }
-
-    private func searchTapped() {
-        Task {
-            await search()
-        }
-    }
-
-    private func staleDetail(_ failureDetail: String) -> String {
-        guard let lastUpdatedAt = state.lastUpdatedAt else {
-            return failureDetail
-        }
-
-        return "Showing previous results from \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
-    }
-}
-
-private struct SourceRecentSearchChips: View {
-    let recentSearches: [SonoicRecentSourceSearch]
-    let select: (SonoicRecentSourceSearch) -> Void
-    let clear: () -> Void
-
-    var body: some View {
-        if !recentSearches.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Recent")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    Spacer(minLength: 0)
-
-                    Button("Clear", action: clear)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        ForEach(recentSearches) { recentSearch in
-                            Button {
-                                select(recentSearch)
-                            } label: {
-                                Label(recentSearch.query, systemImage: "clock")
-                                    .font(.caption.weight(.semibold))
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 11)
-                                    .padding(.vertical, 7)
-                            }
-                            .buttonStyle(.glass)
-                            .buttonBorderShape(.capsule)
-                            .accessibilityLabel("Search \(recentSearch.query)")
-                        }
-                    }
-                    .padding(.vertical, 1)
-                }
-                .scrollIndicators(.hidden)
-            }
-        }
-    }
-}
-
-struct SourceSearchAvailabilityMessage: Equatable {
-    var title: String
-    var detail: String
-    var systemImage: String
-}
-
-private struct SourceSearchField: View {
-    @Binding var query: String
-    let serviceName: String
-    let submit: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.body.weight(.medium))
-                .foregroundStyle(.secondary)
-
-            TextField("Search \(serviceName)", text: $query)
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled(false)
-                .onSubmit(submit)
-
-            if query.sonoicNonEmptyTrimmed != nil {
-                Button(action: clearQuery) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(.quaternary.opacity(0.35), in: Capsule())
-        .frame(maxWidth: .infinity)
-    }
-
-    private func clearQuery() {
-        query = ""
-    }
-}
-
-private struct SourceSearchMessageRow: View {
-    let title: String
-    let detail: String
-    let systemImage: String
-
-    var body: some View {
-        HStack(spacing: 14) {
-            RoomSurfaceIconView(
-                systemImage: systemImage,
-                size: 44,
-                cornerRadius: 14,
-                font: .body.weight(.semibold)
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.body.weight(.medium))
-
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(.secondary)
-    }
-}
-
-private struct SourceSearchIdleRow: View {
-    let serviceName: String
-
-    var body: some View {
-        HStack(spacing: 14) {
-            RoomSurfaceIconView(
-                systemImage: "music.magnifyingglass",
-                size: 44,
-                cornerRadius: 14,
-                font: .body.weight(.semibold)
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(serviceName) Search")
-                    .font(.body.weight(.medium))
-
-                Text("Enter a search term.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(.secondary)
     }
 }
 

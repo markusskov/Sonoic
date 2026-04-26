@@ -14,14 +14,6 @@ struct SourceDetailView: View {
         model.recentSourceItems(for: source)
     }
 
-    private var catalogSearchState: SonoicSourceSearchState {
-        model.sourceSearchState(for: source)
-    }
-
-    private var showsCatalogSearch: Bool {
-        source.service.kind == .appleMusic
-    }
-
     private var isAppleMusic: Bool {
         source.service.kind == .appleMusic
     }
@@ -36,24 +28,12 @@ struct SourceDetailView: View {
                             authorizationState: model.appleMusicAuthorizationState,
                             requestAuthorization: requestAppleMusicAuthorization
                         )
+                        AppleMusicSearchEntrySection(openSearch: openSearch)
                         AppleMusicLibrarySection()
                         AppleMusicRecentlyAddedSection()
                         AppleMusicDiscoverySection()
                     } else {
                         SourceHeaderCard(source: source)
-                    }
-
-                    if showsCatalogSearch {
-                        SourceSearchSection(
-                            serviceName: source.service.name,
-                            query: catalogSearchBinding,
-                            state: catalogSearchState,
-                            recentSearches: model.recentSourceSearches(for: source),
-                            availabilityMessage: appleMusicAvailabilityMessage,
-                            search: searchCatalog,
-                            selectRecentSearch: selectRecentSearch,
-                            clearRecentSearches: clearRecentSearches
-                        )
                     }
 
                     if !favoriteItems.isEmpty {
@@ -74,7 +54,7 @@ struct SourceDetailView: View {
                         SourceEmptyCard(serviceName: source.service.name)
                     }
 
-                    if !showsCatalogSearch {
+                    if !isAppleMusic {
                         SourceCatalogPlaceholderCard(serviceName: source.service.name)
                     }
                 }
@@ -133,51 +113,14 @@ struct SourceDetailView: View {
         _ = await model.playManualSonosPayload(payload)
     }
 
-    private var catalogSearchBinding: Binding<String> {
-        Binding(
-            get: {
-                model.sourceSearchState(for: source).query
-            },
-            set: { query in
-                model.updateSourceSearchQuery(query, for: source)
-            }
-        )
-    }
-
-    private func searchCatalog() async {
-        model.updateSourceSearchScope(.all, for: source)
-        await model.searchSourceCatalog(for: source)
-    }
-
-    private func selectRecentSearch(_ recentSearch: SonoicRecentSourceSearch) {
-        model.updateSourceSearchQuery(recentSearch.query, for: source)
-        Task {
-            await model.searchSourceCatalog(for: source)
-        }
-    }
-
-    private func clearRecentSearches() {
-        model.clearRecentSourceSearches(for: source)
-    }
-
     private func requestAppleMusicAuthorization() {
         Task {
             await model.requestAppleMusicAuthorization()
         }
     }
 
-    private var appleMusicAvailabilityMessage: SourceSearchAvailabilityMessage? {
-        guard source.service.kind == .appleMusic,
-              !model.appleMusicAuthorizationState.allowsCatalogSearch
-        else {
-            return nil
-        }
-
-        return SourceSearchAvailabilityMessage(
-            title: model.appleMusicAuthorizationState.title,
-            detail: model.appleMusicAuthorizationState.detail,
-            systemImage: model.appleMusicAuthorizationState.systemImage
-        )
+    private func openSearch() {
+        model.selectedTab = .search
     }
 }
 
