@@ -5,6 +5,16 @@ extension SonoicModel {
         appleMusicPlaybackCandidates(for: item).first
     }
 
+    func appleMusicExactPlaybackCandidate(for item: SonoicSourceItem) -> SonoicSonosPlaybackCandidate? {
+        guard let candidate = appleMusicPlaybackCandidate(for: item),
+              candidate.confidence == .exact
+        else {
+            return nil
+        }
+
+        return candidate
+    }
+
     func appleMusicPlaybackCandidates(for item: SonoicSourceItem) -> [SonoicSonosPlaybackCandidate] {
         SonoicAppleMusicPlaybackPayloadResolver()
             .candidates(for: item, favorites: homeFavoritesState.snapshot?.items ?? [])
@@ -207,13 +217,13 @@ struct SonoicAppleMusicPlaybackPayloadResolver {
     ) -> String {
         switch (confidence, hasKindMatch) {
         case (.exact, true):
-            "Sonoic found a saved Apple Music favorite with matching title, detail, and item type. Playback will use Sonos' own URI and DIDL metadata."
+            "Favorite match"
         case (.exact, false):
-            "Sonoic found a saved Apple Music favorite with matching title and detail. Playback will use Sonos' own URI and DIDL metadata."
+            "Favorite match"
         case (.likely, true):
-            "Sonoic found a saved Apple Music favorite with a matching title and compatible item type. Check the match before playing."
+            "Possible favorite"
         case (.likely, false):
-            "Sonoic found a saved Apple Music favorite with a matching title. Check the match before playing."
+            "Possible favorite"
         }
     }
 }

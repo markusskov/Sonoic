@@ -490,11 +490,7 @@ struct SourceItemNavigationRow: View {
     }
 
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
-        guard playbackCandidate?.confidence == .exact else {
-            return nil
-        }
-
-        return playbackCandidate
+        model.appleMusicExactPlaybackCandidate(for: item)
     }
 
     var body: some View {
