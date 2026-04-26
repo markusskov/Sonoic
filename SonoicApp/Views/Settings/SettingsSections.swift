@@ -8,7 +8,7 @@ struct SettingsHouseholdSection: View {
     var body: some View {
         Section {
             SettingsStatusRow(
-                title: "Discovery",
+                title: "Rooms",
                 statusTitle: model.roomDiscoveryStatus.title,
                 detail: discoveryStatusDetail,
                 systemImage: model.roomDiscoveryStatus.systemImage,
@@ -19,23 +19,21 @@ struct SettingsHouseholdSection: View {
                 if model.isSonosDiscoveryRefreshing {
                     HStack(spacing: 8) {
                         ProgressView()
-                        Text("Refreshing Discovery")
+                        Text("Refreshing")
                     }
                 } else {
-                    Label("Refresh Discovery", systemImage: "arrow.clockwise")
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
             }
             .disabled(model.isSonosDiscoveryRefreshing)
 
             if model.hasManualSonosHost {
                 Button(role: .destructive, action: model.clearSelectedPlayer) {
-                    Label("Clear Selected Player", systemImage: "xmark.circle")
+                    Label("Forget Room", systemImage: "xmark.circle")
                 }
             }
         } header: {
-            Text("Sonos Household")
-        } footer: {
-            Text("Sonoic discovers nearby Sonos speakers automatically and uses your selected room for queue, favorites, now-playing, and lock-screen controls.")
+            Text("System")
         }
     }
 
@@ -48,7 +46,7 @@ struct SettingsPlayerPickerSection: View {
     let model: SonoicModel
 
     var body: some View {
-        Section("Choose Player") {
+        Section("Rooms") {
             ForEach(model.discoveredPlayers) { player in
                 SettingsDiscoveredPlayerRow(
                     player: player,
@@ -68,30 +66,25 @@ struct SettingsSelectedPlayerSection: View {
 
     var body: some View {
         Section {
-            LabeledContent("Selected Room", value: model.activeTarget.name)
+            LabeledContent("Room", value: model.activeTarget.name)
 
             if let selectedDiscoveredPlayer = model.selectedDiscoveredPlayer {
                 LabeledContent("Model", value: selectedDiscoveredPlayer.detailText)
-                LabeledContent("Host", value: selectedDiscoveredPlayer.host)
-            } else {
-                LabeledContent("Host", value: model.manualSonosHost)
             }
 
             Button(action: refreshPlayer) {
                 if model.manualHostRefreshStatus.isRefreshing {
                     HStack(spacing: 8) {
                         ProgressView()
-                        Text("Refreshing From Player")
+                        Text("Refreshing")
                     }
                 } else {
-                    Label("Refresh From Player", systemImage: "arrow.clockwise")
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
             }
             .disabled(model.manualHostRefreshStatus.isRefreshing)
         } header: {
-            Text("Selected Player")
-        } footer: {
-            Text("Use this to force a fresh read of now playing, volume, queue context, and room details from the selected Sonos player.")
+            Text("Room")
         }
     }
 
@@ -158,38 +151,17 @@ struct SettingsMusicServicesSection: View {
                         if model.appleMusicAuthorizationState.isRequestingAuthorization {
                             HStack(spacing: 8) {
                                 ProgressView()
-                                Text("Authorizing Apple Music")
+                                Text("Connecting")
                             }
                         } else {
-                            Label("Authorize Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                            Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
                         }
                     }
                     .disabled(!model.appleMusicAuthorizationState.canRequestAuthorization)
-
-                    if model.appleMusicAuthorizationState.allowsCatalogSearch {
-                        SettingsAppleMusicServiceDetailsRows(details: model.appleMusicServiceDetails)
-                        SettingsAppleMusicRequestReadinessRows(readiness: model.appleMusicRequestReadiness)
-
-                        Button(action: refreshAppleMusicDetails) {
-                            if model.appleMusicServiceDetails.isLoading {
-                                HStack(spacing: 8) {
-                                    ProgressView()
-                                    Text("Refreshing Apple Music Details")
-                                }
-                            } else {
-                                Label("Refresh Apple Music Details", systemImage: "arrow.clockwise")
-                            }
-                        }
-                        .disabled(model.appleMusicServiceDetails.isLoading)
-                    }
-
-                    SettingsMusicKitDiagnosticsRows(diagnostics: model.musicKitDiagnostics)
                 }
             }
         } header: {
             Text("Music Services")
-        } footer: {
-            Text("Sonoic will keep Sonos as the playback owner. Service accounts will only unlock catalog metadata and Sonos-native playback payloads when those integrations are ready.")
         }
     }
 
@@ -200,18 +172,27 @@ struct SettingsMusicServicesSection: View {
         case .spotify:
             "Coming Later"
         case .sonosRadio, .genericStreaming:
-            "Visible Through Sonos"
+            "Available"
         }
     }
 
-    private func detailText(for service: SonosServiceDescriptor) -> String {
+    private func detailText(for service: SonosServiceDescriptor) -> String? {
         switch service.kind {
         case .appleMusic:
-            model.appleMusicAuthorizationState.detail
+            switch model.appleMusicAuthorizationState.status {
+            case .authorized:
+                nil
+            case .requesting:
+                "Connecting..."
+            case .notDetermined:
+                nil
+            case .denied, .restricted, .unavailable:
+                model.appleMusicAuthorizationState.detail
+            }
         case .spotify:
-            "Spotify account and catalog access are planned after Apple Music."
+            nil
         case .sonosRadio, .genericStreaming:
-            "This source appears when Sonos reports matching favorites or playback."
+            nil
         }
     }
 
@@ -249,6 +230,60 @@ struct SettingsMusicServicesSection: View {
     private func requestAppleMusicAuthorization() {
         Task {
             await model.requestAppleMusicAuthorization()
+        }
+    }
+
+}
+
+struct SettingsAdvancedNavigationSection: View {
+    let model: SonoicModel
+    let playerRefreshDetail: String?
+    let playerRefreshTint: Color
+    let identityStatusDetail: String?
+    let topologyStatusDetail: String?
+    let dataStatusTint: (SonosRoomDataStatus) -> Color
+    let refreshTimingText: (Date?) -> String
+
+    var body: some View {
+        Section {
+            NavigationLink {
+                SettingsAdvancedView(
+                    model: model,
+                    playerRefreshDetail: playerRefreshDetail,
+                    playerRefreshTint: playerRefreshTint,
+                    identityStatusDetail: identityStatusDetail,
+                    topologyStatusDetail: topologyStatusDetail,
+                    dataStatusTint: dataStatusTint,
+                    refreshTimingText: refreshTimingText
+                )
+            } label: {
+                Label("Advanced", systemImage: "wrench.and.screwdriver")
+            }
+        }
+    }
+}
+
+struct SettingsAdvancedMusicServicesSection: View {
+    let model: SonoicModel
+
+    var body: some View {
+        Section("Apple Music") {
+            SettingsAppleMusicServiceDetailsRows(details: model.appleMusicServiceDetails)
+            SettingsAppleMusicRequestReadinessRows(readiness: model.appleMusicRequestReadiness)
+
+            Button(action: refreshAppleMusicDetails) {
+                if model.appleMusicServiceDetails.isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Refreshing")
+                    }
+                } else {
+                    Label("Refresh Details", systemImage: "arrow.clockwise")
+                }
+            }
+            .disabled(model.appleMusicServiceDetails.isLoading)
+
+            SettingsMusicKitDiagnosticsRows(diagnostics: model.musicKitDiagnostics)
         }
     }
 

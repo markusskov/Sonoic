@@ -11,8 +11,6 @@ struct SettingsRefreshTimingSection: View {
             LabeledContent("Bonded Setup", value: refreshTimingText(model.manualHostTopologyLastRefreshAt))
         } header: {
             Text("Refresh Timing")
-        } footer: {
-            Text("Tiny timing surface for manual verification of refresh, failure, and retry behavior.")
         }
     }
 }
@@ -85,7 +83,7 @@ struct SettingsEmptySelectionSection: View {
     var body: some View {
         Section("Selection") {
             Label(
-                "Choose one of your discovered Sonos rooms to start diagnostics and direct playback control.",
+                "Choose a room to start.",
                 systemImage: "info.circle"
             )
             .font(.subheadline)

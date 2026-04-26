@@ -34,7 +34,6 @@ struct SourceDetailView: View {
                         AppleMusicSourceHeader(
                             source: source,
                             authorizationState: model.appleMusicAuthorizationState,
-                            serviceDetails: model.appleMusicServiceDetails,
                             requestAuthorization: requestAppleMusicAuthorization
                         )
                         AppleMusicLibrarySection()

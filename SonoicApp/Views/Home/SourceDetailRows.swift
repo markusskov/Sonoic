@@ -3,7 +3,6 @@ import SwiftUI
 struct AppleMusicSourceHeader: View {
     let source: SonoicSource
     let authorizationState: SonoicAppleMusicAuthorizationState
-    let serviceDetails: SonoicAppleMusicServiceDetails
     let requestAuthorization: () -> Void
 
     var body: some View {
@@ -13,110 +12,29 @@ struct AppleMusicSourceHeader: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text(authorizationState.detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            if !authorizationState.allowsCatalogSearch {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(authorizationState.title)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
 
-                AppleMusicStatusChips(
-                    authorizationState: authorizationState,
-                    serviceDetails: serviceDetails
-                )
-
-                if authorizationState.canRequestAuthorization {
-                    Button(action: requestAuthorization) {
-                        Label("Authorize Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                    if authorizationState.canRequestAuthorization {
+                        Button(action: requestAuthorization) {
+                            Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
                     }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.capsule)
                 }
+            } else if authorizationState.canRequestAuthorization {
+                Button(action: requestAuthorization) {
+                    Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct AppleMusicStatusChips: View {
-    let authorizationState: SonoicAppleMusicAuthorizationState
-    let serviceDetails: SonoicAppleMusicServiceDetails
-
-    var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                AppleMusicStatusChip(
-                    title: authorizationState.title,
-                    systemImage: authorizationState.systemImage,
-                    tint: authorizationState.allowsCatalogSearch ? .green : .secondary
-                )
-
-                AppleMusicStatusChip(
-                    title: storefrontTitle,
-                    systemImage: "globe",
-                    tint: .secondary
-                )
-
-                AppleMusicStatusChip(
-                    title: catalogPlaybackTitle,
-                    systemImage: "music.note",
-                    tint: .secondary
-                )
-
-                AppleMusicStatusChip(
-                    title: cloudLibraryTitle,
-                    systemImage: "icloud",
-                    tint: .secondary
-                )
-            }
-            .padding(.vertical, 1)
-        }
-        .scrollIndicators(.hidden)
-    }
-
-    private var storefrontTitle: String {
-        if serviceDetails.isLoading {
-            return "Loading"
-        }
-
-        return serviceDetails.storefrontCountryCode ?? "Storefront"
-    }
-
-    private var catalogPlaybackTitle: String {
-        switch serviceDetails.canPlayCatalogContent {
-        case .some(true):
-            "Catalog"
-        case .some(false):
-            "Preview Only"
-        case .none:
-            "Catalog"
-        }
-    }
-
-    private var cloudLibraryTitle: String {
-        switch serviceDetails.hasCloudLibraryEnabled {
-        case .some(true):
-            "Library"
-        case .some(false):
-            "No Library"
-        case .none:
-            "Library"
-        }
-    }
-}
-
-private struct AppleMusicStatusChip: View {
-    let title: String
-    let systemImage: String
-    let tint: Color
-
-    var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(tint)
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(.quaternary.opacity(0.45), in: Capsule())
     }
 }
 
@@ -158,20 +76,19 @@ struct AppleMusicLibrarySection: View {
 
         return AppleMusicSourceNavigationRow.Model(
             title: destination.title,
-            subtitle: destination.subtitle,
             systemImage: destination.systemImage,
             badgeTitle: libraryBadgeTitle(for: state)
         )
     }
 
-    private func libraryBadgeTitle(for state: SonoicAppleMusicLibraryState) -> String {
+    private func libraryBadgeTitle(for state: SonoicAppleMusicLibraryState) -> String? {
         switch state.status {
         case .idle:
-            "Open"
+            nil
         case .loading:
             "Loading"
         case .loaded:
-            "\(state.items.count)"
+            state.items.isEmpty ? nil : "\(state.items.count)"
         case .failed:
             "Error"
         }
@@ -214,23 +131,22 @@ struct AppleMusicDiscoverySection: View {
     ) -> AppleMusicSourceNavigationRow.Model {
         AppleMusicSourceNavigationRow.Model(
             title: destination.title,
-            subtitle: destination.subtitle,
             systemImage: destination.systemImage,
             badgeTitle: browseBadgeTitle(for: model.appleMusicBrowseState(for: destination))
         )
     }
 
-    private func browseBadgeTitle(for state: SonoicAppleMusicBrowseState) -> String {
+    private func browseBadgeTitle(for state: SonoicAppleMusicBrowseState) -> String? {
         switch state.status {
         case .idle:
-            return "Open"
+            return nil
         case .loading:
             return "Loading"
         case .loaded:
             let count = state.sections.reduce(state.genres.count) { total, section in
                 total + section.items.count
             }
-            return count > 0 ? "\(count)" : "Soon"
+            return count > 0 ? "\(count)" : nil
         case .failed:
             return "Error"
         }
@@ -259,7 +175,7 @@ struct AppleMusicRecentlyAddedSection: View {
         if state.isLoading && state.items.isEmpty {
             AppleMusicRecentlyAddedMessageRow(
                 title: "Loading Library",
-                detail: "Reading recently added Apple Music items.",
+                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.items.isEmpty {
@@ -270,15 +186,15 @@ struct AppleMusicRecentlyAddedSection: View {
             )
         } else if state.status == .loaded && state.items.isEmpty {
             AppleMusicRecentlyAddedMessageRow(
-                title: "No Recently Added Items",
-                detail: "Apple Music did not return recent library additions for this account.",
+                title: "No Items",
+                detail: "Nothing here yet.",
                 systemImage: "music.note.list"
             )
         } else if state.status == .loaded || !state.items.isEmpty {
             if state.isLoading {
                 AppleMusicRecentlyAddedMessageRow(
-                    title: "Refreshing Recently Added",
-                    detail: "Keeping the last Apple Music library items visible while Sonoic checks for updates.",
+                    title: "Refreshing",
+                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }
@@ -402,7 +318,7 @@ private struct AppleMusicSourceNavigationRow: View {
         var title: String
         var subtitle: String?
         var systemImage: String
-        var badgeTitle = "Soon"
+        var badgeTitle: String?
         var showsChevron = true
 
         var id: String {
@@ -435,12 +351,14 @@ private struct AppleMusicSourceNavigationRow: View {
 
             Spacer(minLength: 0)
 
-            Text(row.badgeTitle)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(.quaternary.opacity(0.45), in: Capsule())
+            if let badgeTitle = row.badgeTitle {
+                Text(badgeTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(.quaternary.opacity(0.45), in: Capsule())
+            }
 
             if row.showsChevron {
                 Image(systemName: "chevron.right")
