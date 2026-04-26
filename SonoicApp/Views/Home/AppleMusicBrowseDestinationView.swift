@@ -89,20 +89,49 @@ struct AppleMusicBrowseDestinationView: View {
 
 private struct AppleMusicBrowseSectionView: View {
     let section: SonoicAppleMusicItemDetailSection
+    private let previewLimit = 8
+
+    private var previewItems: [SonoicSourceItem] {
+        Array(section.items.prefix(previewLimit))
+    }
+
+    private var showsViewAll: Bool {
+        section.items.count > previewItems.count
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: section.title,
-                subtitle: section.subtitle ?? "Apple Music catalog metadata"
-            )
+            HStack(alignment: .top, spacing: 12) {
+                HomeSectionHeader(
+                    title: section.title,
+                    subtitle: section.subtitle ?? "Apple Music catalog metadata"
+                )
+
+                Spacer(minLength: 0)
+
+                if showsViewAll {
+                    NavigationLink {
+                        AppleMusicItemCollectionView(
+                            title: section.title,
+                            subtitle: section.subtitle ?? "Apple Music catalog metadata",
+                            items: section.items
+                        )
+                    } label: {
+                        Label("View All", systemImage: "chevron.right")
+                            .labelStyle(.titleAndIcon)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+            }
 
             RoomSurfaceCard {
                 VStack(spacing: 0) {
-                    ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(previewItems.enumerated()), id: \.element.id) { index, item in
                         SourceItemNavigationRow(item: item)
 
-                        if index < section.items.count - 1 {
+                        if index < previewItems.count - 1 {
                             Divider()
                                 .padding(.leading, 76)
                         }
