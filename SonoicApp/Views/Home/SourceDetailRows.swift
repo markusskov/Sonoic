@@ -130,7 +130,13 @@ struct AppleMusicSearchEntrySection: View {
 struct AppleMusicDiscoverySection: View {
     @Environment(SonoicModel.self) private var model
 
-    private let destinations = SonoicAppleMusicBrowseDestination.allCases
+    private let destinations: [SonoicAppleMusicBrowseDestination] = [
+        .popularRecommendations,
+        .categories,
+        .playlistsForYou,
+        .appleMusicPlaylists,
+        .radioShows
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
