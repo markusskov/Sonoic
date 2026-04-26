@@ -40,7 +40,8 @@ struct SonoicAppleMusicPlaybackPayloadResolver {
 
         return favorites.compactMap { favorite in
             guard favorite.service?.kind == .appleMusic,
-                  let payload = favorite.playablePayload,
+                  let favoritePayload = favorite.playablePayload,
+                  let payload = try? SonosPlayablePayloadPreparer().prepare(favoritePayload),
                   normalizedAppleMusicMatchText(favorite.title) == itemTitle
             else {
                 return nil

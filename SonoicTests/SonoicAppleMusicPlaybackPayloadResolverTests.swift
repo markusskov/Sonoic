@@ -124,6 +124,45 @@ struct SonoicAppleMusicPlaybackPayloadResolverTests {
     }
 
     @Test
+    func rejectsFavoriteWithUnsafePlaybackURI() {
+        let item = appleMusicItem(
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato • That Low and Lonesome Sound",
+            kind: .song
+        )
+        let favorite = favorite(
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato",
+            service: .appleMusic,
+            uri: "x-rincon-queue:RINCON_123#0",
+            kind: .item
+        )
+
+        #expect(resolver.candidates(for: item, favorites: [favorite]).isEmpty)
+    }
+
+    @Test
+    func returnsPreparedFavoritePayload() throws {
+        let item = appleMusicItem(
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato • That Low and Lonesome Sound",
+            kind: .song
+        )
+        let favorite = favorite(
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato",
+            service: .appleMusic,
+            uri: "  x-sonosapi-hls:song%3a123?sid=204  ",
+            kind: .item
+        )
+
+        let candidate = try #require(resolver.candidates(for: item, favorites: [favorite]).first)
+
+        #expect(candidate.payload.uri == "x-sonosapi-hls:song%3a123?sid=204")
+        #expect(candidate.payload.metadataXML == "<DIDL-Lite><item><dc:title>Sweet Jane</dc:title></item></DIDL-Lite>")
+    }
+
+    @Test
     func avoidsExactSongMatchWhenOnlyAlbumOverlaps() throws {
         let item = appleMusicItem(
             title: "Intro",
