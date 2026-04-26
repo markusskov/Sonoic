@@ -80,13 +80,15 @@ extension SonoicModel {
 
     func updateSourceSearchScope(_ scope: SonoicSourceSearchScope, for source: SonoicSource) {
         let currentState = sourceSearchState(for: source)
+        let shouldPreserveResults = scope != currentState.scope && currentState.hasQuery && !currentState.items.isEmpty
+
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
             query: currentState.query,
             service: source.service,
             scope: scope,
-            items: scope == currentState.scope ? currentState.items : [],
-            status: scope == currentState.scope ? currentState.status : .idle,
-            lastUpdatedAt: scope == currentState.scope ? currentState.lastUpdatedAt : nil
+            items: scope == currentState.scope || shouldPreserveResults ? currentState.items : [],
+            status: scope == currentState.scope || shouldPreserveResults ? currentState.status : .idle,
+            lastUpdatedAt: scope == currentState.scope || shouldPreserveResults ? currentState.lastUpdatedAt : nil
         )
     }
 

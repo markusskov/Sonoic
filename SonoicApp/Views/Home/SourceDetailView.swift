@@ -154,7 +154,14 @@ struct SourceDetailView: View {
     }
 
     private func selectSourceSearchScope(_ scope: SonoicSourceSearchScope) {
+        let shouldSearch = scope != catalogSearchState.scope && catalogSearchState.hasQuery
         model.updateSourceSearchScope(scope, for: source)
+
+        if shouldSearch {
+            Task {
+                await model.searchSourceCatalog(for: source)
+            }
+        }
     }
 
     private func selectRecentSearch(_ recentSearch: SonoicRecentSourceSearch) {

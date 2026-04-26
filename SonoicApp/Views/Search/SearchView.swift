@@ -111,7 +111,12 @@ struct SearchView: View {
     }
 
     private func selectScope(_ scope: SonoicSourceSearchScope) {
+        let shouldSearch = scope != searchState.scope && searchState.hasQuery
         model.updateSourceSearchScope(scope, for: selectedSource)
+
+        if shouldSearch {
+            searchCatalog()
+        }
     }
 
     private func selectRecentSearch(_ recentSearch: SonoicRecentSourceSearch) {
