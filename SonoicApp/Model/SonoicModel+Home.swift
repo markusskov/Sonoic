@@ -81,11 +81,12 @@ extension SonoicModel {
             updateSourceSearchQuery("", for: source)
             return
         }
+        let searchScope = currentState.scope
 
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
             query: query,
             service: source.service,
-            scope: currentState.scope,
+            scope: searchScope,
             status: .loading
         )
 
@@ -95,9 +96,18 @@ extension SonoicModel {
             case .appleMusic:
                 refreshAppleMusicAuthorizationState()
                 guard appleMusicAuthorizationState.allowsCatalogSearch else {
+                    guard shouldApplySourceSearchResponse(
+                        serviceID: source.service.id,
+                        query: query,
+                        scope: searchScope
+                    ) else {
+                        return
+                    }
+
                     sourceSearchStates[source.service.id] = SonoicSourceSearchState(
                         query: query,
                         service: source.service,
+                        scope: searchScope,
                         status: .failed(appleMusicAuthorizationState.detail)
                     )
                     return
@@ -105,27 +115,52 @@ extension SonoicModel {
 
                 items = try await appleMusicCatalogSearchClient.searchCatalog(
                     term: query,
-                    scope: currentState.scope
+                    scope: searchScope
                 )
             case .spotify, .sonosRadio, .genericStreaming:
                 items = []
             }
 
+            guard shouldApplySourceSearchResponse(
+                serviceID: source.service.id,
+                query: query,
+                scope: searchScope
+            ) else {
+                return
+            }
+
             sourceSearchStates[source.service.id] = SonoicSourceSearchState(
                 query: query,
                 service: source.service,
-                scope: currentState.scope,
+                scope: searchScope,
                 items: items,
                 status: .loaded
             )
         } catch {
+            guard shouldApplySourceSearchResponse(
+                serviceID: source.service.id,
+                query: query,
+                scope: searchScope
+            ) else {
+                return
+            }
+
             sourceSearchStates[source.service.id] = SonoicSourceSearchState(
                 query: query,
                 service: source.service,
-                scope: currentState.scope,
+                scope: searchScope,
                 status: .failed(error.localizedDescription)
             )
         }
+    }
+
+    private func shouldApplySourceSearchResponse(
+        serviceID: String,
+        query: String,
+        scope: SonoicSourceSearchScope
+    ) -> Bool {
+        let state = sourceSearchStates[serviceID]
+        return state?.query.sonoicNonEmptyTrimmed == query && state?.scope == scope
     }
 
     func refreshHomeFavorites(showLoading: Bool = true) async {

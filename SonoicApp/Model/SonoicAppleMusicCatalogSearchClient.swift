@@ -390,7 +390,7 @@ private actor SonoicMusicKitRequestGate {
         }
 
         for index in artists.indices where artists[index].artworkURL == nil {
-            artists[index].artworkURL = try await fetchCatalogArtistArtworkURL(
+            artists[index].artworkURL = try? await fetchCatalogArtistArtworkURL(
                 artistName: artists[index].title,
                 width: 400,
                 height: 400
