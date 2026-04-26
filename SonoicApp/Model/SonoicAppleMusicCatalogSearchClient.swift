@@ -254,7 +254,8 @@ struct SonoicAppleMusicCatalogSearchClient {
             kind: sourceKind(for: metadata.kind),
             origin: sourceOrigin(for: metadata.origin),
             catalogID: metadata.catalogItemID,
-            libraryID: metadata.libraryItemID
+            libraryID: metadata.libraryItemID,
+            externalURL: metadata.externalURL
         )
     }
 

@@ -14,6 +14,7 @@ nonisolated struct AppleMusicItemMetadata: Sendable {
     var title: String
     var subtitle: String?
     var artworkURL: String?
+    var externalURL: String?
     var kind: AppleMusicItemKind
     var origin: AppleMusicItemOrigin
 
@@ -34,6 +35,7 @@ nonisolated struct AppleMusicItemMetadata: Sendable {
                 [resource.attributes?.artistName, albumName].compactMap(\.self).joined(separator: " • ")
             } ?? resource.attributes?.artistName ?? resource.attributes?.curatorName,
             artworkURL: resource.attributes?.artwork?.sizedURL(width: 400, height: 400),
+            externalURL: resource.attributes?.url,
             kind: kind,
             origin: origin
         )
@@ -116,6 +118,7 @@ nonisolated struct AppleMusicLibraryAttributes: Decodable {
     var albumName: String?
     var curatorName: String?
     var artwork: AppleMusicLibraryArtwork?
+    var url: String?
     var playParams: AppleMusicPlayParameters?
 }
 

@@ -179,52 +179,72 @@ private struct AppleMusicItemCapabilityCard: View {
 
     var body: some View {
         RoomSurfaceCard {
-            if let playbackCandidate {
-                VStack(alignment: .leading, spacing: 12) {
-                    Label(playbackCandidate.confidence.title, systemImage: playbackCandidate.confidence == .exact ? "play.circle" : "checkmark.circle")
-                        .font(.headline)
-
-                    Text(playbackCandidate.detail)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if playbackCandidate.confidence == .exact {
-                        Button {
-                            Task {
-                                await play(playbackCandidate)
-                            }
-                        } label: {
-                            Label("Play with Sonos", systemImage: "play.fill")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                    } else {
-                        Text("This looks related to a saved Sonos favorite, but Sonoic needs a stronger match before it starts playback.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Metadata Only", systemImage: "lock.circle")
-                        .font(.headline)
-
-                    Text("Sonoic can browse this Apple Music item, but still needs a Sonos-native playback payload before it can start playback on your speakers.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if let serviceItemID = item.serviceItemID {
-                        Text("MusicKit ID: \(serviceItemID)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                capabilityContent
+                appleMusicLink
             }
+        }
+    }
+
+    @ViewBuilder
+    private var capabilityContent: some View {
+        if let playbackCandidate {
+            Label(playbackCandidate.confidence.title, systemImage: playbackCandidate.confidence == .exact ? "play.circle" : "checkmark.circle")
+                .font(.headline)
+
+            Text(playbackCandidate.detail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if playbackCandidate.confidence == .exact {
+                Button {
+                    Task {
+                        await play(playbackCandidate)
+                    }
+                } label: {
+                    Label("Play with Sonos", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            } else {
+                Text("This looks related to a saved Sonos favorite, but Sonoic needs a stronger match before it starts playback.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } else {
+            Label("Metadata Only", systemImage: "lock.circle")
+                .font(.headline)
+
+            Text("Sonoic can browse this Apple Music item, but still needs a Sonos-native playback payload before it can start playback on your speakers.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let serviceItemID = item.serviceItemID {
+                Text("MusicKit ID: \(serviceItemID)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var appleMusicLink: some View {
+        if let externalURL = item.externalURL,
+           let url = URL(string: externalURL) {
+            Divider()
+
+            Link(destination: url) {
+                Label("Open in Apple Music", systemImage: "arrow.up.forward.app")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
+            .accessibilityLabel("Open \(item.title) in Apple Music")
         }
     }
 }

@@ -16,6 +16,7 @@ struct SonoicAppleMusicIdentityTests {
                 "name": "Sweet Jane",
                 "artistName": "Garrett Kato",
                 "albumName": "That Low and Lonesome Sound",
+                "url": "https://music.apple.com/us/song/sweet-jane/1440857781",
                 "playParams": {
                   "id": "i.abc123",
                   "kind": "song",
@@ -36,6 +37,7 @@ struct SonoicAppleMusicIdentityTests {
         #expect(metadata.catalogItemID == "1440857781")
         #expect(metadata.title == "Sweet Jane")
         #expect(metadata.subtitle == "Garrett Kato • That Low and Lonesome Sound")
+        #expect(metadata.externalURL == "https://music.apple.com/us/song/sweet-jane/1440857781")
     }
 
     @Test
@@ -48,13 +50,15 @@ struct SonoicAppleMusicIdentityTests {
             kind: .song,
             origin: .library,
             catalogID: "1440857781",
-            libraryID: "i.abc123"
+            libraryID: "i.abc123",
+            externalURL: "https://music.apple.com/us/song/sweet-jane/1440857781"
         )
 
         #expect(item.serviceItemID == "i.abc123")
         #expect(item.appleMusicIdentity?.catalogID == "1440857781")
         #expect(item.appleMusicIdentity?.libraryID == "i.abc123")
         #expect(item.appleMusicIdentity?.kind == .song)
+        #expect(item.externalURL == "https://music.apple.com/us/song/sweet-jane/1440857781")
     }
 
     @Test

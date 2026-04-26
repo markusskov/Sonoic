@@ -208,6 +208,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
     var artworkIdentifier: String?
     var serviceItemID: String?
     var appleMusicIdentity: SonoicAppleMusicItemIdentity?
+    var externalURL: String?
     var service: SonosServiceDescriptor
     var origin: Origin
     var kind: Kind
@@ -225,6 +226,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         artworkIdentifier: String?,
         serviceItemID: String? = nil,
         appleMusicIdentity: SonoicAppleMusicItemIdentity? = nil,
+        externalURL: String? = nil,
         service: SonosServiceDescriptor,
         origin: Origin,
         kind: Kind = .unknown,
@@ -237,6 +239,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         self.artworkIdentifier = artworkIdentifier
         self.serviceItemID = serviceItemID
         self.appleMusicIdentity = appleMusicIdentity
+        self.externalURL = externalURL
         self.service = service
         self.origin = origin
         self.kind = kind
@@ -279,7 +282,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
         subtitle: String?,
         artworkURL: String?,
         kind: Kind,
-        service: SonosServiceDescriptor
+        service: SonosServiceDescriptor,
+        externalURL: String? = nil
     ) -> SonoicSourceItem {
         SonoicSourceItem(
             id: "catalog-\(service.id)-\(id)",
@@ -288,6 +292,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
             artworkURL: artworkURL,
             artworkIdentifier: nil,
             serviceItemID: id,
+            externalURL: externalURL,
             service: service,
             origin: .catalogSearch,
             kind: kind,
@@ -303,7 +308,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
         kind: Kind,
         origin: Origin,
         catalogID: String? = nil,
-        libraryID: String? = nil
+        libraryID: String? = nil,
+        externalURL: String? = nil
     ) -> SonoicSourceItem {
         SonoicSourceItem(
             id: "\(origin.rawValue)-\(SonosServiceDescriptor.appleMusic.id)-\(kind.rawValue)-\(id)",
@@ -317,6 +323,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
                 libraryID: libraryID,
                 kind: kind
             ),
+            externalURL: externalURL,
             service: .appleMusic,
             origin: origin,
             kind: kind,

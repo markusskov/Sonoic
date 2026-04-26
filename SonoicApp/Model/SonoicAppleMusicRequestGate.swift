@@ -36,6 +36,7 @@ actor SonoicMusicKitRequestGate {
                 title: song.title,
                 subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
                 artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
+                externalURL: song.url?.absoluteString,
                 kind: .song,
                 origin: .catalogSearch
             )
@@ -48,6 +49,7 @@ actor SonoicMusicKitRequestGate {
                 title: album.title,
                 subtitle: album.artistName,
                 artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
+                externalURL: album.url?.absoluteString,
                 kind: .album,
                 origin: .catalogSearch
             )
@@ -60,6 +62,7 @@ actor SonoicMusicKitRequestGate {
                 title: artist.name,
                 subtitle: "Artist",
                 artworkURL: artist.artwork?.url(width: 400, height: 400)?.absoluteString,
+                externalURL: artist.url?.absoluteString,
                 kind: .artist,
                 origin: .catalogSearch
             )
@@ -72,6 +75,7 @@ actor SonoicMusicKitRequestGate {
                 title: playlist.name,
                 subtitle: playlist.curatorName,
                 artworkURL: playlist.artwork?.url(width: 400, height: 400)?.absoluteString,
+                externalURL: playlist.url?.absoluteString,
                 kind: .playlist,
                 origin: .catalogSearch
             )
@@ -90,6 +94,7 @@ actor SonoicMusicKitRequestGate {
                 title: album.attributes?.name ?? "Unknown Album",
                 subtitle: album.attributes?.artistName,
                 artworkURL: album.attributes?.artwork?.sizedURL(width: 400, height: 400),
+                externalURL: album.attributes?.url,
                 kind: .album,
                 origin: .library
             )
@@ -106,6 +111,7 @@ actor SonoicMusicKitRequestGate {
                 title: playlist.attributes?.name ?? "Unknown Playlist",
                 subtitle: playlist.attributes?.curatorName,
                 artworkURL: playlist.attributes?.artwork?.sizedURL(width: 400, height: 400),
+                externalURL: playlist.attributes?.url,
                 kind: .playlist,
                 origin: .library
             )
@@ -122,6 +128,7 @@ actor SonoicMusicKitRequestGate {
                 title: artist.attributes?.name ?? "Unknown Artist",
                 subtitle: "Artist",
                 artworkURL: artist.attributes?.artwork?.sizedURL(width: 400, height: 400),
+                externalURL: artist.attributes?.url,
                 kind: .artist,
                 origin: .library
             )
@@ -153,6 +160,7 @@ actor SonoicMusicKitRequestGate {
                     [artistName, albumName].compactMap(\.self).joined(separator: " • ")
                 } ?? artistName,
                 artworkURL: song.attributes?.artwork?.sizedURL(width: 400, height: 400),
+                externalURL: song.attributes?.url,
                 kind: .song,
                 origin: .library
             )
