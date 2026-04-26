@@ -198,42 +198,24 @@ actor SonoicMusicKitRequestGate {
             types = "songs,albums,playlists"
         }
 
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = "api.music.apple.com"
-        components.path = "/v1/catalog/\(try await storefrontCountryCode())/charts"
-        components.queryItems = [
-            URLQueryItem(name: "types", value: types),
-            URLQueryItem(name: "chart", value: "most-played"),
-            URLQueryItem(name: "limit", value: "10")
-        ]
-
-        guard let url = components.url else {
-            throw URLError(.badURL)
-        }
-
-        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
-        let response = try await request.response()
-        let chartResponse = try JSONDecoder().decode(AppleMusicChartResponse.self, from: response.data)
+        let chartResponse: AppleMusicChartResponse = try await fetchDecoded(
+            path: "/v1/catalog/\(try await storefrontCountryCode())/charts",
+            queryItems: [
+                URLQueryItem(name: "types", value: types),
+                URLQueryItem(name: "chart", value: "most-played"),
+                URLQueryItem(name: "limit", value: "10")
+            ]
+        )
         return chartResponse.results.sections()
     }
 
     func fetchCatalogGenres(limit: Int) async throws -> [AppleMusicGenreMetadata] {
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = "api.music.apple.com"
-        components.path = "/v1/catalog/\(try await storefrontCountryCode())/genres"
-        components.queryItems = [
-            URLQueryItem(name: "limit", value: "\(limit)")
-        ]
-
-        guard let url = components.url else {
-            throw URLError(.badURL)
-        }
-
-        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
-        let response = try await request.response()
-        let genreResponse = try JSONDecoder().decode(AppleMusicGenreResponse.self, from: response.data)
+        let genreResponse: AppleMusicGenreResponse = try await fetchDecoded(
+            path: "/v1/catalog/\(try await storefrontCountryCode())/genres",
+            queryItems: [
+                URLQueryItem(name: "limit", value: "\(limit)")
+            ]
+        )
         return genreResponse.data.compactMap { genre in
             guard let name = genre.attributes?.name else {
                 return nil
@@ -380,25 +362,14 @@ actor SonoicMusicKitRequestGate {
     }
 
     private func fetchLibraryResponse(path: String, limit: Int, offset: Int? = nil) async throws -> AppleMusicLibraryResponse {
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = "api.music.apple.com"
-        components.path = "/v1/me/library/\(path)"
         var queryItems = [
             URLQueryItem(name: "limit", value: "\(limit)")
         ]
         if let offset {
             queryItems.append(URLQueryItem(name: "offset", value: "\(offset)"))
         }
-        components.queryItems = queryItems
 
-        guard let url = components.url else {
-            throw URLError(.badURL)
-        }
-
-        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
-        let response = try await request.response()
-        return try JSONDecoder().decode(AppleMusicLibraryResponse.self, from: response.data)
+        return try await fetchDecoded(path: "/v1/me/library/\(path)", queryItems: queryItems)
     }
 
     private func fetchRelatedItems(
@@ -469,19 +440,10 @@ actor SonoicMusicKitRequestGate {
     }
 
     private func fetchResourceResponse(path: String, limit: Int? = nil) async throws -> AppleMusicLibraryResponse {
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = "api.music.apple.com"
-        components.path = path
-        components.queryItems = limit.map { [URLQueryItem(name: "limit", value: "\($0)")] }
-
-        guard let url = components.url else {
-            throw URLError(.badURL)
-        }
-
-        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
-        let response = try await request.response()
-        return try JSONDecoder().decode(AppleMusicLibraryResponse.self, from: response.data)
+        try await fetchDecoded(
+            path: path,
+            queryItems: limit.map { [URLQueryItem(name: "limit", value: "\($0)")] } ?? []
+        )
     }
 
     private func fetchCatalogArtistArtworkURL(
@@ -489,15 +451,26 @@ actor SonoicMusicKitRequestGate {
         width: Int,
         height: Int
     ) async throws -> String? {
+        let searchResponse: AppleMusicCatalogSearchResponse = try await fetchDecoded(
+            path: "/v1/catalog/\(try await storefrontCountryCode())/search",
+            queryItems: [
+                URLQueryItem(name: "term", value: artistName),
+                URLQueryItem(name: "types", value: "artists"),
+                URLQueryItem(name: "limit", value: "1")
+            ]
+        )
+        return searchResponse.results.artists?.data.first?.attributes?.artwork?.sizedURL(width: width, height: height)
+    }
+
+    private func fetchDecoded<Response: Decodable>(
+        path: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> Response {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "api.music.apple.com"
-        components.path = "/v1/catalog/\(try await storefrontCountryCode())/search"
-        components.queryItems = [
-            URLQueryItem(name: "term", value: artistName),
-            URLQueryItem(name: "types", value: "artists"),
-            URLQueryItem(name: "limit", value: "1")
-        ]
+        components.path = path
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
 
         guard let url = components.url else {
             throw URLError(.badURL)
@@ -505,8 +478,7 @@ actor SonoicMusicKitRequestGate {
 
         let request = MusicDataRequest(urlRequest: URLRequest(url: url))
         let response = try await request.response()
-        let searchResponse = try JSONDecoder().decode(AppleMusicCatalogSearchResponse.self, from: response.data)
-        return searchResponse.results.artists?.data.first?.attributes?.artwork?.sizedURL(width: width, height: height)
+        return try JSONDecoder().decode(Response.self, from: response.data)
     }
 
     private func storefrontCountryCode() async throws -> String {
