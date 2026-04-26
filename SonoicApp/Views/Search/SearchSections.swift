@@ -2,16 +2,9 @@ import SwiftUI
 
 struct SearchHeader: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Search", systemImage: "magnifyingglass")
-                .font(.largeTitle.weight(.bold))
-                .foregroundStyle(.primary)
-
-            Text("Find songs, artists, albums, and playlists across connected music services.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Label("Search", systemImage: "magnifyingglass")
+            .font(.largeTitle.weight(.bold))
+            .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -22,10 +15,7 @@ struct SearchServicePicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: "Service",
-                subtitle: "Choose where Sonoic should search first."
-            )
+            HomeSectionHeader(title: "Service")
 
             ScrollView(.horizontal) {
                 HStack(spacing: 10) {
@@ -125,59 +115,118 @@ struct SearchInputCard: View {
     }
 }
 
+struct SearchRecentQueriesSection: View {
+    let service: SonosServiceDescriptor
+    let recentSearches: [SonoicRecentSourceSearch]
+    let select: (SonoicRecentSourceSearch) -> Void
+    let clear: () -> Void
+
+    var body: some View {
+        if !recentSearches.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    HomeSectionHeader(
+                        title: "Recent"
+                    )
+
+                    Spacer(minLength: 0)
+
+                    Button("Clear", action: clear)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                ScrollView(.horizontal) {
+                    HStack(spacing: 10) {
+                        ForEach(recentSearches) { recentSearch in
+                            Button {
+                                select(recentSearch)
+                            } label: {
+                                Label(recentSearch.query, systemImage: "clock")
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 13)
+                                    .padding(.vertical, 9)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.capsule)
+                            .accessibilityLabel("Search \(recentSearch.query)")
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+    }
+}
+
 struct SearchResultsSection: View {
     let service: SonosServiceDescriptor
     let state: SonoicSourceSearchState
     let availabilityMessage: SearchMessage?
+    let canRequestAuthorization: Bool
+    let requestAuthorization: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: "Results",
-                subtitle: state.scope.resultSubtitle
-            )
+        if shouldShowResults {
+            VStack(alignment: .leading, spacing: 14) {
+                HomeSectionHeader(title: "Results")
 
-            RoomSurfaceCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    if let availabilityMessage {
-                        SearchMessageRow(message: availabilityMessage)
-                    } else if !state.hasQuery || state.status == .idle {
-                        SearchMessageRow(
-                            message: SearchMessage(
-                                title: "\(service.name) Search",
-                                detail: "Search the Apple Music catalog for \(state.scope.title.lowercased()).",
-                                systemImage: "music.magnifyingglass"
-                            )
-                        )
-                    } else if let failureDetail = state.failureDetail {
-                        SearchMessageRow(
-                            message: SearchMessage(
-                                title: "Search Failed",
-                                detail: failureDetail,
-                                systemImage: "exclamationmark.triangle"
-                            )
-                        )
-                    } else if state.status == .loaded && state.items.isEmpty {
-                        SearchMessageRow(
-                            message: SearchMessage(
-                                title: "No Results",
-                                detail: "Apple Music did not return catalog matches for this search.",
-                                systemImage: "magnifyingglass"
-                            )
-                        )
-                    } else {
-                        ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
-                            SourceItemNavigationRow(item: item)
+                RoomSurfaceCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if let availabilityMessage {
+                            SearchMessageRow(message: availabilityMessage)
 
-                            if index < state.items.count - 1 {
-                                Divider()
-                                    .padding(.leading, 76)
+                            if canRequestAuthorization {
+                                Button(action: requestAuthorization) {
+                                    Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                                }
+                                .buttonStyle(.glass)
+                                .buttonBorderShape(.capsule)
                             }
+                        } else if let failureDetail = state.failureDetail {
+                            SearchMessageRow(
+                                message: SearchMessage(
+                                    title: "Search Failed",
+                                    detail: staleDetail(failureDetail),
+                                    systemImage: "exclamationmark.triangle"
+                                )
+                            )
+                        }
+
+                        if state.status == .loaded && state.items.isEmpty {
+                            SearchMessageRow(
+                                message: SearchMessage(
+                                    title: "No Results",
+                                    detail: "No matches.",
+                                    systemImage: "magnifyingglass"
+                                )
+                            )
+                        } else if !state.items.isEmpty {
+                            SourceGroupedItemRows(items: state.items)
                         }
                     }
                 }
             }
         }
+    }
+
+    private var shouldShowResults: Bool {
+        availabilityMessage != nil
+            || state.hasQuery
+            || state.failureDetail != nil
+            || !state.items.isEmpty
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard !state.items.isEmpty,
+              let lastUpdatedAt = state.lastUpdatedAt
+        else {
+            return failureDetail
+        }
+
+        return "Showing previous results from \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 }
 
@@ -212,80 +261,5 @@ private struct SearchMessageRow: View {
             Spacer(minLength: 0)
         }
         .foregroundStyle(.secondary)
-    }
-}
-
-struct SearchScopeSection: View {
-    let service: SonosServiceDescriptor
-    let selectedScope: SonoicSourceSearchScope
-    let selectScope: (SonoicSourceSearchScope) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: "Find",
-                subtitle: "Filter \(service.name) results before searching."
-            )
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(SonoicSourceSearchScope.allCases) { scope in
-                    SearchScopeCard(
-                        service: service,
-                        scope: scope,
-                        isSelected: selectedScope == scope,
-                        select: {
-                            selectScope(scope)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-private struct SearchScopeCard: View {
-    let service: SonosServiceDescriptor
-    let scope: SonoicSourceSearchScope
-    let isSelected: Bool
-    let select: () -> Void
-
-    var body: some View {
-        Button(action: select) {
-            RoomSurfaceCard(isInteractive: isSelected) {
-                Image(systemName: scope.systemImage)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(isSelected ? .pink : .secondary)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(scope.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    Text(service.name)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Search \(service.name) \(scope.title)")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityElement(children: .combine)
-    }
-}
-
-struct SearchComingSoonCard: View {
-    let service: SonosServiceDescriptor
-
-    var body: some View {
-        RoomSurfaceCard {
-            Label("\(service.name) Search Is Coming", systemImage: "sparkles")
-                .font(.headline)
-
-            Text("This service will use the same result model as Apple Music once its catalog and Sonos playback rules are ready.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
     }
 }

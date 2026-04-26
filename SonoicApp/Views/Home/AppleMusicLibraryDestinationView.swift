@@ -40,28 +40,21 @@ struct AppleMusicLibraryDestinationView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(destination.title, systemImage: destination.systemImage)
-                .font(.largeTitle.weight(.bold))
-                .foregroundStyle(.primary)
-
-            Text(destination.subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Label(destination.title, systemImage: destination.systemImage)
+            .font(.largeTitle.weight(.bold))
+            .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
     private var content: some View {
-        if state.isLoading {
+        if state.isLoading && state.items.isEmpty {
             AppleMusicLibraryMessageCard(
                 title: "Loading \(destination.title)",
-                detail: "Reading your Apple Music library metadata.",
+                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
-        } else if let failureDetail = state.failureDetail {
+        } else if let failureDetail = state.failureDetail, state.items.isEmpty {
             AppleMusicLibraryMessageCard(
                 title: "Could Not Load \(destination.title)",
                 detail: failureDetail,
@@ -70,15 +63,15 @@ struct AppleMusicLibraryDestinationView: View {
         } else if state.status == .loaded && state.items.isEmpty {
             AppleMusicLibraryMessageCard(
                 title: "No \(destination.title)",
-                detail: "Apple Music did not return saved \(destination.title.lowercased()) for this library.",
+                detail: "Nothing here yet.",
                 systemImage: "music.note.list"
             )
-        } else if state.status == .loaded {
+        } else if state.status == .loaded || !state.items.isEmpty {
             libraryItemsSection
         } else {
             AppleMusicLibraryMessageCard(
-                title: "\(destination.title) Ready",
-                detail: "Tap refresh to load this Apple Music library lane.",
+                title: destination.title,
+                detail: "Pull to refresh.",
                 systemImage: destination.systemImage
             )
         }
@@ -88,9 +81,16 @@ struct AppleMusicLibraryDestinationView: View {
     private var libraryItemsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: destination.title,
-                subtitle: "Apple Music library metadata. These are not Sonos-playable yet."
+                title: destination.title
             )
+
+            if let failureDetail = state.failureDetail {
+                AppleMusicLibraryMessageCard(
+                    title: "Showing Cached \(destination.title)",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
 
             if destination == .songs {
                 RoomSurfaceCard {
@@ -108,11 +108,41 @@ struct AppleMusicLibraryDestinationView: View {
             } else {
                 AppleMusicLibraryGrid(items: state.items)
             }
+
+            if state.canLoadMore || state.isLoading {
+                Button(action: loadMoreTapped) {
+                    if state.isLoading {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Loading More")
+                        }
+                    } else {
+                        Label("Load More", systemImage: "chevron.down")
+                    }
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .disabled(state.isLoading)
+                .accessibilityLabel("Load more \(destination.title)")
+            }
         }
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return failureDetail
+        }
+
+        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 
     private func refreshTapped() {
         model.loadAppleMusicLibraryDestination(destination, force: true)
+    }
+
+    private func loadMoreTapped() {
+        model.loadAppleMusicLibraryDestination(destination, append: true)
     }
 }
 
@@ -138,50 +168,63 @@ private struct AppleMusicLibraryGridCard: View {
 
     let item: SonoicSourceItem
 
-    private var playbackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicPlaybackCandidate(for: item)
+    private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
+        model.appleMusicExactPlaybackCandidate(for: item)
     }
 
     var body: some View {
-        NavigationLink {
-            AppleMusicItemDetailView(item: item)
-        } label: {
-            VStack(alignment: .leading, spacing: 9) {
-                HomeFavoriteArtworkView(
-                    artworkURL: item.artworkURL,
-                    artworkIdentifier: item.artworkIdentifier,
-                    maximumDisplayDimension: 220
-                )
-                .aspectRatio(1, contentMode: .fit)
+        ZStack(alignment: .topTrailing) {
+            NavigationLink {
+                AppleMusicItemDetailView(item: item)
+            } label: {
+                VStack(alignment: .leading, spacing: 9) {
+                    HomeFavoriteArtworkView(
+                        artworkURL: item.artworkURL,
+                        artworkIdentifier: item.artworkIdentifier,
+                        maximumDisplayDimension: 220
+                    )
+                    .aspectRatio(1, contentMode: .fit)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-
-                    if let subtitle = item.subtitle {
-                        Text(subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
-                    }
 
-                    if let playbackCandidate {
-                        Label(playbackCandidate.confidence.badgeTitle, systemImage: "checkmark.circle")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(playbackCandidate.confidence == .exact ? .green : .secondary)
-                            .lineLimit(1)
+                        if let subtitle = item.subtitle {
+                            Text(subtitle)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
+
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityLabel(item.title)
+
+            if let exactPlaybackCandidate {
+                Button {
+                    Task {
+                        _ = await model.playManualSonosPayload(exactPlaybackCandidate.payload)
+                    }
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .padding(8)
+                .accessibilityLabel("Play \(item.title)")
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(item.title)
     }
 }
 

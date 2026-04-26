@@ -9,9 +9,12 @@ struct AppleMusicServiceMetadata: Sendable {
 
 nonisolated struct AppleMusicItemMetadata: Sendable {
     var serviceItemID: String
+    var catalogItemID: String?
+    var libraryItemID: String?
     var title: String
     var subtitle: String?
     var artworkURL: String?
+    var externalURL: String?
     var kind: AppleMusicItemKind
     var origin: AppleMusicItemOrigin
 
@@ -25,11 +28,14 @@ nonisolated struct AppleMusicItemMetadata: Sendable {
 
         return AppleMusicItemMetadata(
             serviceItemID: resource.id,
+            catalogItemID: resource.catalogItemID,
+            libraryItemID: resource.libraryItemID,
             title: resource.attributes?.name ?? "Unknown",
             subtitle: resource.attributes?.albumName.map { albumName in
                 [resource.attributes?.artistName, albumName].compactMap(\.self).joined(separator: " • ")
             } ?? resource.attributes?.artistName ?? resource.attributes?.curatorName,
             artworkURL: resource.attributes?.artwork?.sizedURL(width: 400, height: 400),
+            externalURL: resource.attributes?.url,
             kind: kind,
             origin: origin
         )
@@ -43,6 +49,73 @@ nonisolated struct AppleMusicItemMetadataSection: Sendable {
     var items: [AppleMusicItemMetadata]
 }
 
+nonisolated struct AppleMusicItemMetadataPage: Sendable {
+    var items: [AppleMusicItemMetadata]
+    var nextOffset: Int?
+}
+
+nonisolated enum AppleMusicSearchResultBalancer {
+    static func groupedItems(
+        groups: [[AppleMusicItemMetadata]],
+        itemLimitPerGroup: Int,
+        totalLimit: Int
+    ) -> [AppleMusicItemMetadata] {
+        guard itemLimitPerGroup > 0, totalLimit > 0 else {
+            return []
+        }
+
+        var items: [AppleMusicItemMetadata] = []
+        items.reserveCapacity(totalLimit)
+
+        for group in groups {
+            guard items.count < totalLimit else {
+                break
+            }
+
+            let remainingItemCount = totalLimit - items.count
+            items.append(contentsOf: group.prefix(min(itemLimitPerGroup, remainingItemCount)))
+        }
+
+        return items
+    }
+
+    static func balancedItems(
+        groups: [[AppleMusicItemMetadata]],
+        limit: Int
+    ) -> [AppleMusicItemMetadata] {
+        guard limit > 0 else {
+            return []
+        }
+
+        var indexes = Array(repeating: 0, count: groups.count)
+        var items: [AppleMusicItemMetadata] = []
+        items.reserveCapacity(limit)
+
+        while items.count < limit {
+            let countBeforePass = items.count
+
+            for groupIndex in groups.indices {
+                guard indexes[groupIndex] < groups[groupIndex].count else {
+                    continue
+                }
+
+                items.append(groups[groupIndex][indexes[groupIndex]])
+                indexes[groupIndex] += 1
+
+                if items.count == limit {
+                    break
+                }
+            }
+
+            if items.count == countBeforePass {
+                break
+            }
+        }
+
+        return items
+    }
+}
+
 nonisolated struct AppleMusicGenreMetadata: Sendable {
     var id: String
     var title: String
@@ -50,6 +123,8 @@ nonisolated struct AppleMusicGenreMetadata: Sendable {
 
 nonisolated struct AppleMusicItemLookup: Sendable {
     var serviceItemID: String
+    var catalogItemID: String?
+    var libraryItemID: String?
     var title: String
     var kind: AppleMusicItemKind
     var origin: AppleMusicItemOrigin
@@ -65,6 +140,7 @@ nonisolated enum AppleMusicItemKind: Sendable {
     case artist
     case playlist
     case song
+    case station
 
     init?(resourceType: String?) {
         switch resourceType {
@@ -76,6 +152,8 @@ nonisolated enum AppleMusicItemKind: Sendable {
             self = .playlist
         case "songs", "library-songs":
             self = .song
+        case "stations":
+            self = .station
         default:
             return nil
         }
@@ -84,12 +162,37 @@ nonisolated enum AppleMusicItemKind: Sendable {
 
 nonisolated struct AppleMusicLibraryResponse: Decodable {
     var data: [AppleMusicLibraryResource]
+    var next: String?
+
+    var nextOffset: Int? {
+        guard let next,
+              let components = URLComponents(string: next),
+              let offsetValue = components.queryItems?.first(where: { $0.name == "offset" })?.value,
+              let offset = Int(offsetValue)
+        else {
+            return nil
+        }
+
+        return offset
+    }
 }
 
 nonisolated struct AppleMusicLibraryResource: Decodable {
     var id: String
     var type: String?
     var attributes: AppleMusicLibraryAttributes?
+
+    var catalogItemID: String? {
+        if type?.hasPrefix("library-") == true {
+            return attributes?.playParams?.catalogId
+        }
+
+        return id
+    }
+
+    var libraryItemID: String? {
+        type?.hasPrefix("library-") == true ? id : nil
+    }
 }
 
 nonisolated struct AppleMusicLibraryAttributes: Decodable {
@@ -98,6 +201,12 @@ nonisolated struct AppleMusicLibraryAttributes: Decodable {
     var albumName: String?
     var curatorName: String?
     var artwork: AppleMusicLibraryArtwork?
+    var url: String?
+    var playParams: AppleMusicPlayParameters?
+}
+
+nonisolated struct AppleMusicPlayParameters: Decodable {
+    var catalogId: String?
 }
 
 nonisolated struct AppleMusicLibraryArtwork: Decodable {
@@ -120,6 +229,49 @@ nonisolated struct AppleMusicCatalogSearchResults: Decodable {
 
 nonisolated struct AppleMusicCatalogResourceCollection: Decodable {
     var data: [AppleMusicLibraryResource]
+}
+
+nonisolated struct AppleMusicRecommendationResponse: Decodable {
+    var data: [AppleMusicRecommendationResource]
+
+    func sections() -> [AppleMusicItemMetadataSection] {
+        data.compactMap(\.section)
+    }
+}
+
+nonisolated struct AppleMusicRecommendationResource: Decodable {
+    var id: String
+    var attributes: AppleMusicRecommendationAttributes?
+    var relationships: AppleMusicRecommendationRelationships?
+
+    var section: AppleMusicItemMetadataSection? {
+        let items = relationships?.contents?.data.compactMap { resource in
+            AppleMusicItemMetadata.metadata(from: resource, origin: .catalogSearch)
+        } ?? []
+
+        guard !items.isEmpty else {
+            return nil
+        }
+
+        return AppleMusicItemMetadataSection(
+            id: id,
+            title: attributes?.title?.stringForDisplay ?? "For You",
+            subtitle: nil,
+            items: items
+        )
+    }
+}
+
+nonisolated struct AppleMusicRecommendationAttributes: Decodable {
+    var title: AppleMusicDisplayString?
+}
+
+nonisolated struct AppleMusicDisplayString: Decodable {
+    var stringForDisplay: String?
+}
+
+nonisolated struct AppleMusicRecommendationRelationships: Decodable {
+    var contents: AppleMusicCatalogResourceCollection?
 }
 
 nonisolated struct AppleMusicChartResponse: Decodable {

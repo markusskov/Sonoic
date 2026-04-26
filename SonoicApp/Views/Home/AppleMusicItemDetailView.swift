@@ -9,8 +9,8 @@ struct AppleMusicItemDetailView: View {
         model.appleMusicItemDetailState(for: item)
     }
 
-    private var playbackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicPlaybackCandidate(for: item)
+    private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
+        model.appleMusicExactPlaybackCandidate(for: item)
     }
 
     var body: some View {
@@ -18,11 +18,14 @@ struct AppleMusicItemDetailView: View {
             GlassEffectContainer(spacing: 18) {
                 VStack(alignment: .leading, spacing: 24) {
                     AppleMusicItemDetailHeader(item: item)
-                    AppleMusicItemCapabilityCard(
-                        item: item,
-                        playbackCandidate: playbackCandidate,
-                        play: playCandidate
-                    )
+
+                    if let exactPlaybackCandidate {
+                        AppleMusicItemActionCard(
+                            playbackCandidate: exactPlaybackCandidate,
+                            play: playCandidate
+                        )
+                    }
+
                     content
                 }
                 .padding(20)
@@ -32,7 +35,7 @@ struct AppleMusicItemDetailView: View {
         .scrollIndicators(.hidden)
         .navigationTitle(item.kind.title)
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: item.id) {
+        .task(id: item.appleMusicDetailCacheKey) {
             model.loadAppleMusicItemDetail(for: item)
         }
         .toolbar {
@@ -51,13 +54,13 @@ struct AppleMusicItemDetailView: View {
 
     @ViewBuilder
     private var content: some View {
-        if state.isLoading {
+        if state.isLoading && state.sections.isEmpty {
             AppleMusicItemDetailMessageCard(
                 title: "Loading \(item.kind.title)",
-                detail: "Reading Apple Music metadata.",
+                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
-        } else if let failureDetail = state.failureDetail {
+        } else if let failureDetail = state.failureDetail, state.sections.isEmpty {
             AppleMusicItemDetailMessageCard(
                 title: "Could Not Load Details",
                 detail: failureDetail,
@@ -65,15 +68,39 @@ struct AppleMusicItemDetailView: View {
             )
         } else if state.sections.isEmpty {
             AppleMusicItemDetailMessageCard(
-                title: "No More Metadata",
-                detail: "Apple Music did not return extra detail sections for this item yet.",
+                title: "No Details",
+                detail: "Nothing else here yet.",
                 systemImage: item.kind.systemImage
             )
         } else {
+            if state.isLoading {
+                AppleMusicItemDetailMessageCard(
+                    title: "Refreshing",
+                    detail: "Updating...",
+                    systemImage: "arrow.clockwise"
+                )
+            }
+
+            if let failureDetail = state.failureDetail {
+                AppleMusicItemDetailMessageCard(
+                    title: "Showing Cached Details",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+
             ForEach(state.sections) { section in
                 AppleMusicItemDetailSectionView(section: section)
             }
         }
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return failureDetail
+        }
+
+        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 
     private func refreshTapped() {
@@ -95,7 +122,8 @@ private struct AppleMusicItemDetailHeader: View {
                 artworkIdentifier: item.artworkIdentifier,
                 maximumDisplayDimension: 260
             )
-            .frame(width: 260, height: 260)
+            .aspectRatio(1, contentMode: .fit)
+            .frame(maxWidth: 260)
             .frame(maxWidth: .infinity, alignment: .center)
 
             VStack(alignment: .leading, spacing: 8) {
@@ -115,108 +143,84 @@ private struct AppleMusicItemDetailHeader: View {
                         .lineLimit(2)
                 }
 
-                HStack(spacing: 8) {
-                    AppleMusicItemDetailChip(title: item.service.name, systemImage: item.service.systemImage)
-                    AppleMusicItemDetailChip(title: originTitle, systemImage: originSystemImage)
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        AppleMusicItemDetailChip(title: item.service.name, systemImage: item.service.systemImage)
+                    }
+                    .padding(.vertical, 1)
                 }
+                .scrollIndicators(.hidden)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private var originTitle: String {
-        switch item.origin {
-        case .catalogSearch:
-            "Catalog"
-        case .favorite:
-            "Favorite"
-        case .library:
-            "Library"
-        case .recentPlay:
-            "Recent"
-        }
-    }
-
-    private var originSystemImage: String {
-        switch item.origin {
-        case .catalogSearch:
-            "magnifyingglass"
-        case .favorite:
-            "star"
-        case .library:
-            "rectangle.stack"
-        case .recentPlay:
-            "clock"
-        }
-    }
 }
 
-private struct AppleMusicItemCapabilityCard: View {
-    let item: SonoicSourceItem
-    let playbackCandidate: SonoicSonosPlaybackCandidate?
+private struct AppleMusicItemActionCard: View {
+    let playbackCandidate: SonoicSonosPlaybackCandidate
     let play: (SonoicSonosPlaybackCandidate) async -> Void
 
     var body: some View {
         RoomSurfaceCard {
-            if let playbackCandidate {
-                VStack(alignment: .leading, spacing: 12) {
-                    Label(playbackCandidate.confidence.title, systemImage: "play.circle")
-                        .font(.headline)
-
-                    Text(playbackCandidate.detail)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Button {
-                        Task {
-                            await play(playbackCandidate)
-                        }
-                    } label: {
-                        Label("Play with Sonos", systemImage: "play.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+            Button {
+                Task {
+                    await play(playbackCandidate)
                 }
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Metadata Only", systemImage: "lock.circle")
-                        .font(.headline)
-
-                    Text("Sonoic can browse this Apple Music item, but still needs a Sonos-native playback payload before it can start playback on your speakers.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if let serviceItemID = item.serviceItemID {
-                        Text("MusicKit ID: \(serviceItemID)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                }
+            } label: {
+                Label("Play", systemImage: "play.fill")
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
     }
 }
 
 private struct AppleMusicItemDetailSectionView: View {
     let section: SonoicAppleMusicItemDetailSection
+    private let previewLimit = 8
+
+    private var previewItems: [SonoicSourceItem] {
+        Array(section.items.prefix(previewLimit))
+    }
+
+    private var showsViewAll: Bool {
+        section.items.count > previewItems.count
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: section.title,
-                subtitle: section.subtitle ?? "Apple Music metadata"
-            )
+            HStack(alignment: .top, spacing: 12) {
+                HomeSectionHeader(
+                    title: section.title,
+                    subtitle: section.subtitle
+                )
+
+                Spacer(minLength: 0)
+
+                if showsViewAll {
+                    NavigationLink {
+                        AppleMusicItemCollectionView(
+                            title: section.title,
+                            subtitle: section.subtitle,
+                            items: section.items
+                        )
+                    } label: {
+                        Label("View All", systemImage: "chevron.right")
+                            .labelStyle(.titleAndIcon)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+            }
 
             RoomSurfaceCard {
                 VStack(spacing: 0) {
-                    ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(previewItems.enumerated()), id: \.element.id) { index, item in
                         SourceItemNavigationRow(item: item)
 
-                        if index < section.items.count - 1 {
+                        if index < previewItems.count - 1 {
                             Divider()
                                 .padding(.leading, 76)
                         }

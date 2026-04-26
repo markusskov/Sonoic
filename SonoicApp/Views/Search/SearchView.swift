@@ -6,6 +6,7 @@ struct SearchView: View {
 
     private var services: [SonosServiceDescriptor] {
         orderedServices(model.homeSources.map(\.service) + SonosServiceCatalog.browsableServices)
+            .filter(supportsCatalogSearch)
     }
 
     private var selectedService: SonosServiceDescriptor {
@@ -27,8 +28,8 @@ struct SearchView: View {
         model.sourceSearchState(for: selectedSource)
     }
 
-    private var supportsCatalogSearch: Bool {
-        selectedService.kind == .appleMusic
+    private var supportsSelectedCatalogSearch: Bool {
+        supportsCatalogSearch(selectedService)
     }
 
     var body: some View {
@@ -37,33 +38,36 @@ struct SearchView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     SearchHeader()
 
-                    SearchServicePicker(
-                        services: services,
-                        selectedServiceID: $selectedServiceID
-                    )
+                    if services.count > 1 {
+                        SearchServicePicker(
+                            services: services,
+                            selectedServiceID: $selectedServiceID
+                        )
+                    }
 
-                    SearchInputCard(
-                        query: searchQueryBinding,
-                        service: selectedService,
-                        state: searchState,
-                        supportsCatalogSearch: supportsCatalogSearch,
-                        submit: searchCatalog
-                    )
+                    if supportsSelectedCatalogSearch {
+                        SearchInputCard(
+                            query: searchQueryBinding,
+                            service: selectedService,
+                            state: searchState,
+                            supportsCatalogSearch: supportsSelectedCatalogSearch,
+                            submit: searchCatalog
+                        )
 
-                    SearchScopeSection(
-                        service: selectedService,
-                        selectedScope: searchState.scope,
-                        selectScope: selectScope
-                    )
+                        SearchRecentQueriesSection(
+                            service: selectedService,
+                            recentSearches: model.recentSourceSearches(for: selectedSource),
+                            select: selectRecentSearch,
+                            clear: clearRecentSearches
+                        )
 
-                    if supportsCatalogSearch {
                         SearchResultsSection(
                             service: selectedService,
                             state: searchState,
-                            availabilityMessage: appleMusicAvailabilityMessage
+                            availabilityMessage: appleMusicAvailabilityMessage,
+                            canRequestAuthorization: model.appleMusicAuthorizationState.canRequestAuthorization,
+                            requestAuthorization: requestAppleMusicAuthorization
                         )
-                    } else {
-                        SearchComingSoonCard(service: selectedService)
                     }
                 }
                 .padding(20)
@@ -86,6 +90,10 @@ struct SearchView: View {
         }
     }
 
+    private func supportsCatalogSearch(_ service: SonosServiceDescriptor) -> Bool {
+        service.kind == .appleMusic
+    }
+
     private var searchQueryBinding: Binding<String> {
         Binding(
             get: {
@@ -98,13 +106,26 @@ struct SearchView: View {
     }
 
     private func searchCatalog() {
+        model.updateSourceSearchScope(.all, for: selectedSource)
+
         Task {
             await model.searchSourceCatalog(for: selectedSource)
         }
     }
 
-    private func selectScope(_ scope: SonoicSourceSearchScope) {
-        model.updateSourceSearchScope(scope, for: selectedSource)
+    private func selectRecentSearch(_ recentSearch: SonoicRecentSourceSearch) {
+        model.updateSourceSearchQuery(recentSearch.query, for: selectedSource)
+        searchCatalog()
+    }
+
+    private func clearRecentSearches() {
+        model.clearRecentSourceSearches(for: selectedSource)
+    }
+
+    private func requestAppleMusicAuthorization() {
+        Task {
+            await model.requestAppleMusicAuthorization()
+        }
     }
 
     private var appleMusicAvailabilityMessage: SearchMessage? {

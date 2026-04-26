@@ -14,14 +14,6 @@ struct SourceDetailView: View {
         model.recentSourceItems(for: source)
     }
 
-    private var catalogSearchState: SonoicSourceSearchState {
-        model.sourceSearchState(for: source)
-    }
-
-    private var showsCatalogSearch: Bool {
-        source.service.kind == .appleMusic
-    }
-
     private var isAppleMusic: Bool {
         source.service.kind == .appleMusic
     }
@@ -34,8 +26,9 @@ struct SourceDetailView: View {
                         AppleMusicSourceHeader(
                             source: source,
                             authorizationState: model.appleMusicAuthorizationState,
-                            serviceDetails: model.appleMusicServiceDetails
+                            requestAuthorization: requestAppleMusicAuthorization
                         )
+                        AppleMusicSearchEntrySection(openSearch: openSearch)
                         AppleMusicLibrarySection()
                         AppleMusicRecentlyAddedSection()
                         AppleMusicDiscoverySection()
@@ -43,20 +36,9 @@ struct SourceDetailView: View {
                         SourceHeaderCard(source: source)
                     }
 
-                    if showsCatalogSearch {
-                        SourceSearchSection(
-                            serviceName: source.service.name,
-                            query: catalogSearchBinding,
-                            state: catalogSearchState,
-                            availabilityMessage: appleMusicAvailabilityMessage,
-                            search: searchCatalog
-                        )
-                    }
-
                     if !favoriteItems.isEmpty {
                         sourceSection(
                             title: "Favorites",
-                            subtitle: "Saved Sonos favorites from \(source.service.name).",
                             items: favoriteItems
                         )
                     }
@@ -64,16 +46,15 @@ struct SourceDetailView: View {
                     if !recentItems.isEmpty {
                         sourceSection(
                             title: "Recently Played",
-                            subtitle: "History Sonoic has seen from this source.",
                             items: recentItems
                         )
                     }
 
-                    if favoriteItems.isEmpty && recentItems.isEmpty {
+                    if !isAppleMusic && favoriteItems.isEmpty && recentItems.isEmpty {
                         SourceEmptyCard(serviceName: source.service.name)
                     }
 
-                    if !showsCatalogSearch {
+                    if !isAppleMusic {
                         SourceCatalogPlaceholderCard(serviceName: source.service.name)
                     }
                 }
@@ -100,11 +81,10 @@ struct SourceDetailView: View {
 
     private func sourceSection(
         title: String,
-        subtitle: String,
         items: [SonoicSourceItem]
     ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(title: title, subtitle: subtitle)
+            HomeSectionHeader(title: title)
 
             RoomSurfaceCard {
                 VStack(spacing: 0) {
@@ -133,33 +113,14 @@ struct SourceDetailView: View {
         _ = await model.playManualSonosPayload(payload)
     }
 
-    private var catalogSearchBinding: Binding<String> {
-        Binding(
-            get: {
-                model.sourceSearchState(for: source).query
-            },
-            set: { query in
-                model.updateSourceSearchQuery(query, for: source)
-            }
-        )
-    }
-
-    private func searchCatalog() async {
-        await model.searchSourceCatalog(for: source)
-    }
-
-    private var appleMusicAvailabilityMessage: SourceSearchAvailabilityMessage? {
-        guard source.service.kind == .appleMusic,
-              !model.appleMusicAuthorizationState.allowsCatalogSearch
-        else {
-            return nil
+    private func requestAppleMusicAuthorization() {
+        Task {
+            await model.requestAppleMusicAuthorization()
         }
+    }
 
-        return SourceSearchAvailabilityMessage(
-            title: model.appleMusicAuthorizationState.title,
-            detail: model.appleMusicAuthorizationState.detail,
-            systemImage: model.appleMusicAuthorizationState.systemImage
-        )
+    private func openSearch() {
+        model.selectedTab = .search
     }
 }
 

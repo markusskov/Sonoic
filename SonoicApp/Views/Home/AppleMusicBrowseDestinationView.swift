@@ -40,84 +40,131 @@ struct AppleMusicBrowseDestinationView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(destination.title, systemImage: destination.systemImage)
-                .font(.largeTitle.weight(.bold))
-                .foregroundStyle(.primary)
-
-            Text(destination.subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Label(destination.title, systemImage: destination.systemImage)
+            .font(.largeTitle.weight(.bold))
+            .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
     private var content: some View {
-        if state.isLoading {
+        if state.isLoading && state.sections.isEmpty && state.genres.isEmpty {
             AppleMusicBrowseMessageCard(
                 title: "Loading \(destination.title)",
-                detail: "Reading Apple Music catalog metadata.",
+                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
-        } else if let failureDetail = state.failureDetail {
+        } else if let failureDetail = state.failureDetail, state.sections.isEmpty && state.genres.isEmpty {
             AppleMusicBrowseMessageCard(
                 title: "Could Not Load \(destination.title)",
                 detail: failureDetail,
                 systemImage: "exclamationmark.triangle"
             )
         } else if !state.sections.isEmpty {
+            if state.isLoading {
+                AppleMusicBrowseMessageCard(
+                    title: "Refreshing",
+                    detail: "Updating...",
+                    systemImage: "arrow.clockwise"
+                )
+            }
+
+            if let failureDetail = state.failureDetail {
+                AppleMusicBrowseMessageCard(
+                    title: "Showing Cached \(destination.title)",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+
             ForEach(state.sections) { section in
                 AppleMusicBrowseSectionView(section: section)
             }
         } else if !state.genres.isEmpty {
-            AppleMusicBrowseGenreSection(genres: state.genres)
-        } else {
-            nextStepsCard
-        }
-    }
-
-    private var nextStepsCard: some View {
-        RoomSurfaceCard {
-            VStack(alignment: .leading, spacing: 12) {
-                AppleMusicBrowseStatusRow(
-                    title: "Show Apple Music items",
-                    subtitle: "Use the matching catalog or personalized endpoint for this lane.",
-                    systemImage: "checklist"
-                )
-                Divider()
-                    .padding(.leading, 46)
-                AppleMusicBrowseStatusRow(
-                    title: "Resolve Sonos playback",
-                    subtitle: "Map selected results to Sonos-native service payloads before enabling Play.",
-                    systemImage: "speaker.wave.2"
+            if state.isLoading {
+                AppleMusicBrowseMessageCard(
+                    title: "Refreshing Categories",
+                    detail: "Updating...",
+                    systemImage: "arrow.clockwise"
                 )
             }
+
+            if let failureDetail = state.failureDetail {
+                AppleMusicBrowseMessageCard(
+                    title: "Showing Cached Categories",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+
+            AppleMusicBrowseGenreSection(genres: state.genres)
+        } else {
+            AppleMusicBrowseMessageCard(
+                title: "No Items",
+                detail: "Nothing here yet.",
+                systemImage: destination.systemImage
+            )
         }
     }
 
     private func refreshTapped() {
         model.loadAppleMusicBrowseDestination(destination, force: true)
     }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return failureDetail
+        }
+
+        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
+    }
 }
 
 private struct AppleMusicBrowseSectionView: View {
     let section: SonoicAppleMusicItemDetailSection
+    private let previewLimit = 8
+
+    private var previewItems: [SonoicSourceItem] {
+        Array(section.items.prefix(previewLimit))
+    }
+
+    private var showsViewAll: Bool {
+        section.items.count > previewItems.count
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: section.title,
-                subtitle: section.subtitle ?? "Apple Music catalog metadata"
-            )
+            HStack(alignment: .top, spacing: 12) {
+                HomeSectionHeader(
+                    title: section.title,
+                    subtitle: section.subtitle
+                )
+
+                Spacer(minLength: 0)
+
+                if showsViewAll {
+                    NavigationLink {
+                        AppleMusicItemCollectionView(
+                            title: section.title,
+                            subtitle: section.subtitle,
+                            items: section.items
+                        )
+                    } label: {
+                        Label("View All", systemImage: "chevron.right")
+                            .labelStyle(.titleAndIcon)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+            }
 
             RoomSurfaceCard {
                 VStack(spacing: 0) {
-                    ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(previewItems.enumerated()), id: \.element.id) { index, item in
                         SourceItemNavigationRow(item: item)
 
-                        if index < section.items.count - 1 {
+                        if index < previewItems.count - 1 {
                             Divider()
                                 .padding(.leading, 76)
                         }
@@ -134,8 +181,7 @@ private struct AppleMusicBrowseGenreSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Categories",
-                subtitle: "Apple Music genres used by catalog charts."
+                title: "Categories"
             )
 
             RoomSurfaceCard {
@@ -204,32 +250,6 @@ private struct AppleMusicBrowseMessageCard: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-        }
-    }
-}
-
-private struct AppleMusicBrowseStatusRow: View {
-    let title: String
-    let subtitle: String
-    let systemImage: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.pink)
-                .frame(width: 32, height: 32)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

@@ -66,11 +66,11 @@ enum SonoicPlaybackCapability: Equatable {
     var displayTitle: String {
         switch self {
         case .sonosNative:
-            "Playable on Sonos"
+            "Playable"
         case .metadataOnly:
-            "Metadata Only"
+            "Not Playable"
         case .unsupported:
-            "Unsupported"
+            "Not Playable"
         }
     }
 
@@ -90,6 +90,15 @@ struct SonoicSonosPlaybackCandidate: Identifiable, Equatable {
     enum Confidence: String, Equatable {
         case exact
         case likely
+
+        var shortTitle: String {
+            switch self {
+            case .exact:
+                "Favorite Match"
+            case .likely:
+                "Possible Match"
+            }
+        }
 
         var title: String {
             switch self {
@@ -116,6 +125,37 @@ struct SonoicSonosPlaybackCandidate: Identifiable, Equatable {
 
     var id: String {
         payload.id
+    }
+}
+
+struct SonoicAppleMusicItemIdentity: Hashable, Sendable {
+    var catalogID: String?
+    var libraryID: String?
+    var kind: SonoicSourceItem.Kind
+
+    var primaryID: String? {
+        catalogID ?? libraryID
+    }
+
+    func routedID(for origin: SonoicSourceItem.Origin) -> String? {
+        switch origin {
+        case .catalogSearch:
+            catalogID ?? libraryID
+        case .library:
+            libraryID ?? catalogID
+        case .favorite, .recentPlay:
+            primaryID
+        }
+    }
+
+    func detailCacheKey(for origin: SonoicSourceItem.Origin) -> String {
+        [
+            "apple-music",
+            origin.rawValue,
+            kind.rawValue,
+            catalogID ?? "no-catalog-id",
+            libraryID ?? "no-library-id"
+        ].joined(separator: ":")
     }
 }
 
@@ -176,10 +216,16 @@ struct SonoicSourceItem: Identifiable, Equatable {
     var artworkURL: String?
     var artworkIdentifier: String?
     var serviceItemID: String?
+    var appleMusicIdentity: SonoicAppleMusicItemIdentity?
+    var externalURL: String?
     var service: SonosServiceDescriptor
     var origin: Origin
     var kind: Kind
     var playbackCapability: SonoicPlaybackCapability
+
+    var appleMusicDetailCacheKey: String {
+        appleMusicIdentity?.detailCacheKey(for: origin) ?? id
+    }
 
     init(
         id: String,
@@ -188,6 +234,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
         artworkURL: String?,
         artworkIdentifier: String?,
         serviceItemID: String? = nil,
+        appleMusicIdentity: SonoicAppleMusicItemIdentity? = nil,
+        externalURL: String? = nil,
         service: SonosServiceDescriptor,
         origin: Origin,
         kind: Kind = .unknown,
@@ -199,6 +247,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
         self.artworkURL = artworkURL
         self.artworkIdentifier = artworkIdentifier
         self.serviceItemID = serviceItemID
+        self.appleMusicIdentity = appleMusicIdentity
+        self.externalURL = externalURL
         self.service = service
         self.origin = origin
         self.kind = kind
@@ -241,7 +291,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
         subtitle: String?,
         artworkURL: String?,
         kind: Kind,
-        service: SonosServiceDescriptor
+        service: SonosServiceDescriptor,
+        externalURL: String? = nil
     ) -> SonoicSourceItem {
         SonoicSourceItem(
             id: "catalog-\(service.id)-\(id)",
@@ -250,6 +301,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
             artworkURL: artworkURL,
             artworkIdentifier: nil,
             serviceItemID: id,
+            externalURL: externalURL,
             service: service,
             origin: .catalogSearch,
             kind: kind,
@@ -263,7 +315,10 @@ struct SonoicSourceItem: Identifiable, Equatable {
         subtitle: String?,
         artworkURL: String?,
         kind: Kind,
-        origin: Origin
+        origin: Origin,
+        catalogID: String? = nil,
+        libraryID: String? = nil,
+        externalURL: String? = nil
     ) -> SonoicSourceItem {
         SonoicSourceItem(
             id: "\(origin.rawValue)-\(SonosServiceDescriptor.appleMusic.id)-\(kind.rawValue)-\(id)",
@@ -272,6 +327,12 @@ struct SonoicSourceItem: Identifiable, Equatable {
             artworkURL: artworkURL,
             artworkIdentifier: nil,
             serviceItemID: id,
+            appleMusicIdentity: SonoicAppleMusicItemIdentity(
+                catalogID: catalogID,
+                libraryID: libraryID,
+                kind: kind
+            ),
+            externalURL: externalURL,
             service: .appleMusic,
             origin: origin,
             kind: kind,
@@ -292,18 +353,21 @@ struct SonoicSourceSearchState: Equatable {
     var scope: SonoicSourceSearchScope
     var items: [SonoicSourceItem]
     var status: Status
+    var lastUpdatedAt: Date?
 
     init(
         query: String = "",
         service: SonosServiceDescriptor,
         scope: SonoicSourceSearchScope = .all,
         items: [SonoicSourceItem]? = nil,
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil
     ) {
         self.query = query
         self.scope = scope
         self.items = items ?? []
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
     }
 
     var hasQuery: Bool {
@@ -321,6 +385,11 @@ struct SonoicSourceSearchState: Equatable {
             nil
         }
     }
+}
+
+struct SonoicSourceItemPage: Equatable {
+    var items: [SonoicSourceItem]
+    var nextOffset: Int?
 }
 
 enum SonoicSourceSearchScope: String, CaseIterable, Identifiable, Equatable, Sendable {
@@ -428,6 +497,15 @@ enum SonoicAppleMusicLibraryDestination: String, CaseIterable, Identifiable, Equ
             "music.note"
         }
     }
+
+    var initialLoadLimit: Int {
+        switch self {
+        case .playlists, .albums:
+            24
+        case .artists, .songs:
+            50
+        }
+    }
 }
 
 enum SonoicAppleMusicBrowseDestination: String, CaseIterable, Identifiable, Equatable {
@@ -505,15 +583,21 @@ struct SonoicAppleMusicLibraryState: Equatable {
     var destination: SonoicAppleMusicLibraryDestination
     var items: [SonoicSourceItem]
     var status: Status
+    var lastUpdatedAt: Date?
+    var nextOffset: Int?
 
     init(
         destination: SonoicAppleMusicLibraryDestination,
         items: [SonoicSourceItem] = [],
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil,
+        nextOffset: Int? = nil
     ) {
         self.destination = destination
         self.items = items
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
+        self.nextOffset = nextOffset
     }
 
     var isLoading: Bool {
@@ -527,6 +611,10 @@ struct SonoicAppleMusicLibraryState: Equatable {
             nil
         }
     }
+
+    var canLoadMore: Bool {
+        nextOffset != nil
+    }
 }
 
 struct SonoicAppleMusicRecentlyAddedState: Equatable {
@@ -539,13 +627,16 @@ struct SonoicAppleMusicRecentlyAddedState: Equatable {
 
     var items: [SonoicSourceItem]
     var status: Status
+    var lastUpdatedAt: Date?
 
     init(
         items: [SonoicSourceItem] = [],
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil
     ) {
         self.items = items
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
     }
 
     var isLoading: Bool {
@@ -573,17 +664,20 @@ struct SonoicAppleMusicBrowseState: Equatable {
     var sections: [SonoicAppleMusicItemDetailSection]
     var genres: [SonoicAppleMusicGenreItem]
     var status: Status
+    var lastUpdatedAt: Date?
 
     init(
         destination: SonoicAppleMusicBrowseDestination,
         sections: [SonoicAppleMusicItemDetailSection] = [],
         genres: [SonoicAppleMusicGenreItem] = [],
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil
     ) {
         self.destination = destination
         self.sections = sections
         self.genres = genres
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
     }
 
     var isLoading: Bool {
@@ -619,15 +713,18 @@ struct SonoicAppleMusicItemDetailState: Equatable {
     var item: SonoicSourceItem
     var sections: [SonoicAppleMusicItemDetailSection]
     var status: Status
+    var lastUpdatedAt: Date?
 
     init(
         item: SonoicSourceItem,
         sections: [SonoicAppleMusicItemDetailSection] = [],
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil
     ) {
         self.item = item
         self.sections = sections
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
     }
 
     var isLoading: Bool {

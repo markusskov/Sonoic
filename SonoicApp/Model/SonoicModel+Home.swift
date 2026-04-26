@@ -55,6 +55,20 @@ extension SonoicModel {
         sourceSearchStates[source.service.id] ?? SonoicSourceSearchState(service: source.service)
     }
 
+    func recentSourceSearches(for source: SonoicSource) -> [SonoicRecentSourceSearch] {
+        recentSourceSearches.filter { $0.serviceID == source.service.id }
+    }
+
+    func clearRecentSourceSearches(for source: SonoicSource) {
+        let nextSearches = recentSourceSearches.filter { $0.serviceID != source.service.id }
+        guard nextSearches != recentSourceSearches else {
+            return
+        }
+
+        recentSourceSearches = nextSearches
+        settingsStore.saveRecentSourceSearches(nextSearches)
+    }
+
     func updateSourceSearchQuery(_ query: String, for source: SonoicSource) {
         let currentState = sourceSearchState(for: source)
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
@@ -66,12 +80,15 @@ extension SonoicModel {
 
     func updateSourceSearchScope(_ scope: SonoicSourceSearchScope, for source: SonoicSource) {
         let currentState = sourceSearchState(for: source)
+        let shouldPreserveResults = scope != currentState.scope && currentState.hasQuery && !currentState.items.isEmpty
+
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
             query: currentState.query,
             service: source.service,
             scope: scope,
-            items: scope == currentState.scope ? currentState.items : [],
-            status: scope == currentState.scope ? currentState.status : .idle
+            items: scope == currentState.scope || shouldPreserveResults ? currentState.items : [],
+            status: scope == currentState.scope || shouldPreserveResults ? currentState.status : .idle,
+            lastUpdatedAt: scope == currentState.scope || shouldPreserveResults ? currentState.lastUpdatedAt : nil
         )
     }
 
@@ -81,12 +98,15 @@ extension SonoicModel {
             updateSourceSearchQuery("", for: source)
             return
         }
+        let searchScope = currentState.scope
 
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
             query: query,
             service: source.service,
-            scope: currentState.scope,
-            status: .loading
+            scope: searchScope,
+            items: currentState.items,
+            status: .loading,
+            lastUpdatedAt: currentState.lastUpdatedAt
         )
 
         do {
@@ -95,37 +115,122 @@ extension SonoicModel {
             case .appleMusic:
                 refreshAppleMusicAuthorizationState()
                 guard appleMusicAuthorizationState.allowsCatalogSearch else {
+                    guard shouldApplySourceSearchResponse(
+                        serviceID: source.service.id,
+                        query: query,
+                        scope: searchScope
+                    ) else {
+                        return
+                    }
+
                     sourceSearchStates[source.service.id] = SonoicSourceSearchState(
                         query: query,
                         service: source.service,
-                        status: .failed(appleMusicAuthorizationState.detail)
+                        scope: searchScope,
+                        items: currentState.items,
+                        status: .failed(appleMusicAuthorizationState.detail),
+                        lastUpdatedAt: currentState.lastUpdatedAt
                     )
                     return
                 }
 
                 items = try await appleMusicCatalogSearchClient.searchCatalog(
                     term: query,
-                    scope: currentState.scope
+                    scope: searchScope
                 )
+                recordAppleMusicRequestSuccess()
             case .spotify, .sonosRadio, .genericStreaming:
                 items = []
+            }
+
+            guard shouldApplySourceSearchResponse(
+                serviceID: source.service.id,
+                query: query,
+                scope: searchScope
+            ) else {
+                return
             }
 
             sourceSearchStates[source.service.id] = SonoicSourceSearchState(
                 query: query,
                 service: source.service,
-                scope: currentState.scope,
+                scope: searchScope,
                 items: items,
-                status: .loaded
+                status: .loaded,
+                lastUpdatedAt: .now
             )
-        } catch {
+            recordRecentSourceSearch(query, for: source)
+        } catch where SonoicAppleMusicCatalogSearchClient.isCancellation(error) {
+            guard shouldApplySourceSearchResponse(
+                serviceID: source.service.id,
+                query: query,
+                scope: searchScope
+            ) else {
+                return
+            }
+
             sourceSearchStates[source.service.id] = SonoicSourceSearchState(
                 query: query,
                 service: source.service,
-                scope: currentState.scope,
-                status: .failed(error.localizedDescription)
+                scope: searchScope,
+                items: sourceSearchStates[source.service.id]?.items ?? currentState.items,
+                status: .idle,
+                lastUpdatedAt: sourceSearchStates[source.service.id]?.lastUpdatedAt ?? currentState.lastUpdatedAt
+            )
+        } catch {
+            guard shouldApplySourceSearchResponse(
+                serviceID: source.service.id,
+                query: query,
+                scope: searchScope
+            ) else {
+                return
+            }
+
+            sourceSearchStates[source.service.id] = SonoicSourceSearchState(
+                query: query,
+                service: source.service,
+                scope: searchScope,
+                items: sourceSearchStates[source.service.id]?.items ?? currentState.items,
+                status: .failed(
+                    appleMusicFailureDetail(from: error, endpointFamily: .search)
+                ),
+                lastUpdatedAt: sourceSearchStates[source.service.id]?.lastUpdatedAt ?? currentState.lastUpdatedAt
             )
         }
+    }
+
+    private func shouldApplySourceSearchResponse(
+        serviceID: String,
+        query: String,
+        scope: SonoicSourceSearchScope
+    ) -> Bool {
+        let state = sourceSearchStates[serviceID]
+        return state?.query.sonoicNonEmptyTrimmed == query && state?.scope == scope
+    }
+
+    private func recordRecentSourceSearch(_ query: String, for source: SonoicSource) {
+        guard let trimmedQuery = query.sonoicNonEmptyTrimmed else {
+            return
+        }
+
+        let recentSearch = SonoicRecentSourceSearch(
+            serviceID: source.service.id,
+            query: trimmedQuery,
+            searchedAt: .now
+        )
+        var nextSearches = recentSourceSearches.filter { $0.id != recentSearch.id }
+        nextSearches.insert(recentSearch, at: 0)
+
+        if nextSearches.count > Self.recentSourceSearchLimit {
+            nextSearches = Array(nextSearches.prefix(Self.recentSourceSearchLimit))
+        }
+
+        guard nextSearches != recentSourceSearches else {
+            return
+        }
+
+        recentSourceSearches = nextSearches
+        settingsStore.saveRecentSourceSearches(nextSearches)
     }
 
     func refreshHomeFavorites(showLoading: Bool = true) async {

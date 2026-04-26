@@ -3,7 +3,7 @@ import SwiftUI
 struct AppleMusicSourceHeader: View {
     let source: SonoicSource
     let authorizationState: SonoicAppleMusicAuthorizationState
-    let serviceDetails: SonoicAppleMusicServiceDetails
+    let requestAuthorization: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -12,102 +12,29 @@ struct AppleMusicSourceHeader: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text(authorizationState.detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            if !authorizationState.allowsCatalogSearch {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(authorizationState.title)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
 
-                AppleMusicStatusChips(
-                    authorizationState: authorizationState,
-                    serviceDetails: serviceDetails
-                )
+                    if authorizationState.canRequestAuthorization {
+                        Button(action: requestAuthorization) {
+                            Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
+                    }
+                }
+            } else if authorizationState.canRequestAuthorization {
+                Button(action: requestAuthorization) {
+                    Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct AppleMusicStatusChips: View {
-    let authorizationState: SonoicAppleMusicAuthorizationState
-    let serviceDetails: SonoicAppleMusicServiceDetails
-
-    var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                AppleMusicStatusChip(
-                    title: authorizationState.title,
-                    systemImage: authorizationState.systemImage,
-                    tint: authorizationState.allowsCatalogSearch ? .green : .secondary
-                )
-
-                AppleMusicStatusChip(
-                    title: storefrontTitle,
-                    systemImage: "globe",
-                    tint: .secondary
-                )
-
-                AppleMusicStatusChip(
-                    title: catalogPlaybackTitle,
-                    systemImage: "music.note",
-                    tint: .secondary
-                )
-
-                AppleMusicStatusChip(
-                    title: cloudLibraryTitle,
-                    systemImage: "icloud",
-                    tint: .secondary
-                )
-            }
-            .padding(.vertical, 1)
-        }
-        .scrollIndicators(.hidden)
-    }
-
-    private var storefrontTitle: String {
-        if serviceDetails.isLoading {
-            return "Loading"
-        }
-
-        return serviceDetails.storefrontCountryCode ?? "Storefront"
-    }
-
-    private var catalogPlaybackTitle: String {
-        switch serviceDetails.canPlayCatalogContent {
-        case .some(true):
-            "Catalog"
-        case .some(false):
-            "Preview Only"
-        case .none:
-            "Catalog"
-        }
-    }
-
-    private var cloudLibraryTitle: String {
-        switch serviceDetails.hasCloudLibraryEnabled {
-        case .some(true):
-            "Library"
-        case .some(false):
-            "No Library"
-        case .none:
-            "Library"
-        }
-    }
-}
-
-private struct AppleMusicStatusChip: View {
-    let title: String
-    let systemImage: String
-    let tint: Color
-
-    var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(tint)
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(.quaternary.opacity(0.45), in: Capsule())
     }
 }
 
@@ -119,8 +46,7 @@ struct AppleMusicLibrarySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Library",
-                subtitle: "Your saved Apple Music playlists, artists, albums, and songs."
+                title: "Library"
             )
 
             RoomSurfaceCard {
@@ -150,34 +76,72 @@ struct AppleMusicLibrarySection: View {
 
         return AppleMusicSourceNavigationRow.Model(
             title: destination.title,
-            subtitle: destination.subtitle,
             systemImage: destination.systemImage,
             badgeTitle: libraryBadgeTitle(for: state)
         )
     }
 
-    private func libraryBadgeTitle(for state: SonoicAppleMusicLibraryState) -> String {
+    private func libraryBadgeTitle(for state: SonoicAppleMusicLibraryState) -> String? {
         switch state.status {
         case .idle:
-            "Open"
+            nil
         case .loading:
             "Loading"
         case .loaded:
-            "\(state.items.count)"
+            state.items.isEmpty ? nil : "\(state.items.count)"
         case .failed:
             "Error"
         }
     }
 }
 
+struct AppleMusicSearchEntrySection: View {
+    let openSearch: () -> Void
+
+    var body: some View {
+        Button(action: openSearch) {
+            RoomSurfaceCard(isInteractive: true) {
+                HStack(spacing: 14) {
+                    RoomSurfaceIconView(
+                        systemImage: "magnifyingglass",
+                        size: 44,
+                        cornerRadius: 14,
+                        font: .body.weight(.semibold)
+                    )
+
+                    Text("Search Apple Music")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Search Apple Music")
+    }
+}
+
 struct AppleMusicDiscoverySection: View {
-    private let destinations = SonoicAppleMusicBrowseDestination.allCases
+    @Environment(SonoicModel.self) private var model
+
+    private let destinations: [SonoicAppleMusicBrowseDestination] = [
+        .popularRecommendations,
+        .categories,
+        .playlistsForYou,
+        .appleMusicPlaylists,
+        .radioShows
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Browse",
-                subtitle: "Catalog lanes for discovery, recommendations, and future Sonos-native starts."
+                title: "Browse"
             )
 
             RoomSurfaceCard {
@@ -205,9 +169,25 @@ struct AppleMusicDiscoverySection: View {
     ) -> AppleMusicSourceNavigationRow.Model {
         AppleMusicSourceNavigationRow.Model(
             title: destination.title,
-            subtitle: destination.subtitle,
-            systemImage: destination.systemImage
+            systemImage: destination.systemImage,
+            badgeTitle: browseBadgeTitle(for: model.appleMusicBrowseState(for: destination))
         )
+    }
+
+    private func browseBadgeTitle(for state: SonoicAppleMusicBrowseState) -> String? {
+        switch state.status {
+        case .idle:
+            return nil
+        case .loading:
+            return "Loading"
+        case .loaded:
+            let count = state.sections.reduce(state.genres.count) { total, section in
+                total + section.items.count
+            }
+            return count > 0 ? "\(count)" : nil
+        case .failed:
+            return "Error"
+        }
     }
 }
 
@@ -221,8 +201,7 @@ struct AppleMusicRecentlyAddedSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Recently Added",
-                subtitle: "Fresh Apple Music library metadata from your account."
+                title: "Recently Added"
             )
 
             content
@@ -231,13 +210,13 @@ struct AppleMusicRecentlyAddedSection: View {
 
     @ViewBuilder
     private var content: some View {
-        if state.isLoading {
+        if state.isLoading && state.items.isEmpty {
             AppleMusicRecentlyAddedMessageRow(
                 title: "Loading Library",
-                detail: "Reading recently added Apple Music items.",
+                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
-        } else if let failureDetail = state.failureDetail {
+        } else if let failureDetail = state.failureDetail, state.items.isEmpty {
             AppleMusicRecentlyAddedMessageRow(
                 title: "Could Not Load Recently Added",
                 detail: failureDetail,
@@ -245,11 +224,27 @@ struct AppleMusicRecentlyAddedSection: View {
             )
         } else if state.status == .loaded && state.items.isEmpty {
             AppleMusicRecentlyAddedMessageRow(
-                title: "No Recently Added Items",
-                detail: "Apple Music did not return recent library additions for this account.",
+                title: "No Items",
+                detail: "Nothing here yet.",
                 systemImage: "music.note.list"
             )
-        } else if state.status == .loaded {
+        } else if state.status == .loaded || !state.items.isEmpty {
+            if state.isLoading {
+                AppleMusicRecentlyAddedMessageRow(
+                    title: "Refreshing",
+                    detail: "Updating...",
+                    systemImage: "arrow.clockwise"
+                )
+            }
+
+            if let failureDetail = state.failureDetail {
+                AppleMusicRecentlyAddedMessageRow(
+                    title: "Showing Cached Recently Added",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+
             ScrollView(.horizontal) {
                 HStack(alignment: .top, spacing: 14) {
                     ForEach(state.items) { item in
@@ -261,6 +256,14 @@ struct AppleMusicRecentlyAddedSection: View {
             .scrollTargetBehavior(.viewAligned)
             .scrollIndicators(.hidden)
         }
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return failureDetail
+        }
+
+        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 }
 
@@ -353,7 +356,7 @@ private struct AppleMusicSourceNavigationRow: View {
         var title: String
         var subtitle: String?
         var systemImage: String
-        var badgeTitle = "Soon"
+        var badgeTitle: String?
         var showsChevron = true
 
         var id: String {
@@ -386,12 +389,14 @@ private struct AppleMusicSourceNavigationRow: View {
 
             Spacer(minLength: 0)
 
-            Text(row.badgeTitle)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(.quaternary.opacity(0.45), in: Capsule())
+            if let badgeTitle = row.badgeTitle {
+                Text(badgeTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(.quaternary.opacity(0.45), in: Capsule())
+            }
 
             if row.showsChevron {
                 Image(systemName: "chevron.right")
@@ -439,11 +444,6 @@ struct SourceItemRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-
-                Label(originTitle, systemImage: item.service.systemImage)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
 
             Spacer(minLength: 0)
@@ -461,19 +461,6 @@ struct SourceItemRow: View {
         }
     }
 
-    private var originTitle: String {
-        switch item.origin {
-        case .catalogSearch:
-            "Catalog"
-        case .favorite:
-            "Favorite"
-        case .library:
-            "Library"
-        case .recentPlay:
-            "Recent Play"
-        }
-    }
-
     private func playTapped() {
         Task {
             await playAction()
@@ -486,16 +473,8 @@ struct SourceItemNavigationRow: View {
 
     let item: SonoicSourceItem
 
-    private var playbackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicPlaybackCandidate(for: item)
-    }
-
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
-        guard playbackCandidate?.confidence == .exact else {
-            return nil
-        }
-
-        return playbackCandidate
+        model.appleMusicExactPlaybackCandidate(for: item)
     }
 
     var body: some View {
@@ -503,7 +482,7 @@ struct SourceItemNavigationRow: View {
             NavigationLink {
                 AppleMusicItemDetailView(item: item)
             } label: {
-                SourceItemMetadataRow(item: item, playbackCandidate: playbackCandidate)
+                SourceItemMetadataRow(item: item)
             }
             .buttonStyle(.plain)
 
@@ -530,9 +509,84 @@ struct SourceItemNavigationRow: View {
     }
 }
 
+struct SourceGroupedItemRows: View {
+    let items: [SonoicSourceItem]
+
+    private var sections: [SourceItemSection] {
+        SonoicSourceItem.Kind.searchResultOrder.compactMap { kind in
+            let sectionItems = items.filter { $0.kind == kind }
+
+            guard !sectionItems.isEmpty else {
+                return nil
+            }
+
+            return SourceItemSection(kind: kind, items: sectionItems)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ForEach(sections) { section in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(section.kind.pluralTitle)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    VStack(spacing: 0) {
+                        ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
+                            SourceItemNavigationRow(item: item)
+
+                            if index < section.items.count - 1 {
+                                Divider()
+                                    .padding(.leading, 76)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct SourceItemSection: Identifiable {
+    var kind: SonoicSourceItem.Kind
+    var items: [SonoicSourceItem]
+
+    var id: String {
+        kind.rawValue
+    }
+}
+
+private extension SonoicSourceItem.Kind {
+    static let searchResultOrder: [SonoicSourceItem.Kind] = [
+        .artist,
+        .song,
+        .album,
+        .playlist,
+        .station,
+        .unknown
+    ]
+
+    var pluralTitle: String {
+        switch self {
+        case .album:
+            "Albums"
+        case .artist:
+            "Artists"
+        case .playlist:
+            "Playlists"
+        case .song:
+            "Songs"
+        case .station:
+            "Stations"
+        case .unknown:
+            "Other"
+        }
+    }
+}
+
 private struct SourceItemMetadataRow: View {
     let item: SonoicSourceItem
-    let playbackCandidate: SonoicSonosPlaybackCandidate?
 
     var body: some View {
         HStack(spacing: 14) {
@@ -555,18 +609,6 @@ private struct SourceItemMetadataRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-
-                Label(originTitle, systemImage: item.service.systemImage)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if let playbackCandidate {
-                    Label(playbackCandidate.confidence.badgeTitle, systemImage: "checkmark.circle")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(playbackCandidate.confidence == .exact ? .green : .secondary)
-                        .lineLimit(1)
-                }
             }
 
             Spacer(minLength: 0)
@@ -575,194 +617,6 @@ private struct SourceItemMetadataRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var originTitle: String {
-        switch item.origin {
-        case .catalogSearch:
-            "Catalog"
-        case .favorite:
-            "Favorite"
-        case .library:
-            "Library"
-        case .recentPlay:
-            "Recent Play"
-        }
-    }
-}
-
-struct SourceSearchSection: View {
-    let serviceName: String
-    @Binding var query: String
-    let state: SonoicSourceSearchState
-    let availabilityMessage: SourceSearchAvailabilityMessage?
-    let search: () async -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: "Catalog",
-                subtitle: "Search Apple Music metadata. Playback stays Sonos-native until a playable payload exists."
-            )
-
-            RoomSurfaceCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 10) {
-                        SourceSearchField(
-                            query: $query,
-                            serviceName: serviceName,
-                            submit: searchTapped
-                        )
-
-                        Button(action: searchTapped) {
-                            if state.isSearching {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .frame(width: 20, height: 20)
-                            } else {
-                                Image(systemName: "arrow.right")
-                                    .font(.body.weight(.semibold))
-                                    .frame(width: 20, height: 20)
-                            }
-                        }
-                        .buttonStyle(.glass)
-                        .buttonBorderShape(.circle)
-                        .disabled(!state.hasQuery || state.isSearching)
-                        .accessibilityLabel("Search \(serviceName)")
-                    }
-
-                    if let availabilityMessage {
-                        SourceSearchMessageRow(
-                            title: availabilityMessage.title,
-                            detail: availabilityMessage.detail,
-                            systemImage: availabilityMessage.systemImage
-                        )
-                    } else if !state.hasQuery || state.status == .idle {
-                        SourceSearchIdleRow(serviceName: serviceName)
-                    } else if let failureDetail = state.failureDetail {
-                        SourceSearchMessageRow(
-                            title: "Search Failed",
-                            detail: failureDetail,
-                            systemImage: "exclamationmark.triangle"
-                        )
-                    } else if state.status == .loaded && state.items.isEmpty {
-                        SourceSearchMessageRow(
-                            title: "No Results",
-                            detail: "Apple Music did not return catalog matches for this search.",
-                            systemImage: "magnifyingglass"
-                        )
-                    } else {
-                        ForEach(state.items) { item in
-                            SourceItemNavigationRow(item: item)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func searchTapped() {
-        Task {
-            await search()
-        }
-    }
-}
-
-struct SourceSearchAvailabilityMessage: Equatable {
-    var title: String
-    var detail: String
-    var systemImage: String
-}
-
-private struct SourceSearchField: View {
-    @Binding var query: String
-    let serviceName: String
-    let submit: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.body.weight(.medium))
-                .foregroundStyle(.secondary)
-
-            TextField("Search \(serviceName)", text: $query)
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled(false)
-                .onSubmit(submit)
-
-            if query.sonoicNonEmptyTrimmed != nil {
-                Button(action: clearQuery) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(.quaternary.opacity(0.35), in: Capsule())
-        .frame(maxWidth: .infinity)
-    }
-
-    private func clearQuery() {
-        query = ""
-    }
-}
-
-private struct SourceSearchMessageRow: View {
-    let title: String
-    let detail: String
-    let systemImage: String
-
-    var body: some View {
-        HStack(spacing: 14) {
-            RoomSurfaceIconView(
-                systemImage: systemImage,
-                size: 44,
-                cornerRadius: 14,
-                font: .body.weight(.semibold)
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.body.weight(.medium))
-
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(.secondary)
-    }
-}
-
-private struct SourceSearchIdleRow: View {
-    let serviceName: String
-
-    var body: some View {
-        HStack(spacing: 14) {
-            RoomSurfaceIconView(
-                systemImage: "music.magnifyingglass",
-                size: 44,
-                cornerRadius: 14,
-                font: .body.weight(.semibold)
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(serviceName) Search")
-                    .font(.body.weight(.medium))
-
-                Text("Enter a search term to preview catalog metadata")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(.secondary)
-    }
 }
 
 struct SourceEmptyCard: View {
@@ -770,12 +624,8 @@ struct SourceEmptyCard: View {
 
     var body: some View {
         RoomSurfaceCard {
-            Label("No \(serviceName) Items Yet", systemImage: "music.note.list")
+            Label("No \(serviceName) Items", systemImage: "music.note.list")
                 .font(.headline)
-
-            Text("Favorites and recent plays from this source will appear here after Sonoic sees them on Sonos.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
     }
 }
@@ -786,8 +636,7 @@ struct SourceCatalogPlaceholderCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Catalog",
-                subtitle: "Search and service browsing will connect here later."
+                title: "Search"
             )
 
             RoomSurfaceCard {

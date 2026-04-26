@@ -73,18 +73,104 @@ struct SonoicAppleMusicPlaybackPayloadResolverTests {
         #expect(candidate.payload.kind == .collection)
     }
 
+    @Test
+    func rejectsSongWhenSubtitleIsMissing() {
+        let item = appleMusicItem(title: "Intro", subtitle: nil, kind: .song)
+        let favorite = favorite(
+            title: "Intro",
+            subtitle: "Artist One",
+            service: .appleMusic,
+            uri: "x-sonosapi-hls:song%3a456?sid=204",
+            kind: .item
+        )
+
+        #expect(resolver.candidates(for: item, favorites: [favorite]).isEmpty)
+    }
+
+    @Test
+    func rejectsSongFavoriteWhenFavoriteSubtitleIsMissing() {
+        let item = appleMusicItem(title: "Intro", subtitle: "Artist One • Album One", kind: .song)
+        let favorite = favorite(
+            title: "Intro",
+            subtitle: nil,
+            service: .appleMusic,
+            uri: "x-sonosapi-hls:song%3a456?sid=204",
+            kind: .item
+        )
+
+        #expect(resolver.candidates(for: item, favorites: [favorite]).isEmpty)
+    }
+
+    @Test
+    func returnsExactCandidateWhenFavoritePayloadContainsCatalogID() throws {
+        let item = appleMusicItem(
+            title: "Suspicious Minds",
+            subtitle: "Elvis Presley • From Elvis in Memphis",
+            kind: .song,
+            catalogID: "1440845464"
+        )
+        let favorite = favorite(
+            title: "Suspicious Minds",
+            subtitle: nil,
+            service: .appleMusic,
+            uri: "x-sonosapi-hls:song%3a1440845464?sid=204",
+            kind: .item
+        )
+
+        let candidate = try #require(resolver.candidates(for: item, favorites: [favorite]).first)
+
+        #expect(candidate.confidence == .exact)
+        #expect(candidate.payload.uri == favorite.playbackURI)
+    }
+
+    @Test
+    func avoidsExactSongMatchWhenOnlyAlbumOverlaps() throws {
+        let item = appleMusicItem(
+            title: "Intro",
+            subtitle: "Artist One • Shared Album",
+            kind: .song
+        )
+        let favorite = favorite(
+            title: "Intro",
+            subtitle: "Shared Album",
+            service: .appleMusic,
+            uri: "x-sonosapi-hls:song%3a789?sid=204",
+            kind: .item
+        )
+
+        let candidate = try #require(resolver.candidates(for: item, favorites: [favorite]).first)
+
+        #expect(candidate.confidence == .likely)
+    }
+
+    @Test
+    func rejectsSameTitleWithDifferentKindAndNoSubtitleMatch() {
+        let item = appleMusicItem(title: "Road Trip", subtitle: "Garrett Kato", kind: .song)
+        let favorite = favorite(
+            title: "Road Trip",
+            subtitle: "Road Trip Playlist",
+            service: .appleMusic,
+            uri: "x-rincon-cpcontainer:1006206cplaylist%3a123?sid=204",
+            kind: .collection
+        )
+
+        #expect(resolver.candidates(for: item, favorites: [favorite]).isEmpty)
+    }
+
     private func appleMusicItem(
         title: String,
         subtitle: String?,
-        kind: SonoicSourceItem.Kind
+        kind: SonoicSourceItem.Kind,
+        catalogID: String? = nil
     ) -> SonoicSourceItem {
         SonoicSourceItem.appleMusicMetadata(
-            id: "catalog-\(title)",
+            id: catalogID ?? "catalog-\(title)",
             title: title,
             subtitle: subtitle,
             artworkURL: nil,
             kind: kind,
-            origin: .catalogSearch
+            origin: .catalogSearch,
+            catalogID: catalogID
         )
     }
 

@@ -19,20 +19,19 @@ struct SettingsView: View {
 
             if model.hasManualSonosHost {
                 SettingsSelectedPlayerSection(model: model)
-                SettingsStatusSection(
-                    model: model,
-                    playerRefreshDetail: playerRefreshDetail,
-                    playerRefreshTint: playerRefreshTint,
-                    identityStatusDetail: identityStatusDetail,
-                    topologyStatusDetail: topologyStatusDetail,
-                    dataStatusTint: tint(for:)
-                )
-                SettingsRefreshTimingSection(model: model, refreshTimingText: refreshTimingText(for:))
-                SettingsPlaybackDiagnosticsSection(model: model)
-                SettingsNowPlayingDiagnosticsSection(model: model, refreshTimingText: refreshTimingText(for:))
             } else {
                 SettingsEmptySelectionSection()
             }
+
+            SettingsAdvancedNavigationSection(
+                model: model,
+                playerRefreshDetail: playerRefreshDetail,
+                playerRefreshTint: playerRefreshTint,
+                identityStatusDetail: identityStatusDetail,
+                topologyStatusDetail: topologyStatusDetail,
+                dataStatusTint: tint(for:),
+                refreshTimingText: refreshTimingText(for:)
+            )
         }
         .miniPlayerContentInset()
         .navigationTitle("Settings")
@@ -45,10 +44,8 @@ struct SettingsView: View {
     }
 
     private var discoveryStatusDetail: String? {
-        if let lastSonosDiscoveryRefreshAt = model.lastSonosDiscoveryRefreshAt,
-           !model.isSonosDiscoveryRefreshing
-        {
-            return "\(model.roomDiscoveryStatus.detail) Last updated \(lastSonosDiscoveryRefreshAt.formatted(.dateTime.hour().minute()))."
+        guard case .failed = model.roomDiscoveryStatus else {
+            return nil
         }
 
         return model.roomDiscoveryStatus.detail
@@ -131,6 +128,38 @@ struct SettingsView: View {
         }
 
         return date.formatted(.dateTime.hour().minute().second())
+    }
+}
+
+struct SettingsAdvancedView: View {
+    let model: SonoicModel
+    let playerRefreshDetail: String?
+    let playerRefreshTint: Color
+    let identityStatusDetail: String?
+    let topologyStatusDetail: String?
+    let dataStatusTint: (SonosRoomDataStatus) -> Color
+    let refreshTimingText: (Date?) -> String
+
+    var body: some View {
+        Form {
+            SettingsAdvancedMusicServicesSection(model: model)
+
+            if model.hasManualSonosHost {
+                SettingsStatusSection(
+                    model: model,
+                    playerRefreshDetail: playerRefreshDetail,
+                    playerRefreshTint: playerRefreshTint,
+                    identityStatusDetail: identityStatusDetail,
+                    topologyStatusDetail: topologyStatusDetail,
+                    dataStatusTint: dataStatusTint
+                )
+                SettingsRefreshTimingSection(model: model, refreshTimingText: refreshTimingText)
+                SettingsPlaybackDiagnosticsSection(model: model)
+                SettingsNowPlayingDiagnosticsSection(model: model, refreshTimingText: refreshTimingText)
+            }
+        }
+        .miniPlayerContentInset()
+        .navigationTitle("Advanced")
     }
 }
 
