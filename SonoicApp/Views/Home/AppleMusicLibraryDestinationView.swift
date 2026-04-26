@@ -120,7 +120,10 @@ struct AppleMusicLibraryDestinationView: View {
     }
 
     private var sectionSubtitle: String {
-        let base = "Apple Music library metadata. These are not Sonos-playable yet."
+        let base = [
+            "Showing \(state.items.count) items from the first Apple Music library page.",
+            "Sonoic still needs Sonos-native payloads before playback."
+        ].joined(separator: " ")
 
         guard let lastUpdatedAt = state.lastUpdatedAt else {
             return base

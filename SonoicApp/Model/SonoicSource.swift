@@ -483,6 +483,15 @@ enum SonoicAppleMusicLibraryDestination: String, CaseIterable, Identifiable, Equ
             "music.note"
         }
     }
+
+    var initialLoadLimit: Int {
+        switch self {
+        case .playlists, .albums:
+            24
+        case .artists, .songs:
+            50
+        }
+    }
 }
 
 enum SonoicAppleMusicBrowseDestination: String, CaseIterable, Identifiable, Equatable {

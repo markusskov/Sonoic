@@ -336,13 +336,13 @@ extension SonoicModel {
     ) async throws -> [SonoicSourceItem] {
         switch destination {
         case .playlists:
-            try await appleMusicCatalogSearchClient.fetchLibraryPlaylists()
+            try await appleMusicCatalogSearchClient.fetchLibraryPlaylists(limit: destination.initialLoadLimit)
         case .albums:
-            try await appleMusicCatalogSearchClient.fetchLibraryAlbums()
+            try await appleMusicCatalogSearchClient.fetchLibraryAlbums(limit: destination.initialLoadLimit)
         case .songs:
-            try await appleMusicCatalogSearchClient.fetchLibrarySongs()
+            try await appleMusicCatalogSearchClient.fetchLibrarySongs(limit: destination.initialLoadLimit)
         case .artists:
-            try await appleMusicCatalogSearchClient.fetchLibraryArtists()
+            try await appleMusicCatalogSearchClient.fetchLibraryArtists(limit: destination.initialLoadLimit)
         }
     }
 
