@@ -61,17 +61,33 @@ struct AppleMusicBrowseDestinationView: View {
                 detail: "Reading Apple Music catalog metadata.",
                 systemImage: "icloud.and.arrow.down"
             )
-        } else if let failureDetail = state.failureDetail {
+        } else if let failureDetail = state.failureDetail, state.sections.isEmpty && state.genres.isEmpty {
             AppleMusicBrowseMessageCard(
                 title: "Could Not Load \(destination.title)",
                 detail: failureDetail,
                 systemImage: "exclamationmark.triangle"
             )
         } else if !state.sections.isEmpty {
+            if let failureDetail = state.failureDetail {
+                AppleMusicBrowseMessageCard(
+                    title: "Showing Cached \(destination.title)",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+
             ForEach(state.sections) { section in
                 AppleMusicBrowseSectionView(section: section)
             }
         } else if !state.genres.isEmpty {
+            if let failureDetail = state.failureDetail {
+                AppleMusicBrowseMessageCard(
+                    title: "Showing Cached Categories",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+
             AppleMusicBrowseGenreSection(genres: state.genres)
         } else {
             AppleMusicBrowseMessageCard(
@@ -84,6 +100,14 @@ struct AppleMusicBrowseDestinationView: View {
 
     private func refreshTapped() {
         model.loadAppleMusicBrowseDestination(destination, force: true)
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return failureDetail
+        }
+
+        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 }
 

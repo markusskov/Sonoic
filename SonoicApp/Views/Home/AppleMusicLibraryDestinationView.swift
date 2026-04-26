@@ -61,7 +61,7 @@ struct AppleMusicLibraryDestinationView: View {
                 detail: "Reading your Apple Music library metadata.",
                 systemImage: "icloud.and.arrow.down"
             )
-        } else if let failureDetail = state.failureDetail {
+        } else if let failureDetail = state.failureDetail, state.items.isEmpty {
             AppleMusicLibraryMessageCard(
                 title: "Could Not Load \(destination.title)",
                 detail: failureDetail,
@@ -73,7 +73,7 @@ struct AppleMusicLibraryDestinationView: View {
                 detail: "Apple Music did not return saved \(destination.title.lowercased()) for this library.",
                 systemImage: "music.note.list"
             )
-        } else if state.status == .loaded {
+        } else if state.status == .loaded || !state.items.isEmpty {
             libraryItemsSection
         } else {
             AppleMusicLibraryMessageCard(
@@ -89,8 +89,16 @@ struct AppleMusicLibraryDestinationView: View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: destination.title,
-                subtitle: "Apple Music library metadata. These are not Sonos-playable yet."
+                subtitle: sectionSubtitle
             )
+
+            if let failureDetail = state.failureDetail {
+                AppleMusicLibraryMessageCard(
+                    title: "Showing Cached \(destination.title)",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
 
             if destination == .songs {
                 RoomSurfaceCard {
@@ -109,6 +117,24 @@ struct AppleMusicLibraryDestinationView: View {
                 AppleMusicLibraryGrid(items: state.items)
             }
         }
+    }
+
+    private var sectionSubtitle: String {
+        let base = "Apple Music library metadata. These are not Sonos-playable yet."
+
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return base
+        }
+
+        return "\(base) Updated \(lastUpdatedAt.formatted(.dateTime.hour().minute()))."
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return failureDetail
+        }
+
+        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 
     private func refreshTapped() {

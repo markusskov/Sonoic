@@ -87,7 +87,9 @@ extension SonoicModel {
             query: query,
             service: source.service,
             scope: searchScope,
-            status: .loading
+            items: currentState.items,
+            status: .loading,
+            lastUpdatedAt: currentState.lastUpdatedAt
         )
 
         do {
@@ -108,7 +110,9 @@ extension SonoicModel {
                         query: query,
                         service: source.service,
                         scope: searchScope,
-                        status: .failed(appleMusicAuthorizationState.detail)
+                        items: currentState.items,
+                        status: .failed(appleMusicAuthorizationState.detail),
+                        lastUpdatedAt: currentState.lastUpdatedAt
                     )
                     return
                 }
@@ -135,7 +139,8 @@ extension SonoicModel {
                 service: source.service,
                 scope: searchScope,
                 items: items,
-                status: .loaded
+                status: .loaded,
+                lastUpdatedAt: .now
             )
         } catch {
             guard shouldApplySourceSearchResponse(
@@ -150,9 +155,11 @@ extension SonoicModel {
                 query: query,
                 service: source.service,
                 scope: searchScope,
+                items: sourceSearchStates[source.service.id]?.items ?? currentState.items,
                 status: .failed(
                     appleMusicFailureDetail(from: error, endpointFamily: .search)
-                )
+                ),
+                lastUpdatedAt: sourceSearchStates[source.service.id]?.lastUpdatedAt ?? currentState.lastUpdatedAt
             )
         }
     }

@@ -153,11 +153,13 @@ struct SearchResultsSection: View {
                         SearchMessageRow(
                             message: SearchMessage(
                                 title: "Search Failed",
-                                detail: failureDetail,
+                                detail: staleDetail(failureDetail),
                                 systemImage: "exclamationmark.triangle"
                             )
                         )
-                    } else if state.status == .loaded && state.items.isEmpty {
+                    }
+
+                    if state.status == .loaded && state.items.isEmpty {
                         SearchMessageRow(
                             message: SearchMessage(
                                 title: "No Results",
@@ -165,7 +167,7 @@ struct SearchResultsSection: View {
                                 systemImage: "magnifyingglass"
                             )
                         )
-                    } else {
+                    } else if !state.items.isEmpty {
                         ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
                             SourceItemNavigationRow(item: item)
 
@@ -178,6 +180,16 @@ struct SearchResultsSection: View {
                 }
             }
         }
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard !state.items.isEmpty,
+              let lastUpdatedAt = state.lastUpdatedAt
+        else {
+            return failureDetail
+        }
+
+        return "Showing previous results from \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 }
 

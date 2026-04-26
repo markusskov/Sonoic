@@ -57,7 +57,7 @@ struct AppleMusicItemDetailView: View {
                 detail: "Reading Apple Music metadata.",
                 systemImage: "icloud.and.arrow.down"
             )
-        } else if let failureDetail = state.failureDetail {
+        } else if let failureDetail = state.failureDetail, state.sections.isEmpty {
             AppleMusicItemDetailMessageCard(
                 title: "Could Not Load Details",
                 detail: failureDetail,
@@ -70,10 +70,26 @@ struct AppleMusicItemDetailView: View {
                 systemImage: item.kind.systemImage
             )
         } else {
+            if let failureDetail = state.failureDetail {
+                AppleMusicItemDetailMessageCard(
+                    title: "Showing Cached Details",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+
             ForEach(state.sections) { section in
                 AppleMusicItemDetailSectionView(section: section)
             }
         }
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return failureDetail
+        }
+
+        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 
     private func refreshTapped() {

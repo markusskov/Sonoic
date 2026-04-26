@@ -337,18 +337,21 @@ struct SonoicSourceSearchState: Equatable {
     var scope: SonoicSourceSearchScope
     var items: [SonoicSourceItem]
     var status: Status
+    var lastUpdatedAt: Date?
 
     init(
         query: String = "",
         service: SonosServiceDescriptor,
         scope: SonoicSourceSearchScope = .all,
         items: [SonoicSourceItem]? = nil,
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil
     ) {
         self.query = query
         self.scope = scope
         self.items = items ?? []
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
     }
 
     var hasQuery: Bool {
@@ -550,15 +553,18 @@ struct SonoicAppleMusicLibraryState: Equatable {
     var destination: SonoicAppleMusicLibraryDestination
     var items: [SonoicSourceItem]
     var status: Status
+    var lastUpdatedAt: Date?
 
     init(
         destination: SonoicAppleMusicLibraryDestination,
         items: [SonoicSourceItem] = [],
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil
     ) {
         self.destination = destination
         self.items = items
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
     }
 
     var isLoading: Bool {
@@ -584,13 +590,16 @@ struct SonoicAppleMusicRecentlyAddedState: Equatable {
 
     var items: [SonoicSourceItem]
     var status: Status
+    var lastUpdatedAt: Date?
 
     init(
         items: [SonoicSourceItem] = [],
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil
     ) {
         self.items = items
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
     }
 
     var isLoading: Bool {
@@ -618,17 +627,20 @@ struct SonoicAppleMusicBrowseState: Equatable {
     var sections: [SonoicAppleMusicItemDetailSection]
     var genres: [SonoicAppleMusicGenreItem]
     var status: Status
+    var lastUpdatedAt: Date?
 
     init(
         destination: SonoicAppleMusicBrowseDestination,
         sections: [SonoicAppleMusicItemDetailSection] = [],
         genres: [SonoicAppleMusicGenreItem] = [],
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil
     ) {
         self.destination = destination
         self.sections = sections
         self.genres = genres
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
     }
 
     var isLoading: Bool {
@@ -664,15 +676,18 @@ struct SonoicAppleMusicItemDetailState: Equatable {
     var item: SonoicSourceItem
     var sections: [SonoicAppleMusicItemDetailSection]
     var status: Status
+    var lastUpdatedAt: Date?
 
     init(
         item: SonoicSourceItem,
         sections: [SonoicAppleMusicItemDetailSection] = [],
-        status: Status = .idle
+        status: Status = .idle,
+        lastUpdatedAt: Date? = nil
     ) {
         self.item = item
         self.sections = sections
         self.status = status
+        self.lastUpdatedAt = lastUpdatedAt
     }
 
     var isLoading: Bool {

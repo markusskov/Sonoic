@@ -256,7 +256,7 @@ struct AppleMusicRecentlyAddedSection: View {
                 detail: "Reading recently added Apple Music items.",
                 systemImage: "icloud.and.arrow.down"
             )
-        } else if let failureDetail = state.failureDetail {
+        } else if let failureDetail = state.failureDetail, state.items.isEmpty {
             AppleMusicRecentlyAddedMessageRow(
                 title: "Could Not Load Recently Added",
                 detail: failureDetail,
@@ -268,7 +268,15 @@ struct AppleMusicRecentlyAddedSection: View {
                 detail: "Apple Music did not return recent library additions for this account.",
                 systemImage: "music.note.list"
             )
-        } else if state.status == .loaded {
+        } else if state.status == .loaded || !state.items.isEmpty {
+            if let failureDetail = state.failureDetail {
+                AppleMusicRecentlyAddedMessageRow(
+                    title: "Showing Cached Recently Added",
+                    detail: staleDetail(failureDetail),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+
             ScrollView(.horizontal) {
                 HStack(alignment: .top, spacing: 14) {
                     ForEach(state.items) { item in
@@ -280,6 +288,14 @@ struct AppleMusicRecentlyAddedSection: View {
             .scrollTargetBehavior(.viewAligned)
             .scrollIndicators(.hidden)
         }
+    }
+
+    private func staleDetail(_ failureDetail: String) -> String {
+        guard let lastUpdatedAt = state.lastUpdatedAt else {
+            return failureDetail
+        }
+
+        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 }
 

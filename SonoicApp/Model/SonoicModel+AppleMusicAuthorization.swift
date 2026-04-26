@@ -76,7 +76,11 @@ extension SonoicModel {
         }
 
         appleMusicRecentlyAddedLoadTask?.cancel()
-        appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(status: .loading)
+        appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(
+            items: appleMusicRecentlyAddedState.items,
+            status: .loading,
+            lastUpdatedAt: appleMusicRecentlyAddedState.lastUpdatedAt
+        )
 
         appleMusicRecentlyAddedLoadTask = Task { [weak self] in
             guard let self else {
@@ -91,7 +95,8 @@ extension SonoicModel {
 
                 self.appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(
                     items: items,
-                    status: .loaded
+                    status: .loaded,
+                    lastUpdatedAt: .now
                 )
                 self.recordAppleMusicRequestSuccess()
             } catch is CancellationError {
@@ -100,9 +105,11 @@ extension SonoicModel {
                 }
             } catch {
                 self.appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState(
+                    items: self.appleMusicRecentlyAddedState.items,
                     status: .failed(
                         self.appleMusicFailureDetail(from: error, endpointFamily: .recentlyAdded)
-                    )
+                    ),
+                    lastUpdatedAt: self.appleMusicRecentlyAddedState.lastUpdatedAt
                 )
             }
 
@@ -130,7 +137,13 @@ extension SonoicModel {
         }
 
         appleMusicBrowseLoadTasks[destination]?.cancel()
-        appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(destination: destination, status: .loading)
+        appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(
+            destination: destination,
+            sections: currentState.sections,
+            genres: currentState.genres,
+            status: .loading,
+            lastUpdatedAt: currentState.lastUpdatedAt
+        )
 
         appleMusicBrowseLoadTasks[destination] = Task { [weak self] in
             guard let self else {
@@ -143,7 +156,13 @@ extension SonoicModel {
                     return
                 }
 
-                self.appleMusicBrowseStates[destination] = state
+                self.appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(
+                    destination: destination,
+                    sections: state.sections,
+                    genres: state.genres,
+                    status: state.status,
+                    lastUpdatedAt: .now
+                )
                 self.recordAppleMusicRequestSuccess()
             } catch is CancellationError {
                 if self.appleMusicBrowseState(for: destination).isLoading {
@@ -152,9 +171,12 @@ extension SonoicModel {
             } catch {
                 self.appleMusicBrowseStates[destination] = SonoicAppleMusicBrowseState(
                     destination: destination,
+                    sections: self.appleMusicBrowseState(for: destination).sections,
+                    genres: self.appleMusicBrowseState(for: destination).genres,
                     status: .failed(
                         self.appleMusicFailureDetail(from: error, endpointFamily: .browse)
-                    )
+                    ),
+                    lastUpdatedAt: self.appleMusicBrowseState(for: destination).lastUpdatedAt
                 )
             }
 
@@ -193,7 +215,12 @@ extension SonoicModel {
         }
 
         appleMusicItemDetailLoadTasks[detailCacheKey]?.cancel()
-        appleMusicItemDetailStates[detailCacheKey] = SonoicAppleMusicItemDetailState(item: item, status: .loading)
+        appleMusicItemDetailStates[detailCacheKey] = SonoicAppleMusicItemDetailState(
+            item: item,
+            sections: currentState.sections,
+            status: .loading,
+            lastUpdatedAt: currentState.lastUpdatedAt
+        )
 
         appleMusicItemDetailLoadTasks[detailCacheKey] = Task { [weak self] in
             guard let self else {
@@ -209,7 +236,8 @@ extension SonoicModel {
                 self.appleMusicItemDetailStates[detailCacheKey] = SonoicAppleMusicItemDetailState(
                     item: item,
                     sections: sections,
-                    status: .loaded
+                    status: .loaded,
+                    lastUpdatedAt: .now
                 )
                 self.recordAppleMusicRequestSuccess()
             } catch is CancellationError {
@@ -219,9 +247,11 @@ extension SonoicModel {
             } catch {
                 self.appleMusicItemDetailStates[detailCacheKey] = SonoicAppleMusicItemDetailState(
                     item: item,
+                    sections: self.appleMusicItemDetailState(for: item).sections,
                     status: .failed(
                         self.appleMusicFailureDetail(from: error, endpointFamily: .itemDetail)
-                    )
+                    ),
+                    lastUpdatedAt: self.appleMusicItemDetailState(for: item).lastUpdatedAt
                 )
             }
 
@@ -257,7 +287,12 @@ extension SonoicModel {
         }
 
         appleMusicLibraryLoadTasks[destination]?.cancel()
-        appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(destination: destination, status: .loading)
+        appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(
+            destination: destination,
+            items: currentState.items,
+            status: .loading,
+            lastUpdatedAt: currentState.lastUpdatedAt
+        )
 
         appleMusicLibraryLoadTasks[destination] = Task { [weak self] in
             guard let self else {
@@ -273,7 +308,8 @@ extension SonoicModel {
                 self.appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(
                     destination: destination,
                     items: items,
-                    status: .loaded
+                    status: .loaded,
+                    lastUpdatedAt: .now
                 )
                 self.recordAppleMusicRequestSuccess()
             } catch is CancellationError {
@@ -283,9 +319,11 @@ extension SonoicModel {
             } catch {
                 self.appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(
                     destination: destination,
+                    items: self.appleMusicLibraryState(for: destination).items,
                     status: .failed(
                         self.appleMusicFailureDetail(from: error, endpointFamily: .library)
-                    )
+                    ),
+                    lastUpdatedAt: self.appleMusicLibraryState(for: destination).lastUpdatedAt
                 )
             }
 
