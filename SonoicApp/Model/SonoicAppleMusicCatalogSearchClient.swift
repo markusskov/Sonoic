@@ -2,6 +2,10 @@ import Foundation
 @preconcurrency import MusicKit
 
 struct SonoicAppleMusicCatalogSearchClient {
+    private static let allSearchItemLimitPerGroup = 6
+    private static let allSearchTotalLimit = 24
+    private static let scopedSearchLimit = 24
+
     enum ClientError: LocalizedError {
         case unauthorized(MusicAuthorization.Status)
         case requestFailed(SonoicAppleMusicRequestFailure)
@@ -52,7 +56,13 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
 
         do {
-            return try await requestGate.searchCatalog(term: term, scope: scope, limit: 12).map(sourceItem)
+            return try await requestGate.searchCatalog(
+                term: term,
+                scope: scope,
+                limit: searchRequestLimit(for: scope),
+                totalLimit: searchTotalLimit(for: scope)
+            )
+            .map(sourceItem)
         } catch {
             throw mappedMusicKitError(error, endpointFamily: .search)
         }
@@ -245,6 +255,24 @@ struct SonoicAppleMusicCatalogSearchClient {
                 endpointFamily: endpointFamily
             )
         )
+    }
+
+    private func searchRequestLimit(for scope: SonoicSourceSearchScope) -> Int {
+        switch scope {
+        case .all:
+            Self.allSearchItemLimitPerGroup
+        case .songs, .artists, .albums, .playlists:
+            Self.scopedSearchLimit
+        }
+    }
+
+    private func searchTotalLimit(for scope: SonoicSourceSearchScope) -> Int {
+        switch scope {
+        case .all:
+            Self.allSearchTotalLimit
+        case .songs, .artists, .albums, .playlists:
+            Self.scopedSearchLimit
+        }
     }
 
     private func mappedMusicKitError(

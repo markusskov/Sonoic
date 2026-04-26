@@ -21,7 +21,8 @@ actor SonoicMusicKitRequestGate {
     func searchCatalog(
         term: String,
         scope: SonoicSourceSearchScope = .all,
-        limit: Int
+        limit: Int,
+        totalLimit: Int
     ) async throws -> [AppleMusicItemMetadata] {
         var request = MusicCatalogSearchRequest(
             term: term,
@@ -84,13 +85,14 @@ actor SonoicMusicKitRequestGate {
         }
 
         if scope == .all {
-            return AppleMusicSearchResultBalancer.balancedItems(
-                groups: [songs, albums, artists, playlists],
-                limit: limit
+            return AppleMusicSearchResultBalancer.groupedItems(
+                groups: [artists, songs, albums, playlists],
+                itemLimitPerGroup: limit,
+                totalLimit: totalLimit
             )
         }
 
-        return Array((songs + albums + artists + playlists).prefix(limit))
+        return Array((songs + albums + artists + playlists).prefix(totalLimit))
     }
 
     func fetchLibraryAlbums(limit: Int, offset: Int? = nil) async throws -> AppleMusicItemMetadataPage {
@@ -323,7 +325,7 @@ actor SonoicMusicKitRequestGate {
     private func fetchArtistSearchFallbackSections(
         for artistName: String
     ) async throws -> [AppleMusicItemMetadataSection] {
-        let results = try await searchCatalog(term: artistName, limit: 16)
+        let results = try await searchCatalog(term: artistName, limit: 16, totalLimit: 16)
         let songs = Array(results.filter { $0.kind == .song }.prefix(8))
         let albums = Array(results.filter { $0.kind == .album }.prefix(8))
         var sections: [AppleMusicItemMetadataSection] = []

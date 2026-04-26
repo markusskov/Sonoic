@@ -55,6 +55,30 @@ nonisolated struct AppleMusicItemMetadataPage: Sendable {
 }
 
 nonisolated enum AppleMusicSearchResultBalancer {
+    static func groupedItems(
+        groups: [[AppleMusicItemMetadata]],
+        itemLimitPerGroup: Int,
+        totalLimit: Int
+    ) -> [AppleMusicItemMetadata] {
+        guard itemLimitPerGroup > 0, totalLimit > 0 else {
+            return []
+        }
+
+        var items: [AppleMusicItemMetadata] = []
+        items.reserveCapacity(totalLimit)
+
+        for group in groups {
+            guard items.count < totalLimit else {
+                break
+            }
+
+            let remainingItemCount = totalLimit - items.count
+            items.append(contentsOf: group.prefix(min(itemLimitPerGroup, remainingItemCount)))
+        }
+
+        return items
+    }
+
     static func balancedItems(
         groups: [[AppleMusicItemMetadata]],
         limit: Int
