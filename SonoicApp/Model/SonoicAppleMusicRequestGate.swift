@@ -2,6 +2,8 @@ import Foundation
 @preconcurrency import MusicKit
 
 actor SonoicMusicKitRequestGate {
+    private static let artistArtworkFallbackLimit = 12
+
     private var cachedStorefrontCountryCode: String?
 
     func fetchServiceDetails() async throws -> AppleMusicServiceMetadata {
@@ -145,7 +147,12 @@ actor SonoicMusicKitRequestGate {
             )
         }
 
-        for index in artists.indices where artists[index].artworkURL == nil {
+        let artworkFallbackIndices = artists.indices
+            .filter { artists[$0].artworkURL == nil }
+            .prefix(Self.artistArtworkFallbackLimit)
+
+        for index in artworkFallbackIndices {
+            try Task.checkCancellation()
             artists[index].artworkURL = try? await fetchCatalogArtistArtworkURL(
                 artistName: artists[index].title,
                 width: 400,
