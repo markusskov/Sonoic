@@ -17,7 +17,7 @@ Implemented so far:
 - real mini-player and draggable player sheet
 - real local Sonos `play/pause`, `next`, `previous`, `mute`, volume, and seek
 - real now-playing title, artist, album, source, artwork, duration, and progress reads
-- now-playing diagnostics for raw Sonos metadata, transport URI, duration, and elapsed-time behavior
+- Advanced now-playing inspection for raw Sonos metadata, transport URI, duration, and elapsed-time behavior
 - manual playback transition smoothing so local progress does not run ahead before Sonos confirms `PLAYING`
 - discovery-backed Sonos room selection through Bonjour and household topology
 - real group awareness for current Sonos groups and group coordinator selection
@@ -27,13 +27,13 @@ Implemented so far:
 - App Group-backed artwork cache and shared state store
 - manual host fallback through `Settings`
 - `Rooms` surface for the selected room or group, discovered groups, discovered room list, bonded setup, discovery refresh state, and home theater entry point
-- `Settings` focused on manual player setup and diagnostics
+- `Settings` focused on quiet everyday configuration, with manual setup and diagnostics behind Advanced
 - lightweight foreground polling for playback, metadata, volume, and mute
 - stale-state handling for outside-app state
 - native Apple now-playing integration for playback commands, artwork, progress, and lock-screen scrubbing when duration is available
-- home theater controls for EQ, sub level, speech enhancement, night sound, and TV audio diagnostics
+- home theater controls for EQ, sub level, speech enhancement, and night sound; TV audio details stay behind Advanced until they become useful controls
 - Swift Testing target for focused Sonos parser coverage
-- Apple Music source surface with authorization diagnostics, catalog search, saved playlists/artists/albums/songs, recently added library metadata, search/library item detail pages, and structured Browse destinations
+- Apple Music source surface with quiet authorization state, catalog search, saved playlists/artists/albums/songs, recently added library items, search/library item detail pages, and structured Browse destinations
 - explicit playback capability states so service metadata does not pretend to be Sonos-playable until Sonoic has a Sonos-native payload
 
 ## Architecture Guardrails
@@ -48,6 +48,7 @@ Principles:
 - prefer concrete types over broad protocol scaffolding
 - add new folders only when a feature becomes real
 - avoid “foundation” rewrites that are not tied to user-visible progress
+- keep the main UI quiet: short labels, obvious actions, and no diagnostic explanations outside Advanced
 
 In practice:
 
@@ -89,13 +90,13 @@ The next work here should be careful:
 - verify queue editing during transitions and grouped playback
 - verify lock-screen scrubbing and progress across services
 - verify home theater controls across products with and without Sub, surrounds, speech enhancement, and night sound
-- keep diagnostics useful without turning them into product clutter
+- keep diagnostics behind Advanced so the main UI stays quiet
 
 ### 2. Expand music sources from Home
 
 Home now has enough gravity to become the center of Sonoic.
 
-Apple Music V1 is now a real metadata surface. It can search Apple Music, browse saved library lanes, open item details, and show recently added library content. Playback still stays honest: only Sonos-native favorites can start playback today.
+Apple Music V1 is now a real service surface. It can search Apple Music, browse saved library lanes, open item details, and show recently added library content. Search should feel like one search with grouped results, not a mode picker. Playback still stays honest: only Sonos-native favorites can start playback today.
 
 The next meaningful work here is:
 
@@ -104,7 +105,7 @@ The next meaningful work here is:
 - decide whether Apple Music library playlists/albums can be mapped safely into Sonos queue/session starts
 - keep Spotify as a separate integration path because Spotify iOS SDK/App Remote is app-owned control, not Sonos-native playback
 - add queue-derived actions from recent plays, favorites, and service metadata once payload ownership is clear
-- keep capability labels visible until each item has a trustworthy playback path
+- keep playback affordances visible only when each item has a trustworthy playback path
 
 ### 3. Make Queue a creation surface
 
@@ -135,7 +136,7 @@ The first home theater path is real. It should now get product polish and more d
 Next slices:
 
 - better capability descriptions for unsupported controls
-- stronger TV audio diagnostics if more HTControl state proves available
+- move TV audio inspection into Advanced if more HTControl state proves available
 - product-specific tuning for Arc, Beam, Ray, Amp, Sub, and surround setups
 - fast room switching without stale theater state
 
@@ -148,7 +149,7 @@ These are real project decisions, but they do not all need to be answered right 
 - How far should Sonoic go into service-native browsing before it starts duplicating the Sonos app?
 - Which Apple Music API lanes are worth making first: recently added, charts, editorial playlists, recommendations, or category browsing?
 - What is the smallest reliable Sonos-native payload path for an Apple Music catalog/library item?
-- Which home theater diagnostics are stable enough to make user-facing rather than diagnostic-only?
+- Which home theater details are useful enough for quiet UI, and which diagnostics should stay Advanced-only?
 
 ## Working Style
 
