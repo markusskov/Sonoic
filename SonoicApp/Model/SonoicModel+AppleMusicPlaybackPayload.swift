@@ -38,6 +38,7 @@ struct SonoicAppleMusicPlaybackPayloadResolver {
 
             let favoriteSubtitleParts = normalizedAppleMusicSubtitleParts(favorite.subtitle)
             let favoriteSubtitleSet = Set(favoriteSubtitleParts)
+            let hasPayloadIDMatch = appleMusicItem(item, hasPayloadIDMatchWith: favorite)
             let hasSubtitleOverlap = !itemSubtitleSet.isDisjoint(with: favoriteSubtitleSet)
             let hasKindMatch = appleMusicItem(item, matchesFavoriteKind: favorite)
             let hasStrongSubtitleMatch = appleMusicItem(
@@ -48,6 +49,7 @@ struct SonoicAppleMusicPlaybackPayloadResolver {
 
             guard appleMusicItem(
                 item,
+                payloadIDMatch: hasPayloadIDMatch,
                 hasPlayableMatchWithKindMatch: hasKindMatch,
                 subtitleOverlap: hasSubtitleOverlap,
                 itemParts: itemSubtitleParts,
@@ -56,7 +58,8 @@ struct SonoicAppleMusicPlaybackPayloadResolver {
                 return nil
             }
 
-            let confidence: SonoicSonosPlaybackCandidate.Confidence = hasKindMatch && hasStrongSubtitleMatch ? .exact : .likely
+            let confidence: SonoicSonosPlaybackCandidate.Confidence =
+                hasPayloadIDMatch || (hasKindMatch && hasStrongSubtitleMatch) ? .exact : .likely
             return SonoicSonosPlaybackCandidate(
                 payload: payload,
                 confidence: confidence,
@@ -114,19 +117,67 @@ struct SonoicAppleMusicPlaybackPayloadResolver {
 
     private func appleMusicItem(
         _ item: SonoicSourceItem,
+        payloadIDMatch: Bool,
         hasPlayableMatchWithKindMatch hasKindMatch: Bool,
         subtitleOverlap: Bool,
         itemParts: [String],
         favoriteParts: [String]
     ) -> Bool {
+        if payloadIDMatch {
+            return true
+        }
+
         switch item.kind {
         case .song:
-            hasKindMatch && subtitleOverlap && !itemParts.isEmpty && !favoriteParts.isEmpty
+            return hasKindMatch && subtitleOverlap && !itemParts.isEmpty && !favoriteParts.isEmpty
         case .album, .playlist, .station:
-            subtitleOverlap || hasKindMatch || favoriteParts.isEmpty || itemParts.isEmpty
+            return subtitleOverlap || hasKindMatch || favoriteParts.isEmpty || itemParts.isEmpty
         case .artist, .unknown:
-            subtitleOverlap || hasKindMatch
+            return subtitleOverlap || hasKindMatch
         }
+    }
+
+    private func appleMusicItem(
+        _ item: SonoicSourceItem,
+        hasPayloadIDMatchWith favorite: SonosFavoriteItem
+    ) -> Bool {
+        let candidateIDs = [
+            item.appleMusicIdentity?.catalogID,
+            item.appleMusicIdentity?.libraryID,
+            item.serviceItemID
+        ]
+        .compactMap(\.self)
+        .compactMap(\.sonoicNonEmptyTrimmed)
+
+        guard !candidateIDs.isEmpty else {
+            return false
+        }
+
+        let searchableFavoritePayload = normalizedFavoritePayloadSearchText(for: favorite)
+        return candidateIDs.contains { candidateID in
+            searchableFavoritePayload.contains(normalizedAppleMusicPayloadID(candidateID))
+        }
+    }
+
+    private func normalizedFavoritePayloadSearchText(for favorite: SonosFavoriteItem) -> String {
+        [
+            favorite.playbackURI,
+            favorite.playbackURI.removingPercentEncoding,
+            favorite.playbackMetadataXML,
+            favorite.playbackMetadataXML?.removingPercentEncoding
+        ]
+        .compactMap(\.self)
+        .map(normalizedAppleMusicPayloadID)
+        .joined(separator: " ")
+    }
+
+    private func normalizedAppleMusicPayloadID(_ value: String) -> String {
+        value
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined()
     }
 
     private func normalizedAppleMusicSubtitleParts(_ subtitle: String?) -> [String] {
