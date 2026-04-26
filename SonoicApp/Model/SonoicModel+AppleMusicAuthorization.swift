@@ -261,11 +261,17 @@ extension SonoicModel {
 
     func loadAppleMusicLibraryDestination(
         _ destination: SonoicAppleMusicLibraryDestination,
-        force: Bool = false
+        force: Bool = false,
+        append: Bool = false
     ) {
         let currentState = appleMusicLibraryState(for: destination)
 
-        if currentState.isLoading || (!force && currentState.status == .loaded) {
+        if currentState.isLoading || (!append && !force && currentState.status == .loaded) {
+            return
+        }
+
+        let offset = append ? currentState.nextOffset : nil
+        if append && offset == nil {
             return
         }
 
@@ -273,7 +279,10 @@ extension SonoicModel {
         guard appleMusicAuthorizationState.allowsCatalogSearch else {
             appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(
                 destination: destination,
-                status: .failed(appleMusicAuthorizationState.detail)
+                items: append ? currentState.items : [],
+                status: .failed(appleMusicAuthorizationState.detail),
+                lastUpdatedAt: currentState.lastUpdatedAt,
+                nextOffset: append ? currentState.nextOffset : nil
             )
             return
         }
@@ -281,7 +290,10 @@ extension SonoicModel {
         if appleMusicServiceDetails.hasCloudLibraryEnabled == .some(false) {
             appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(
                 destination: destination,
-                status: .failed("iCloud Music Library is not enabled for this Apple Music account.")
+                items: append ? currentState.items : [],
+                status: .failed("iCloud Music Library is not enabled for this Apple Music account."),
+                lastUpdatedAt: currentState.lastUpdatedAt,
+                nextOffset: append ? currentState.nextOffset : nil
             )
             return
         }
@@ -291,7 +303,8 @@ extension SonoicModel {
             destination: destination,
             items: currentState.items,
             status: .loading,
-            lastUpdatedAt: currentState.lastUpdatedAt
+            lastUpdatedAt: currentState.lastUpdatedAt,
+            nextOffset: currentState.nextOffset
         )
 
         appleMusicLibraryLoadTasks[destination] = Task { [weak self] in
@@ -300,16 +313,21 @@ extension SonoicModel {
             }
 
             do {
-                let items = try await self.fetchAppleMusicLibraryItems(for: destination)
+                let page = try await self.fetchAppleMusicLibraryItems(
+                    for: destination,
+                    offset: offset
+                )
                 guard !Task.isCancelled else {
                     return
                 }
+                let nextItems = append ? currentState.items + page.items : page.items
 
                 self.appleMusicLibraryStates[destination] = SonoicAppleMusicLibraryState(
                     destination: destination,
-                    items: items,
+                    items: nextItems,
                     status: .loaded,
-                    lastUpdatedAt: .now
+                    lastUpdatedAt: .now,
+                    nextOffset: page.nextOffset
                 )
                 self.recordAppleMusicRequestSuccess()
             } catch is CancellationError {
@@ -323,7 +341,8 @@ extension SonoicModel {
                     status: .failed(
                         self.appleMusicFailureDetail(from: error, endpointFamily: .library)
                     ),
-                    lastUpdatedAt: self.appleMusicLibraryState(for: destination).lastUpdatedAt
+                    lastUpdatedAt: self.appleMusicLibraryState(for: destination).lastUpdatedAt,
+                    nextOffset: self.appleMusicLibraryState(for: destination).nextOffset
                 )
             }
 
@@ -332,17 +351,30 @@ extension SonoicModel {
     }
 
     private func fetchAppleMusicLibraryItems(
-        for destination: SonoicAppleMusicLibraryDestination
-    ) async throws -> [SonoicSourceItem] {
+        for destination: SonoicAppleMusicLibraryDestination,
+        offset: Int?
+    ) async throws -> SonoicSourceItemPage {
         switch destination {
         case .playlists:
-            try await appleMusicCatalogSearchClient.fetchLibraryPlaylists(limit: destination.initialLoadLimit)
+            try await appleMusicCatalogSearchClient.fetchLibraryPlaylists(
+                limit: destination.initialLoadLimit,
+                offset: offset
+            )
         case .albums:
-            try await appleMusicCatalogSearchClient.fetchLibraryAlbums(limit: destination.initialLoadLimit)
+            try await appleMusicCatalogSearchClient.fetchLibraryAlbums(
+                limit: destination.initialLoadLimit,
+                offset: offset
+            )
         case .songs:
-            try await appleMusicCatalogSearchClient.fetchLibrarySongs(limit: destination.initialLoadLimit)
+            try await appleMusicCatalogSearchClient.fetchLibrarySongs(
+                limit: destination.initialLoadLimit,
+                offset: offset
+            )
         case .artists:
-            try await appleMusicCatalogSearchClient.fetchLibraryArtists(limit: destination.initialLoadLimit)
+            try await appleMusicCatalogSearchClient.fetchLibraryArtists(
+                limit: destination.initialLoadLimit,
+                offset: offset
+            )
         }
     }
 

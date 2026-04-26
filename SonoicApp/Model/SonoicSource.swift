@@ -378,6 +378,11 @@ struct SonoicSourceSearchState: Equatable {
     }
 }
 
+struct SonoicSourceItemPage: Equatable {
+    var items: [SonoicSourceItem]
+    var nextOffset: Int?
+}
+
 enum SonoicSourceSearchScope: String, CaseIterable, Identifiable, Equatable, Sendable {
     case all
     case songs
@@ -570,17 +575,20 @@ struct SonoicAppleMusicLibraryState: Equatable {
     var items: [SonoicSourceItem]
     var status: Status
     var lastUpdatedAt: Date?
+    var nextOffset: Int?
 
     init(
         destination: SonoicAppleMusicLibraryDestination,
         items: [SonoicSourceItem] = [],
         status: Status = .idle,
-        lastUpdatedAt: Date? = nil
+        lastUpdatedAt: Date? = nil,
+        nextOffset: Int? = nil
     ) {
         self.destination = destination
         self.items = items
         self.status = status
         self.lastUpdatedAt = lastUpdatedAt
+        self.nextOffset = nextOffset
     }
 
     var isLoading: Bool {
@@ -593,6 +601,10 @@ struct SonoicAppleMusicLibraryState: Equatable {
         } else {
             nil
         }
+    }
+
+    var canLoadMore: Bool {
+        nextOffset != nil
     }
 }
 

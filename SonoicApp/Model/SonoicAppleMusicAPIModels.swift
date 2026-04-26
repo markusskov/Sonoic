@@ -49,6 +49,11 @@ nonisolated struct AppleMusicItemMetadataSection: Sendable {
     var items: [AppleMusicItemMetadata]
 }
 
+nonisolated struct AppleMusicItemMetadataPage: Sendable {
+    var items: [AppleMusicItemMetadata]
+    var nextOffset: Int?
+}
+
 nonisolated enum AppleMusicSearchResultBalancer {
     static func balancedItems(
         groups: [[AppleMusicItemMetadata]],
@@ -130,6 +135,19 @@ nonisolated enum AppleMusicItemKind: Sendable {
 
 nonisolated struct AppleMusicLibraryResponse: Decodable {
     var data: [AppleMusicLibraryResource]
+    var next: String?
+
+    var nextOffset: Int? {
+        guard let next,
+              let components = URLComponents(string: next),
+              let offsetValue = components.queryItems?.first(where: { $0.name == "offset" })?.value,
+              let offset = Int(offsetValue)
+        else {
+            return nil
+        }
+
+        return offset
+    }
 }
 
 nonisolated struct AppleMusicLibraryResource: Decodable {

@@ -91,9 +91,9 @@ actor SonoicMusicKitRequestGate {
         return Array((songs + albums + artists + playlists).prefix(limit))
     }
 
-    func fetchLibraryAlbums(limit: Int) async throws -> [AppleMusicItemMetadata] {
-        let response = try await fetchLibraryResponse(path: "albums", limit: limit)
-        return response.data.map { album in
+    func fetchLibraryAlbums(limit: Int, offset: Int? = nil) async throws -> AppleMusicItemMetadataPage {
+        let response = try await fetchLibraryResponse(path: "albums", limit: limit, offset: offset)
+        let items = response.data.map { album in
             AppleMusicItemMetadata(
                 serviceItemID: album.id,
                 catalogItemID: album.catalogItemID,
@@ -106,11 +106,13 @@ actor SonoicMusicKitRequestGate {
                 origin: .library
             )
         }
+
+        return AppleMusicItemMetadataPage(items: items, nextOffset: response.nextOffset)
     }
 
-    func fetchLibraryPlaylists(limit: Int) async throws -> [AppleMusicItemMetadata] {
-        let response = try await fetchLibraryResponse(path: "playlists", limit: limit)
-        return response.data.map { playlist in
+    func fetchLibraryPlaylists(limit: Int, offset: Int? = nil) async throws -> AppleMusicItemMetadataPage {
+        let response = try await fetchLibraryResponse(path: "playlists", limit: limit, offset: offset)
+        let items = response.data.map { playlist in
             AppleMusicItemMetadata(
                 serviceItemID: playlist.id,
                 catalogItemID: playlist.catalogItemID,
@@ -123,10 +125,12 @@ actor SonoicMusicKitRequestGate {
                 origin: .library
             )
         }
+
+        return AppleMusicItemMetadataPage(items: items, nextOffset: response.nextOffset)
     }
 
-    func fetchLibraryArtists(limit: Int) async throws -> [AppleMusicItemMetadata] {
-        let response = try await fetchLibraryResponse(path: "artists", limit: limit)
+    func fetchLibraryArtists(limit: Int, offset: Int? = nil) async throws -> AppleMusicItemMetadataPage {
+        let response = try await fetchLibraryResponse(path: "artists", limit: limit, offset: offset)
         var artists = response.data.map { artist in
             AppleMusicItemMetadata(
                 serviceItemID: artist.id,
@@ -149,12 +153,12 @@ actor SonoicMusicKitRequestGate {
             )
         }
 
-        return artists
+        return AppleMusicItemMetadataPage(items: artists, nextOffset: response.nextOffset)
     }
 
-    func fetchLibrarySongs(limit: Int) async throws -> [AppleMusicItemMetadata] {
-        let response = try await fetchLibraryResponse(path: "songs", limit: limit)
-        return response.data.map { song in
+    func fetchLibrarySongs(limit: Int, offset: Int? = nil) async throws -> AppleMusicItemMetadataPage {
+        let response = try await fetchLibraryResponse(path: "songs", limit: limit, offset: offset)
+        let items = response.data.map { song in
             let artistName = song.attributes?.artistName
             let albumName = song.attributes?.albumName
 
@@ -172,6 +176,8 @@ actor SonoicMusicKitRequestGate {
                 origin: .library
             )
         }
+
+        return AppleMusicItemMetadataPage(items: items, nextOffset: response.nextOffset)
     }
 
     func fetchRecentlyAdded(limit: Int) async throws -> [AppleMusicItemMetadata] {
@@ -373,14 +379,18 @@ actor SonoicMusicKitRequestGate {
         }
     }
 
-    private func fetchLibraryResponse(path: String, limit: Int) async throws -> AppleMusicLibraryResponse {
+    private func fetchLibraryResponse(path: String, limit: Int, offset: Int? = nil) async throws -> AppleMusicLibraryResponse {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "api.music.apple.com"
         components.path = "/v1/me/library/\(path)"
-        components.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "limit", value: "\(limit)")
         ]
+        if let offset {
+            queryItems.append(URLQueryItem(name: "offset", value: "\(offset)"))
+        }
+        components.queryItems = queryItems
 
         guard let url = components.url else {
             throw URLError(.badURL)

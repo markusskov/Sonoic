@@ -55,7 +55,7 @@ struct AppleMusicLibraryDestinationView: View {
 
     @ViewBuilder
     private var content: some View {
-        if state.isLoading {
+        if state.isLoading && state.items.isEmpty {
             AppleMusicLibraryMessageCard(
                 title: "Loading \(destination.title)",
                 detail: "Reading your Apple Music library metadata.",
@@ -116,12 +116,30 @@ struct AppleMusicLibraryDestinationView: View {
             } else {
                 AppleMusicLibraryGrid(items: state.items)
             }
+
+            if state.canLoadMore || state.isLoading {
+                Button(action: loadMoreTapped) {
+                    if state.isLoading {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Loading More")
+                        }
+                    } else {
+                        Label("Load More", systemImage: "chevron.down")
+                    }
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .disabled(state.isLoading)
+                .accessibilityLabel("Load more \(destination.title)")
+            }
         }
     }
 
     private var sectionSubtitle: String {
         let base = [
-            "Showing \(state.items.count) items from the first Apple Music library page.",
+            "Showing \(state.items.count) Apple Music library items.",
             "Sonoic still needs Sonos-native payloads before playback."
         ].joined(separator: " ")
 
@@ -142,6 +160,10 @@ struct AppleMusicLibraryDestinationView: View {
 
     private func refreshTapped() {
         model.loadAppleMusicLibraryDestination(destination, force: true)
+    }
+
+    private func loadMoreTapped() {
+        model.loadAppleMusicLibraryDestination(destination, append: true)
     }
 }
 

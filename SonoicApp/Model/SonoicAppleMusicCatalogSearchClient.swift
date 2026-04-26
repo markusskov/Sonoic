@@ -58,49 +58,49 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
     }
 
-    func fetchLibraryAlbums(limit: Int = 24) async throws -> [SonoicSourceItem] {
+    func fetchLibraryAlbums(limit: Int = 24, offset: Int? = nil) async throws -> SonoicSourceItemPage {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw unauthorizedError(endpointFamily: .library)
         }
 
         do {
-            return try await requestGate.fetchLibraryAlbums(limit: limit).map(sourceItem)
+            return sourceItemPage(from: try await requestGate.fetchLibraryAlbums(limit: limit, offset: offset))
         } catch {
             throw mappedMusicKitError(error, endpointFamily: .library)
         }
     }
 
-    func fetchLibraryPlaylists(limit: Int = 24) async throws -> [SonoicSourceItem] {
+    func fetchLibraryPlaylists(limit: Int = 24, offset: Int? = nil) async throws -> SonoicSourceItemPage {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw unauthorizedError(endpointFamily: .library)
         }
 
         do {
-            return try await requestGate.fetchLibraryPlaylists(limit: limit).map(sourceItem)
+            return sourceItemPage(from: try await requestGate.fetchLibraryPlaylists(limit: limit, offset: offset))
         } catch {
             throw mappedMusicKitError(error, endpointFamily: .library)
         }
     }
 
-    func fetchLibraryArtists(limit: Int = 50) async throws -> [SonoicSourceItem] {
+    func fetchLibraryArtists(limit: Int = 50, offset: Int? = nil) async throws -> SonoicSourceItemPage {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw unauthorizedError(endpointFamily: .library)
         }
 
         do {
-            return try await requestGate.fetchLibraryArtists(limit: limit).map(sourceItem)
+            return sourceItemPage(from: try await requestGate.fetchLibraryArtists(limit: limit, offset: offset))
         } catch {
             throw mappedMusicKitError(error, endpointFamily: .library)
         }
     }
 
-    func fetchLibrarySongs(limit: Int = 50) async throws -> [SonoicSourceItem] {
+    func fetchLibrarySongs(limit: Int = 50, offset: Int? = nil) async throws -> SonoicSourceItemPage {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw unauthorizedError(endpointFamily: .library)
         }
 
         do {
-            return try await requestGate.fetchLibrarySongs(limit: limit).map(sourceItem)
+            return sourceItemPage(from: try await requestGate.fetchLibrarySongs(limit: limit, offset: offset))
         } catch {
             throw mappedMusicKitError(error, endpointFamily: .library)
         }
@@ -256,6 +256,13 @@ struct SonoicAppleMusicCatalogSearchClient {
             catalogID: metadata.catalogItemID,
             libraryID: metadata.libraryItemID,
             externalURL: metadata.externalURL
+        )
+    }
+
+    private func sourceItemPage(from page: AppleMusicItemMetadataPage) -> SonoicSourceItemPage {
+        SonoicSourceItemPage(
+            items: page.items.map(sourceItem),
+            nextOffset: page.nextOffset
         )
     }
 
