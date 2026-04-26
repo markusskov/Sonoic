@@ -9,6 +9,8 @@ struct AppleMusicServiceMetadata: Sendable {
 
 nonisolated struct AppleMusicItemMetadata: Sendable {
     var serviceItemID: String
+    var catalogItemID: String?
+    var libraryItemID: String?
     var title: String
     var subtitle: String?
     var artworkURL: String?
@@ -25,6 +27,8 @@ nonisolated struct AppleMusicItemMetadata: Sendable {
 
         return AppleMusicItemMetadata(
             serviceItemID: resource.id,
+            catalogItemID: resource.catalogItemID,
+            libraryItemID: resource.libraryItemID,
             title: resource.attributes?.name ?? "Unknown",
             subtitle: resource.attributes?.albumName.map { albumName in
                 [resource.attributes?.artistName, albumName].compactMap(\.self).joined(separator: " • ")
@@ -50,6 +54,8 @@ nonisolated struct AppleMusicGenreMetadata: Sendable {
 
 nonisolated struct AppleMusicItemLookup: Sendable {
     var serviceItemID: String
+    var catalogItemID: String?
+    var libraryItemID: String?
     var title: String
     var kind: AppleMusicItemKind
     var origin: AppleMusicItemOrigin
@@ -90,6 +96,18 @@ nonisolated struct AppleMusicLibraryResource: Decodable {
     var id: String
     var type: String?
     var attributes: AppleMusicLibraryAttributes?
+
+    var catalogItemID: String? {
+        if type?.hasPrefix("library-") == true {
+            return attributes?.playParams?.catalogId
+        }
+
+        return id
+    }
+
+    var libraryItemID: String? {
+        type?.hasPrefix("library-") == true ? id : nil
+    }
 }
 
 nonisolated struct AppleMusicLibraryAttributes: Decodable {
@@ -98,6 +116,11 @@ nonisolated struct AppleMusicLibraryAttributes: Decodable {
     var albumName: String?
     var curatorName: String?
     var artwork: AppleMusicLibraryArtwork?
+    var playParams: AppleMusicPlayParameters?
+}
+
+nonisolated struct AppleMusicPlayParameters: Decodable {
+    var catalogId: String?
 }
 
 nonisolated struct AppleMusicLibraryArtwork: Decodable {

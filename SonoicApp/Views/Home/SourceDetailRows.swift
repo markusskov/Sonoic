@@ -171,6 +171,8 @@ struct AppleMusicLibrarySection: View {
 }
 
 struct AppleMusicDiscoverySection: View {
+    @Environment(SonoicModel.self) private var model
+
     private let destinations = SonoicAppleMusicBrowseDestination.allCases
 
     var body: some View {
@@ -206,8 +208,25 @@ struct AppleMusicDiscoverySection: View {
         AppleMusicSourceNavigationRow.Model(
             title: destination.title,
             subtitle: destination.subtitle,
-            systemImage: destination.systemImage
+            systemImage: destination.systemImage,
+            badgeTitle: browseBadgeTitle(for: model.appleMusicBrowseState(for: destination))
         )
+    }
+
+    private func browseBadgeTitle(for state: SonoicAppleMusicBrowseState) -> String {
+        switch state.status {
+        case .idle:
+            return "Open"
+        case .loading:
+            return "Loading"
+        case .loaded:
+            let count = state.sections.reduce(state.genres.count) { total, section in
+                total + section.items.count
+            }
+            return count > 0 ? "\(count)" : "Soon"
+        case .failed:
+            return "Error"
+        }
     }
 }
 

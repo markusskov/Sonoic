@@ -160,7 +160,7 @@ private struct AppleMusicItemCapabilityCard: View {
         RoomSurfaceCard {
             if let playbackCandidate {
                 VStack(alignment: .leading, spacing: 12) {
-                    Label(playbackCandidate.confidence.title, systemImage: "play.circle")
+                    Label(playbackCandidate.confidence.title, systemImage: playbackCandidate.confidence == .exact ? "play.circle" : "checkmark.circle")
                         .font(.headline)
 
                     Text(playbackCandidate.detail)
@@ -168,15 +168,22 @@ private struct AppleMusicItemCapabilityCard: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Button {
-                        Task {
-                            await play(playbackCandidate)
+                    if playbackCandidate.confidence == .exact {
+                        Button {
+                            Task {
+                                await play(playbackCandidate)
+                            }
+                        } label: {
+                            Label("Play with Sonos", systemImage: "play.fill")
                         }
-                    } label: {
-                        Label("Play with Sonos", systemImage: "play.fill")
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                    } else {
+                        Text("This looks related to a saved Sonos favorite, but Sonoic needs a stronger match before it starts playback.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 8) {

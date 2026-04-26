@@ -119,6 +119,16 @@ struct SonoicSonosPlaybackCandidate: Identifiable, Equatable {
     }
 }
 
+struct SonoicAppleMusicItemIdentity: Equatable, Sendable {
+    var catalogID: String?
+    var libraryID: String?
+    var kind: SonoicSourceItem.Kind
+
+    var primaryID: String? {
+        catalogID ?? libraryID
+    }
+}
+
 struct SonoicSourceItem: Identifiable, Equatable {
     enum Origin: String, Equatable, Sendable {
         case catalogSearch
@@ -176,6 +186,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
     var artworkURL: String?
     var artworkIdentifier: String?
     var serviceItemID: String?
+    var appleMusicIdentity: SonoicAppleMusicItemIdentity?
     var service: SonosServiceDescriptor
     var origin: Origin
     var kind: Kind
@@ -188,6 +199,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         artworkURL: String?,
         artworkIdentifier: String?,
         serviceItemID: String? = nil,
+        appleMusicIdentity: SonoicAppleMusicItemIdentity? = nil,
         service: SonosServiceDescriptor,
         origin: Origin,
         kind: Kind = .unknown,
@@ -199,6 +211,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         self.artworkURL = artworkURL
         self.artworkIdentifier = artworkIdentifier
         self.serviceItemID = serviceItemID
+        self.appleMusicIdentity = appleMusicIdentity
         self.service = service
         self.origin = origin
         self.kind = kind
@@ -263,7 +276,9 @@ struct SonoicSourceItem: Identifiable, Equatable {
         subtitle: String?,
         artworkURL: String?,
         kind: Kind,
-        origin: Origin
+        origin: Origin,
+        catalogID: String? = nil,
+        libraryID: String? = nil
     ) -> SonoicSourceItem {
         SonoicSourceItem(
             id: "\(origin.rawValue)-\(SonosServiceDescriptor.appleMusic.id)-\(kind.rawValue)-\(id)",
@@ -272,6 +287,11 @@ struct SonoicSourceItem: Identifiable, Equatable {
             artworkURL: artworkURL,
             artworkIdentifier: nil,
             serviceItemID: id,
+            appleMusicIdentity: SonoicAppleMusicItemIdentity(
+                catalogID: catalogID,
+                libraryID: libraryID,
+                kind: kind
+            ),
             service: .appleMusic,
             origin: origin,
             kind: kind,

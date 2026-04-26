@@ -69,7 +69,7 @@ struct SourceDetailView: View {
                         )
                     }
 
-                    if favoriteItems.isEmpty && recentItems.isEmpty {
+                    if !isAppleMusic && favoriteItems.isEmpty && recentItems.isEmpty {
                         SourceEmptyCard(serviceName: source.service.name)
                     }
 
