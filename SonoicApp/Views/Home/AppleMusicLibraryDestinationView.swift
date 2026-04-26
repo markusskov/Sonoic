@@ -193,46 +193,73 @@ private struct AppleMusicLibraryGridCard: View {
         model.appleMusicPlaybackCandidate(for: item)
     }
 
+    private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
+        guard playbackCandidate?.confidence == .exact else {
+            return nil
+        }
+
+        return playbackCandidate
+    }
+
     var body: some View {
-        NavigationLink {
-            AppleMusicItemDetailView(item: item)
-        } label: {
-            VStack(alignment: .leading, spacing: 9) {
-                HomeFavoriteArtworkView(
-                    artworkURL: item.artworkURL,
-                    artworkIdentifier: item.artworkIdentifier,
-                    maximumDisplayDimension: 220
-                )
-                .aspectRatio(1, contentMode: .fit)
+        ZStack(alignment: .topTrailing) {
+            NavigationLink {
+                AppleMusicItemDetailView(item: item)
+            } label: {
+                VStack(alignment: .leading, spacing: 9) {
+                    HomeFavoriteArtworkView(
+                        artworkURL: item.artworkURL,
+                        artworkIdentifier: item.artworkIdentifier,
+                        maximumDisplayDimension: 220
+                    )
+                    .aspectRatio(1, contentMode: .fit)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-
-                    if let subtitle = item.subtitle {
-                        Text(subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
-                    }
 
-                    if let playbackCandidate {
-                        Label(playbackCandidate.confidence.badgeTitle, systemImage: "checkmark.circle")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(playbackCandidate.confidence == .exact ? .green : .secondary)
-                            .lineLimit(1)
+                        if let subtitle = item.subtitle {
+                            Text(subtitle)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
+
+                        if let playbackCandidate {
+                            Label(playbackCandidate.confidence.badgeTitle, systemImage: "checkmark.circle")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(playbackCandidate.confidence == .exact ? .green : .secondary)
+                                .lineLimit(1)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityLabel(item.title)
+
+            if let exactPlaybackCandidate {
+                Button {
+                    Task {
+                        _ = await model.playManualSonosPayload(exactPlaybackCandidate.payload)
+                    }
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .padding(8)
+                .accessibilityLabel("Play \(item.title)")
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(item.title)
     }
 }
 
