@@ -169,53 +169,54 @@ struct SearchResultsSection: View {
     let requestAuthorization: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(title: "Results")
+        if shouldShowResults {
+            VStack(alignment: .leading, spacing: 14) {
+                HomeSectionHeader(title: "Results")
 
-            RoomSurfaceCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    if let availabilityMessage {
-                        SearchMessageRow(message: availabilityMessage)
+                RoomSurfaceCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if let availabilityMessage {
+                            SearchMessageRow(message: availabilityMessage)
 
-                        if canRequestAuthorization {
-                            Button(action: requestAuthorization) {
-                                Label("Authorize Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                            if canRequestAuthorization {
+                                Button(action: requestAuthorization) {
+                                    Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                                }
+                                .buttonStyle(.glass)
+                                .buttonBorderShape(.capsule)
                             }
-                            .buttonStyle(.glass)
-                            .buttonBorderShape(.capsule)
+                        } else if let failureDetail = state.failureDetail {
+                            SearchMessageRow(
+                                message: SearchMessage(
+                                    title: "Search Failed",
+                                    detail: staleDetail(failureDetail),
+                                    systemImage: "exclamationmark.triangle"
+                                )
+                            )
                         }
-                    } else if !state.hasQuery || state.status == .idle {
-                        SearchMessageRow(
-                            message: SearchMessage(
-                                title: "\(service.name)",
-                                detail: "Search the catalog.",
-                                systemImage: "music.magnifyingglass"
-                            )
-                        )
-                    } else if let failureDetail = state.failureDetail {
-                        SearchMessageRow(
-                            message: SearchMessage(
-                                title: "Search Failed",
-                                detail: staleDetail(failureDetail),
-                                systemImage: "exclamationmark.triangle"
-                            )
-                        )
-                    }
 
-                    if state.status == .loaded && state.items.isEmpty {
-                        SearchMessageRow(
-                            message: SearchMessage(
-                                title: "No Results",
-                                detail: "No matches.",
-                                systemImage: "magnifyingglass"
+                        if state.status == .loaded && state.items.isEmpty {
+                            SearchMessageRow(
+                                message: SearchMessage(
+                                    title: "No Results",
+                                    detail: "No matches.",
+                                    systemImage: "magnifyingglass"
+                                )
                             )
-                        )
-                    } else if !state.items.isEmpty {
-                        SourceGroupedItemRows(items: state.items)
+                        } else if !state.items.isEmpty {
+                            SourceGroupedItemRows(items: state.items)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private var shouldShowResults: Bool {
+        availabilityMessage != nil
+            || state.hasQuery
+            || state.failureDetail != nil
+            || !state.items.isEmpty
     }
 
     private func staleDetail(_ failureDetail: String) -> String {
@@ -260,20 +261,5 @@ private struct SearchMessageRow: View {
             Spacer(minLength: 0)
         }
         .foregroundStyle(.secondary)
-    }
-}
-
-struct SearchComingSoonCard: View {
-    let service: SonosServiceDescriptor
-
-    var body: some View {
-        RoomSurfaceCard {
-            Label(service.name, systemImage: service.systemImage)
-                .font(.headline)
-
-            Text("Coming later.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
     }
 }

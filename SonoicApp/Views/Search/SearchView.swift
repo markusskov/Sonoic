@@ -6,6 +6,7 @@ struct SearchView: View {
 
     private var services: [SonosServiceDescriptor] {
         orderedServices(model.homeSources.map(\.service) + SonosServiceCatalog.browsableServices)
+            .filter(supportsCatalogSearch)
     }
 
     private var selectedService: SonosServiceDescriptor {
@@ -27,8 +28,8 @@ struct SearchView: View {
         model.sourceSearchState(for: selectedSource)
     }
 
-    private var supportsCatalogSearch: Bool {
-        selectedService.kind == .appleMusic
+    private var supportsSelectedCatalogSearch: Bool {
+        supportsCatalogSearch(selectedService)
     }
 
     var body: some View {
@@ -37,17 +38,19 @@ struct SearchView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     SearchHeader()
 
-                    SearchServicePicker(
-                        services: services,
-                        selectedServiceID: $selectedServiceID
-                    )
+                    if services.count > 1 {
+                        SearchServicePicker(
+                            services: services,
+                            selectedServiceID: $selectedServiceID
+                        )
+                    }
 
-                    if supportsCatalogSearch {
+                    if supportsSelectedCatalogSearch {
                         SearchInputCard(
                             query: searchQueryBinding,
                             service: selectedService,
                             state: searchState,
-                            supportsCatalogSearch: supportsCatalogSearch,
+                            supportsCatalogSearch: supportsSelectedCatalogSearch,
                             submit: searchCatalog
                         )
 
@@ -65,8 +68,6 @@ struct SearchView: View {
                             canRequestAuthorization: model.appleMusicAuthorizationState.canRequestAuthorization,
                             requestAuthorization: requestAppleMusicAuthorization
                         )
-                    } else {
-                        SearchComingSoonCard(service: selectedService)
                     }
                 }
                 .padding(20)
@@ -87,6 +88,10 @@ struct SearchView: View {
             seen.insert(service.id)
             return true
         }
+    }
+
+    private func supportsCatalogSearch(_ service: SonosServiceDescriptor) -> Bool {
+        service.kind == .appleMusic
     }
 
     private var searchQueryBinding: Binding<String> {
