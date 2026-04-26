@@ -81,6 +81,13 @@ actor SonoicMusicKitRequestGate {
             )
         }
 
+        if scope == .all {
+            return AppleMusicSearchResultBalancer.balancedItems(
+                groups: [songs, albums, artists, playlists],
+                limit: limit
+            )
+        }
+
         return Array((songs + albums + artists + playlists).prefix(limit))
     }
 
