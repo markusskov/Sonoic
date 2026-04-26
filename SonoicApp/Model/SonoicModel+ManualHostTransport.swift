@@ -93,7 +93,7 @@ extension SonoicModel {
     }
 
     func playManualSonosPayload(_ payload: SonosPlayablePayload) async -> Bool {
-        guard payload.isValidForLaunch else {
+        guard let preparedPayload = try? SonosPlayablePayloadPreparer().prepare(payload) else {
             return false
         }
 
@@ -107,14 +107,14 @@ extension SonoicModel {
             let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
             try await avTransportClient.setTransportURI(
                 host: playbackHost,
-                uri: payload.uri,
-                metadataXML: payload.metadataXML
+                uri: preparedPayload.uri,
+                metadataXML: preparedPayload.metadataXML
             )
             try await avTransportClient.play(host: playbackHost)
         }
 
         if didStartPlayback {
-            recordRecentPlayablePayload(payload)
+            recordRecentPlayablePayload(preparedPayload)
         }
 
         return didStartPlayback
