@@ -250,7 +250,7 @@ struct AppleMusicRecentlyAddedSection: View {
 
     @ViewBuilder
     private var content: some View {
-        if state.isLoading {
+        if state.isLoading && state.items.isEmpty {
             AppleMusicRecentlyAddedMessageRow(
                 title: "Loading Library",
                 detail: "Reading recently added Apple Music items.",
@@ -269,6 +269,14 @@ struct AppleMusicRecentlyAddedSection: View {
                 systemImage: "music.note.list"
             )
         } else if state.status == .loaded || !state.items.isEmpty {
+            if state.isLoading {
+                AppleMusicRecentlyAddedMessageRow(
+                    title: "Refreshing Recently Added",
+                    detail: "Keeping the last Apple Music library items visible while Sonoic checks for updates.",
+                    systemImage: "arrow.clockwise"
+                )
+            }
+
             if let failureDetail = state.failureDetail {
                 AppleMusicRecentlyAddedMessageRow(
                     title: "Showing Cached Recently Added",

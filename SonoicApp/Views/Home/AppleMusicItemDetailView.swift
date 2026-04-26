@@ -51,7 +51,7 @@ struct AppleMusicItemDetailView: View {
 
     @ViewBuilder
     private var content: some View {
-        if state.isLoading {
+        if state.isLoading && state.sections.isEmpty {
             AppleMusicItemDetailMessageCard(
                 title: "Loading \(item.kind.title)",
                 detail: "Reading Apple Music metadata.",
@@ -70,6 +70,14 @@ struct AppleMusicItemDetailView: View {
                 systemImage: item.kind.systemImage
             )
         } else {
+            if state.isLoading {
+                AppleMusicItemDetailMessageCard(
+                    title: "Refreshing Details",
+                    detail: "Keeping the last Apple Music metadata visible while Sonoic checks for updates.",
+                    systemImage: "arrow.clockwise"
+                )
+            }
+
             if let failureDetail = state.failureDetail {
                 AppleMusicItemDetailMessageCard(
                     title: "Showing Cached Details",

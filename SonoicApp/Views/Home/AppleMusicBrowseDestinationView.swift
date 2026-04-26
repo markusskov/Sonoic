@@ -55,7 +55,7 @@ struct AppleMusicBrowseDestinationView: View {
 
     @ViewBuilder
     private var content: some View {
-        if state.isLoading {
+        if state.isLoading && state.sections.isEmpty && state.genres.isEmpty {
             AppleMusicBrowseMessageCard(
                 title: "Loading \(destination.title)",
                 detail: "Reading Apple Music catalog metadata.",
@@ -68,6 +68,14 @@ struct AppleMusicBrowseDestinationView: View {
                 systemImage: "exclamationmark.triangle"
             )
         } else if !state.sections.isEmpty {
+            if state.isLoading {
+                AppleMusicBrowseMessageCard(
+                    title: "Refreshing \(destination.title)",
+                    detail: "Keeping the last Apple Music results visible while Sonoic checks for updates.",
+                    systemImage: "arrow.clockwise"
+                )
+            }
+
             if let failureDetail = state.failureDetail {
                 AppleMusicBrowseMessageCard(
                     title: "Showing Cached \(destination.title)",
@@ -80,6 +88,14 @@ struct AppleMusicBrowseDestinationView: View {
                 AppleMusicBrowseSectionView(section: section)
             }
         } else if !state.genres.isEmpty {
+            if state.isLoading {
+                AppleMusicBrowseMessageCard(
+                    title: "Refreshing Categories",
+                    detail: "Keeping the last Apple Music genres visible while Sonoic checks for updates.",
+                    systemImage: "arrow.clockwise"
+                )
+            }
+
             if let failureDetail = state.failureDetail {
                 AppleMusicBrowseMessageCard(
                     title: "Showing Cached Categories",
