@@ -34,7 +34,8 @@ struct SourceDetailView: View {
                         AppleMusicSourceHeader(
                             source: source,
                             authorizationState: model.appleMusicAuthorizationState,
-                            serviceDetails: model.appleMusicServiceDetails
+                            serviceDetails: model.appleMusicServiceDetails,
+                            requestAuthorization: requestAppleMusicAuthorization
                         )
                         AppleMusicLibrarySection()
                         AppleMusicRecentlyAddedSection()
@@ -173,6 +174,12 @@ struct SourceDetailView: View {
 
     private func clearRecentSearches() {
         model.clearRecentSourceSearches(for: source)
+    }
+
+    private func requestAppleMusicAuthorization() {
+        Task {
+            await model.requestAppleMusicAuthorization()
+        }
     }
 
     private var appleMusicAvailabilityMessage: SourceSearchAvailabilityMessage? {

@@ -176,6 +176,8 @@ struct SearchResultsSection: View {
     let service: SonosServiceDescriptor
     let state: SonoicSourceSearchState
     let availabilityMessage: SearchMessage?
+    let canRequestAuthorization: Bool
+    let requestAuthorization: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -188,6 +190,14 @@ struct SearchResultsSection: View {
                 VStack(alignment: .leading, spacing: 14) {
                     if let availabilityMessage {
                         SearchMessageRow(message: availabilityMessage)
+
+                        if canRequestAuthorization {
+                            Button(action: requestAuthorization) {
+                                Label("Authorize Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.capsule)
+                        }
                     } else if !state.hasQuery || state.status == .idle {
                         SearchMessageRow(
                             message: SearchMessage(

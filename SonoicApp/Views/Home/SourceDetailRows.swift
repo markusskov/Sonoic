@@ -4,6 +4,7 @@ struct AppleMusicSourceHeader: View {
     let source: SonoicSource
     let authorizationState: SonoicAppleMusicAuthorizationState
     let serviceDetails: SonoicAppleMusicServiceDetails
+    let requestAuthorization: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -22,6 +23,14 @@ struct AppleMusicSourceHeader: View {
                     authorizationState: authorizationState,
                     serviceDetails: serviceDetails
                 )
+
+                if authorizationState.canRequestAuthorization {
+                    Button(action: requestAuthorization) {
+                        Label("Authorize Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.capsule)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

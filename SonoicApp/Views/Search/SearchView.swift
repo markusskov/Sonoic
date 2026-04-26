@@ -67,7 +67,9 @@ struct SearchView: View {
                         SearchResultsSection(
                             service: selectedService,
                             state: searchState,
-                            availabilityMessage: appleMusicAvailabilityMessage
+                            availabilityMessage: appleMusicAvailabilityMessage,
+                            canRequestAuthorization: model.appleMusicAuthorizationState.canRequestAuthorization,
+                            requestAuthorization: requestAppleMusicAuthorization
                         )
                     } else {
                         SearchComingSoonCard(service: selectedService)
@@ -126,6 +128,12 @@ struct SearchView: View {
 
     private func clearRecentSearches() {
         model.clearRecentSourceSearches(for: selectedSource)
+    }
+
+    private func requestAppleMusicAuthorization() {
+        Task {
+            await model.requestAppleMusicAuthorization()
+        }
     }
 
     private var appleMusicAvailabilityMessage: SearchMessage? {
