@@ -100,8 +100,8 @@ struct AppleMusicBrowseDestinationView: View {
             AppleMusicBrowseGenreSection(genres: state.genres)
         } else {
             AppleMusicBrowseMessageCard(
-                title: "Coming Soon",
-                detail: destination.title,
+                title: "No Items",
+                detail: "Nothing here yet.",
                 systemImage: destination.systemImage
             )
         }

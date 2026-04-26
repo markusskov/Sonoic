@@ -9,8 +9,8 @@ struct AppleMusicItemDetailView: View {
         model.appleMusicItemDetailState(for: item)
     }
 
-    private var playbackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicPlaybackCandidate(for: item)
+    private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
+        model.appleMusicExactPlaybackCandidate(for: item)
     }
 
     var body: some View {
@@ -18,11 +18,15 @@ struct AppleMusicItemDetailView: View {
             GlassEffectContainer(spacing: 18) {
                 VStack(alignment: .leading, spacing: 24) {
                     AppleMusicItemDetailHeader(item: item)
-                    AppleMusicItemCapabilityCard(
-                        item: item,
-                        playbackCandidate: playbackCandidate,
-                        play: playCandidate
-                    )
+
+                    if exactPlaybackCandidate != nil || item.externalURL != nil {
+                        AppleMusicItemActionCard(
+                            item: item,
+                            playbackCandidate: exactPlaybackCandidate,
+                            play: playCandidate
+                        )
+                    }
+
                     content
                 }
                 .padding(20)
@@ -143,7 +147,6 @@ private struct AppleMusicItemDetailHeader: View {
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {
                         AppleMusicItemDetailChip(title: item.service.name, systemImage: item.service.systemImage)
-                        AppleMusicItemDetailChip(title: originTitle, systemImage: originSystemImage)
                     }
                     .padding(.vertical, 1)
                 }
@@ -153,34 +156,9 @@ private struct AppleMusicItemDetailHeader: View {
         }
     }
 
-    private var originTitle: String {
-        switch item.origin {
-        case .catalogSearch:
-            "Catalog"
-        case .favorite:
-            "Favorite"
-        case .library:
-            "Library"
-        case .recentPlay:
-            "Recent"
-        }
-    }
-
-    private var originSystemImage: String {
-        switch item.origin {
-        case .catalogSearch:
-            "magnifyingglass"
-        case .favorite:
-            "star"
-        case .library:
-            "rectangle.stack"
-        case .recentPlay:
-            "clock"
-        }
-    }
 }
 
-private struct AppleMusicItemCapabilityCard: View {
+private struct AppleMusicItemActionCard: View {
     let item: SonoicSourceItem
     let playbackCandidate: SonoicSonosPlaybackCandidate?
     let play: (SonoicSonosPlaybackCandidate) async -> Void
@@ -197,28 +175,15 @@ private struct AppleMusicItemCapabilityCard: View {
     @ViewBuilder
     private var capabilityContent: some View {
         if let playbackCandidate {
-            Label(playbackCandidate.confidence.shortTitle, systemImage: playbackCandidate.confidence == .exact ? "play.circle" : "checkmark.circle")
-                .font(.headline)
-
-            if playbackCandidate.confidence == .exact {
-                Button {
-                    Task {
-                        await play(playbackCandidate)
-                    }
-                } label: {
-                    Label("Play", systemImage: "play.fill")
+            Button {
+                Task {
+                    await play(playbackCandidate)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            } else {
-                Text("Possible favorite.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+            } label: {
+                Label("Play", systemImage: "play.fill")
             }
-        } else {
-            Label("Not Playable", systemImage: "lock.circle")
-                .font(.headline)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
     }
 
@@ -226,8 +191,6 @@ private struct AppleMusicItemCapabilityCard: View {
     private var appleMusicLink: some View {
         if let externalURL = item.externalURL,
            let url = URL(string: externalURL) {
-            Divider()
-
             Link(destination: url) {
                 Label("Open in Apple Music", systemImage: "arrow.up.forward.app")
                     .font(.subheadline.weight(.semibold))
