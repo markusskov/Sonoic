@@ -175,6 +175,8 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
         let lookup = AppleMusicItemLookup(
             serviceItemID: serviceItemID,
+            catalogItemID: item.appleMusicIdentity?.catalogID,
+            libraryItemID: item.appleMusicIdentity?.libraryID,
             title: item.title,
             kind: kind,
             origin: origin
@@ -209,7 +211,9 @@ struct SonoicAppleMusicCatalogSearchClient {
             subtitle: metadata.subtitle,
             artworkURL: metadata.artworkURL,
             kind: sourceKind(for: metadata.kind),
-            origin: sourceOrigin(for: metadata.origin)
+            origin: sourceOrigin(for: metadata.origin),
+            catalogID: metadata.catalogItemID,
+            libraryID: metadata.libraryItemID
         )
     }
 
@@ -292,6 +296,8 @@ private actor SonoicMusicKitRequestGate {
         let songs = response.songs.map { song in
             AppleMusicItemMetadata(
                 serviceItemID: song.id.rawValue,
+                catalogItemID: song.id.rawValue,
+                libraryItemID: nil,
                 title: song.title,
                 subtitle: song.albumTitle.map { "\(song.artistName) • \($0)" } ?? song.artistName,
                 artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
@@ -302,6 +308,8 @@ private actor SonoicMusicKitRequestGate {
         let albums = response.albums.map { album in
             AppleMusicItemMetadata(
                 serviceItemID: album.id.rawValue,
+                catalogItemID: album.id.rawValue,
+                libraryItemID: nil,
                 title: album.title,
                 subtitle: album.artistName,
                 artworkURL: album.artwork?.url(width: 400, height: 400)?.absoluteString,
@@ -312,6 +320,8 @@ private actor SonoicMusicKitRequestGate {
         let artists = response.artists.map { artist in
             AppleMusicItemMetadata(
                 serviceItemID: artist.id.rawValue,
+                catalogItemID: artist.id.rawValue,
+                libraryItemID: nil,
                 title: artist.name,
                 subtitle: "Artist",
                 artworkURL: artist.artwork?.url(width: 400, height: 400)?.absoluteString,
@@ -322,6 +332,8 @@ private actor SonoicMusicKitRequestGate {
         let playlists = response.playlists.map { playlist in
             AppleMusicItemMetadata(
                 serviceItemID: playlist.id.rawValue,
+                catalogItemID: playlist.id.rawValue,
+                libraryItemID: nil,
                 title: playlist.name,
                 subtitle: playlist.curatorName,
                 artworkURL: playlist.artwork?.url(width: 400, height: 400)?.absoluteString,
@@ -353,6 +365,8 @@ private actor SonoicMusicKitRequestGate {
         return response.data.map { album in
             AppleMusicItemMetadata(
                 serviceItemID: album.id,
+                catalogItemID: album.catalogItemID,
+                libraryItemID: album.libraryItemID,
                 title: album.attributes?.name ?? "Unknown Album",
                 subtitle: album.attributes?.artistName,
                 artworkURL: album.attributes?.artwork?.sizedURL(width: 400, height: 400),
@@ -367,6 +381,8 @@ private actor SonoicMusicKitRequestGate {
         return response.data.map { playlist in
             AppleMusicItemMetadata(
                 serviceItemID: playlist.id,
+                catalogItemID: playlist.catalogItemID,
+                libraryItemID: playlist.libraryItemID,
                 title: playlist.attributes?.name ?? "Unknown Playlist",
                 subtitle: playlist.attributes?.curatorName,
                 artworkURL: playlist.attributes?.artwork?.sizedURL(width: 400, height: 400),
@@ -381,6 +397,8 @@ private actor SonoicMusicKitRequestGate {
         var artists = response.data.map { artist in
             AppleMusicItemMetadata(
                 serviceItemID: artist.id,
+                catalogItemID: artist.catalogItemID,
+                libraryItemID: artist.libraryItemID,
                 title: artist.attributes?.name ?? "Unknown Artist",
                 subtitle: "Artist",
                 artworkURL: artist.attributes?.artwork?.sizedURL(width: 400, height: 400),
@@ -408,6 +426,8 @@ private actor SonoicMusicKitRequestGate {
 
             return AppleMusicItemMetadata(
                 serviceItemID: song.id,
+                catalogItemID: song.catalogItemID,
+                libraryItemID: song.libraryItemID,
                 title: song.attributes?.name ?? "Unknown Song",
                 subtitle: albumName.map { albumName in
                     [artistName, albumName].compactMap(\.self).joined(separator: " • ")
