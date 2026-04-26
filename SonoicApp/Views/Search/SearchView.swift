@@ -42,28 +42,28 @@ struct SearchView: View {
                         selectedServiceID: $selectedServiceID
                     )
 
-                    SearchInputCard(
-                        query: searchQueryBinding,
-                        service: selectedService,
-                        state: searchState,
-                        supportsCatalogSearch: supportsCatalogSearch,
-                        submit: searchCatalog
-                    )
-
-                    SearchRecentQueriesSection(
-                        service: selectedService,
-                        recentSearches: model.recentSourceSearches(for: selectedSource),
-                        select: selectRecentSearch,
-                        clear: clearRecentSearches
-                    )
-
-                    SearchScopeSection(
-                        service: selectedService,
-                        selectedScope: searchState.scope,
-                        selectScope: selectScope
-                    )
-
                     if supportsCatalogSearch {
+                        SearchInputCard(
+                            query: searchQueryBinding,
+                            service: selectedService,
+                            state: searchState,
+                            supportsCatalogSearch: supportsCatalogSearch,
+                            submit: searchCatalog
+                        )
+
+                        SearchRecentQueriesSection(
+                            service: selectedService,
+                            recentSearches: model.recentSourceSearches(for: selectedSource),
+                            select: selectRecentSearch,
+                            clear: clearRecentSearches
+                        )
+
+                        SearchScopeSection(
+                            service: selectedService,
+                            selectedScope: searchState.scope,
+                            selectScope: selectScope
+                        )
+
                         SearchResultsSection(
                             service: selectedService,
                             state: searchState,
