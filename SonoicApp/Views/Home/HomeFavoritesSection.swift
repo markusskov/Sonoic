@@ -19,8 +19,8 @@ struct HomeFavoritesSection: View {
             .scrollIndicators(.hidden)
         case .empty:
             HomeMessageCard(
-                title: "No Favorites Yet",
-                detail: "Save a few Sonos favorites in the Sonos app and they'll appear here for quick playback."
+                title: "No Favorites",
+                detail: "Add favorites in Sonos."
             )
         case let .failed(detail):
             HomeActionCard(

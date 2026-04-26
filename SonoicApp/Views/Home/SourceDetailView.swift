@@ -51,9 +51,7 @@ struct SourceDetailView: View {
                             state: catalogSearchState,
                             recentSearches: model.recentSourceSearches(for: source),
                             availabilityMessage: appleMusicAvailabilityMessage,
-                            selectedScope: catalogSearchState.scope,
                             search: searchCatalog,
-                            selectScope: selectSourceSearchScope,
                             selectRecentSearch: selectRecentSearch,
                             clearRecentSearches: clearRecentSearches
                         )
@@ -62,7 +60,6 @@ struct SourceDetailView: View {
                     if !favoriteItems.isEmpty {
                         sourceSection(
                             title: "Favorites",
-                            subtitle: "Saved Sonos favorites from \(source.service.name).",
                             items: favoriteItems
                         )
                     }
@@ -70,7 +67,6 @@ struct SourceDetailView: View {
                     if !recentItems.isEmpty {
                         sourceSection(
                             title: "Recently Played",
-                            subtitle: "History Sonoic has seen from this source.",
                             items: recentItems
                         )
                     }
@@ -106,11 +102,10 @@ struct SourceDetailView: View {
 
     private func sourceSection(
         title: String,
-        subtitle: String,
         items: [SonoicSourceItem]
     ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(title: title, subtitle: subtitle)
+            HomeSectionHeader(title: title)
 
             RoomSurfaceCard {
                 VStack(spacing: 0) {
@@ -151,18 +146,8 @@ struct SourceDetailView: View {
     }
 
     private func searchCatalog() async {
+        model.updateSourceSearchScope(.all, for: source)
         await model.searchSourceCatalog(for: source)
-    }
-
-    private func selectSourceSearchScope(_ scope: SonoicSourceSearchScope) {
-        let shouldSearch = scope != catalogSearchState.scope && catalogSearchState.hasQuery
-        model.updateSourceSearchScope(scope, for: source)
-
-        if shouldSearch {
-            Task {
-                await model.searchSourceCatalog(for: source)
-            }
-        }
     }
 
     private func selectRecentSearch(_ recentSearch: SonoicRecentSourceSearch) {

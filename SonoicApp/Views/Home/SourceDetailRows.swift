@@ -128,8 +128,7 @@ struct AppleMusicLibrarySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Library",
-                subtitle: "Your saved Apple Music playlists, artists, albums, and songs."
+                title: "Library"
             )
 
             RoomSurfaceCard {
@@ -187,8 +186,7 @@ struct AppleMusicDiscoverySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Browse",
-                subtitle: "Catalog lanes for discovery, recommendations, and future Sonos-native starts."
+                title: "Browse"
             )
 
             RoomSurfaceCard {
@@ -249,8 +247,7 @@ struct AppleMusicRecentlyAddedSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Recently Added",
-                subtitle: "Fresh Apple Music library metadata from your account."
+                title: "Recently Added"
             )
 
             content
@@ -582,6 +579,82 @@ struct SourceItemNavigationRow: View {
     }
 }
 
+struct SourceGroupedItemRows: View {
+    let items: [SonoicSourceItem]
+
+    private var sections: [SourceItemSection] {
+        SonoicSourceItem.Kind.searchResultOrder.compactMap { kind in
+            let sectionItems = items.filter { $0.kind == kind }
+
+            guard !sectionItems.isEmpty else {
+                return nil
+            }
+
+            return SourceItemSection(kind: kind, items: sectionItems)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ForEach(sections) { section in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(section.kind.pluralTitle)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    VStack(spacing: 0) {
+                        ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
+                            SourceItemNavigationRow(item: item)
+
+                            if index < section.items.count - 1 {
+                                Divider()
+                                    .padding(.leading, 76)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct SourceItemSection: Identifiable {
+    var kind: SonoicSourceItem.Kind
+    var items: [SonoicSourceItem]
+
+    var id: String {
+        kind.rawValue
+    }
+}
+
+private extension SonoicSourceItem.Kind {
+    static let searchResultOrder: [SonoicSourceItem.Kind] = [
+        .artist,
+        .song,
+        .album,
+        .playlist,
+        .station,
+        .unknown
+    ]
+
+    var pluralTitle: String {
+        switch self {
+        case .album:
+            "Albums"
+        case .artist:
+            "Artists"
+        case .playlist:
+            "Playlists"
+        case .song:
+            "Songs"
+        case .station:
+            "Stations"
+        case .unknown:
+            "Other"
+        }
+    }
+}
+
 private struct SourceItemMetadataRow: View {
     let item: SonoicSourceItem
     let playbackCandidate: SonoicSonosPlaybackCandidate?
@@ -647,18 +720,13 @@ struct SourceSearchSection: View {
     let state: SonoicSourceSearchState
     let recentSearches: [SonoicRecentSourceSearch]
     let availabilityMessage: SourceSearchAvailabilityMessage?
-    let selectedScope: SonoicSourceSearchScope
     let search: () async -> Void
-    let selectScope: (SonoicSourceSearchScope) -> Void
     let selectRecentSearch: (SonoicRecentSourceSearch) -> Void
     let clearRecentSearches: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: "Catalog",
-                subtitle: "Search Apple Music metadata. Playback stays Sonos-native until a playable payload exists."
-            )
+            HomeSectionHeader(title: "Search")
 
             RoomSurfaceCard {
                 VStack(alignment: .leading, spacing: 14) {
@@ -686,11 +754,6 @@ struct SourceSearchSection: View {
                         .accessibilityLabel("Search \(serviceName)")
                     }
 
-                    SourceSearchScopeChips(
-                        selectedScope: selectedScope,
-                        select: selectScope
-                    )
-
                     SourceRecentSearchChips(
                         recentSearches: recentSearches,
                         select: selectRecentSearch,
@@ -714,7 +777,7 @@ struct SourceSearchSection: View {
                     } else if state.status == .loaded && state.items.isEmpty {
                         SourceSearchMessageRow(
                             title: "No Results",
-                            detail: "Apple Music did not return catalog matches for this search.",
+                            detail: "No matches.",
                             systemImage: "magnifyingglass"
                         )
                     } else {
@@ -726,14 +789,7 @@ struct SourceSearchSection: View {
                             )
                         }
 
-                        ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
-                            SourceItemNavigationRow(item: item)
-
-                            if index < state.items.count - 1 {
-                                Divider()
-                                    .padding(.leading, 76)
-                            }
-                        }
+                        SourceGroupedItemRows(items: state.items)
                     }
                 }
             }
@@ -752,39 +808,6 @@ struct SourceSearchSection: View {
         }
 
         return "Showing previous results from \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
-    }
-}
-
-private struct SourceSearchScopeChips: View {
-    let selectedScope: SonoicSourceSearchScope
-    let select: (SonoicSourceSearchScope) -> Void
-
-    var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 9) {
-                ForEach(SonoicSourceSearchScope.allCases) { scope in
-                    Button {
-                        select(scope)
-                    } label: {
-                        Label(scope.title, systemImage: scope.systemImage)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(selectedScope == scope ? .primary : .secondary)
-                            .lineLimit(1)
-                            .padding(.horizontal, 11)
-                            .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.plain)
-                    .glassEffect(
-                        selectedScope == scope ? .regular.interactive() : .regular,
-                        in: .capsule
-                    )
-                    .accessibilityLabel("Search \(scope.title)")
-                    .accessibilityAddTraits(selectedScope == scope ? .isSelected : [])
-                }
-            }
-            .padding(.vertical, 1)
-        }
-        .scrollIndicators(.hidden)
     }
 }
 
@@ -921,7 +944,7 @@ private struct SourceSearchIdleRow: View {
                 Text("\(serviceName) Search")
                     .font(.body.weight(.medium))
 
-                Text("Enter a search term to preview catalog metadata")
+                Text("Enter a search term.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -937,12 +960,8 @@ struct SourceEmptyCard: View {
 
     var body: some View {
         RoomSurfaceCard {
-            Label("No \(serviceName) Items Yet", systemImage: "music.note.list")
+            Label("No \(serviceName) Items", systemImage: "music.note.list")
                 .font(.headline)
-
-            Text("Favorites and recent plays from this source will appear here after Sonoic sees them on Sonos.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
     }
 }
@@ -953,8 +972,7 @@ struct SourceCatalogPlaceholderCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
-                title: "Catalog",
-                subtitle: "Search and service browsing will connect here later."
+                title: "Search"
             )
 
             RoomSurfaceCard {

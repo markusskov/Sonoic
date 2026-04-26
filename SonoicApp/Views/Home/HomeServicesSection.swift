@@ -37,17 +37,12 @@ private struct HomeServiceChip: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     titleRow
-
-                    Text(source.detailText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
                 }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .frame(width: 220, alignment: .leading)
+        .frame(width: 168, alignment: .leading)
         .glassEffect(.regular, in: .rect(cornerRadius: 18))
     }
 

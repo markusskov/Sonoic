@@ -58,12 +58,6 @@ struct SearchView: View {
                             clear: clearRecentSearches
                         )
 
-                        SearchScopeSection(
-                            service: selectedService,
-                            selectedScope: searchState.scope,
-                            selectScope: selectScope
-                        )
-
                         SearchResultsSection(
                             service: selectedService,
                             state: searchState,
@@ -107,17 +101,10 @@ struct SearchView: View {
     }
 
     private func searchCatalog() {
+        model.updateSourceSearchScope(.all, for: selectedSource)
+
         Task {
             await model.searchSourceCatalog(for: selectedSource)
-        }
-    }
-
-    private func selectScope(_ scope: SonoicSourceSearchScope) {
-        let shouldSearch = scope != searchState.scope && searchState.hasQuery
-        model.updateSourceSearchScope(scope, for: selectedSource)
-
-        if shouldSearch {
-            searchCatalog()
         }
     }
 

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct HomeSectionHeader: View {
     let title: String
-    let subtitle: String
+    var subtitle: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -10,16 +10,18 @@ struct HomeSectionHeader: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
 
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }
 
 struct HomeMessageCard: View {
     let title: String
-    let detail: String
+    var detail: String?
 
     var body: some View {
         GroupBox {
@@ -28,9 +30,11 @@ struct HomeMessageCard: View {
                     .font(.headline)
                     .foregroundStyle(.primary)
 
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                if let detail {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -39,7 +43,7 @@ struct HomeMessageCard: View {
 
 struct HomeActionCard: View {
     let title: String
-    let detail: String
+    var detail: String?
     let buttonTitle: String
     let buttonSystemImage: String
     let action: () async -> Void
@@ -52,9 +56,11 @@ struct HomeActionCard: View {
                         .font(.headline)
                         .foregroundStyle(.primary)
 
-                    Text(detail)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    if let detail {
+                        Text(detail)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Button(buttonTitle, systemImage: buttonSystemImage, action: buttonTapped)

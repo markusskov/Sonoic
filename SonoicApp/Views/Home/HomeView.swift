@@ -20,10 +20,7 @@ struct HomeView: View {
 
                     if !recentPlays.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
-                            HomeSectionHeader(
-                                title: "Recently Played",
-                                subtitle: "Fresh listening history from this Sonoic setup."
-                            )
+                            HomeSectionHeader(title: "Recently Played")
 
                             HomeRecentlyPlayedSection(
                                 items: recentPlays,
@@ -32,10 +29,7 @@ struct HomeView: View {
                         }
                     }
 
-                    HomeSectionHeader(
-                        title: "Favorites",
-                        subtitle: "Start something quickly from your saved Sonos favorites."
-                    )
+                    HomeSectionHeader(title: "Favorites")
 
                     HomeFavoritesSection(
                         state: model.homeFavoritesState,
@@ -45,10 +39,7 @@ struct HomeView: View {
 
                     if !model.homeFavoriteCollections.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
-                            HomeSectionHeader(
-                                title: "Playlists & Stations",
-                                subtitle: "Collection-style Sonos favorites ready for this room."
-                            )
+                            HomeSectionHeader(title: "Playlists & Stations")
 
                             HomeCollectionsSection(
                                 collections: model.homeFavoriteCollections,
@@ -59,10 +50,7 @@ struct HomeView: View {
 
                     if !model.homeSources.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
-                            HomeSectionHeader(
-                                title: "Sources",
-                                subtitle: "Services visible through Sonos, plus the next integrations."
-                            )
+                            HomeSectionHeader(title: "Sources")
 
                             HomeServicesSection(sources: model.homeSources)
                         }
@@ -131,7 +119,7 @@ private struct HomeSetupCard: View {
                 Label("Choose a Room", systemImage: "speaker.wave.2.circle")
                     .font(.headline)
 
-                Text("Pick one of your discovered Sonos rooms to load favorites, services, and playback controls.")
+                Text("Select a room to start.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
