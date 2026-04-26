@@ -11,6 +11,7 @@ struct RoomVolumeSliderRow: View {
 
     @State private var draftVolume = 0.0
     @State private var isEditing = false
+    @State private var volumeCommitTask: Task<Void, Never>?
 
     private var volumeLabel: String {
         volume.isMuted ? "Muted" : "\(Int(draftVolume.rounded()))%"
@@ -32,6 +33,10 @@ struct RoomVolumeSliderRow: View {
             }
 
             draftVolume = Double(newValue)
+        }
+        .onDisappear {
+            volumeCommitTask?.cancel()
+            volumeCommitTask = nil
         }
     }
 
@@ -77,13 +82,15 @@ struct RoomVolumeSliderRow: View {
             Slider(
                 value: Binding(
                     get: { draftVolume },
-                    set: { draftVolume = min(max($0.rounded(), 0), 100) }
+                    set: { newValue in
+                        updateDraftVolume(newValue)
+                    }
                 ),
                 in: 0 ... 100,
                 step: 1,
                 onEditingChanged: handleEditingChanged
             )
-            .disabled(!isEnabled)
+            .disabled(!isEnabled && !isEditing)
 
             Image(systemName: "speaker.wave.3.fill")
                 .foregroundStyle(.tertiary)
@@ -93,9 +100,38 @@ struct RoomVolumeSliderRow: View {
     private func handleEditingChanged(_ editing: Bool) {
         isEditing = editing
 
-        guard !editing else {
-            return
+        if !editing {
+            commitVolumeImmediately()
         }
+    }
+
+    private func updateDraftVolume(_ newValue: Double) {
+        draftVolume = min(max(newValue.rounded(), 0), 100)
+        scheduleVolumeCommit()
+    }
+
+    private func scheduleVolumeCommit() {
+        volumeCommitTask?.cancel()
+
+        let level = Int(draftVolume.rounded())
+        volumeCommitTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(250))
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            _ = await setVolume(level)
+        }
+    }
+
+    private func commitVolumeImmediately() {
+        volumeCommitTask?.cancel()
+        volumeCommitTask = nil
 
         let level = Int(draftVolume.rounded())
         Task {

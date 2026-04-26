@@ -18,8 +18,8 @@ struct RoomsViewContent: View {
     let refreshGroupControl: () async -> Void
     let addRoomToGroup: (SonosDiscoveredPlayer) async -> Void
     let removeRoomFromGroup: (SonosDiscoveredPlayer) async -> Void
-    let setRoomVolume: (SonosDiscoveredPlayer, Int) async -> Void
-    let toggleRoomMute: (SonosDiscoveredPlayer) async -> Void
+    let setRoomVolume: (SonosRoomVolumeItem, Int) async -> Bool
+    let toggleRoomMute: (SonosRoomVolumeItem) async -> Void
 
     private var isRefreshingRoomState: Bool {
         model.manualHostRefreshStatus.isRefreshing

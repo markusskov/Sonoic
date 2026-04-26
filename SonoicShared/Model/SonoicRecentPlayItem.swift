@@ -96,6 +96,30 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
         )
     }
 
+    init(payload: SonosPlayablePayload, playedAt: Date) {
+        let sourceName = payload.service?.name ?? "Sonos Playback"
+
+        self.init(
+            id: Self.fingerprint(
+                title: payload.title,
+                artistName: payload.subtitle,
+                albumTitle: nil,
+                sourceName: sourceName
+            ),
+            title: payload.title,
+            artistName: payload.subtitle,
+            albumTitle: nil,
+            sourceName: sourceName,
+            artworkURL: payload.artworkURL?.sonoicNonEmptyTrimmed,
+            artworkIdentifier: nil,
+            service: payload.service,
+            lastPlayedAt: playedAt,
+            playbackURI: payload.uri,
+            playbackMetadataXML: payload.metadataXML,
+            favoriteKind: SonosFavoriteItem.Kind(payloadKind: payload.kind)
+        )
+    }
+
     var subtitle: String? {
         var parts: [String] = []
 
@@ -118,6 +142,18 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
         playbackURI.sonoicNonEmptyTrimmed != nil
     }
 
+    var isVisibleInHomeHistory: Bool {
+        service != nil
+    }
+
+    var homeHistoryIdentity: String {
+        Self.historyIdentity(
+            title: title,
+            artistName: artistName,
+            albumTitle: albumTitle
+        )
+    }
+
     var replayFavorite: SonosFavoriteItem? {
         guard let playbackURI = playbackURI?.sonoicNonEmptyTrimmed else {
             return nil
@@ -133,6 +169,10 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
             playbackMetadataXML: playbackMetadataXML,
             kind: favoriteKind ?? .item
         )
+    }
+
+    func matchesHomeHistoryIdentity(of otherItem: SonoicRecentPlayItem) -> Bool {
+        homeHistoryIdentity == otherItem.homeHistoryIdentity
     }
 
     func enriched(with newerItem: SonoicRecentPlayItem) -> SonoicRecentPlayItem {
@@ -174,5 +214,29 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
             sourceName.sonoicTrimmed.lowercased()
         ]
         .joined(separator: "|")
+    }
+
+    private static func historyIdentity(
+        title: String,
+        artistName: String?,
+        albumTitle: String?
+    ) -> String {
+        [
+            title.sonoicTrimmed.lowercased(),
+            artistName?.sonoicTrimmed.lowercased() ?? "",
+            albumTitle?.sonoicTrimmed.lowercased() ?? ""
+        ]
+        .joined(separator: "|")
+    }
+}
+
+private extension SonosFavoriteItem.Kind {
+    init(payloadKind: SonosPlayablePayload.Kind) {
+        switch payloadKind {
+        case .item:
+            self = .item
+        case .collection:
+            self = .collection
+        }
     }
 }

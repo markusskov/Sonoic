@@ -1,14 +1,19 @@
 import SwiftUI
 
 struct HomeServicesSection: View {
-    let summaries: [SonoicHomeSourceSummary]
+    let sources: [SonoicSource]
 
     var body: some View {
         ScrollView(.horizontal) {
             GlassEffectContainer(spacing: 12) {
                 HStack(spacing: 12) {
-                    ForEach(summaries) { summary in
-                        HomeServiceChip(summary: summary)
+                    ForEach(sources) { source in
+                        NavigationLink {
+                            SourceDetailView(source: source)
+                        } label: {
+                            HomeServiceChip(source: source)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.vertical, 2)
@@ -19,12 +24,12 @@ struct HomeServicesSection: View {
 }
 
 private struct HomeServiceChip: View {
-    let summary: SonoicHomeSourceSummary
+    let source: SonoicSource
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                Image(systemName: summary.service.systemImage)
+                Image(systemName: source.service.systemImage)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
                     .frame(width: 38, height: 38)
@@ -33,7 +38,7 @@ private struct HomeServiceChip: View {
                 VStack(alignment: .leading, spacing: 3) {
                     titleRow
 
-                    Text(summary.detailText)
+                    Text(source.detailText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
@@ -48,12 +53,12 @@ private struct HomeServiceChip: View {
 
     private var titleRow: some View {
         HStack(spacing: 6) {
-            Text(summary.service.name)
+            Text(source.service.name)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
 
-            if summary.isCurrent {
+            if source.isCurrent {
                 Image(systemName: "speaker.wave.2.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)

@@ -34,17 +34,17 @@ extension SonoicModel {
         case .inactive:
             isSceneActive = false
             stopSonosDiscovery()
-            stopManualHostRefreshLoop()
+            startManualHostRefreshLoopIfPossible()
         case .background:
             isSceneActive = false
             stopSonosDiscovery()
-            stopManualHostRefreshLoop()
+            startManualHostRefreshLoopIfPossible()
             scheduleBackgroundPlayerRefreshIfPossible()
             refreshPlayerStateOnBackgroundTransitionIfPossible()
         @unknown default:
             isSceneActive = false
             stopSonosDiscovery()
-            stopManualHostRefreshLoop()
+            startManualHostRefreshLoopIfPossible()
             scheduleBackgroundPlayerRefreshIfPossible()
         }
     }

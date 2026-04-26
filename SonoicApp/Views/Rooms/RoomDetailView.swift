@@ -123,12 +123,7 @@ struct RoomDetailView: View {
     }
 
     private func setTargetVolume(_ level: Int) async -> Bool {
-        let didSetVolume = await model.setManualSonosVolume(to: level)
-        if didSetVolume {
-            await model.refreshRoomVolumes(showLoading: false)
-        }
-
-        return didSetVolume
+        await model.setManualSonosVolume(to: level)
     }
 
     private func toggleTargetMute() async {

@@ -27,6 +27,10 @@ struct SonosFavoriteItem: Identifiable, Equatable {
             || normalizedURI.contains("radio")
             || normalizedURI.contains("album")
     }
+
+    var playablePayload: SonosPlayablePayload? {
+        SonosPlayablePayload(favorite: self)
+    }
 }
 
 struct SonosFavoritesSnapshot: Equatable {
