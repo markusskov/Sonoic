@@ -19,9 +19,8 @@ struct AppleMusicItemDetailView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     AppleMusicItemDetailHeader(item: item)
 
-                    if exactPlaybackCandidate != nil || item.externalURL != nil {
+                    if let exactPlaybackCandidate {
                         AppleMusicItemActionCard(
-                            item: item,
                             playbackCandidate: exactPlaybackCandidate,
                             play: playCandidate
                         )
@@ -159,22 +158,11 @@ private struct AppleMusicItemDetailHeader: View {
 }
 
 private struct AppleMusicItemActionCard: View {
-    let item: SonoicSourceItem
-    let playbackCandidate: SonoicSonosPlaybackCandidate?
+    let playbackCandidate: SonoicSonosPlaybackCandidate
     let play: (SonoicSonosPlaybackCandidate) async -> Void
 
     var body: some View {
         RoomSurfaceCard {
-            VStack(alignment: .leading, spacing: 12) {
-                capabilityContent
-                appleMusicLink
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var capabilityContent: some View {
-        if let playbackCandidate {
             Button {
                 Task {
                     await play(playbackCandidate)
@@ -184,20 +172,6 @@ private struct AppleMusicItemActionCard: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-        }
-    }
-
-    @ViewBuilder
-    private var appleMusicLink: some View {
-        if let externalURL = item.externalURL,
-           let url = URL(string: externalURL) {
-            Link(destination: url) {
-                Label("Open in Apple Music", systemImage: "arrow.up.forward.app")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.capsule)
-            .accessibilityLabel("Open \(item.title) in Apple Music")
         }
     }
 }
