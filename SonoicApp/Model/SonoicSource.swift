@@ -274,6 +274,12 @@ struct SonoicSourceItem: Identifiable, Equatable {
 
     init(recentPlay: SonoicRecentPlayItem) {
         let playablePayload = recentPlay.replayFavorite?.playablePayload
+        let kind = recentPlay.sourceItemKindRawValue.flatMap(SonoicSourceItem.Kind.init(rawValue:)) ?? .unknown
+        let appleMusicIdentity = recentPlay.service?.kind == .appleMusic ? SonoicAppleMusicItemIdentity(
+            catalogID: recentPlay.appleMusicCatalogID ?? recentPlay.sourceItemID,
+            libraryID: recentPlay.appleMusicLibraryID,
+            kind: kind
+        ) : nil
 
         self.init(
             id: "recent-\(recentPlay.id)",
@@ -281,9 +287,11 @@ struct SonoicSourceItem: Identifiable, Equatable {
             subtitle: recentPlay.subtitle ?? recentPlay.sourceName,
             artworkURL: recentPlay.artworkURL,
             artworkIdentifier: recentPlay.artworkIdentifier,
+            serviceItemID: recentPlay.sourceItemID,
+            appleMusicIdentity: appleMusicIdentity,
             service: recentPlay.service ?? .genericStreaming,
             origin: .recentPlay,
-            kind: .unknown,
+            kind: kind,
             playbackCapability: playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .metadataOnly
         )
     }

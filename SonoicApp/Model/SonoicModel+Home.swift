@@ -328,7 +328,11 @@ extension SonoicModel {
                 lastPlayedAt: .now,
                 playbackURI: replayPayload?.uri,
                 playbackMetadataXML: replayPayload?.metadataXML,
-                favoriteKind: recentFavoriteKind(for: item)
+                favoriteKind: recentFavoriteKind(for: item),
+                sourceItemID: item.serviceItemID,
+                appleMusicCatalogID: item.appleMusicIdentity?.catalogID,
+                appleMusicLibraryID: item.appleMusicIdentity?.libraryID,
+                sourceItemKindRawValue: item.kind.rawValue
             )
         )
     }

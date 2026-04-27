@@ -13,6 +13,10 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
     var playbackURI: String?
     var playbackMetadataXML: String?
     var favoriteKind: SonosFavoriteItem.Kind?
+    var sourceItemID: String?
+    var appleMusicCatalogID: String?
+    var appleMusicLibraryID: String?
+    var sourceItemKindRawValue: String?
 
     init(
         id: String,
@@ -26,7 +30,11 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
         lastPlayedAt: Date,
         playbackURI: String? = nil,
         playbackMetadataXML: String? = nil,
-        favoriteKind: SonosFavoriteItem.Kind? = nil
+        favoriteKind: SonosFavoriteItem.Kind? = nil,
+        sourceItemID: String? = nil,
+        appleMusicCatalogID: String? = nil,
+        appleMusicLibraryID: String? = nil,
+        sourceItemKindRawValue: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -40,6 +48,10 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
         self.playbackURI = playbackURI
         self.playbackMetadataXML = playbackMetadataXML
         self.favoriteKind = favoriteKind
+        self.sourceItemID = sourceItemID
+        self.appleMusicCatalogID = appleMusicCatalogID
+        self.appleMusicLibraryID = appleMusicLibraryID
+        self.sourceItemKindRawValue = sourceItemKindRawValue
     }
 
     init?(snapshot: SonosNowPlayingSnapshot, observedAt: Date) {
@@ -205,7 +217,11 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
             lastPlayedAt: newerItem.lastPlayedAt,
             playbackURI: newerItem.playbackURI ?? playbackURI,
             playbackMetadataXML: newerItem.playbackMetadataXML ?? playbackMetadataXML,
-            favoriteKind: newerItem.favoriteKind ?? favoriteKind
+            favoriteKind: newerItem.favoriteKind ?? favoriteKind,
+            sourceItemID: newerItem.sourceItemID ?? sourceItemID,
+            appleMusicCatalogID: newerItem.appleMusicCatalogID ?? appleMusicCatalogID,
+            appleMusicLibraryID: newerItem.appleMusicLibraryID ?? appleMusicLibraryID,
+            sourceItemKindRawValue: newerItem.sourceItemKindRawValue ?? sourceItemKindRawValue
         )
     }
 

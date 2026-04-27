@@ -22,10 +22,7 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             HomeSectionHeader(title: "Recently Played")
 
-                            HomeRecentlyPlayedSection(
-                                items: recentPlays,
-                                playRecentItem: playRecentItem
-                            )
+                            HomeRecentlyPlayedSection(items: recentPlays)
                         }
                     }
 
@@ -91,10 +88,6 @@ struct HomeView: View {
 
     private func playFavorite(_ favorite: SonosFavoriteItem) async {
         _ = await model.playManualSonosFavorite(favorite)
-    }
-
-    private func playRecentItem(_ recentItem: SonoicRecentPlayItem) async {
-        _ = await model.playRecentItem(recentItem)
     }
 
     private func togglePlayback() async {
