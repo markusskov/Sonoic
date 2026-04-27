@@ -232,6 +232,172 @@ struct SettingsSonosMusicServiceProbeSection: View {
     }
 }
 
+struct SettingsSonosContentDirectoryProbeSection: View {
+    let model: SonoicModel
+    let refreshTimingText: (Date?) -> String
+
+    var body: some View {
+        Section("Sonos Content") {
+            SettingsStatusRow(
+                title: "Content Probe",
+                statusTitle: statusTitle,
+                detail: statusDetail,
+                systemImage: systemImage,
+                tint: tint
+            )
+
+            if let snapshot = model.sonosContentDirectoryProbeState.snapshot {
+                LabeledContent("Observed At", value: refreshTimingText(snapshot.observedAt))
+
+                if !snapshot.discoveredRecentCandidates.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Recent Candidates")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        ForEach(snapshot.discoveredRecentCandidates) { entry in
+                            Text("\(entry.title) · \(entry.id)")
+                                .font(.footnote)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                ForEach(snapshot.browses) { browse in
+                    SettingsSonosContentDirectoryBrowseRow(browse: browse)
+                }
+            }
+
+            Button(action: refreshProbe) {
+                if model.sonosContentDirectoryProbeState.isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Refreshing")
+                    }
+                } else {
+                    Label("Refresh Content", systemImage: "arrow.clockwise")
+                }
+            }
+            .disabled(model.sonosContentDirectoryProbeState.isLoading)
+        }
+    }
+
+    private var statusTitle: String {
+        switch model.sonosContentDirectoryProbeState.status {
+        case .idle:
+            "Not Refreshed"
+        case .loading:
+            "Refreshing"
+        case .loaded:
+            "Loaded"
+        case .failed:
+            "Failed"
+        }
+    }
+
+    private var statusDetail: String? {
+        switch model.sonosContentDirectoryProbeState.status {
+        case .idle:
+            "Browses Sonos content containers."
+        case .loading:
+            "Reading local Sonos content."
+        case .loaded:
+            nil
+        case .failed(let detail):
+            detail
+        }
+    }
+
+    private var systemImage: String {
+        switch model.sonosContentDirectoryProbeState.status {
+        case .idle:
+            "folder"
+        case .loading:
+            "arrow.clockwise"
+        case .loaded:
+            "checkmark.circle.fill"
+        case .failed:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch model.sonosContentDirectoryProbeState.status {
+        case .idle:
+            .secondary
+        case .loading:
+            .orange
+        case .loaded:
+            .green
+        case .failed:
+            .red
+        }
+    }
+
+    private func refreshProbe() {
+        Task {
+            await model.refreshSonosContentDirectoryProbe()
+        }
+    }
+}
+
+private struct SettingsSonosContentDirectoryBrowseRow: View {
+    let browse: SonosContentDirectoryProbeBrowse
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(browse.title)
+                        .font(.body.weight(.medium))
+
+                    Text(browse.objectID)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(browse.countText)
+                    .foregroundStyle(statusTint)
+            }
+
+            if case .failed(let detail) = browse.status {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(browse.entries.prefix(8)) { entry in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.title)
+                        .font(.footnote.weight(.semibold))
+                        .lineLimit(1)
+
+                    Text(entry.detailText)
+                        .font(.caption)
+                        .foregroundStyle(entry.looksLikeRecentlyPlayedContainer ? .orange : .secondary)
+                        .lineLimit(2)
+                }
+                .padding(.leading, 8)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var statusTint: Color {
+        switch browse.status {
+        case .loaded:
+            .green
+        case .empty:
+            .secondary
+        case .failed:
+            .orange
+        }
+    }
+}
+
 private struct SettingsSonosMusicServiceProbeRow: View {
     let row: SonosMusicServiceProbeRow
 

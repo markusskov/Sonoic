@@ -158,6 +158,7 @@ struct SettingsAdvancedView: View {
                 SettingsNowPlayingDiagnosticsSection(model: model, refreshTimingText: refreshTimingText)
                 SettingsQueueDiagnosticsSection(model: model, refreshTimingText: refreshTimingText)
                 SettingsSonosMusicServiceProbeSection(model: model, refreshTimingText: refreshTimingText)
+                SettingsSonosContentDirectoryProbeSection(model: model, refreshTimingText: refreshTimingText)
             }
         }
         .miniPlayerContentInset()

@@ -62,6 +62,7 @@ final class SonoicModel {
     @ObservationIgnored let queueClient: SonosQueueClient
     @ObservationIgnored let favoritesClient: SonosFavoritesClient
     @ObservationIgnored let musicServicesClient: SonosMusicServicesClient
+    @ObservationIgnored let contentDirectoryProbeClient: SonosContentDirectoryProbeClient
     @ObservationIgnored let appleMusicCatalogSearchClient: SonoicAppleMusicCatalogSearchClient
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
 
@@ -94,6 +95,7 @@ final class SonoicModel {
             manualQueueContextPayloads = nil
             manualRecentPlaybackContextPayload = nil
             sonosMusicServiceProbeState = .idle
+            sonosContentDirectoryProbeState = .idle
             resetManualHostIdentity()
             stopManualHostRefreshLoop()
             scheduleBackgroundPlayerRefreshIfPossible()
@@ -120,6 +122,7 @@ final class SonoicModel {
     var appleMusicRequestReadiness = SonoicAppleMusicRequestReadiness.idle
     var musicKitDiagnostics = SonoicMusicKitDiagnostics.current
     var sonosMusicServiceProbeState = SonosMusicServiceProbeState.idle
+    var sonosContentDirectoryProbeState = SonosContentDirectoryProbeState.idle
     var isQueueRefreshing = false
     var isQueueClearing = false
     var isQueueMutating = false
@@ -246,6 +249,7 @@ final class SonoicModel {
         queueClient = SonosQueueClient(transport: sonosControlTransport)
         favoritesClient = SonosFavoritesClient(transport: sonosControlTransport)
         musicServicesClient = SonosMusicServicesClient(transport: sonosControlTransport)
+        contentDirectoryProbeClient = SonosContentDirectoryProbeClient(transport: sonosControlTransport)
         appleMusicCatalogSearchClient = SonoicAppleMusicCatalogSearchClient()
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         manualSonosHost = settingsStore.loadManualSonosHost()
