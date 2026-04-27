@@ -161,6 +161,9 @@ struct SettingsAdvancedView: View {
         }
         .miniPlayerContentInset()
         .navigationTitle("Advanced")
+        .task(id: model.queueRefreshContext) {
+            await model.refreshQueue(showLoading: false)
+        }
     }
 }
 
