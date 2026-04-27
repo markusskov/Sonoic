@@ -17,6 +17,7 @@ extension SonoicModel {
 
         do {
             let snapshot = try await musicServicesClient.fetchProbeSnapshot(host: host)
+                .includingObservedAccounts(from: observedSonosServiceAccountValues)
             sonosMusicServiceProbeState = SonosMusicServiceProbeState(
                 status: .loaded,
                 snapshot: snapshot
@@ -27,5 +28,19 @@ extension SonoicModel {
                 snapshot: sonosMusicServiceProbeState.snapshot
             )
         }
+    }
+
+    private var observedSonosServiceAccountValues: [String?] {
+        var values: [String?] = [
+            nowPlayingDiagnostics.currentURI,
+            nowPlayingDiagnostics.trackURI,
+        ]
+
+        if let favorites = homeFavoritesState.snapshot?.items {
+            values.append(contentsOf: favorites.map(\.playbackURI))
+            values.append(contentsOf: favorites.map(\.playbackMetadataXML))
+        }
+
+        return values
     }
 }

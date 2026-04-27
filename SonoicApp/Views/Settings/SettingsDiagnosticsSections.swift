@@ -262,7 +262,7 @@ private struct SettingsSonosMusicServiceProbeRow: View {
             ForEach(row.accounts) { account in
                 Text(account.redactedDetail)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(accountTint(account))
             }
         }
         .padding(.vertical, 4)
@@ -273,7 +273,15 @@ private struct SettingsSonosMusicServiceProbeRow: View {
             return .secondary
         }
 
-        return row.accounts.isEmpty ? .orange : .green
+        if row.accounts.isEmpty {
+            return .orange
+        }
+
+        return row.accounts.contains(where: \.hasStatusAccount) ? .green : .orange
+    }
+
+    private func accountTint(_ account: SonosMusicServiceAccountSummary) -> Color {
+        account.hasStatusAccount ? .secondary : .orange
     }
 }
 

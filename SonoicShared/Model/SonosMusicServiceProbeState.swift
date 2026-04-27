@@ -42,6 +42,19 @@ struct SonosMusicServiceProbeSnapshot: Equatable {
             )
         }
     }
+
+    func includingObservedAccounts(from values: [String?]) -> SonosMusicServiceProbeSnapshot {
+        var snapshot = self
+        let observedAccounts = SonosMusicServiceAccountSummary.observedAccounts(from: values)
+
+        for observedAccount in observedAccounts where !snapshot.accounts.contains(where: {
+            $0.serviceType == observedAccount.serviceType && $0.serialNumber == observedAccount.serialNumber
+        }) {
+            snapshot.accounts.append(observedAccount)
+        }
+
+        return snapshot
+    }
 }
 
 struct SonosMusicServiceProbeRow: Identifiable, Equatable {
@@ -58,7 +71,11 @@ struct SonosMusicServiceProbeRow: Identifiable, Equatable {
             return "Not Found"
         }
 
-        return accounts.isEmpty ? "No Account" : "Ready"
+        guard !accounts.isEmpty else {
+            return "No Account"
+        }
+
+        return accounts.contains(where: \.hasStatusAccount) ? "Ready" : "Observed"
     }
 
     var detailText: String {
@@ -96,15 +113,25 @@ struct SonosMusicServiceDescriptor: Identifiable, Equatable {
 }
 
 struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
+    enum Source: Equatable {
+        case statusAccounts
+        case observedPlayback
+    }
+
     var serviceType: String
     var serialNumber: String
     var nickname: String?
     var hasUsername: Bool
     var hasOAuthDeviceID: Bool
     var hasKey: Bool
+    var source: Source = .statusAccounts
 
     var id: String {
         "\(serviceType)-\(serialNumber)"
+    }
+
+    var hasStatusAccount: Bool {
+        source == .statusAccounts
     }
 
     var displayName: String {
@@ -127,6 +154,52 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
         }
 
         return parts.joined(separator: " · ")
+    }
+
+    static func observedAccounts(from values: [String?]) -> [SonosMusicServiceAccountSummary] {
+        var seenIDs: Set<String> = []
+        return values.compactMap(observedAccount).filter { account in
+            seenIDs.insert(account.id).inserted
+        }
+    }
+
+    private static func observedAccount(from value: String?) -> SonosMusicServiceAccountSummary? {
+        guard let value = value?.sonoicNonEmptyTrimmed else {
+            return nil
+        }
+
+        let query = value
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .split(separator: "?", maxSplits: 1)
+            .dropFirst()
+            .first
+            .map(String.init) ?? value
+
+        let pairs = query.split(separator: "&").reduce(into: [String: String]()) { result, pair in
+            let parts = pair.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2 else {
+                return
+            }
+
+            result[String(parts[0]).lowercased()] = String(parts[1])
+        }
+
+        guard let sid = pairs["sid"],
+              let serialNumber = pairs["sn"]?.sonoicNonEmptyTrimmed,
+              let serviceID = Int(sid)
+        else {
+            return nil
+        }
+
+        return SonosMusicServiceAccountSummary(
+            serviceType: String((serviceID * 256) + 7),
+            serialNumber: serialNumber,
+            nickname: "Observed in playback",
+            hasUsername: false,
+            hasOAuthDeviceID: false,
+            hasKey: false,
+            source: .observedPlayback
+        )
     }
 }
 
