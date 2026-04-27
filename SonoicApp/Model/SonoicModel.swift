@@ -44,6 +44,7 @@ final class SonoicModel {
     @ObservationIgnored var isHomeFavoritesRefreshing = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
     @ObservationIgnored var isManualPlayTransitionAwaitingConfirmation = false
+    @ObservationIgnored var manualPlaybackContextPayload: SonosPlayablePayload?
     @ObservationIgnored var backgroundExecutionIdentifier: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored let sonosDiscoveryBrowser: SonosBonjourBrowser
     @ObservationIgnored var discoverySnapshotTask: Task<Void, Never>?
@@ -87,6 +88,7 @@ final class SonoicModel {
             homeTheaterOperationErrorDetail = nil
             roomVolumeOperationErrorDetail = nil
             nowPlayingDiagnostics = .empty
+            manualPlaybackContextPayload = nil
             sonosMusicServiceProbeState = .idle
             resetManualHostIdentity()
             stopManualHostRefreshLoop()

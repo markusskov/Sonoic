@@ -63,6 +63,20 @@ struct SonosAVTransportClient {
         return SonosTransportActions(actionsString: value)
     }
 
+    func setPlayMode(host: String, mode: String) async throws {
+        _ = try await transport.performAction(
+            service: .avTransport,
+            named: "SetPlayMode",
+            body: """
+            <u:SetPlayMode xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+              <NewPlayMode>\(escapedSOAPValue(mode))</NewPlayMode>
+            </u:SetPlayMode>
+            """,
+            host: host
+        )
+    }
+
     func play(host: String) async throws {
         _ = try await transport.performAction(
             service: .avTransport,

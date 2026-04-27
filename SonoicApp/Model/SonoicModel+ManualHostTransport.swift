@@ -35,6 +35,7 @@ extension SonoicModel {
     }
 
     func skipToNextManualSonosTrack() async -> Bool {
+        manualPlaybackContextPayload = nil
         if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
             beginManualPlayTransitionGrace()
             markLocalPlaybackState(.playing)
@@ -49,6 +50,7 @@ extension SonoicModel {
     }
 
     func skipToPreviousManualSonosTrack() async -> Bool {
+        manualPlaybackContextPayload = nil
         if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
             beginManualPlayTransitionGrace()
             markLocalPlaybackState(.playing)
@@ -73,6 +75,7 @@ extension SonoicModel {
             return false
         }
 
+        manualPlaybackContextPayload = nil
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
         return await performManualTransportCommand(
@@ -92,10 +95,18 @@ extension SonoicModel {
         return await playManualSonosPayload(payload)
     }
 
-    func playManualSonosPayload(_ payload: SonosPlayablePayload) async -> Bool {
+    func playManualSonosPayload(
+        _ payload: SonosPlayablePayload,
+        startingTrackNumber: Int? = nil,
+        localNowPlayingPayload: SonosPlayablePayload? = nil
+    ) async -> Bool {
         guard let preparedPayload = try? SonosPlayablePayloadPreparer().prepare(payload) else {
             return false
         }
+        let preparedLocalPayload = localNowPlayingPayload.flatMap {
+            try? SonosPlayablePayloadPreparer().prepare($0)
+        }
+        let displayPayload = preparedLocalPayload ?? preparedPayload
 
         if let snapshot = queueState.snapshot {
             queueState = .loaded(SonosQueueSnapshot(
@@ -106,7 +117,8 @@ extension SonoicModel {
         }
 
         beginManualPlayTransitionGrace()
-        markLocalNowPlaying(from: preparedPayload)
+        manualPlaybackContextPayload = displayPayload
+        markLocalNowPlaying(from: displayPayload)
         let didStartPlayback = await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
             let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
             try await avTransportClient.setTransportURI(
@@ -114,11 +126,21 @@ extension SonoicModel {
                 uri: preparedPayload.uri,
                 metadataXML: preparedPayload.metadataXML
             )
+            if SonosPlaybackSourceOwnership(uri: preparedPayload.uri) == .directServiceStream {
+                try? await avTransportClient.setPlayMode(host: playbackHost, mode: "NORMAL")
+            }
+            if let startingTrackNumber,
+               startingTrackNumber > 1
+            {
+                try? await avTransportClient.seekToTrack(host: playbackHost, trackNumber: startingTrackNumber)
+            }
             try await avTransportClient.play(host: playbackHost)
         }
 
         if didStartPlayback {
-            recordRecentPlayablePayload(preparedPayload)
+            recordRecentPlayablePayload(displayPayload)
+        } else {
+            manualPlaybackContextPayload = nil
         }
 
         return didStartPlayback

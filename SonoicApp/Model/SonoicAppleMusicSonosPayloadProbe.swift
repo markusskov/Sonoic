@@ -3,12 +3,15 @@ import Foundation
 struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
     enum Strategy: String, Equatable {
         case catalogHLS
+        case catalogPlaylistContainer
         case libraryTrack
 
         var title: String {
             switch self {
             case .catalogHLS:
                 "Catalog HLS"
+            case .catalogPlaylistContainer:
+                "Catalog Playlist"
             case .libraryTrack:
                 "Library Track"
             }
@@ -25,7 +28,7 @@ struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
     }
 
     var isUserPlayable: Bool {
-        strategy == .catalogHLS
+        strategy == .catalogHLS || strategy == .catalogPlaylistContainer
     }
 
     func playbackPayload(for item: SonoicSourceItem) -> SonosPlayablePayload {
@@ -37,7 +40,7 @@ struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
             service: .appleMusic,
             uri: uri,
             metadataXML: metadataXML,
-            kind: .item,
+            kind: strategy == .catalogPlaylistContainer ? .collection : .item,
             duration: item.duration
         )
     }
@@ -55,7 +58,6 @@ struct SonoicAppleMusicSonosPayloadProbe {
         playbackHint: SonosMusicServicePlaybackHint?
     ) -> [SonoicAppleMusicGeneratedPayloadCandidate] {
         guard item.service.kind == .appleMusic,
-              item.kind == .song,
               let playbackHint,
               let identity = item.appleMusicIdentity
         else {
@@ -65,7 +67,8 @@ struct SonoicAppleMusicSonosPayloadProbe {
         var candidates: [SonoicAppleMusicGeneratedPayloadCandidate] = []
         let metadataBuilder = SonoicAppleMusicSonosCandidateMetadataBuilder()
 
-        if let catalogID = identity.catalogID.sonoicNonEmptyTrimmed,
+        if item.kind == .song,
+           let catalogID = identity.catalogID.sonoicNonEmptyTrimmed,
            let launchSerial = playbackHint.preferredLaunchSerial?.sonoicNonEmptyTrimmed,
            let encodedCatalogID = sonosPayloadID(catalogID) {
             let uri = "x-sonosapi-hls:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&sn=\(launchSerial)"
@@ -83,7 +86,27 @@ struct SonoicAppleMusicSonosPayloadProbe {
             )
         }
 
-        if let libraryID = identity.libraryID.sonoicNonEmptyTrimmed,
+        if item.kind == .playlist,
+           let catalogID = identity.catalogID.sonoicNonEmptyTrimmed,
+           let launchSerial = playbackHint.preferredLaunchSerial?.sonoicNonEmptyTrimmed,
+           let encodedCatalogID = sonosPayloadID(catalogID) {
+            let uri = "x-rincon-cpcontainer:1006206cplaylist%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&flags=8300&sn=\(launchSerial)"
+            candidates.append(
+                SonoicAppleMusicGeneratedPayloadCandidate(
+                    strategy: .catalogPlaylistContainer,
+                    uri: uri,
+                    metadataXML: metadataBuilder.metadataXML(
+                        for: item,
+                        itemID: "playlist:\(catalogID)",
+                        serviceID: appleMusicServiceID
+                    ),
+                    serialNumber: launchSerial
+                )
+            )
+        }
+
+        if item.kind == .song,
+           let libraryID = identity.libraryID.sonoicNonEmptyTrimmed,
            let trackSerial = playbackHint.trackSerials.first?.sonoicNonEmptyTrimmed,
            let encodedLibraryID = sonosPayloadID(libraryID) {
             let uri = "x-sonos-http:librarytrack%3a\(encodedLibraryID).m4p?sid=\(appleMusicServiceID)&flags=8232&sn=\(trackSerial)"
@@ -125,8 +148,17 @@ private struct SonoicAppleMusicSonosCandidateMetadataBuilder {
         let serviceType = SonosServiceDescriptor.appleMusic.sonosServiceType ?? serviceID
 
         return """
-        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/"><item id="\(xmlEscaped(itemID))" parentID="" restricted="true"><dc:title>\(xmlEscaped(item.title))</dc:title>\(optionalElement("dc:creator", creator))\(optionalElement("upnp:album", album))\(optionalElement("upnp:albumArtURI", item.artworkURL))<upnp:class>object.item.audioItem.musicTrack</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON\(serviceType)_X_#Svc\(serviceType)-0-Token</desc></item></DIDL-Lite>
+        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/"><item id="\(xmlEscaped(itemID))" parentID="" restricted="true"><dc:title>\(xmlEscaped(item.title))</dc:title>\(optionalElement("dc:creator", creator))\(optionalElement("upnp:album", album))\(optionalElement("upnp:albumArtURI", item.artworkURL))<upnp:class>\(upnpClass(for: item.kind))</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON\(serviceType)_X_#Svc\(serviceType)-0-Token</desc></item></DIDL-Lite>
         """
+    }
+
+    private func upnpClass(for kind: SonoicSourceItem.Kind) -> String {
+        switch kind {
+        case .playlist:
+            "object.container.playlistContainer"
+        default:
+            "object.item.audioItem.musicTrack"
+        }
     }
 
     private func optionalElement(_ name: String, _ value: String?) -> String {

@@ -55,6 +55,37 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
     }
 
     @Test
+    func buildsPlaylistContainerCandidateFromLaunchSerial() throws {
+        let item = SonoicSourceItem.appleMusicMetadata(
+            id: "p.abc123",
+            title: "Road Songs",
+            subtitle: "Apple Music",
+            artworkURL: nil,
+            kind: .playlist,
+            origin: .catalogSearch,
+            catalogID: "p.abc123"
+        )
+        let candidates = probe.candidates(
+            for: item,
+            playbackHint: SonosMusicServicePlaybackHint(
+                launchSerials: ["3"],
+                trackSerials: ["7"]
+            )
+        )
+
+        let candidate = try #require(candidates.first { $0.strategy == .catalogPlaylistContainer })
+
+        #expect(candidate.isUserPlayable)
+        #expect(candidate.serialNumber == "3")
+        #expect(candidate.uri == "x-rincon-cpcontainer:1006206cplaylist%3ap.abc123?sid=204&flags=8300&sn=3")
+        #expect(candidate.metadataXML.contains("playlist:p.abc123"))
+        #expect(candidate.metadataXML.contains("<upnp:class>object.container.playlistContainer</upnp:class>"))
+
+        let payload = candidate.playbackPayload(for: item)
+        #expect(payload.kind == .collection)
+    }
+
+    @Test
     func escapesMetadataXMLValues() throws {
         let item = SonoicSourceItem.appleMusicMetadata(
             id: "1440857781",
@@ -89,7 +120,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
     }
 
     @Test
-    func onlyBuildsSongCandidatesForNow() {
+    func doesNotGuessAlbumCandidatesYet() {
         let album = SonoicSourceItem.appleMusicMetadata(
             id: "1440857780",
             title: "That Low and Lonesome Sound",

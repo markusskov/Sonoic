@@ -472,6 +472,7 @@ struct SourceItemNavigationRow: View {
     @Environment(SonoicModel.self) private var model
 
     let item: SonoicSourceItem
+    var playOverride: (() async -> Void)?
 
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
         model.appleMusicExactPlaybackCandidate(for: item)
@@ -486,7 +487,7 @@ struct SourceItemNavigationRow: View {
     }
 
     private var canPlay: Bool {
-        exactPlaybackCandidate != nil || generatedPlaybackCandidate != nil
+        playOverride != nil || exactPlaybackCandidate != nil || generatedPlaybackCandidate != nil
     }
 
     var body: some View {
@@ -521,6 +522,11 @@ struct SourceItemNavigationRow: View {
     }
 
     private func play() async {
+        if let playOverride {
+            await playOverride()
+            return
+        }
+
         if let exactPlaybackCandidate {
             _ = await model.playManualSonosPayload(exactPlaybackCandidate.payload)
             return
