@@ -143,7 +143,7 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
     }
 
     var isVisibleInHomeHistory: Bool {
-        service != nil
+        service != nil && !titleMatchesSourceName
     }
 
     var homeHistoryIdentity: String {
@@ -169,6 +169,23 @@ struct SonoicRecentPlayItem: Identifiable, Codable, Equatable {
             playbackMetadataXML: playbackMetadataXML,
             kind: favoriteKind ?? .item
         )
+    }
+
+    private var titleMatchesSourceName: Bool {
+        let normalizedTitle = title.sonoicTrimmed
+        let normalizedSourceName = sourceName.sonoicTrimmed
+
+        guard !normalizedTitle.isEmpty, !normalizedSourceName.isEmpty else {
+            return false
+        }
+
+        if normalizedTitle.caseInsensitiveCompare(normalizedSourceName) == .orderedSame {
+            return true
+        }
+
+        return service?.name.sonoicNonEmptyTrimmed.map {
+            normalizedTitle.caseInsensitiveCompare($0) == .orderedSame
+        } == true
     }
 
     func matchesHomeHistoryIdentity(of otherItem: SonoicRecentPlayItem) -> Bool {

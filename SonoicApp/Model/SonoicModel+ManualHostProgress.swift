@@ -186,6 +186,10 @@ extension SonoicModel {
         let subtitleParts = manualPlaybackSubtitleParts(for: payload)
         var preservedSnapshot = snapshot
 
+        if shouldPreserveManualPlaybackTitle(in: preservedSnapshot, diagnostics: diagnostics, payload: payload) {
+            preservedSnapshot.title = payload.title
+        }
+
         if preservedSnapshot.artistName.sonoicNonEmptyTrimmed == nil {
             preservedSnapshot.artistName = subtitleParts.first
         }
@@ -213,6 +217,26 @@ extension SonoicModel {
         }
 
         return preservedSnapshot
+    }
+
+    private func shouldPreserveManualPlaybackTitle(
+        in snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics,
+        payload: SonosPlayablePayload
+    ) -> Bool {
+        guard !diagnostics.hasTrackMetadata,
+              !diagnostics.hasSourceMetadata
+        else {
+            return false
+        }
+
+        let snapshotTitle = snapshot.title.sonoicTrimmed
+        let serviceName = payload.service?.name.sonoicTrimmed
+
+        return snapshotTitle.isEmpty
+            || snapshotTitle.caseInsensitiveCompare(snapshot.sourceName.sonoicTrimmed) == .orderedSame
+            || serviceName.map { snapshotTitle.caseInsensitiveCompare($0) == .orderedSame } == true
+            || SonosMetadataHeuristics.isGenericQueueTitle(snapshotTitle)
     }
 
     func effectiveLocalElapsedTime(referenceDate: Date = .now) -> TimeInterval? {

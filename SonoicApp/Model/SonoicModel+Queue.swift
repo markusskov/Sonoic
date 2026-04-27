@@ -42,7 +42,9 @@ extension SonoicModel {
         }
 
         do {
-            let snapshot = try await queueClient.fetchSnapshot(host: manualSonosHost)
+            let snapshot = queueSnapshotEnrichedFromManualContext(
+                try await queueClient.fetchSnapshot(host: manualSonosHost)
+            )
             queueDiagnostics = SonosQueueDiagnostics(
                 observedAt: Date(),
                 currentURI: snapshot.sourceURI ?? nowPlayingDiagnostics.currentURI,
@@ -70,6 +72,43 @@ extension SonoicModel {
             )
             queueState = .failed(error.localizedDescription)
         }
+    }
+
+    private func queueSnapshotEnrichedFromManualContext(_ snapshot: SonosQueueSnapshot) -> SonosQueueSnapshot {
+        guard let payloads = manualQueueContextPayloads,
+              payloads.count == snapshot.items.count
+        else {
+            return snapshot
+        }
+
+        let enrichedItems = zip(snapshot.items, payloads).map { item, payload in
+            queueItemEnriched(item, with: payload)
+        }
+
+        return SonosQueueSnapshot(
+            items: enrichedItems,
+            currentItemIndex: snapshot.currentItemIndex,
+            sourceURI: snapshot.sourceURI
+        )
+    }
+
+    private func queueItemEnriched(
+        _ item: SonosQueueItem,
+        with payload: SonosPlayablePayload
+    ) -> SonosQueueItem {
+        let payloadSubtitleParts = payload.subtitle?
+            .components(separatedBy: "•")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty } ?? []
+
+        return SonosQueueItem(
+            id: item.id,
+            title: item.title == "Unknown Track" ? payload.title : item.title,
+            artistName: item.artistName ?? payloadSubtitleParts.first,
+            albumTitle: item.albumTitle ?? payloadSubtitleParts.dropFirst().first,
+            artworkURL: item.artworkURL ?? payload.artworkURL,
+            duration: item.duration ?? payload.duration
+        )
     }
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
