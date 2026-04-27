@@ -111,7 +111,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
 
     private func normalizedFieldName(for elementName: String) -> String? {
         switch elementName {
-        case "title", "creator", "artist", "album", "albumArtURI", "res":
+        case "title", "creator", "artist", "album", "albumArtURI", "res", "resMD":
             return elementName
         default:
             return nil
@@ -140,8 +140,32 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
             if currentItem?.artworkURL == nil {
                 currentItem?.artworkURL = value
             }
+        case "resMD":
+            mergeNestedMetadata(from: value)
         default:
             break
+        }
+    }
+
+    private func mergeNestedMetadata(from value: String) {
+        guard let metadata = try? SonosDIDLMetadataParser().parse(value), !metadata.isEmpty else {
+            return
+        }
+
+        if currentItem?.title == nil {
+            currentItem?.title = metadata.title
+        }
+
+        if currentItem?.artistName == nil {
+            currentItem?.artistName = metadata.artistName
+        }
+
+        if currentItem?.albumTitle == nil {
+            currentItem?.albumTitle = metadata.albumTitle
+        }
+
+        if currentItem?.artworkURL == nil {
+            currentItem?.artworkURL = metadata.albumArtURI
         }
     }
 }

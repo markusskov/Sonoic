@@ -131,7 +131,7 @@ private struct QueueItemRow: View {
                     Text(item.title)
                         .font(.body.weight(isCurrent ? .semibold : .regular))
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
+                        .lineLimit(1)
 
                     if isCurrent {
                         Text("Playing")
@@ -147,7 +147,7 @@ private struct QueueItemRow: View {
                     Text(subtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
             }
 

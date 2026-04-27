@@ -54,12 +54,12 @@ private struct HomeRecentPlayCard: View {
                 Text(item.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
+                    .lineLimit(1)
 
                 Text(item.subtitle ?? item.sourceName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
 
                 Label(item.sourceName, systemImage: item.service?.systemImage ?? "music.note")
                     .font(.caption2.weight(.medium))

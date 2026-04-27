@@ -24,6 +24,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         #expect(candidate.uri == "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3")
         #expect(candidate.metadataXML.contains("<dc:title>Sweet Jane</dc:title>"))
         #expect(candidate.metadataXML.contains("<dc:creator>Garrett Kato</dc:creator>"))
+        #expect(candidate.metadataXML.contains("<res protocolInfo=\"sonos.com-http:*:application/vnd.apple.mpegurl:*\" duration=\"00:03:34\">x-sonosapi-hls:song%3a1440857781?sid=204&amp;sn=3</res>"))
         #expect(candidate.metadataXML.contains("SA_RINCON52231_X_#Svc52231-0-Token"))
 
         let payload = try candidate.preparedPlaybackPayload(for: item)
@@ -51,6 +52,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         #expect(candidate.serialNumber == "7")
         #expect(candidate.uri == "x-sonos-http:librarytrack%3ai.BOVNeOxU6BVbp8.m4p?sid=204&flags=8232&sn=7")
         #expect(candidate.metadataXML.contains("librarytrack:i.BOVNeOxU6BVbp8"))
+        #expect(candidate.metadataXML.contains("<res protocolInfo=\"sonos.com-http:*:audio/mp4:*\" duration=\"00:03:34\">x-sonos-http:librarytrack%3ai.BOVNeOxU6BVbp8.m4p?sid=204&amp;flags=8232&amp;sn=7</res>"))
         #expect(candidate.metadataXML.contains("<upnp:class>object.item.audioItem.musicTrack</upnp:class>"))
     }
 
@@ -112,6 +114,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         #expect(candidate.uri == "x-rincon-cpcontainer:1006206cplaylist%3ap.abc123?sid=204&flags=8300&sn=3")
         #expect(candidate.metadataXML.contains("<container id=\"playlist:p.abc123\""))
         #expect(candidate.metadataXML.contains("playlist:p.abc123"))
+        #expect(candidate.metadataXML.contains("<res protocolInfo=\"x-rincon-cpcontainer:*:*:*\">x-rincon-cpcontainer:1006206cplaylist%3ap.abc123?sid=204&amp;flags=8300&amp;sn=3</res>"))
         #expect(candidate.metadataXML.contains("<upnp:class>object.container.playlistContainer</upnp:class>"))
 
         let payload = candidate.playbackPayload(for: item)

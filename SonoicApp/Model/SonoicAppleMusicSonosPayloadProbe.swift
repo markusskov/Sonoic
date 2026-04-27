@@ -79,7 +79,8 @@ struct SonoicAppleMusicSonosPayloadProbe {
                     metadataXML: metadataBuilder.metadataXML(
                         for: item,
                         itemID: "song:\(catalogID)",
-                        serviceID: appleMusicServiceID
+                        serviceID: appleMusicServiceID,
+                        resourceURI: uri
                     ),
                     serialNumber: launchSerial
                 )
@@ -98,7 +99,8 @@ struct SonoicAppleMusicSonosPayloadProbe {
                     metadataXML: metadataBuilder.metadataXML(
                         for: item,
                         itemID: "playlist:\(catalogID)",
-                        serviceID: appleMusicServiceID
+                        serviceID: appleMusicServiceID,
+                        resourceURI: uri
                     ),
                     serialNumber: launchSerial
                 )
@@ -117,7 +119,8 @@ struct SonoicAppleMusicSonosPayloadProbe {
                     metadataXML: metadataBuilder.metadataXML(
                         for: item,
                         itemID: "librarytrack:\(libraryID)",
-                        serviceID: appleMusicServiceID
+                        serviceID: appleMusicServiceID,
+                        resourceURI: uri
                     ),
                     serialNumber: trackSerial
                 )
@@ -146,7 +149,8 @@ private struct SonoicAppleMusicSonosCandidateMetadataBuilder {
     func metadataXML(
         for item: SonoicSourceItem,
         itemID: String,
-        serviceID: String
+        serviceID: String,
+        resourceURI: String
     ) -> String {
         let subtitleParts = item.subtitle?
             .components(separatedBy: "•")
@@ -159,7 +163,7 @@ private struct SonoicAppleMusicSonosCandidateMetadataBuilder {
         let elementName = didlElementName(for: item.kind)
 
         return """
-        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/"><\(elementName) id="\(xmlEscaped(itemID))" parentID="" restricted="true"><dc:title>\(xmlEscaped(item.title))</dc:title>\(optionalElement("dc:creator", creator))\(optionalElement("upnp:album", album))\(optionalElement("upnp:albumArtURI", item.artworkURL))<upnp:class>\(upnpClass(for: item.kind))</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON\(serviceType)_X_#Svc\(serviceType)-0-Token</desc></\(elementName)></DIDL-Lite>
+        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/"><\(elementName) id="\(xmlEscaped(itemID))" parentID="" restricted="true"><dc:title>\(xmlEscaped(item.title))</dc:title>\(optionalElement("dc:creator", creator))\(optionalElement("upnp:album", album))\(optionalElement("upnp:albumArtURI", item.artworkURL))<upnp:class>\(upnpClass(for: item.kind))</upnp:class>\(resourceElement(for: item, uri: resourceURI))<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON\(serviceType)_X_#Svc\(serviceType)-0-Token</desc></\(elementName)></DIDL-Lite>
         """
     }
 
@@ -187,6 +191,36 @@ private struct SonoicAppleMusicSonosCandidateMetadataBuilder {
         }
 
         return "<\(name)>\(xmlEscaped(value))</\(name)>"
+    }
+
+    private func resourceElement(for item: SonoicSourceItem, uri: String) -> String {
+        var attributes = "protocolInfo=\"\(xmlEscaped(protocolInfo(for: uri)))\""
+
+        if let duration = item.duration {
+            attributes += " duration=\"\(formattedDuration(duration))\""
+        }
+
+        return "<res \(attributes)>\(xmlEscaped(uri))</res>"
+    }
+
+    private func protocolInfo(for uri: String) -> String {
+        if uri.hasPrefix("x-rincon-cpcontainer:") {
+            return "x-rincon-cpcontainer:*:*:*"
+        }
+
+        if uri.hasPrefix("x-sonosapi-hls:") {
+            return "sonos.com-http:*:application/vnd.apple.mpegurl:*"
+        }
+
+        return "sonos.com-http:*:audio/mp4:*"
+    }
+
+    private func formattedDuration(_ duration: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(duration.rounded()))
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
     private func xmlEscaped(_ value: String) -> String {

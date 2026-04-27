@@ -45,7 +45,7 @@ struct AppleMusicItemCollectionView: View {
             Text(title)
                 .font(.largeTitle.weight(.bold))
                 .foregroundStyle(.primary)
-                .lineLimit(2)
+                .lineLimit(1)
 
             if let subtitle {
                 Text(subtitle)

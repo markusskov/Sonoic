@@ -286,7 +286,7 @@ private struct AppleMusicRecentlyAddedCard: View {
                 Text(item.title)
                     .font(.headline)
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .multilineTextAlignment(.leading)
                     .frame(width: 154, alignment: .leading)
 
@@ -294,7 +294,7 @@ private struct AppleMusicRecentlyAddedCard: View {
                     Text(subtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                         .multilineTextAlignment(.leading)
                         .frame(width: 154, alignment: .leading)
                 }
@@ -440,7 +440,7 @@ struct SourceItemRow: View {
                 Text(item.title)
                     .font(.body.weight(.medium))
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
+                    .lineLimit(1)
 
                 if let subtitle = item.subtitle {
                     Text(subtitle)
@@ -685,7 +685,7 @@ private struct SourceItemMetadataRow: View {
                 Text(item.title)
                     .font(.body.weight(.medium))
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
+                    .lineLimit(1)
 
                 if let subtitle = item.subtitle {
                     Text(subtitle)

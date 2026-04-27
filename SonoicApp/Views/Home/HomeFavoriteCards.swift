@@ -18,12 +18,12 @@ struct HomeFavoriteCard: View {
                     Text(favorite.title)
                         .font(.headline)
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
+                        .lineLimit(1)
 
                     Text(favorite.subtitle ?? favorite.service?.name ?? "Sonos Favorite")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     if let service = favorite.service {
