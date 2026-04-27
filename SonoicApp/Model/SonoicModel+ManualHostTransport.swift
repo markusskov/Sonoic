@@ -98,7 +98,11 @@ extension SonoicModel {
         }
 
         if let snapshot = queueState.snapshot {
-            queueState = .loaded(SonosQueueSnapshot(items: snapshot.items, currentItemIndex: nil))
+            queueState = .loaded(SonosQueueSnapshot(
+                items: snapshot.items,
+                currentItemIndex: nil,
+                sourceURI: snapshot.sourceURI
+            ))
         }
 
         beginManualPlayTransitionGrace()

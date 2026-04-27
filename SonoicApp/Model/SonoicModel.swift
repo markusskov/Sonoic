@@ -81,6 +81,7 @@ final class SonoicModel {
             mutatingRoomVolumeIDs = []
             pendingRoomVolumeLevels = [:]
             queueOperationErrorDetail = nil
+            queueDiagnostics = .empty
             groupControlErrorDetail = nil
             homeTheaterOperationErrorDetail = nil
             roomVolumeOperationErrorDetail = nil
@@ -119,6 +120,7 @@ final class SonoicModel {
     var isHomeTheaterMutating = false
     var mutatingRoomVolumeIDs: Set<String> = []
     var queueOperationErrorDetail: String?
+    var queueDiagnostics = SonosQueueDiagnostics.empty
     var groupControlErrorDetail: String?
     var homeTheaterOperationErrorDetail: String?
     var roomVolumeOperationErrorDetail: String?
@@ -135,6 +137,7 @@ final class SonoicModel {
             if oldValue != activeTarget {
                 queueState = .idle
                 queueOperationErrorDetail = nil
+                queueDiagnostics = .empty
                 isQueueRefreshing = false
                 isQueueClearing = false
                 isQueueMutating = false

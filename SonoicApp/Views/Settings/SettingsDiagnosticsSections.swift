@@ -97,6 +97,38 @@ struct SettingsNowPlayingDiagnosticsSection: View {
     }
 }
 
+struct SettingsQueueDiagnosticsSection: View {
+    let model: SonoicModel
+    let refreshTimingText: (Date?) -> String
+
+    var body: some View {
+        let ownership = model.queueDiagnostics.currentURIOwnership
+
+        Section("Queue Diagnostics") {
+            LabeledContent("Observed At", value: refreshTimingText(model.queueDiagnostics.observedAt))
+            LabeledContent("Current URI Kind", value: ownership.title)
+            LabeledContent("Queue Editable", value: ownership.supportsLocalQueueMutation ? "Yes" : "No")
+
+            if let itemCount = model.queueDiagnostics.itemCount {
+                LabeledContent("Items", value: itemCount.formatted())
+            }
+
+            SettingsDiagnosticRow(
+                title: "Current URI",
+                value: model.queueDiagnostics.currentURI ?? "Unavailable"
+            )
+
+            if let refreshError = model.queueDiagnostics.lastRefreshErrorDetail {
+                SettingsDiagnosticRow(title: "Last Refresh Error", value: refreshError)
+            }
+
+            if let mutationError = model.queueDiagnostics.lastMutationErrorDetail {
+                SettingsDiagnosticRow(title: "Last Mutation Error", value: mutationError)
+            }
+        }
+    }
+}
+
 struct SettingsEmptySelectionSection: View {
     var body: some View {
         Section("Selection") {

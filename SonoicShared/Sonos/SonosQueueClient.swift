@@ -2,12 +2,19 @@ import Foundation
 
 struct SonosQueueClient {
     enum ClientError: LocalizedError {
-        case unavailableForCurrentSource
+        case unavailableForCurrentSource(currentURI: String?)
 
         var errorDescription: String? {
             switch self {
             case .unavailableForCurrentSource:
                 "The active source isn't using the Sonos queue right now."
+            }
+        }
+
+        var currentURI: String? {
+            switch self {
+            case .unavailableForCurrentSource(let currentURI):
+                currentURI
             }
         }
     }
@@ -31,7 +38,7 @@ struct SonosQueueClient {
         let currentURI = try await fetchCurrentURI(host: host)
 
         guard SonosMetadataHeuristics.isQueueContainerURI(currentURI) else {
-            throw ClientError.unavailableForCurrentSource
+            throw ClientError.unavailableForCurrentSource(currentURI: currentURI)
         }
 
         let items = try await fetchQueueItems(host: host)
@@ -41,7 +48,8 @@ struct SonosQueueClient {
             currentItemIndex: resolvedCurrentItemIndex(
                 trackNumber: currentTrackNumber,
                 itemCount: items.count
-            )
+            ),
+            sourceURI: currentURI
         )
     }
 

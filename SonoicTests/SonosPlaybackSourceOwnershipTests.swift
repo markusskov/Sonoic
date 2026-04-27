@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Sonoic
 
@@ -56,5 +57,61 @@ struct SonosPlaybackSourceOwnershipTests {
         #expect(diagnostics.currentURIOwnership == .sonosQueue)
         #expect(diagnostics.currentURIOwnership.supportsLocalQueueMutation)
         #expect(diagnostics.trackURIOwnership == .directServiceStream)
+    }
+
+    @Test
+    func queueSnapshotPreservesSourceURIWhenRemovingItems() {
+        let snapshot = queueSnapshot()
+
+        let updatedSnapshot = snapshot.removingItems(atOffsets: IndexSet(integer: 1))
+
+        #expect(updatedSnapshot.sourceURI == "x-rincon-queue:RINCON_123#0")
+        #expect(updatedSnapshot.items.map(\.id) == ["one", "three"])
+    }
+
+    @Test
+    func queueSnapshotPreservesSourceURIWhenMovingItems() {
+        let snapshot = queueSnapshot()
+
+        let updatedSnapshot = snapshot.movingItems(
+            fromOffsets: IndexSet(integer: 0),
+            toOffset: 2
+        )
+
+        #expect(updatedSnapshot.sourceURI == "x-rincon-queue:RINCON_123#0")
+        #expect(updatedSnapshot.items.map(\.id) == ["two", "one", "three"])
+    }
+
+    private func queueSnapshot() -> SonosQueueSnapshot {
+        SonosQueueSnapshot(
+            items: [
+                SonosQueueItem(
+                    id: "one",
+                    title: "One",
+                    artistName: nil,
+                    albumTitle: nil,
+                    artworkURL: nil,
+                    duration: nil
+                ),
+                SonosQueueItem(
+                    id: "two",
+                    title: "Two",
+                    artistName: nil,
+                    albumTitle: nil,
+                    artworkURL: nil,
+                    duration: nil
+                ),
+                SonosQueueItem(
+                    id: "three",
+                    title: "Three",
+                    artistName: nil,
+                    albumTitle: nil,
+                    artworkURL: nil,
+                    duration: nil
+                )
+            ],
+            currentItemIndex: 0,
+            sourceURI: "x-rincon-queue:RINCON_123#0"
+        )
     }
 }

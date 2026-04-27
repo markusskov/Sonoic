@@ -23,6 +23,7 @@ extension SonoicModel {
     func refreshQueue(showLoading: Bool = true) async {
         guard hasManualSonosHost else {
             queueState = .idle
+            queueDiagnostics = .empty
             isQueueRefreshing = false
             return
         }
@@ -42,10 +43,31 @@ extension SonoicModel {
 
         do {
             let snapshot = try await queueClient.fetchSnapshot(host: manualSonosHost)
+            queueDiagnostics = SonosQueueDiagnostics(
+                observedAt: Date(),
+                currentURI: snapshot.sourceURI ?? nowPlayingDiagnostics.currentURI,
+                itemCount: snapshot.items.count,
+                lastRefreshErrorDetail: nil,
+                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+            )
             queueState = .loaded(snapshot)
         } catch let error as SonosQueueClient.ClientError {
+            queueDiagnostics = SonosQueueDiagnostics(
+                observedAt: Date(),
+                currentURI: error.currentURI ?? nowPlayingDiagnostics.currentURI,
+                itemCount: nil,
+                lastRefreshErrorDetail: error.localizedDescription,
+                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+            )
             queueState = .unavailable(error.localizedDescription)
         } catch {
+            queueDiagnostics = SonosQueueDiagnostics(
+                observedAt: Date(),
+                currentURI: nowPlayingDiagnostics.currentURI,
+                itemCount: nil,
+                lastRefreshErrorDetail: error.localizedDescription,
+                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+            )
             queueState = .failed(error.localizedDescription)
         }
     }
@@ -91,7 +113,11 @@ extension SonoicModel {
         }
 
         return await performQueueMutation(
-            optimisticSnapshot: SonosQueueSnapshot(items: [], currentItemIndex: nil)
+            optimisticSnapshot: SonosQueueSnapshot(
+                items: [],
+                currentItemIndex: nil,
+                sourceURI: queueState.snapshot?.sourceURI
+            )
         ) { clearHost in
             try await avTransportClient.removeAllTracksFromQueue(host: clearHost)
         }
@@ -175,6 +201,7 @@ extension SonoicModel {
 
         let previousQueueState = queueState
         queueOperationErrorDetail = nil
+        queueDiagnostics.lastMutationErrorDetail = nil
         queueState = .loaded(optimisticSnapshot)
         isQueueMutating = true
         defer {
@@ -191,6 +218,7 @@ extension SonoicModel {
         } catch {
             queueState = previousQueueState
             queueOperationErrorDetail = error.localizedDescription
+            queueDiagnostics.lastMutationErrorDetail = error.localizedDescription
             startManualHostRefreshLoopIfPossible()
             return false
         }
