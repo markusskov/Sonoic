@@ -11,11 +11,26 @@ enum SonosMetadataHeuristics {
     }
 
     static func isQueueContainerURI(_ uri: String?) -> Bool {
-        guard let normalizedURI = uri.sonoicNonEmptyTrimmed?.lowercased() else {
-            return false
-        }
+        sourceOwnership(for: uri).isQueueBacked
+    }
 
-        return normalizedURI.hasPrefix("x-rincon-queue:")
-            || normalizedURI.hasPrefix("x-rincon-cpcontainer:")
+    static func isPlaybackContainerURI(_ uri: String?) -> Bool {
+        switch sourceOwnership(for: uri) {
+        case .sonosQueue, .serviceContainer:
+            true
+        case .unavailable,
+             .directServiceStream,
+             .groupCoordinator,
+             .tvAudio,
+             .lineIn,
+             .musicLibrary,
+             .webStream,
+             .unknown:
+            false
+        }
+    }
+
+    static func sourceOwnership(for uri: String?) -> SonosPlaybackSourceOwnership {
+        SonosPlaybackSourceOwnership(uri: uri)
     }
 }

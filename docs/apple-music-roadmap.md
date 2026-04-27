@@ -85,6 +85,8 @@ Shipped first safety slice:
 - Known Sonos service/container URI families are allowed; queue-owned, group, and generic HTTP URLs are rejected.
 - DIDL metadata from favorites is preserved and trimmed, not synthesized.
 - Tests cover playable favorite payloads and rejected payloads.
+- Settings diagnostics classify current URI ownership so Sonoic can tell queue-backed playback apart from service containers, streams, TV audio, line-in, and unknown sources.
+- Research notes live in [Sonos-Native Playback Research](sonos-native-playback-research.md).
 
 Next:
 
@@ -96,7 +98,7 @@ Next:
 
 ## Milestone 6: Queue And Handoff
 
-57. Add "Play Next" and "Add to Queue" only for items with Sonos-native payloads.
+57. Keep "Play Next" and "Add to Queue" hidden until source ownership and device QA prove the active source can accept queue mutation.
 58. Add queue preview for source playlists once payloads are reliable.
 59. Add a safe handoff flow that starts a favorite without destroying the current queue.
 60. Add queue ownership diagnostics after service starts.
@@ -104,6 +106,10 @@ Next:
 62. Add optimistic UI only after Sonos confirms the transport state.
 63. Add recovery UI if Sonos accepts a payload but metadata does not update.
 64. Add tests for queue-safe favorite starts.
+
+Closed experiment:
+
+- A local `AddURIToQueue`/`Play Next` attempt with favorite-backed Apple Music payloads did not reliably add to the active queue on device. Do not re-open this as a UI feature until Sonoic either owns a true `x-rincon-queue:` source or uses a documented Sonos-native service/cloud-queue path.
 
 ## Milestone 7: UI Polish And Maintainability
 

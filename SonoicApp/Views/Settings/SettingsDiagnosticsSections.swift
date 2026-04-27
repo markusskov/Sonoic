@@ -41,6 +41,8 @@ struct SettingsNowPlayingDiagnosticsSection: View {
     let refreshTimingText: (Date?) -> String
 
     var body: some View {
+        let currentURIOwnership = model.nowPlayingDiagnostics.currentURIOwnership
+
         Section("Now Playing Diagnostics") {
             LabeledContent("Observed At", value: refreshTimingText(model.nowPlayingObservedAt))
             LabeledContent(
@@ -63,9 +65,25 @@ struct SettingsNowPlayingDiagnosticsSection: View {
                 title: "Current URI",
                 value: model.nowPlayingDiagnostics.currentURI ?? "Unavailable"
             )
+            LabeledContent(
+                "Current URI Kind",
+                value: currentURIOwnership.title
+            )
+            LabeledContent(
+                "Queue Editable",
+                value: currentURIOwnership.supportsLocalQueueMutation ? "Yes" : "No"
+            )
+            SettingsDiagnosticRow(
+                title: "Current URI Detail",
+                value: currentURIOwnership.diagnosticDetail
+            )
             SettingsDiagnosticRow(
                 title: "Track URI",
                 value: model.nowPlayingDiagnostics.trackURI ?? "Unavailable"
+            )
+            LabeledContent(
+                "Track URI Kind",
+                value: model.nowPlayingDiagnostics.trackURIOwnership.title
             )
             LabeledContent(
                 "Raw Elapsed",
