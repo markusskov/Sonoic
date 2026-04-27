@@ -31,6 +31,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         #expect(payload.service == .appleMusic)
         #expect(payload.uri == candidate.uri)
         #expect(payload.metadataXML == candidate.metadataXML)
+        #expect(payload.duration == 214)
     }
 
     @Test
@@ -118,7 +119,8 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
             kind: .song,
             origin: libraryID == nil ? .catalogSearch : .library,
             catalogID: catalogID,
-            libraryID: libraryID
+            libraryID: libraryID,
+            duration: 214
         )
     }
 }

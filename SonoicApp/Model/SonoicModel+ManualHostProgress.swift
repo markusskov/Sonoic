@@ -13,6 +13,26 @@ extension SonoicModel {
         nowPlaying = nextNowPlaying
     }
 
+    func markLocalNowPlaying(from payload: SonosPlayablePayload) {
+        let subtitleParts = payload.subtitle?
+            .components(separatedBy: "•")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty } ?? []
+
+        nowPlaying = SonosNowPlayingSnapshot(
+            title: payload.title,
+            artistName: subtitleParts.first,
+            albumTitle: subtitleParts.dropFirst().first,
+            sourceName: payload.service?.name ?? nowPlaying.sourceName,
+            playbackState: .playing,
+            artworkURL: payload.artworkURL,
+            artworkIdentifier: nil,
+            elapsedTime: 0,
+            duration: payload.duration,
+            transportActions: nowPlaying.transportActions
+        )
+    }
+
     func freezeLocalPlaybackTimeIfNeeded() {
         guard nowPlaying.playbackState == .playing,
               let elapsedTime = nowPlaying.elapsedTime

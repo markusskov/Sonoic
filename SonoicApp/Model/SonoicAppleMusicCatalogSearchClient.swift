@@ -302,7 +302,8 @@ struct SonoicAppleMusicCatalogSearchClient {
             origin: sourceOrigin(for: metadata.origin),
             catalogID: metadata.catalogItemID,
             libraryID: metadata.libraryItemID,
-            externalURL: metadata.externalURL
+            externalURL: metadata.externalURL,
+            duration: metadata.duration
         )
     }
 

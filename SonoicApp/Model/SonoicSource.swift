@@ -222,6 +222,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
     var origin: Origin
     var kind: Kind
     var playbackCapability: SonoicPlaybackCapability
+    var duration: TimeInterval?
 
     var appleMusicDetailCacheKey: String {
         appleMusicIdentity?.detailCacheKey(for: origin) ?? id
@@ -239,7 +240,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
         service: SonosServiceDescriptor,
         origin: Origin,
         kind: Kind = .unknown,
-        playbackCapability: SonoicPlaybackCapability
+        playbackCapability: SonoicPlaybackCapability,
+        duration: TimeInterval? = nil
     ) {
         self.id = id
         self.title = title
@@ -253,6 +255,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         self.origin = origin
         self.kind = kind
         self.playbackCapability = playbackCapability
+        self.duration = duration
     }
 
     init(favorite: SonosFavoriteItem) {
@@ -292,7 +295,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
         artworkURL: String?,
         kind: Kind,
         service: SonosServiceDescriptor,
-        externalURL: String? = nil
+        externalURL: String? = nil,
+        duration: TimeInterval? = nil
     ) -> SonoicSourceItem {
         SonoicSourceItem(
             id: "catalog-\(service.id)-\(id)",
@@ -305,7 +309,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
             service: service,
             origin: .catalogSearch,
             kind: kind,
-            playbackCapability: .metadataOnly
+            playbackCapability: .metadataOnly,
+            duration: duration
         )
     }
 
@@ -318,7 +323,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
         origin: Origin,
         catalogID: String? = nil,
         libraryID: String? = nil,
-        externalURL: String? = nil
+        externalURL: String? = nil,
+        duration: TimeInterval? = nil
     ) -> SonoicSourceItem {
         SonoicSourceItem(
             id: "\(origin.rawValue)-\(SonosServiceDescriptor.appleMusic.id)-\(kind.rawValue)-\(id)",
@@ -336,7 +342,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
             service: .appleMusic,
             origin: origin,
             kind: kind,
-            playbackCapability: .metadataOnly
+            playbackCapability: .metadataOnly,
+            duration: duration
         )
     }
 }

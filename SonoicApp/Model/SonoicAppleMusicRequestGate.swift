@@ -41,7 +41,8 @@ actor SonoicMusicKitRequestGate {
                 artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
                 externalURL: song.url?.absoluteString,
                 kind: .song,
-                origin: .catalogSearch
+                origin: .catalogSearch,
+                duration: song.duration
             )
         }
         let albums = response.albums.map { album in
@@ -182,7 +183,8 @@ actor SonoicMusicKitRequestGate {
                 artworkURL: song.attributes?.artwork?.sizedURL(width: 400, height: 400),
                 externalURL: song.attributes?.url,
                 kind: .song,
-                origin: .library
+                origin: .library,
+                duration: song.attributes?.duration
             )
         }
 

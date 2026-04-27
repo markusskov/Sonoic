@@ -37,7 +37,8 @@ struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
             service: .appleMusic,
             uri: uri,
             metadataXML: metadataXML,
-            kind: .item
+            kind: .item,
+            duration: item.duration
         )
     }
 
