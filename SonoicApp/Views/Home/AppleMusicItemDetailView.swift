@@ -22,7 +22,8 @@ struct AppleMusicItemDetailView: View {
                     if let exactPlaybackCandidate {
                         AppleMusicItemActionCard(
                             playbackCandidate: exactPlaybackCandidate,
-                            play: playCandidate
+                            play: playCandidate,
+                            playNext: playCandidateNext
                         )
                     }
 
@@ -110,6 +111,10 @@ struct AppleMusicItemDetailView: View {
     private func playCandidate(_ candidate: SonoicSonosPlaybackCandidate) async {
         _ = await model.playManualSonosPayload(candidate.payload)
     }
+
+    private func playCandidateNext(_ candidate: SonoicSonosPlaybackCandidate) async {
+        _ = await model.playManualSonosPayloadNext(candidate.payload)
+    }
 }
 
 private struct AppleMusicItemDetailHeader: View {
@@ -160,18 +165,38 @@ private struct AppleMusicItemDetailHeader: View {
 private struct AppleMusicItemActionCard: View {
     let playbackCandidate: SonoicSonosPlaybackCandidate
     let play: (SonoicSonosPlaybackCandidate) async -> Void
+    let playNext: (SonoicSonosPlaybackCandidate) async -> Void
+
+    private var canPlayNext: Bool {
+        (try? SonosPlayablePayloadPreparer().prepare(playbackCandidate.payload.withLaunchMode(.queueNext))) != nil
+    }
 
     var body: some View {
         RoomSurfaceCard {
-            Button {
-                Task {
-                    await play(playbackCandidate)
+            VStack(spacing: 10) {
+                Button {
+                    Task {
+                        await play(playbackCandidate)
+                    }
+                } label: {
+                    Label("Play", systemImage: "play.fill")
                 }
-            } label: {
-                Label("Play", systemImage: "play.fill")
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+
+                if canPlayNext {
+                    Button {
+                        Task {
+                            await playNext(playbackCandidate)
+                        }
+                    } label: {
+                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.large)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
         }
     }
 }

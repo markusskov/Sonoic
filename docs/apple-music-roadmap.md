@@ -96,7 +96,13 @@ Next:
 
 ## Milestone 6: Queue And Handoff
 
-57. Add "Play Next" and "Add to Queue" only for items with Sonos-native payloads.
+Shipped first queue action:
+
+- Apple Music detail pages can show "Play Next" for exact favorite-backed item payloads with valid Sonos DIDL metadata.
+- Albums, playlists, stations, and metadata-only items stay disabled until a safe Sonos-native queue payload exists.
+
+Next:
+
 58. Add queue preview for source playlists once payloads are reliable.
 59. Add a safe handoff flow that starts a favorite without destroying the current queue.
 60. Add queue ownership diagnostics after service starts.

@@ -36,6 +36,20 @@ struct SonosPlayablePayload: Identifiable, Equatable {
         validationFailureReason == nil
     }
 
+    func withLaunchMode(_ launchMode: LaunchMode) -> SonosPlayablePayload {
+        SonosPlayablePayload(
+            id: id,
+            title: title,
+            subtitle: subtitle,
+            artworkURL: artworkURL,
+            service: service,
+            uri: uri,
+            metadataXML: metadataXML,
+            kind: kind,
+            launchMode: launchMode
+        )
+    }
+
     init(
         id: String,
         title: String,

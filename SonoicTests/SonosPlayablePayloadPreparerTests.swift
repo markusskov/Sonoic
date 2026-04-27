@@ -101,6 +101,21 @@ struct SonosPlayablePayloadPreparerTests {
         #expect(preparedPayload.metadataXML == "<DIDL-Lite />")
     }
 
+    @Test
+    func copiedQueueNextPayloadPreservesOriginalPayload() {
+        let directPayload = payload(
+            uri: "x-sonosapi-hls:song%3a1440845464?sid=204",
+            metadataXML: "<DIDL-Lite />"
+        )
+
+        let queueNextPayload = directPayload.withLaunchMode(.queueNext)
+
+        #expect(directPayload.launchMode == .direct)
+        #expect(queueNextPayload.launchMode == .queueNext)
+        #expect(queueNextPayload.uri == directPayload.uri)
+        #expect(queueNextPayload.metadataXML == directPayload.metadataXML)
+    }
+
     private func payload(
         uri: String,
         metadataXML: String? = nil,

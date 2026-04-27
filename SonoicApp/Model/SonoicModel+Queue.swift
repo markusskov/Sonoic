@@ -149,6 +149,42 @@ extension SonoicModel {
         }
     }
 
+    func playManualSonosPayloadNext(_ payload: SonosPlayablePayload) async -> Bool {
+        guard hasManualSonosHost,
+              !isQueueRefreshing,
+              !isQueueClearing,
+              !isQueueMutating,
+              let preparedPayload = try? SonosPlayablePayloadPreparer().prepare(payload.withLaunchMode(.queueNext))
+        else {
+            return false
+        }
+
+        let previousQueueState = queueState
+        queueOperationErrorDetail = nil
+        isQueueMutating = true
+        defer {
+            isQueueMutating = false
+        }
+
+        do {
+            let queueHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+            _ = try await avTransportClient.addURIToQueue(
+                host: queueHost,
+                uri: preparedPayload.uri,
+                metadataXML: preparedPayload.metadataXML
+            )
+            _ = await syncManualSonosState(showProgress: false)
+            await refreshQueue(showLoading: false)
+            startManualHostRefreshLoopIfPossible()
+            return true
+        } catch {
+            queueState = previousQueueState
+            queueOperationErrorDetail = error.localizedDescription
+            startManualHostRefreshLoopIfPossible()
+            return false
+        }
+    }
+
     func manualSonosCoordinatorHost() async -> String? {
         let normalizedHost = normalizedManualSonosHost(manualSonosHost)
 
