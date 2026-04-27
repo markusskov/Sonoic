@@ -9,14 +9,14 @@ This roadmap starts from the current V1 foundation:
 - saved library lanes for playlists, artists, albums, and songs
 - recently added library metadata
 - search, library, browse, and detail screens
-- favorite-backed playback candidates for exact Sonos favorites
-- metadata-only behavior for everything else
+- Sonos-owned playback candidates for exact favorites and proven Apple Music payloads
+- metadata-only behavior for items that do not have a trustworthy Sonos-owned payload
 
 ## Guardrails
 
 - Keep Sonos as the audio owner.
 - Do not use MusicKit app-owned playback for the main Sonoic play path.
-- Do not imply arbitrary Apple Music items are playable until Sonoic can build or receive a valid Sonos-native playback payload.
+- Do not imply arbitrary Apple Music items are playable until Sonoic can build or receive a valid Sonos-owned playback payload.
 - Prefer small vertical slices that can be built and manually verified.
 - Keep source and search UI honest about capability.
 
@@ -91,9 +91,9 @@ Shipped first safety slice:
 Next:
 
 52. Research Sonos Control API authorization and playback-session requirements.
-53. Research whether Apple Music catalog or library IDs can map to Sonos service object IDs with user authorization.
-54. Prototype Apple Music-to-Sonos payload generation behind tests only.
-55. Keep all non-favorite Apple Music playback disabled until the Sonos-native path is proven.
+53. Keep hardening Apple Music catalog and library payload generation with real device confirmation.
+54. Preserve playlist and album queue/session context when playback starts from a collection.
+55. Keep Apple Music playback affordances gated behind proven Sonos-owned payloads.
 56. Add diagnostics that explain why an Apple Music item is metadata-only.
 
 ## Milestone 6: Queue And Handoff

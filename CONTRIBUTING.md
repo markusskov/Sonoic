@@ -8,7 +8,9 @@ The project is still early, so the best contributions are the ones that keep mom
 
 - Read [README.md](README.md) for product direction and setup notes.
 - Read [plan.md](plan.md) for the current roadmap and architecture guardrails.
+- Read [AGENTS.md](AGENTS.md) for the agent-readable project map.
 - If you plan a larger change, open an issue or discussion first so we can align on scope.
+- For broad or risky work, create an execution plan from [docs/exec-plans/template.md](docs/exec-plans/template.md).
 
 ## What Good Contributions Look Like
 
@@ -35,9 +37,10 @@ Before opening a pull request:
 
 - make sure the project builds locally when needed
 - make sure the latest PR commit is green in GitHub checks before asking to merge
+- run `python3 scripts/agent_harness_check.py` when docs, scripts, or harness files changed
 - remove temporary debug code and logging
 - make sure the diff does not include personal Xcode state
-- update `README.md` or `plan.md` when project behavior or setup changed
+- update docs when project behavior, architecture, setup, or verification changed
 - keep the PR description clear about what changed and why
 
 ## CI And Branch Sync

@@ -6,6 +6,7 @@ Sonoic's playback goal is still simple: Sonos should own the audio output. Music
 
 - Existing Sonos favorites can include a Sonos-native playback URI and DIDL metadata. Sonoic can safely launch those through local AVTransport when `SonosPlayablePayloadPreparer` accepts the payload.
 - Apple Music catalog and library IDs are Apple identities, not documented Sonos object IDs.
+- Device testing has proven an early Sonos-owned Apple Music HLS payload path for selected catalog and library items.
 - `x-rincon-queue:` means the active transport is using the local Sonos queue. This is the only URI family Sonoic currently treats as locally queue-editable.
 - `x-rincon-cpcontainer:` can describe a service container, but it does not prove the active source is the editable Sonos queue.
 - Local `AddURIToQueue` is not reliable for the Apple Music favorite payloads we tested, even when the payload can start direct playback.
@@ -44,7 +45,7 @@ Those Apple IDs are valuable for UI, search, detail screens, and matching agains
 
 ## Current Sonoic Rule
 
-Sonoic should only show direct Play for Apple Music rows when it has an exact Sonos-native payload from an existing Sonos favorite or another proven Sonos source. Everything else stays metadata-only.
+Sonoic should only show direct Play for Apple Music rows when it has an exact Sonos-native payload from an existing Sonos favorite or another proven Sonos-owned source. Everything else stays metadata-only.
 
 Queue actions should be gated even more strictly:
 
@@ -57,6 +58,6 @@ Queue actions should be gated even more strictly:
 1. Keep source ownership diagnostics visible under Settings -> Advanced.
 2. Add device logs for current URI, track URI, and queue edit attempts before another queue-action PR.
 3. Spike Sonos Control API auth separately from local SOAP playback.
-4. Spike whether Sonos exposes a documented Apple Music service object mapping for an authorized household.
-5. If the mapping exists, prototype payload generation behind tests and hidden debug UI first.
+4. Keep comparing generated Apple Music payloads against Sonos-app-started playback for songs, albums, playlists, and library items.
+5. Add tests around generated payload metadata, queue context, and source ownership.
 6. If the mapping requires cloud queue/service infrastructure, design that as a separate backend-backed milestone.
