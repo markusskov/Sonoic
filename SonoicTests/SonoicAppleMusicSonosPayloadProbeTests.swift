@@ -24,6 +24,12 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         #expect(candidate.metadataXML.contains("<dc:title>Sweet Jane</dc:title>"))
         #expect(candidate.metadataXML.contains("<dc:creator>Garrett Kato</dc:creator>"))
         #expect(candidate.metadataXML.contains("SA_RINCON52231_X_#Svc52231-0-Token"))
+
+        let payload = try candidate.preparedPlaybackPayload(for: item)
+        #expect(payload.title == "Sweet Jane")
+        #expect(payload.service == .appleMusic)
+        #expect(payload.uri == candidate.uri)
+        #expect(payload.metadataXML == candidate.metadataXML)
     }
 
     @Test

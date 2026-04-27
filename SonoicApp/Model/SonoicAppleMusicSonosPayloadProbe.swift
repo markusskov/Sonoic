@@ -23,6 +23,23 @@ struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
     var id: String {
         "\(strategy.rawValue)-\(serialNumber)-\(uri)"
     }
+
+    func playbackPayload(for item: SonoicSourceItem) -> SonosPlayablePayload {
+        SonosPlayablePayload(
+            id: id,
+            title: item.title,
+            subtitle: item.subtitle,
+            artworkURL: item.artworkURL,
+            service: .appleMusic,
+            uri: uri,
+            metadataXML: metadataXML,
+            kind: .item
+        )
+    }
+
+    func preparedPlaybackPayload(for item: SonoicSourceItem) throws -> SonosPlayablePayload {
+        try SonosPlayablePayloadPreparer().prepare(playbackPayload(for: item))
+    }
 }
 
 struct SonoicAppleMusicSonosPayloadProbe {
