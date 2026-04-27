@@ -113,17 +113,19 @@ Before running on your own Apple developer account:
 Notes:
 
 - Sonoic uses Bonjour discovery first and keeps manual host entry as a fallback in `Settings`.
-- `Home` is now a music hub for favorites, collections, recent plays, sources, and the current session. Apple Music can show authorized metadata, library lanes, search results, item details, and recently added items, while playback stays Sonos-native.
+- `Home` is now a music hub for favorites, collections, recent plays, sources, and the current session. Apple Music can show authorized metadata, library lanes, search results, item details, and recently added items, while playback stays Sonos-owned.
 - `Rooms` can show discovered rooms, current groups, selected target state, bonded home theater setup, and home theater controls.
 - `Queue` can inspect, jump, clear, remove, and reorder the active Sonos queue. Adding new queue items from arbitrary services is still future work.
 - `Settings` keeps everyday configuration quiet, with fallback connection and diagnostics available from Advanced.
 - The app requests local-network access because Sonos control currently happens over the LAN.
-- The app requests Apple Music access only for Apple Music metadata surfaces. Sonoic does not use MusicKit app-owned playback as the main path because Sonos should remain the audio owner.
-- Some now-playing behavior on the Lock Screen is still experimental and under active refinement.
+- The app requests Apple Music access for metadata and service browsing. Sonoic does not use MusicKit app-owned playback as the main path because Sonos should remain the audio owner.
+- Lock Screen and Control Center support depend on what Sonos exposes for the current source, especially duration, progress, and queue ownership.
 
 ## Development Roadmap
 
 The public development roadmap lives in [plan.md](plan.md).
+
+Agent-facing project context starts in [AGENTS.md](AGENTS.md). The harness setup and docs map live in [docs/agent-harness.md](docs/agent-harness.md).
 
 The short version:
 

@@ -96,13 +96,13 @@ The next work here should be careful:
 
 Home now has enough gravity to become the center of Sonoic.
 
-Apple Music V1 is now a real service surface. It can search Apple Music, browse saved library lanes, open item details, and show recently added library content. Search should feel like one search with grouped results, not a mode picker. Playback still stays honest: only Sonos-native favorites can start playback today.
+Apple Music V1 is now a real service surface. It can search Apple Music, browse saved library lanes, open item details, show recently added library content, and start playback only when Sonoic has a proven Sonos-owned payload. Search should feel like one search with grouped results, not a mode picker.
 
 The next meaningful work here is:
 
 - wire real Apple Music Browse lanes for recommendations, categories, curated playlists, new releases, and radio metadata
-- research and implement Sonos-native service payload generation for Apple Music items
-- decide whether Apple Music library playlists/albums can be mapped safely into Sonos queue/session starts
+- harden Sonos-owned Apple Music payload generation for catalog and library items
+- decide which Apple Music playlist, album, and song starts can preserve queue/session context safely
 - keep Spotify as a separate integration path because Spotify iOS SDK/App Remote is app-owned control, not Sonos-native playback
 - add queue-derived actions from recent plays, favorites, and service metadata once payload ownership is clear
 - keep playback affordances visible only when each item has a trustworthy playback path
