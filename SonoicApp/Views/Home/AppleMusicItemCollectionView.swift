@@ -79,16 +79,17 @@ struct AppleMusicItemCollectionView: View {
         }
 
         let localPayload = localNowPlayingPayload(for: item)
+        let recentPayload = parentItem.flatMap(playlistPlaybackPayload)
         let didStartPlayback = await model.playManualSonosQueuePayloads(
             queuePayloads,
             startingTrackNumber: trackNumber,
             localNowPlayingPayload: localPayload,
-            recentPlaybackPayload: parentItem.flatMap(playlistPlaybackPayload)
+            recentPlaybackPayload: recentPayload
         )
 
         if didStartPlayback,
            let parentItem {
-            model.recordRecentSourceItem(parentItem)
+            model.recordRecentSourceItem(parentItem, replayPayload: recentPayload)
         }
     }
 

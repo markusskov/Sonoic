@@ -321,15 +321,16 @@ private struct AppleMusicItemDetailSectionView: View {
         }
 
         let localPayload = localNowPlayingPayload(for: item)
+        let recentPayload = playlistPlaybackPayload()
         let didStartPlayback = await model.playManualSonosQueuePayloads(
             queuePayloads,
             startingTrackNumber: trackNumber,
             localNowPlayingPayload: localPayload,
-            recentPlaybackPayload: playlistPlaybackPayload()
+            recentPlaybackPayload: recentPayload
         )
 
         if didStartPlayback {
-            model.recordRecentSourceItem(parentItem)
+            model.recordRecentSourceItem(parentItem, replayPayload: recentPayload)
         }
     }
 

@@ -305,9 +305,11 @@ extension SonoicModel {
         )
     }
 
-    func recordRecentSourceItem(_ item: SonoicSourceItem) {
+    func recordRecentSourceItem(_ item: SonoicSourceItem, replayPayload providedReplayPayload: SonosPlayablePayload? = nil) {
         let replayPayload: SonosPlayablePayload?
-        if case .sonosNative(let payload) = item.playbackCapability {
+        if let providedPayload = providedReplayPayload {
+            replayPayload = providedPayload
+        } else if case .sonosNative(let payload) = item.playbackCapability {
             replayPayload = payload
         } else {
             replayPayload = nil
@@ -340,19 +342,19 @@ extension SonoicModel {
     }
 
     private func upsertRecentPlay(_ recentPlay: SonoicRecentPlayItem) {
-        guard recentPlay.isVisibleInHomeHistory else {
+        guard shouldIncludeInHomeRecentHistory(recentPlay) else {
             return
         }
 
         let existingRecentPlay = recentPlays.first {
-            $0.isVisibleInHomeHistory
+            shouldIncludeInHomeRecentHistory($0)
                 && ($0.id == recentPlay.id || $0.matchesHomeHistoryIdentity(of: recentPlay))
         }
         let resolvedRecentPlay = existingRecentPlay?.enriched(with: recentPlay) ?? recentPlay
         let launchedQueueRecentItems = recentPlay.favoriteKind == .collection ? manualQueueRecentItems() : []
 
         var nextRecentPlays = recentPlays.filter { item in
-            item.isVisibleInHomeHistory
+            shouldIncludeInHomeRecentHistory(item)
                 && item.id != resolvedRecentPlay.id
                 && !item.matchesHomeHistoryIdentity(of: resolvedRecentPlay)
                 && !launchedQueueRecentItems.contains { queueItem in
@@ -377,7 +379,7 @@ extension SonoicModel {
         var seenIdentities: Set<String> = []
 
         return recentPlays.compactMap { recentPlay in
-            guard recentPlay.isVisibleInHomeHistory,
+            guard shouldIncludeInHomeRecentHistory(recentPlay),
                   seenIdentities.insert(recentPlay.homeHistoryIdentity).inserted
             else {
                 return nil
@@ -385,6 +387,20 @@ extension SonoicModel {
 
             return recentPlay
         }
+    }
+
+    private func shouldIncludeInHomeRecentHistory(_ item: SonoicRecentPlayItem) -> Bool {
+        guard item.isVisibleInHomeHistory else {
+            return false
+        }
+
+        guard item.service == .appleMusic else {
+            return true
+        }
+
+        // Match Sonos Home: Apple Music recents are collection launches
+        // (albums/playlists), not every individual track that happens to play.
+        return item.favoriteKind == .collection
     }
 
     private func shouldSuppressSnapshotRecentPlayDuringManualQueue() -> Bool {

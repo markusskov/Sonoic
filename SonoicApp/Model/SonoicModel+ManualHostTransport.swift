@@ -243,11 +243,7 @@ extension SonoicModel {
             try await avTransportClient.play(host: playbackHost)
         }
 
-        if didStartPlayback {
-            if let preparedRecentPayload {
-                recordRecentPlayablePayload(preparedRecentPayload)
-            }
-        } else {
+        if !didStartPlayback {
             manualPlaybackContextPayload = nil
             manualQueueContextPayloads = nil
             manualRecentPlaybackContextPayload = nil
