@@ -10,7 +10,8 @@ struct HomeFavoriteCard: View {
                 HomeFavoriteArtworkView(
                     artworkURL: favorite.artworkURL,
                     artworkIdentifier: nil,
-                    maximumDisplayDimension: 178
+                    maximumDisplayDimension: 178,
+                    placeholderSystemImage: favorite.isCollectionLike ? "music.note.list" : "music.note"
                 )
                 .frame(width: 178, height: 178)
 
@@ -50,6 +51,7 @@ struct HomeFavoriteArtworkView: View {
     let artworkURL: String?
     let artworkIdentifier: String?
     let maximumDisplayDimension: CGFloat
+    var placeholderSystemImage = "music.note"
 
     var body: some View {
         if let artworkIdentifier {
@@ -90,7 +92,7 @@ struct HomeFavoriteArtworkView: View {
                 )
             )
             .overlay {
-                Image(systemName: "music.note")
+                Image(systemName: placeholderSystemImage)
                     .font(.system(size: 42, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.92))
             }

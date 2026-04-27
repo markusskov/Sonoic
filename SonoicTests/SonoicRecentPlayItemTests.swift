@@ -68,4 +68,28 @@ struct SonoicRecentPlayItemTests {
         #expect(sourceItem.appleMusicIdentity?.routedID(for: .recentPlay) == "library-playlist-id")
         #expect(sourceItem.appleMusicIdentity?.routedID(for: .catalogSearch) == "catalog-playlist-id")
     }
+
+    @Test
+    @MainActor
+    func recentAppleMusicSourceItemsRecoverIDsFromPlaybackURI() {
+        let recentPlay = SonoicRecentPlayItem(
+            id: "legacy-playlist",
+            title: "Chill",
+            artistName: "Apple Music",
+            albumTitle: nil,
+            sourceName: "Apple Music",
+            artworkURL: nil,
+            artworkIdentifier: nil,
+            service: .appleMusic,
+            lastPlayedAt: .now,
+            playbackURI: "x-rincon-cpcontainer:1006206cplaylist%3a12345?sid=204&sn=3",
+            favoriteKind: .collection
+        )
+
+        let sourceItem = SonoicSourceItem(recentPlay: recentPlay)
+
+        #expect(sourceItem.kind == .playlist)
+        #expect(sourceItem.serviceItemID == "12345")
+        #expect(sourceItem.appleMusicIdentity?.catalogID == "12345")
+    }
 }

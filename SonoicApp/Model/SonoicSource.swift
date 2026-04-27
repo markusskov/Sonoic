@@ -274,9 +274,15 @@ struct SonoicSourceItem: Identifiable, Equatable {
 
     init(recentPlay: SonoicRecentPlayItem) {
         let playablePayload = recentPlay.replayFavorite?.playablePayload
-        let kind = recentPlay.sourceItemKindRawValue.flatMap(SonoicSourceItem.Kind.init(rawValue:)) ?? .unknown
+        let parsedReference = recentPlay.playbackURI.flatMap(Self.appleMusicServiceReference)
+        let kind = recentPlay.sourceItemKindRawValue.flatMap(SonoicSourceItem.Kind.init(rawValue:))
+            ?? parsedReference?.kind
+            ?? SonoicSourceItem.Kind(favoriteKind: recentPlay.favoriteKind)
+        let serviceItemID = recentPlay.sourceItemID ?? recentPlay.appleMusicCatalogID ?? parsedReference?.id
+        let catalogID = recentPlay.appleMusicCatalogID
+            ?? (recentPlay.appleMusicLibraryID == nil ? serviceItemID : nil)
         let appleMusicIdentity = recentPlay.service?.kind == .appleMusic ? SonoicAppleMusicItemIdentity(
-            catalogID: recentPlay.appleMusicCatalogID ?? (recentPlay.appleMusicLibraryID == nil ? recentPlay.sourceItemID : nil),
+            catalogID: catalogID,
             libraryID: recentPlay.appleMusicLibraryID,
             kind: kind
         ) : nil
@@ -287,13 +293,46 @@ struct SonoicSourceItem: Identifiable, Equatable {
             subtitle: recentPlay.subtitle ?? recentPlay.sourceName,
             artworkURL: recentPlay.artworkURL,
             artworkIdentifier: recentPlay.artworkIdentifier,
-            serviceItemID: recentPlay.sourceItemID,
+            serviceItemID: serviceItemID,
             appleMusicIdentity: appleMusicIdentity,
             service: recentPlay.service ?? .genericStreaming,
             origin: .recentPlay,
             kind: kind,
             playbackCapability: playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .metadataOnly
         )
+    }
+
+    private static func appleMusicServiceReference(from uri: String) -> (id: String, kind: SonoicSourceItem.Kind)? {
+        let normalizedURI = uri.replacingOccurrences(of: "&amp;", with: "&")
+        let lowercasedURI = normalizedURI.lowercased()
+        let prefixes = [
+            ("playlist%3a", SonoicSourceItem.Kind.playlist),
+            ("album%3a", SonoicSourceItem.Kind.album),
+            ("song%3a", SonoicSourceItem.Kind.song),
+        ]
+
+        for (prefix, kind) in prefixes {
+            guard let prefixRange = lowercasedURI.range(of: prefix) else {
+                continue
+            }
+
+            let valueStartOffset = lowercasedURI.distance(from: lowercasedURI.startIndex, to: prefixRange.upperBound)
+            let valueStartIndex = normalizedURI.index(normalizedURI.startIndex, offsetBy: valueStartOffset)
+            let valueAfterPrefix = normalizedURI[valueStartIndex...]
+            guard let id = valueAfterPrefix
+                .split(separator: "?", maxSplits: 1)
+                .first
+                .map(String.init)?
+                .removingPercentEncoding?
+                .sonoicNonEmptyTrimmed
+            else {
+                return nil
+            }
+
+            return (id, kind)
+        }
+
+        return nil
     }
 
     static func catalogMetadata(
@@ -353,6 +392,17 @@ struct SonoicSourceItem: Identifiable, Equatable {
             playbackCapability: .metadataOnly,
             duration: duration
         )
+    }
+}
+
+private extension SonoicSourceItem.Kind {
+    init(favoriteKind: SonosFavoriteItem.Kind?) {
+        switch favoriteKind {
+        case .collection:
+            self = .playlist
+        case .item, .none:
+            self = .song
+        }
     }
 }
 
