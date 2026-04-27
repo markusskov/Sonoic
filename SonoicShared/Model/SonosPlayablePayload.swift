@@ -20,6 +20,7 @@ struct SonosPlayablePayload: Identifiable, Equatable {
     var metadataXML: String?
     var kind: Kind
     var launchMode: LaunchMode
+    var duration: TimeInterval?
 
     var validationFailureReason: String? {
         do {
@@ -45,7 +46,8 @@ struct SonosPlayablePayload: Identifiable, Equatable {
         uri: String,
         metadataXML: String?,
         kind: Kind = .item,
-        launchMode: LaunchMode = .direct
+        launchMode: LaunchMode = .direct,
+        duration: TimeInterval? = nil
     ) {
         self.id = id
         self.title = title
@@ -56,6 +58,7 @@ struct SonosPlayablePayload: Identifiable, Equatable {
         self.metadataXML = metadataXML
         self.kind = kind
         self.launchMode = launchMode
+        self.duration = duration
     }
 
     init?(favorite: SonosFavoriteItem) {

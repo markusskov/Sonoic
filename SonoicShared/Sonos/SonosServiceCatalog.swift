@@ -31,7 +31,7 @@ enum SonosServiceCatalog {
         }
 
         if let serviceID = serviceID(from: normalizedURI),
-           let descriptor = descriptor(forServiceID: serviceID)
+            let descriptor = descriptor(forSonosServiceID: serviceID)
         {
             return descriptor
         }
@@ -49,7 +49,7 @@ enum SonosServiceCatalog {
         return nil
     }
 
-    private static func descriptor(forServiceID serviceID: String) -> SonosServiceDescriptor? {
+    static func descriptor(forSonosServiceID serviceID: String) -> SonosServiceDescriptor? {
         return switch serviceID {
         case "9":
             SonosServiceDescriptor.spotify

@@ -8,6 +8,7 @@ extension QueueView {
     var isClearQueueDisabled: Bool {
         isQueueInteractionDisabled
             || model.isQueueClearing
+            || !canEditQueue
             || isEditingQueue
             || model.queueState.snapshot?.items.isEmpty == true
     }
@@ -17,7 +18,11 @@ extension QueueView {
     }
 
     var canEditQueue: Bool {
-        model.queueState.snapshot?.items.isEmpty == false
+        guard let snapshot = model.queueState.snapshot else {
+            return false
+        }
+
+        return snapshot.supportsLocalMutation && !snapshot.items.isEmpty
     }
 
     var isEditingQueue: Bool {
@@ -33,7 +38,7 @@ extension QueueView {
     }
 
     func playQueueItem(at position: Int) async {
-        guard !isQueueInteractionDisabled else {
+        guard canEditQueue, !isQueueInteractionDisabled else {
             return
         }
 
@@ -45,10 +50,18 @@ extension QueueView {
     }
 
     func deleteQueueItems(_ offsets: IndexSet) async {
+        guard canEditQueue else {
+            return
+        }
+
         _ = await model.removeQueueItems(atOffsets: offsets)
     }
 
     func moveQueueItems(_ source: IndexSet, _ destination: Int) async {
+        guard canEditQueue else {
+            return
+        }
+
         _ = await model.moveQueueItems(fromOffsets: source, toOffset: destination)
     }
 

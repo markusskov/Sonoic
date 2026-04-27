@@ -10,9 +10,9 @@ struct SourceItemDetailSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
-                capabilityCard
 
                 if item.playbackCapability.canPlay {
+                    capabilityCard
                     primaryActionButton
                 }
             }

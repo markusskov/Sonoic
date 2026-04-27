@@ -13,6 +13,23 @@ extension SonoicModel {
         nowPlaying = nextNowPlaying
     }
 
+    func markLocalNowPlaying(from payload: SonosPlayablePayload) {
+        let subtitleParts = manualPlaybackSubtitleParts(for: payload)
+
+        nowPlaying = SonosNowPlayingSnapshot(
+            title: payload.title,
+            artistName: subtitleParts.first,
+            albumTitle: subtitleParts.dropFirst().first,
+            sourceName: payload.service?.name ?? nowPlaying.sourceName,
+            playbackState: .playing,
+            artworkURL: payload.artworkURL,
+            artworkIdentifier: nil,
+            elapsedTime: 0,
+            duration: payload.duration,
+            transportActions: nowPlaying.transportActions
+        )
+    }
+
     func freezeLocalPlaybackTimeIfNeeded() {
         guard nowPlaying.playbackState == .playing,
               let elapsedTime = nowPlaying.elapsedTime
@@ -30,6 +47,22 @@ extension SonoicModel {
         }
 
         nowPlaying = nextNowPlaying
+    }
+
+    func markLocalSeek(to timeInterval: TimeInterval) {
+        var nextNowPlaying = nowPlaying
+        let boundedElapsedTime: TimeInterval
+
+        if let duration = nowPlaying.duration {
+            boundedElapsedTime = min(max(timeInterval, 0), duration)
+        } else {
+            boundedElapsedTime = max(timeInterval, 0)
+        }
+
+        nextNowPlaying.elapsedTime = boundedElapsedTime
+        nowPlaying = nextNowPlaying
+        nowPlayingObservedAt = .now
+        persistSharedExternalControlState()
     }
 
     func beginManualPlayTransitionGrace() {
@@ -137,6 +170,119 @@ extension SonoicModel {
         return smoothedSnapshot
     }
 
+    func snapshotPreservingManualPlaybackContext(
+        _ snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics
+    ) -> SonosNowPlayingSnapshot {
+        guard let payload = manualPlaybackContextPayload(for: snapshot, diagnostics: diagnostics) else {
+            return snapshot
+        }
+
+        let subtitleParts = manualPlaybackSubtitleParts(for: payload)
+        var preservedSnapshot = snapshot
+
+        if shouldPreserveManualPlaybackTitle(in: preservedSnapshot, diagnostics: diagnostics, payload: payload) {
+            preservedSnapshot.title = payload.title
+        }
+
+        if preservedSnapshot.artistName.sonoicNonEmptyTrimmed == nil {
+            preservedSnapshot.artistName = subtitleParts.first
+        }
+
+        if preservedSnapshot.albumTitle.sonoicNonEmptyTrimmed == nil {
+            preservedSnapshot.albumTitle = subtitleParts.dropFirst().first
+        }
+
+        if preservedSnapshot.sourceName.sonoicNonEmptyTrimmed == nil,
+           let sourceName = payload.service?.name.sonoicNonEmptyTrimmed
+        {
+            preservedSnapshot.sourceName = sourceName
+        }
+
+        if preservedSnapshot.artworkURL.sonoicNonEmptyTrimmed == nil {
+            preservedSnapshot.artworkURL = payload.artworkURL
+        }
+
+        if preservedSnapshot.duration == nil || (preservedSnapshot.duration ?? 0) <= 0 {
+            preservedSnapshot.duration = payload.duration
+        }
+
+        if preservedSnapshot.elapsedTime == nil {
+            preservedSnapshot.elapsedTime = effectiveLocalElapsedTime() ?? 0
+        }
+
+        return preservedSnapshot
+    }
+
+    private func manualPlaybackContextPayload(
+        for snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics
+    ) -> SonosPlayablePayload? {
+        if let payload = manualPlaybackContextPayload,
+           manualPlaybackContextMatches(snapshot, diagnostics: diagnostics, payload: payload)
+        {
+            return payload
+        }
+
+        if let payload = manualQueueContextPayload(matching: diagnostics) {
+            manualPlaybackContextPayload = payload
+            return payload
+        }
+
+        if let payload = manualPlaybackContextPayload {
+            clearManualPlaybackContextIfContentChanged(snapshot, diagnostics: diagnostics, payload: payload)
+        }
+
+        return nil
+    }
+
+    private func manualQueueContextPayload(matching diagnostics: SonosNowPlayingDiagnostics) -> SonosPlayablePayload? {
+        guard let payloads = manualQueueContextPayloads,
+              !payloads.isEmpty
+        else {
+            return nil
+        }
+
+        let observedURIs = [
+            normalizedManualPlaybackURI(diagnostics.currentURI),
+            normalizedManualPlaybackURI(diagnostics.trackURI),
+        ].compactMap(\.self)
+
+        return payloads.first { payload in
+            guard let payloadURI = normalizedManualPlaybackURI(payload.uri) else {
+                return false
+            }
+
+            if observedURIs.contains(payloadURI) {
+                return true
+            }
+
+            guard let payloadItemID = manualPlaybackItemID(from: payload.uri) else {
+                return false
+            }
+
+            return observedURIs.contains { $0.contains(payloadItemID) }
+        }
+    }
+
+    private func shouldPreserveManualPlaybackTitle(
+        in snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics,
+        payload: SonosPlayablePayload
+    ) -> Bool {
+        guard !diagnostics.hasTrackMetadata else {
+            return false
+        }
+
+        let snapshotTitle = snapshot.title.sonoicTrimmed
+        let serviceName = payload.service?.name.sonoicTrimmed
+
+        return snapshotTitle.isEmpty
+            || snapshotTitle.caseInsensitiveCompare(snapshot.sourceName.sonoicTrimmed) == .orderedSame
+            || serviceName.map { snapshotTitle.caseInsensitiveCompare($0) == .orderedSame } == true
+            || SonosMetadataHeuristics.isGenericQueueTitle(snapshotTitle)
+    }
+
     func effectiveLocalElapsedTime(referenceDate: Date = .now) -> TimeInterval? {
         guard let elapsedTime = nowPlaying.elapsedTime else {
             return nil
@@ -180,5 +326,83 @@ extension SonoicModel {
                 self.startManualHostRefreshLoopIfPossible()
             }
         }
+    }
+
+    private func manualPlaybackContextMatches(
+        _ snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics,
+        payload: SonosPlayablePayload
+    ) -> Bool {
+        let payloadURI = normalizedManualPlaybackURI(payload.uri)
+        let observedURIs = [
+            normalizedManualPlaybackURI(diagnostics.currentURI),
+            normalizedManualPlaybackURI(diagnostics.trackURI),
+        ].compactMap(\.self)
+
+        if let payloadURI,
+           observedURIs.contains(payloadURI)
+        {
+            return true
+        }
+
+        if let payloadItemID = manualPlaybackItemID(from: payload.uri),
+           observedURIs.contains(where: { $0.contains(payloadItemID) })
+        {
+            return true
+        }
+
+        let titleMatches = snapshot.title.sonoicTrimmed.caseInsensitiveCompare(payload.title.sonoicTrimmed) == .orderedSame
+        let sourceMatches = payload.service?.name.sonoicNonEmptyTrimmed == nil
+            || snapshot.sourceName.sonoicTrimmed.caseInsensitiveCompare(payload.service?.name.sonoicTrimmed ?? "") == .orderedSame
+            || diagnostics.currentURIOwnership == .directServiceStream
+            || diagnostics.trackURIOwnership == .directServiceStream
+
+        return titleMatches && sourceMatches
+    }
+
+    private func clearManualPlaybackContextIfContentChanged(
+        _ snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics,
+        payload: SonosPlayablePayload
+    ) {
+        guard diagnostics.currentURI.sonoicNonEmptyTrimmed != nil
+                || diagnostics.trackURI.sonoicNonEmptyTrimmed != nil
+                || diagnostics.hasTrackMetadata
+                || diagnostics.hasSourceMetadata
+        else {
+            return
+        }
+
+        guard snapshot.title.sonoicTrimmed.caseInsensitiveCompare(payload.title.sonoicTrimmed) != .orderedSame else {
+            return
+        }
+
+        manualPlaybackContextPayload = nil
+    }
+
+    private func manualPlaybackSubtitleParts(for payload: SonosPlayablePayload) -> [String] {
+        payload.subtitle?
+            .components(separatedBy: "•")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty } ?? []
+    }
+
+    private func normalizedManualPlaybackURI(_ uri: String?) -> String? {
+        uri?
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .sonoicNonEmptyTrimmed?
+            .lowercased()
+    }
+
+    private func manualPlaybackItemID(from uri: String) -> String? {
+        guard let normalizedURI = normalizedManualPlaybackURI(uri),
+              let idStartRange = normalizedURI.range(of: "%3a")
+        else {
+            return nil
+        }
+
+        let valueAfterPrefix = normalizedURI[idStartRange.upperBound...]
+        let id = valueAfterPrefix.split(separator: "?", maxSplits: 1).first.map(String.init)
+        return id?.sonoicNonEmptyTrimmed
     }
 }

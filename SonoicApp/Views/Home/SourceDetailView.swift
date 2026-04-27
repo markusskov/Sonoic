@@ -67,6 +67,7 @@ struct SourceDetailView: View {
         .task(id: source.id) {
             if isAppleMusic {
                 await model.refreshAppleMusicServiceDetails()
+                await model.refreshSonosMusicServiceProbeIfNeeded()
                 model.loadAppleMusicRecentlyAdded()
             }
         }

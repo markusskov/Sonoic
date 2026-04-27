@@ -178,7 +178,7 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
 
         guard let kind = appleMusicKind(for: item.kind),
-              let origin = appleMusicOrigin(for: item.origin),
+              let origin = appleMusicOrigin(for: item.origin, identity: item.appleMusicIdentity),
               let serviceItemID = item.appleMusicIdentity?.routedID(for: item.origin) ?? item.serviceItemID
         else {
             return []
@@ -302,7 +302,8 @@ struct SonoicAppleMusicCatalogSearchClient {
             origin: sourceOrigin(for: metadata.origin),
             catalogID: metadata.catalogItemID,
             libraryID: metadata.libraryItemID,
-            externalURL: metadata.externalURL
+            externalURL: metadata.externalURL,
+            duration: metadata.duration
         )
     }
 
@@ -346,13 +347,18 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
     }
 
-    private func appleMusicOrigin(for sourceOrigin: SonoicSourceItem.Origin) -> AppleMusicItemOrigin? {
+    private func appleMusicOrigin(
+        for sourceOrigin: SonoicSourceItem.Origin,
+        identity: SonoicAppleMusicItemIdentity?
+    ) -> AppleMusicItemOrigin? {
         switch sourceOrigin {
         case .catalogSearch:
             .catalogSearch
         case .library:
             .library
-        case .favorite, .recentPlay:
+        case .recentPlay:
+            identity?.libraryID != nil ? .library : .catalogSearch
+        case .favorite:
             nil
         }
     }

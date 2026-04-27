@@ -4,6 +4,7 @@ struct AppleMusicItemDetailView: View {
     @Environment(SonoicModel.self) private var model
 
     let item: SonoicSourceItem
+    @State private var generatedPlaybackFailure: GeneratedPlaybackFailure?
 
     private var state: SonoicAppleMusicItemDetailState {
         model.appleMusicItemDetailState(for: item)
@@ -11,6 +12,22 @@ struct AppleMusicItemDetailView: View {
 
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
         model.appleMusicExactPlaybackCandidate(for: item)
+    }
+
+    private var generatedPlaybackCandidates: [SonoicAppleMusicGeneratedPayloadCandidate] {
+        guard exactPlaybackCandidate == nil else {
+            return []
+        }
+
+        return model.appleMusicGeneratedPayloadCandidates(for: item)
+    }
+
+    private var generatedPlaybackCandidate: SonoicAppleMusicGeneratedPayloadCandidate? {
+        guard exactPlaybackCandidate == nil else {
+            return nil
+        }
+
+        return model.appleMusicGeneratedPlaybackCandidate(for: item)
     }
 
     var body: some View {
@@ -21,8 +38,15 @@ struct AppleMusicItemDetailView: View {
 
                     if let exactPlaybackCandidate {
                         AppleMusicItemActionCard(
-                            playbackCandidate: exactPlaybackCandidate,
-                            play: playCandidate
+                            play: {
+                                await playCandidate(exactPlaybackCandidate)
+                            }
+                        )
+                    } else if let generatedPlaybackCandidate {
+                        AppleMusicItemActionCard(
+                            play: {
+                                await playGeneratedCandidate(generatedPlaybackCandidate)
+                            }
                         )
                     }
 
@@ -37,6 +61,14 @@ struct AppleMusicItemDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: item.appleMusicDetailCacheKey) {
             model.loadAppleMusicItemDetail(for: item)
+            await refreshGeneratedPlaybackHintsIfNeeded()
+        }
+        .alert(item: $generatedPlaybackFailure) { failure in
+            Alert(
+                title: Text("Could Not Start"),
+                message: Text(failure.detail),
+                dismissButton: .default(Text("OK"))
+            )
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -90,7 +122,7 @@ struct AppleMusicItemDetailView: View {
             }
 
             ForEach(state.sections) { section in
-                AppleMusicItemDetailSectionView(section: section)
+                AppleMusicItemDetailSectionView(parentItem: item, section: section)
             }
         }
     }
@@ -110,6 +142,36 @@ struct AppleMusicItemDetailView: View {
     private func playCandidate(_ candidate: SonoicSonosPlaybackCandidate) async {
         _ = await model.playManualSonosPayload(candidate.payload)
     }
+
+    private func playGeneratedCandidate(_ candidate: SonoicAppleMusicGeneratedPayloadCandidate) async {
+        do {
+            let payload = try candidate.preparedPlaybackPayload(for: item)
+            let didStart = await model.playManualSonosPayload(payload)
+
+            if !didStart {
+                generatedPlaybackFailure = GeneratedPlaybackFailure(detail: "Sonos could not start this Apple Music song.")
+            }
+        } catch {
+            generatedPlaybackFailure = GeneratedPlaybackFailure(detail: error.localizedDescription)
+        }
+    }
+
+    private func refreshGeneratedPlaybackHintsIfNeeded() async {
+        guard item.service.kind == .appleMusic,
+              item.kind == .song || item.kind == .playlist,
+              exactPlaybackCandidate == nil,
+              generatedPlaybackCandidates.isEmpty
+        else {
+            return
+        }
+
+        await model.refreshSonosMusicServiceProbeIfNeeded()
+    }
+}
+
+private struct GeneratedPlaybackFailure: Identifiable {
+    let id = UUID()
+    var detail: String
 }
 
 private struct AppleMusicItemDetailHeader: View {
@@ -158,14 +220,13 @@ private struct AppleMusicItemDetailHeader: View {
 }
 
 private struct AppleMusicItemActionCard: View {
-    let playbackCandidate: SonoicSonosPlaybackCandidate
-    let play: (SonoicSonosPlaybackCandidate) async -> Void
+    let play: () async -> Void
 
     var body: some View {
         RoomSurfaceCard {
             Button {
                 Task {
-                    await play(playbackCandidate)
+                    await play()
                 }
             } label: {
                 Label("Play", systemImage: "play.fill")
@@ -177,6 +238,9 @@ private struct AppleMusicItemActionCard: View {
 }
 
 private struct AppleMusicItemDetailSectionView: View {
+    @Environment(SonoicModel.self) private var model
+
+    let parentItem: SonoicSourceItem
     let section: SonoicAppleMusicItemDetailSection
     private let previewLimit = 8
 
@@ -203,7 +267,9 @@ private struct AppleMusicItemDetailSectionView: View {
                         AppleMusicItemCollectionView(
                             title: section.title,
                             subtitle: section.subtitle,
-                            items: section.items
+                            items: section.items,
+                            parentItem: parentItem,
+                            sectionID: section.id
                         )
                     } label: {
                         Label("View All", systemImage: "chevron.right")
@@ -218,7 +284,10 @@ private struct AppleMusicItemDetailSectionView: View {
             RoomSurfaceCard {
                 VStack(spacing: 0) {
                     ForEach(Array(previewItems.enumerated()), id: \.element.id) { index, item in
-                        SourceItemNavigationRow(item: item)
+                        SourceItemNavigationRow(
+                            item: item,
+                            playOverride: playlistTrackPlayAction(for: item, at: index)
+                        )
 
                         if index < previewItems.count - 1 {
                             Divider()
@@ -227,6 +296,71 @@ private struct AppleMusicItemDetailSectionView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func playlistTrackPlayAction(
+        for item: SonoicSourceItem,
+        at index: Int
+    ) -> (() async -> Void)? {
+        guard parentItem.kind == .playlist,
+              item.kind == .song
+        else {
+            return nil
+        }
+
+        return {
+            await playPlaylistTrack(item, trackNumber: index + 1)
+        }
+    }
+
+    private func playPlaylistTrack(_ item: SonoicSourceItem, trackNumber: Int) async {
+        let queuePayloads = playlistQueuePayloads()
+        guard !queuePayloads.isEmpty else {
+            return
+        }
+
+        let localPayload = localNowPlayingPayload(for: item)
+        let recentPayload = playlistPlaybackPayload()
+        let didStartPlayback = await model.playManualSonosQueuePayloads(
+            queuePayloads,
+            startingTrackNumber: trackNumber,
+            localNowPlayingPayload: localPayload,
+            recentPlaybackPayload: recentPayload
+        )
+
+        if didStartPlayback {
+            model.recordRecentSourceItem(parentItem, replayPayload: recentPayload)
+        }
+    }
+
+    private func playlistPlaybackPayload() -> SonosPlayablePayload? {
+        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: parentItem) {
+            return exactPlaybackCandidate.payload
+        }
+
+        guard let generatedPlaybackCandidate = model.appleMusicGeneratedPlaybackCandidate(for: parentItem) else {
+            return nil
+        }
+
+        return generatedPlaybackCandidate.playbackPayload(for: parentItem)
+    }
+
+    private func localNowPlayingPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {
+        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: item) {
+            return exactPlaybackCandidate.payload
+        }
+
+        return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
+    }
+
+    private func playlistQueuePayloads() -> [SonosPlayablePayload] {
+        section.items.compactMap { item in
+            if let generatedQueueCandidate = model.appleMusicGeneratedQueueCandidate(for: item) {
+                return generatedQueueCandidate.playbackPayload(for: item)
+            }
+
+            return model.appleMusicExactPlaybackCandidate(for: item)?.payload
         }
     }
 }

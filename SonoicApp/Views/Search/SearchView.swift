@@ -76,6 +76,11 @@ struct SearchView: View {
         .miniPlayerContentInset()
         .scrollIndicators(.hidden)
         .navigationTitle("Search")
+        .task(id: selectedServiceID) {
+            if selectedService.kind == .appleMusic {
+                await model.refreshSonosMusicServiceProbeIfNeeded()
+            }
+        }
     }
 
     private func orderedServices(_ services: [SonosServiceDescriptor]) -> [SonosServiceDescriptor] {

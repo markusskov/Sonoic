@@ -281,6 +281,10 @@ extension SonoicModel {
             return
         }
 
+        guard !shouldSuppressSnapshotRecentPlayDuringManualQueue() else {
+            return
+        }
+
         upsertRecentPlay(recentPlay)
     }
 
@@ -301,6 +305,38 @@ extension SonoicModel {
         )
     }
 
+    func recordRecentSourceItem(_ item: SonoicSourceItem, replayPayload providedReplayPayload: SonosPlayablePayload? = nil) {
+        let replayPayload: SonosPlayablePayload?
+        if let providedPayload = providedReplayPayload {
+            replayPayload = providedPayload
+        } else if case .sonosNative(let payload) = item.playbackCapability {
+            replayPayload = payload
+        } else {
+            replayPayload = nil
+        }
+
+        upsertRecentPlay(
+            SonoicRecentPlayItem(
+                id: "source-\(item.service.id)-\(item.kind.rawValue)-\(item.serviceItemID ?? item.id)",
+                title: item.title,
+                artistName: item.subtitle,
+                albumTitle: nil,
+                sourceName: item.service.name,
+                artworkURL: item.artworkURL,
+                artworkIdentifier: item.artworkIdentifier,
+                service: item.service,
+                lastPlayedAt: .now,
+                playbackURI: replayPayload?.uri,
+                playbackMetadataXML: replayPayload?.metadataXML,
+                favoriteKind: recentFavoriteKind(for: item),
+                sourceItemID: item.serviceItemID,
+                appleMusicCatalogID: item.appleMusicIdentity?.catalogID,
+                appleMusicLibraryID: item.appleMusicIdentity?.libraryID,
+                sourceItemKindRawValue: item.kind.rawValue
+            )
+        )
+    }
+
     func playRecentItem(_ recentItem: SonoicRecentPlayItem) async -> Bool {
         guard let favorite = recentItem.replayFavorite else {
             return false
@@ -310,20 +346,24 @@ extension SonoicModel {
     }
 
     private func upsertRecentPlay(_ recentPlay: SonoicRecentPlayItem) {
-        guard recentPlay.isVisibleInHomeHistory else {
+        guard shouldIncludeInHomeRecentHistory(recentPlay) else {
             return
         }
 
         let existingRecentPlay = recentPlays.first {
-            $0.isVisibleInHomeHistory
+            shouldIncludeInHomeRecentHistory($0)
                 && ($0.id == recentPlay.id || $0.matchesHomeHistoryIdentity(of: recentPlay))
         }
         let resolvedRecentPlay = existingRecentPlay?.enriched(with: recentPlay) ?? recentPlay
+        let launchedQueueRecentItems = recentPlay.favoriteKind == .collection ? manualQueueRecentItems() : []
 
-        var nextRecentPlays = recentPlays.filter {
-            $0.isVisibleInHomeHistory
-                && $0.id != resolvedRecentPlay.id
-                && !$0.matchesHomeHistoryIdentity(of: resolvedRecentPlay)
+        var nextRecentPlays = recentPlays.filter { item in
+            shouldIncludeInHomeRecentHistory(item)
+                && item.id != resolvedRecentPlay.id
+                && !item.matchesHomeHistoryIdentity(of: resolvedRecentPlay)
+                && !launchedQueueRecentItems.contains { queueItem in
+                    queueItem.matchesHomeHistoryIdentity(of: item)
+                }
         }
         nextRecentPlays.insert(resolvedRecentPlay, at: 0)
 
@@ -343,13 +383,52 @@ extension SonoicModel {
         var seenIdentities: Set<String> = []
 
         return recentPlays.compactMap { recentPlay in
-            guard recentPlay.isVisibleInHomeHistory,
+            guard shouldIncludeInHomeRecentHistory(recentPlay),
                   seenIdentities.insert(recentPlay.homeHistoryIdentity).inserted
             else {
                 return nil
             }
 
             return recentPlay
+        }
+    }
+
+    private func shouldIncludeInHomeRecentHistory(_ item: SonoicRecentPlayItem) -> Bool {
+        guard item.isVisibleInHomeHistory else {
+            return false
+        }
+
+        guard item.service == .appleMusic else {
+            return true
+        }
+
+        // Match Sonos Home: Apple Music recents are collection launches
+        // (albums/playlists), not every individual track that happens to play.
+        return item.favoriteKind == .collection
+    }
+
+    private func shouldSuppressSnapshotRecentPlayDuringManualQueue() -> Bool {
+        guard let payloads = manualQueueContextPayloads,
+              !payloads.isEmpty
+        else {
+            return false
+        }
+
+        return true
+    }
+
+    private func manualQueueRecentItems() -> [SonoicRecentPlayItem] {
+        manualQueueContextPayloads?.map {
+            SonoicRecentPlayItem(payload: $0, playedAt: .now)
+        } ?? []
+    }
+
+    private func recentFavoriteKind(for item: SonoicSourceItem) -> SonosFavoriteItem.Kind {
+        switch item.kind {
+        case .album, .artist, .playlist, .station:
+            .collection
+        case .song, .unknown:
+            .item
         }
     }
 

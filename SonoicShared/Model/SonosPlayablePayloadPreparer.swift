@@ -53,7 +53,8 @@ struct SonosPlayablePayloadPreparer {
             uri: uri,
             metadataXML: metadataXML,
             kind: payload.kind,
-            launchMode: payload.launchMode
+            launchMode: payload.launchMode,
+            duration: payload.duration
         )
     }
 

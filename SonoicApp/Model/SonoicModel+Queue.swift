@@ -23,6 +23,7 @@ extension SonoicModel {
     func refreshQueue(showLoading: Bool = true) async {
         guard hasManualSonosHost else {
             queueState = .idle
+            queueDiagnostics = .empty
             isQueueRefreshing = false
             return
         }
@@ -41,13 +42,73 @@ extension SonoicModel {
         }
 
         do {
-            let snapshot = try await queueClient.fetchSnapshot(host: manualSonosHost)
+            let snapshot = queueSnapshotEnrichedFromManualContext(
+                try await queueClient.fetchSnapshot(host: manualSonosHost)
+            )
+            queueDiagnostics = SonosQueueDiagnostics(
+                observedAt: Date(),
+                currentURI: snapshot.sourceURI ?? nowPlayingDiagnostics.currentURI,
+                itemCount: snapshot.items.count,
+                lastRefreshErrorDetail: nil,
+                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+            )
             queueState = .loaded(snapshot)
         } catch let error as SonosQueueClient.ClientError {
+            queueDiagnostics = SonosQueueDiagnostics(
+                observedAt: Date(),
+                currentURI: error.currentURI ?? nowPlayingDiagnostics.currentURI,
+                itemCount: nil,
+                lastRefreshErrorDetail: error.localizedDescription,
+                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+            )
             queueState = .unavailable(error.localizedDescription)
         } catch {
+            queueDiagnostics = SonosQueueDiagnostics(
+                observedAt: Date(),
+                currentURI: nowPlayingDiagnostics.currentURI,
+                itemCount: nil,
+                lastRefreshErrorDetail: error.localizedDescription,
+                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+            )
             queueState = .failed(error.localizedDescription)
         }
+    }
+
+    private func queueSnapshotEnrichedFromManualContext(_ snapshot: SonosQueueSnapshot) -> SonosQueueSnapshot {
+        guard let payloads = manualQueueContextPayloads,
+              payloads.count == snapshot.items.count
+        else {
+            return snapshot
+        }
+
+        let enrichedItems = zip(snapshot.items, payloads).map { item, payload in
+            queueItemEnriched(item, with: payload)
+        }
+
+        return SonosQueueSnapshot(
+            items: enrichedItems,
+            currentItemIndex: snapshot.currentItemIndex,
+            sourceURI: snapshot.sourceURI
+        )
+    }
+
+    private func queueItemEnriched(
+        _ item: SonosQueueItem,
+        with payload: SonosPlayablePayload
+    ) -> SonosQueueItem {
+        let payloadSubtitleParts = payload.subtitle?
+            .components(separatedBy: "•")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty } ?? []
+
+        return SonosQueueItem(
+            id: item.id,
+            title: item.title == "Unknown Track" ? payload.title : item.title,
+            artistName: item.artistName ?? payloadSubtitleParts.first,
+            albumTitle: item.albumTitle ?? payloadSubtitleParts.dropFirst().first,
+            artworkURL: item.artworkURL ?? payload.artworkURL,
+            duration: item.duration ?? payload.duration
+        )
     }
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
@@ -81,6 +142,12 @@ extension SonoicModel {
             return false
         }
 
+        guard let snapshot = queueState.snapshot,
+              snapshot.supportsLocalMutation
+        else {
+            return recordQueueMutationUnavailable(sourceURI: queueState.snapshot?.sourceURI)
+        }
+
         guard !isQueueClearing, !isQueueRefreshing, !isQueueMutating else {
             return false
         }
@@ -91,7 +158,11 @@ extension SonoicModel {
         }
 
         return await performQueueMutation(
-            optimisticSnapshot: SonosQueueSnapshot(items: [], currentItemIndex: nil)
+            optimisticSnapshot: SonosQueueSnapshot(
+                items: [],
+                currentItemIndex: nil,
+                sourceURI: snapshot.sourceURI
+            )
         ) { clearHost in
             try await avTransportClient.removeAllTracksFromQueue(host: clearHost)
         }
@@ -100,6 +171,10 @@ extension SonoicModel {
     func removeQueueItems(atOffsets offsets: IndexSet) async -> Bool {
         guard let snapshot = queueState.snapshot else {
             return false
+        }
+
+        guard snapshot.supportsLocalMutation else {
+            return recordQueueMutationUnavailable(sourceURI: snapshot.sourceURI)
         }
 
         let removalRanges = queueRemovalRanges(for: offsets)
@@ -123,6 +198,10 @@ extension SonoicModel {
     func moveQueueItems(fromOffsets source: IndexSet, toOffset destination: Int) async -> Bool {
         guard let snapshot = queueState.snapshot else {
             return false
+        }
+
+        guard snapshot.supportsLocalMutation else {
+            return recordQueueMutationUnavailable(sourceURI: snapshot.sourceURI)
         }
 
         let sourceOffsets = source.sorted()
@@ -175,6 +254,7 @@ extension SonoicModel {
 
         let previousQueueState = queueState
         queueOperationErrorDetail = nil
+        queueDiagnostics.lastMutationErrorDetail = nil
         queueState = .loaded(optimisticSnapshot)
         isQueueMutating = true
         defer {
@@ -191,6 +271,7 @@ extension SonoicModel {
         } catch {
             queueState = previousQueueState
             queueOperationErrorDetail = error.localizedDescription
+            queueDiagnostics.lastMutationErrorDetail = error.localizedDescription
             startManualHostRefreshLoopIfPossible()
             return false
         }
@@ -229,5 +310,13 @@ extension SonoicModel {
         )
 
         return removalRanges
+    }
+
+    private func recordQueueMutationUnavailable(sourceURI: String?) -> Bool {
+        queueOperationErrorDetail = SonosQueueClient.ClientError
+            .unavailableForCurrentSource(currentURI: sourceURI)
+            .localizedDescription
+        queueDiagnostics.lastMutationErrorDetail = queueOperationErrorDetail
+        return false
     }
 }

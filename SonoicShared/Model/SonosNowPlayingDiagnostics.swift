@@ -9,6 +9,14 @@ struct SonosNowPlayingDiagnostics: Equatable {
     var hasSourceMetadata: Bool
     var usedFallbackSnapshot: Bool
 
+    var currentURIOwnership: SonosPlaybackSourceOwnership {
+        SonosMetadataHeuristics.sourceOwnership(for: currentURI)
+    }
+
+    var trackURIOwnership: SonosPlaybackSourceOwnership {
+        SonosMetadataHeuristics.sourceOwnership(for: trackURI)
+    }
+
     static let empty = SonosNowPlayingDiagnostics(
         currentURI: nil,
         trackURI: nil,

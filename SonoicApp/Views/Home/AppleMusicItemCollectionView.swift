@@ -1,9 +1,13 @@
 import SwiftUI
 
 struct AppleMusicItemCollectionView: View {
+    @Environment(SonoicModel.self) private var model
+
     let title: String
     let subtitle: String?
     let items: [SonoicSourceItem]
+    var parentItem: SonoicSourceItem?
+    var sectionID: String?
 
     var body: some View {
         ScrollView {
@@ -14,7 +18,10 @@ struct AppleMusicItemCollectionView: View {
                     RoomSurfaceCard {
                         VStack(spacing: 0) {
                             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                SourceItemNavigationRow(item: item)
+                                SourceItemNavigationRow(
+                                    item: item,
+                                    playOverride: playlistTrackPlayAction(for: item, at: index)
+                                )
 
                                 if index < items.count - 1 {
                                     Divider()
@@ -38,7 +45,7 @@ struct AppleMusicItemCollectionView: View {
             Text(title)
                 .font(.largeTitle.weight(.bold))
                 .foregroundStyle(.primary)
-                .lineLimit(2)
+                .lineLimit(1)
 
             if let subtitle {
                 Text(subtitle)
@@ -48,6 +55,68 @@ struct AppleMusicItemCollectionView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func playlistTrackPlayAction(
+        for item: SonoicSourceItem,
+        at index: Int
+    ) -> (() async -> Void)? {
+        guard parentItem?.kind == .playlist,
+              item.kind == .song
+        else {
+            return nil
+        }
+
+        return {
+            await playPlaylistTrack(item, trackNumber: index + 1)
+        }
+    }
+
+    private func playPlaylistTrack(_ item: SonoicSourceItem, trackNumber: Int) async {
+        let queuePayloads = playlistQueuePayloads()
+        guard !queuePayloads.isEmpty else {
+            return
+        }
+
+        let localPayload = localNowPlayingPayload(for: item)
+        let recentPayload = parentItem.flatMap(playlistPlaybackPayload)
+        let didStartPlayback = await model.playManualSonosQueuePayloads(
+            queuePayloads,
+            startingTrackNumber: trackNumber,
+            localNowPlayingPayload: localPayload,
+            recentPlaybackPayload: recentPayload
+        )
+
+        if didStartPlayback,
+           let parentItem {
+            model.recordRecentSourceItem(parentItem, replayPayload: recentPayload)
+        }
+    }
+
+    private func playlistPlaybackPayload(for parentItem: SonoicSourceItem) -> SonosPlayablePayload? {
+        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: parentItem) {
+            return exactPlaybackCandidate.payload
+        }
+
+        return model.appleMusicGeneratedPlaybackCandidate(for: parentItem)?.playbackPayload(for: parentItem)
+    }
+
+    private func localNowPlayingPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {
+        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: item) {
+            return exactPlaybackCandidate.payload
+        }
+
+        return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
+    }
+
+    private func playlistQueuePayloads() -> [SonosPlayablePayload] {
+        items.compactMap { item in
+            if let generatedQueueCandidate = model.appleMusicGeneratedQueueCandidate(for: item) {
+                return generatedQueueCandidate.playbackPayload(for: item)
+            }
+
+            return model.appleMusicExactPlaybackCandidate(for: item)?.payload
+        }
     }
 }
 

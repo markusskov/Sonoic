@@ -95,6 +95,10 @@ extension SonoicModel {
             let volume = try await refreshedVolume
             let nowPlayingResult = await refreshedNowPlaying
             var nextNowPlaying = nowPlayingResult.snapshot
+            nextNowPlaying = snapshotPreservingManualPlaybackContext(
+                nextNowPlaying,
+                diagnostics: nowPlayingResult.diagnostics
+            )
             nextNowPlaying = smoothedNowPlayingSnapshot(nextNowPlaying)
             nextNowPlaying.artworkIdentifier = try? await syncArtworkIdentifier(for: nextNowPlaying)
             nextNowPlaying.transportActions = await refreshedTransportActions ?? nowPlaying.transportActions

@@ -17,6 +17,7 @@ nonisolated struct AppleMusicItemMetadata: Sendable {
     var externalURL: String?
     var kind: AppleMusicItemKind
     var origin: AppleMusicItemOrigin
+    var duration: TimeInterval?
 
     static func metadata(
         from resource: AppleMusicLibraryResource,
@@ -37,7 +38,8 @@ nonisolated struct AppleMusicItemMetadata: Sendable {
             artworkURL: resource.attributes?.artwork?.sizedURL(width: 400, height: 400),
             externalURL: resource.attributes?.url,
             kind: kind,
-            origin: origin
+            origin: origin,
+            duration: resource.attributes?.duration
         )
     }
 }
@@ -203,6 +205,11 @@ nonisolated struct AppleMusicLibraryAttributes: Decodable {
     var artwork: AppleMusicLibraryArtwork?
     var url: String?
     var playParams: AppleMusicPlayParameters?
+    var durationInMillis: Int?
+
+    var duration: TimeInterval? {
+        durationInMillis.map { TimeInterval($0) / 1000 }
+    }
 }
 
 nonisolated struct AppleMusicPlayParameters: Decodable {

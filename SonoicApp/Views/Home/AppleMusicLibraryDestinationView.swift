@@ -189,14 +189,14 @@ private struct AppleMusicLibraryGridCard: View {
                         Text(item.title)
                             .font(.headline)
                             .foregroundStyle(.primary)
-                            .lineLimit(2)
+                            .lineLimit(1)
                             .multilineTextAlignment(.leading)
 
                         if let subtitle = item.subtitle {
                             Text(subtitle)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(2)
+                                .lineLimit(1)
                                 .multilineTextAlignment(.leading)
                         }
 

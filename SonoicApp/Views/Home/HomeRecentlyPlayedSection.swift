@@ -2,15 +2,12 @@ import SwiftUI
 
 struct HomeRecentlyPlayedSection: View {
     let items: [SonoicRecentPlayItem]
-    let playRecentItem: (SonoicRecentPlayItem) async -> Void
 
     var body: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 16) {
                 ForEach(items) { item in
-                    HomeRecentPlayCard(item: item) {
-                        await playRecentItem(item)
-                    }
+                    HomeRecentPlayCard(item: item)
                 }
             }
             .padding(.vertical, 2)
@@ -21,12 +18,21 @@ struct HomeRecentlyPlayedSection: View {
 
 private struct HomeRecentPlayCard: View {
     let item: SonoicRecentPlayItem
-    let playAction: () async -> Void
+
+    private var sourceItem: SonoicSourceItem? {
+        guard item.service != nil else {
+            return nil
+        }
+
+        return SonoicSourceItem(recentPlay: item)
+    }
 
     var body: some View {
         Group {
-            if item.canReplay {
-                Button(action: playTapped) {
+            if let sourceItem {
+                NavigationLink {
+                    AppleMusicItemDetailView(item: sourceItem)
+                } label: {
                     cardContent
                 }
                 .buttonStyle(.plain)
@@ -39,27 +45,24 @@ private struct HomeRecentPlayCard: View {
 
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ZStack(alignment: .bottomTrailing) {
-                HomeFavoriteArtworkView(
-                    artworkURL: item.artworkURL,
-                    artworkIdentifier: item.artworkIdentifier,
-                    maximumDisplayDimension: 156
-                )
-                .frame(width: 156, height: 156)
-
-                playBadge
-            }
+            HomeFavoriteArtworkView(
+                artworkURL: item.artworkURL,
+                artworkIdentifier: item.artworkIdentifier,
+                maximumDisplayDimension: 156,
+                placeholderSystemImage: placeholderSystemImage
+            )
+            .frame(width: 156, height: 156)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(item.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
+                    .lineLimit(1)
 
                 Text(item.subtitle ?? item.sourceName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
 
                 Label(item.sourceName, systemImage: item.service?.systemImage ?? "music.note")
                     .font(.caption2.weight(.medium))
@@ -69,21 +72,18 @@ private struct HomeRecentPlayCard: View {
         }
     }
 
-    @ViewBuilder
-    private var playBadge: some View {
-        if item.canReplay {
-            Image(systemName: "play.fill")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 30, height: 30)
-                .glassEffect(.regular, in: Circle())
-                .padding(8)
-        }
-    }
-
-    private func playTapped() {
-        Task {
-            await playAction()
+    private var placeholderSystemImage: String {
+        switch sourceItem?.kind {
+        case .album:
+            "rectangle.stack"
+        case .artist:
+            "music.mic"
+        case .playlist:
+            "music.note.list"
+        case .station:
+            "dot.radiowaves.left.and.right"
+        case .song, .unknown, .none:
+            "music.note"
         }
     }
 }

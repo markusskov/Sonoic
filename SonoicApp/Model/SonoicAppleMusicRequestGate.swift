@@ -3,6 +3,7 @@ import Foundation
 
 actor SonoicMusicKitRequestGate {
     private static let artistArtworkFallbackLimit = 12
+    private static let playlistArtworkFallbackLimit = 12
 
     private var cachedStorefrontCountryCode: String?
 
@@ -41,7 +42,8 @@ actor SonoicMusicKitRequestGate {
                 artworkURL: song.artwork?.url(width: 400, height: 400)?.absoluteString,
                 externalURL: song.url?.absoluteString,
                 kind: .song,
-                origin: .catalogSearch
+                origin: .catalogSearch,
+                duration: song.duration
             )
         }
         let albums = response.albums.map { album in
@@ -116,7 +118,7 @@ actor SonoicMusicKitRequestGate {
 
     func fetchLibraryPlaylists(limit: Int, offset: Int? = nil) async throws -> AppleMusicItemMetadataPage {
         let response = try await fetchLibraryResponse(path: "playlists", limit: limit, offset: offset)
-        let items = response.data.map { playlist in
+        var items = response.data.map { playlist in
             AppleMusicItemMetadata(
                 serviceItemID: playlist.id,
                 catalogItemID: playlist.catalogItemID,
@@ -127,6 +129,24 @@ actor SonoicMusicKitRequestGate {
                 externalURL: playlist.attributes?.url,
                 kind: .playlist,
                 origin: .library
+            )
+        }
+
+        let artworkFallbackIndices = items.indices
+            .filter { items[$0].artworkURL == nil && items[$0].catalogItemID?.sonoicNonEmptyTrimmed != nil }
+            .prefix(Self.playlistArtworkFallbackLimit)
+
+        for index in artworkFallbackIndices {
+            try Task.checkCancellation()
+            guard let catalogID = items[index].catalogItemID?.sonoicNonEmptyTrimmed else {
+                continue
+            }
+
+            items[index].artworkURL = try? await fetchCatalogArtworkURL(
+                path: "playlists",
+                id: catalogID,
+                width: 400,
+                height: 400
             )
         }
 
@@ -182,7 +202,8 @@ actor SonoicMusicKitRequestGate {
                 artworkURL: song.attributes?.artwork?.sizedURL(width: 400, height: 400),
                 externalURL: song.attributes?.url,
                 kind: .song,
-                origin: .library
+                origin: .library,
+                duration: song.attributes?.duration
             )
         }
 
@@ -506,6 +527,18 @@ actor SonoicMusicKitRequestGate {
             ]
         )
         return searchResponse.results.artists?.data.first?.attributes?.artwork?.sizedURL(width: width, height: height)
+    }
+
+    private func fetchCatalogArtworkURL(
+        path: String,
+        id: String,
+        width: Int,
+        height: Int
+    ) async throws -> String? {
+        let response: AppleMusicLibraryResponse = try await fetchDecoded(
+            path: "/v1/catalog/\(try await storefrontCountryCode())/\(path)/\(id)"
+        )
+        return response.data.first?.attributes?.artwork?.sizedURL(width: width, height: height)
     }
 
     private func fetchDecoded<Response: Decodable>(

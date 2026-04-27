@@ -156,10 +156,16 @@ struct SettingsAdvancedView: View {
                 SettingsRefreshTimingSection(model: model, refreshTimingText: refreshTimingText)
                 SettingsPlaybackDiagnosticsSection(model: model)
                 SettingsNowPlayingDiagnosticsSection(model: model, refreshTimingText: refreshTimingText)
+                SettingsQueueDiagnosticsSection(model: model, refreshTimingText: refreshTimingText)
+                SettingsSonosMusicServiceProbeSection(model: model, refreshTimingText: refreshTimingText)
+                SettingsSonosContentDirectoryProbeSection(model: model, refreshTimingText: refreshTimingText)
             }
         }
         .miniPlayerContentInset()
         .navigationTitle("Advanced")
+        .task(id: model.queueRefreshContext) {
+            await model.refreshQueue(showLoading: false)
+        }
     }
 }
 

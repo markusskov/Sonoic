@@ -11,6 +11,7 @@ struct SonosControlTransport {
         case groupRenderingControl
         case avTransport
         case contentDirectory
+        case musicServices
         case zoneGroupTopology
         case htControl
 
@@ -24,6 +25,8 @@ struct SonosControlTransport {
                 "urn:schemas-upnp-org:service:AVTransport:1"
             case .contentDirectory:
                 "urn:schemas-upnp-org:service:ContentDirectory:1"
+            case .musicServices:
+                "urn:schemas-upnp-org:service:MusicServices:1"
             case .zoneGroupTopology:
                 "urn:schemas-upnp-org:service:ZoneGroupTopology:1"
             case .htControl:
@@ -41,6 +44,8 @@ struct SonosControlTransport {
                 "/MediaRenderer/AVTransport/Control"
             case .contentDirectory:
                 "/MediaServer/ContentDirectory/Control"
+            case .musicServices:
+                "/MusicServices/Control"
             case .zoneGroupTopology:
                 "/ZoneGroupTopology/Control"
             case .htControl:

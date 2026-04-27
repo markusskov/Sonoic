@@ -41,12 +41,12 @@ struct HomeNowPlayingCard: View {
                     Text(nowPlaying.title)
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
+                        .lineLimit(1)
 
                     Text(nowPlaying.subtitle ?? nowPlaying.sourceName)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
 
                     Text(queueSummary)
                         .font(.caption.weight(.medium))

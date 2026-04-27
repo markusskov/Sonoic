@@ -47,6 +47,7 @@ struct SonosQueueItem: Identifiable, Equatable {
 struct SonosQueueSnapshot: Equatable {
     var items: [SonosQueueItem]
     var currentItemIndex: Int?
+    var sourceURI: String? = nil
 
     var currentItem: SonosQueueItem? {
         guard let currentItemIndex,
@@ -56,6 +57,14 @@ struct SonosQueueSnapshot: Equatable {
         }
 
         return items[currentItemIndex]
+    }
+
+    var sourceOwnership: SonosPlaybackSourceOwnership {
+        SonosPlaybackSourceOwnership(uri: sourceURI)
+    }
+
+    var supportsLocalMutation: Bool {
+        sourceOwnership.supportsLocalQueueMutation
     }
 
     var itemCountText: String {
@@ -93,7 +102,11 @@ struct SonosQueueSnapshot: Equatable {
             removedCurrentIndex: removedCurrentIndex
         )
 
-        return SonosQueueSnapshot(items: updatedItems, currentItemIndex: nextCurrentItemIndex)
+        return SonosQueueSnapshot(
+            items: updatedItems,
+            currentItemIndex: nextCurrentItemIndex,
+            sourceURI: sourceURI
+        )
     }
 
     func movingItems(fromOffsets source: IndexSet, toOffset destination: Int) -> SonosQueueSnapshot {
@@ -107,7 +120,11 @@ struct SonosQueueSnapshot: Equatable {
             removedCurrentIndex: currentItemIndex
         )
 
-        return SonosQueueSnapshot(items: updatedItems, currentItemIndex: nextCurrentItemIndex)
+        return SonosQueueSnapshot(
+            items: updatedItems,
+            currentItemIndex: nextCurrentItemIndex,
+            sourceURI: sourceURI
+        )
     }
 
     private func resolvedCurrentItemIndex(

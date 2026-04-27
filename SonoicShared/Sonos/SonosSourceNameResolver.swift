@@ -34,7 +34,7 @@ struct SonosSourceNameResolver {
         let normalizedTrackURI = trackURI.sonoicNonEmptyTrimmed
 
         if let normalizedCurrentURI,
-           SonosMetadataHeuristics.isQueueContainerURI(normalizedCurrentURI),
+           SonosMetadataHeuristics.isPlaybackContainerURI(normalizedCurrentURI),
            normalizedTrackURI != nil
         {
             return normalizedTrackURI
