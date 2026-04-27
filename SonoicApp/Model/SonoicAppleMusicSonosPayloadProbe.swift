@@ -17,6 +17,7 @@ struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
 
     var strategy: Strategy
     var uri: String
+    var metadataXML: String
     var serialNumber: String
 
     var id: String {
@@ -40,14 +41,21 @@ struct SonoicAppleMusicSonosPayloadProbe {
         }
 
         var candidates: [SonoicAppleMusicGeneratedPayloadCandidate] = []
+        let metadataBuilder = SonoicAppleMusicSonosCandidateMetadataBuilder()
 
         if let catalogID = identity.catalogID.sonoicNonEmptyTrimmed,
            let launchSerial = playbackHint.preferredLaunchSerial?.sonoicNonEmptyTrimmed,
            let encodedCatalogID = sonosPayloadID(catalogID) {
+            let uri = "x-sonosapi-hls:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&sn=\(launchSerial)"
             candidates.append(
                 SonoicAppleMusicGeneratedPayloadCandidate(
                     strategy: .catalogHLS,
-                    uri: "x-sonosapi-hls:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&sn=\(launchSerial)",
+                    uri: uri,
+                    metadataXML: metadataBuilder.metadataXML(
+                        for: item,
+                        itemID: "song:\(catalogID)",
+                        serviceID: appleMusicServiceID
+                    ),
                     serialNumber: launchSerial
                 )
             )
@@ -56,10 +64,16 @@ struct SonoicAppleMusicSonosPayloadProbe {
         if let libraryID = identity.libraryID.sonoicNonEmptyTrimmed,
            let trackSerial = playbackHint.trackSerials.first?.sonoicNonEmptyTrimmed,
            let encodedLibraryID = sonosPayloadID(libraryID) {
+            let uri = "x-sonos-http:librarytrack%3a\(encodedLibraryID).m4p?sid=\(appleMusicServiceID)&flags=8232&sn=\(trackSerial)"
             candidates.append(
                 SonoicAppleMusicGeneratedPayloadCandidate(
                     strategy: .libraryTrack,
-                    uri: "x-sonos-http:librarytrack%3a\(encodedLibraryID).m4p?sid=\(appleMusicServiceID)&flags=8232&sn=\(trackSerial)",
+                    uri: uri,
+                    metadataXML: metadataBuilder.metadataXML(
+                        for: item,
+                        itemID: "librarytrack:\(libraryID)",
+                        serviceID: appleMusicServiceID
+                    ),
                     serialNumber: trackSerial
                 )
             )
@@ -71,6 +85,43 @@ struct SonoicAppleMusicSonosPayloadProbe {
     private func sonosPayloadID(_ value: String) -> String? {
         let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
         return value.addingPercentEncoding(withAllowedCharacters: allowedCharacters)
+    }
+}
+
+private struct SonoicAppleMusicSonosCandidateMetadataBuilder {
+    func metadataXML(
+        for item: SonoicSourceItem,
+        itemID: String,
+        serviceID: String
+    ) -> String {
+        let subtitleParts = item.subtitle?
+            .components(separatedBy: "•")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty } ?? []
+        let creator = subtitleParts.first
+        let album = subtitleParts.dropFirst().first
+        let serviceType = SonosServiceDescriptor.appleMusic.sonosServiceType ?? serviceID
+
+        return """
+        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/"><item id="\(xmlEscaped(itemID))" parentID="" restricted="true"><dc:title>\(xmlEscaped(item.title))</dc:title>\(optionalElement("dc:creator", creator))\(optionalElement("upnp:album", album))\(optionalElement("upnp:albumArtURI", item.artworkURL))<upnp:class>object.item.audioItem.musicTrack</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON\(serviceType)_X_#Svc\(serviceType)-0-Token</desc></item></DIDL-Lite>
+        """
+    }
+
+    private func optionalElement(_ name: String, _ value: String?) -> String {
+        guard let value = value?.sonoicNonEmptyTrimmed else {
+            return ""
+        }
+
+        return "<\(name)>\(xmlEscaped(value))</\(name)>"
+    }
+
+    private func xmlEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 }
 

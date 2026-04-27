@@ -21,6 +21,9 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
 
         #expect(candidate.serialNumber == "3")
         #expect(candidate.uri == "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3")
+        #expect(candidate.metadataXML.contains("<dc:title>Sweet Jane</dc:title>"))
+        #expect(candidate.metadataXML.contains("<dc:creator>Garrett Kato</dc:creator>"))
+        #expect(candidate.metadataXML.contains("SA_RINCON52231_X_#Svc52231-0-Token"))
     }
 
     @Test
@@ -38,6 +41,35 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
 
         #expect(candidate.serialNumber == "7")
         #expect(candidate.uri == "x-sonos-http:librarytrack%3ai.BOVNeOxU6BVbp8.m4p?sid=204&flags=8232&sn=7")
+        #expect(candidate.metadataXML.contains("librarytrack:i.BOVNeOxU6BVbp8"))
+        #expect(candidate.metadataXML.contains("<upnp:class>object.item.audioItem.musicTrack</upnp:class>"))
+    }
+
+    @Test
+    func escapesMetadataXMLValues() throws {
+        let item = SonoicSourceItem.appleMusicMetadata(
+            id: "1440857781",
+            title: "Sweet & Jane",
+            subtitle: "Garrett <Kato> • That Low \"Sound\"",
+            artworkURL: "https://example.com/art?a=1&b=2",
+            kind: .song,
+            origin: .catalogSearch,
+            catalogID: "1440857781"
+        )
+        let candidate = try #require(
+            probe.candidates(
+                for: item,
+                playbackHint: SonosMusicServicePlaybackHint(
+                    launchSerials: ["3"],
+                    trackSerials: []
+                )
+            ).first
+        )
+
+        #expect(candidate.metadataXML.contains("<dc:title>Sweet &amp; Jane</dc:title>"))
+        #expect(candidate.metadataXML.contains("<dc:creator>Garrett &lt;Kato&gt;</dc:creator>"))
+        #expect(candidate.metadataXML.contains("<upnp:album>That Low &quot;Sound&quot;</upnp:album>"))
+        #expect(candidate.metadataXML.contains("https://example.com/art?a=1&amp;b=2"))
     }
 
     @Test
