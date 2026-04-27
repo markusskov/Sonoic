@@ -44,13 +44,25 @@ struct SonosMusicServiceProbeSnapshot: Equatable {
     }
 
     func includingObservedAccounts(from values: [String?]) -> SonosMusicServiceProbeSnapshot {
-        var snapshot = self
-        let observedAccounts = SonosMusicServiceAccountSummary.observedAccounts(from: values)
+        includingObservedAccounts(
+            from: values.map { SonosMusicServiceObservedValue(value: $0, origin: .unknown) }
+        )
+    }
 
-        for observedAccount in observedAccounts where !snapshot.accounts.contains(where: {
-            $0.serviceType == observedAccount.serviceType && $0.serialNumber == observedAccount.serialNumber
-        }) {
-            snapshot.accounts.append(observedAccount)
+    func includingObservedAccounts(
+        from observedValues: [SonosMusicServiceObservedValue]
+    ) -> SonosMusicServiceProbeSnapshot {
+        var snapshot = self
+        let observedAccounts = SonosMusicServiceAccountSummary.observedAccounts(from: observedValues)
+
+        for observedAccount in observedAccounts {
+            if let accountIndex = snapshot.accounts.firstIndex(where: {
+                $0.serviceType == observedAccount.serviceType && $0.serialNumber == observedAccount.serialNumber
+            }) {
+                snapshot.accounts[accountIndex].observedOrigins.formUnion(observedAccount.observedOrigins)
+            } else {
+                snapshot.accounts.append(observedAccount)
+            }
         }
 
         return snapshot
@@ -118,6 +130,23 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
         case observedPlayback
     }
 
+    enum ObservedOrigin: String, Hashable {
+        case currentPlayback
+        case favorite
+        case unknown
+
+        var displayTitle: String? {
+            switch self {
+            case .currentPlayback:
+                "now playing"
+            case .favorite:
+                "favorite"
+            case .unknown:
+                nil
+            }
+        }
+    }
+
     var serviceType: String
     var serialNumber: String
     var nickname: String?
@@ -125,6 +154,7 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
     var hasOAuthDeviceID: Bool
     var hasKey: Bool
     var source: Source = .statusAccounts
+    var observedOrigins: Set<ObservedOrigin> = []
 
     var id: String {
         "\(serviceType)-\(serialNumber)"
@@ -153,18 +183,52 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
             parts.append("key")
         }
 
+        parts.append(contentsOf: observedOriginTitles)
+
         return parts.joined(separator: " · ")
     }
 
     static func observedAccounts(from values: [String?]) -> [SonosMusicServiceAccountSummary] {
+        observedAccounts(
+            from: values.map { SonosMusicServiceObservedValue(value: $0, origin: .unknown) }
+        )
+    }
+
+    static func observedAccounts(from values: [SonosMusicServiceObservedValue]) -> [SonosMusicServiceAccountSummary] {
         var seenIDs: Set<String> = []
-        return values.compactMap(observedAccount).filter { account in
-            seenIDs.insert(account.id).inserted
+        var accounts: [SonosMusicServiceAccountSummary] = []
+
+        for value in values {
+            guard let account = observedAccount(from: value) else {
+                continue
+            }
+
+            if let accountIndex = accounts.firstIndex(where: { $0.id == account.id }) {
+                accounts[accountIndex].observedOrigins.formUnion(account.observedOrigins)
+                continue
+            }
+
+            guard seenIDs.insert(account.id).inserted else {
+                continue
+            }
+
+            accounts.append(account)
+        }
+
+        return accounts
+    }
+
+    private var observedOriginTitles: [String] {
+        let orderedOrigins: [ObservedOrigin] = [.currentPlayback, .favorite, .unknown]
+        return orderedOrigins.compactMap { origin in
+            observedOrigins.contains(origin) ? origin.displayTitle : nil
         }
     }
 
-    private static func observedAccount(from value: String?) -> SonosMusicServiceAccountSummary? {
-        guard let value = value?.sonoicNonEmptyTrimmed else {
+    private static func observedAccount(
+        from observedValue: SonosMusicServiceObservedValue
+    ) -> SonosMusicServiceAccountSummary? {
+        guard let value = observedValue.value?.sonoicNonEmptyTrimmed else {
             return nil
         }
 
@@ -198,9 +262,15 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
             hasUsername: false,
             hasOAuthDeviceID: false,
             hasKey: false,
-            source: .observedPlayback
+            source: .observedPlayback,
+            observedOrigins: [observedValue.origin]
         )
     }
+}
+
+struct SonosMusicServiceObservedValue: Equatable {
+    var value: String?
+    var origin: SonosMusicServiceAccountSummary.ObservedOrigin
 }
 
 extension SonosServiceDescriptor {

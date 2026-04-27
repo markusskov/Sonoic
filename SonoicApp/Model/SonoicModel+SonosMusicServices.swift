@@ -30,15 +30,25 @@ extension SonoicModel {
         }
     }
 
-    private var observedSonosServiceAccountValues: [String?] {
-        var values: [String?] = [
-            nowPlayingDiagnostics.currentURI,
-            nowPlayingDiagnostics.trackURI,
+    private var observedSonosServiceAccountValues: [SonosMusicServiceObservedValue] {
+        var values: [SonosMusicServiceObservedValue] = [
+            SonosMusicServiceObservedValue(
+                value: nowPlayingDiagnostics.currentURI,
+                origin: .currentPlayback
+            ),
+            SonosMusicServiceObservedValue(
+                value: nowPlayingDiagnostics.trackURI,
+                origin: .currentPlayback
+            ),
         ]
 
         if let favorites = homeFavoritesState.snapshot?.items {
-            values.append(contentsOf: favorites.map(\.playbackURI))
-            values.append(contentsOf: favorites.map(\.playbackMetadataXML))
+            values.append(contentsOf: favorites.map {
+                SonosMusicServiceObservedValue(value: $0.playbackURI, origin: .favorite)
+            })
+            values.append(contentsOf: favorites.map {
+                SonosMusicServiceObservedValue(value: $0.playbackMetadataXML, origin: .favorite)
+            })
         }
 
         return values

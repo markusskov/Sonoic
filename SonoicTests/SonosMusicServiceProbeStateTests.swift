@@ -89,6 +89,41 @@ struct SonosMusicServiceProbeStateTests {
         #expect(appleMusic.accounts.first?.redactedDetail == "sn 7")
     }
 
+    @Test("labels observed account origins")
+    func labelsObservedAccountOrigins() throws {
+        let snapshot = SonosMusicServiceProbeSnapshot(
+            observedAt: Date(timeIntervalSince1970: 0),
+            serviceListVersion: nil,
+            services: [
+                SonosMusicServiceDescriptor(
+                    id: "204",
+                    name: "Apple Music",
+                    uri: nil,
+                    secureURI: nil,
+                    containerType: nil,
+                    capabilities: nil,
+                    authPolicy: nil,
+                    presentationMapURI: nil,
+                    stringsURI: nil
+                ),
+            ],
+            accounts: []
+        ).includingObservedAccounts(from: [
+            SonosMusicServiceObservedValue(
+                value: "x-sonos-http:librarytrack%3aabc.m4p?sid=204&flags=8232&sn=7",
+                origin: .currentPlayback
+            ),
+            SonosMusicServiceObservedValue(
+                value: "x-rincon-cpcontainer:1006206cplaylist%3aabc?sid=204&amp;flags=8300&amp;sn=7",
+                origin: .favorite
+            ),
+        ])
+
+        let appleMusic = try #require(snapshot.knownServiceRows.first { $0.service == .appleMusic })
+
+        #expect(appleMusic.accounts.first?.redactedDetail == "sn 7 · now playing · favorite")
+    }
+
     @Test("service type derives from Sonos service id")
     func serviceTypeDerivesFromServiceID() {
         let appleMusic = SonosMusicServiceDescriptor(
