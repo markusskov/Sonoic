@@ -129,6 +129,154 @@ struct SettingsQueueDiagnosticsSection: View {
     }
 }
 
+struct SettingsSonosMusicServiceProbeSection: View {
+    let model: SonoicModel
+    let refreshTimingText: (Date?) -> String
+
+    var body: some View {
+        Section("Sonos Services") {
+            SettingsStatusRow(
+                title: "Service Probe",
+                statusTitle: statusTitle,
+                detail: statusDetail,
+                systemImage: systemImage,
+                tint: tint
+            )
+
+            if let snapshot = model.sonosMusicServiceProbeState.snapshot {
+                LabeledContent("Observed At", value: refreshTimingText(snapshot.observedAt))
+
+                if let serviceListVersion = snapshot.serviceListVersion {
+                    LabeledContent("List Version", value: serviceListVersion)
+                }
+
+                ForEach(snapshot.knownServiceRows) { row in
+                    SettingsSonosMusicServiceProbeRow(row: row)
+                }
+            }
+
+            Button(action: refreshProbe) {
+                if model.sonosMusicServiceProbeState.isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Refreshing")
+                    }
+                } else {
+                    Label("Refresh Services", systemImage: "arrow.clockwise")
+                }
+            }
+            .disabled(model.sonosMusicServiceProbeState.isLoading)
+        }
+    }
+
+    private var statusTitle: String {
+        switch model.sonosMusicServiceProbeState.status {
+        case .idle:
+            "Not Refreshed"
+        case .loading:
+            "Refreshing"
+        case .loaded:
+            "Loaded"
+        case .failed:
+            "Failed"
+        }
+    }
+
+    private var statusDetail: String? {
+        switch model.sonosMusicServiceProbeState.status {
+        case .idle:
+            "Reads Sonos music services and accounts."
+        case .loading:
+            "Reading local Sonos service setup."
+        case .loaded:
+            nil
+        case .failed(let detail):
+            detail
+        }
+    }
+
+    private var systemImage: String {
+        switch model.sonosMusicServiceProbeState.status {
+        case .idle:
+            "network"
+        case .loading:
+            "arrow.clockwise"
+        case .loaded:
+            "checkmark.circle.fill"
+        case .failed:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch model.sonosMusicServiceProbeState.status {
+        case .idle:
+            .secondary
+        case .loading:
+            .orange
+        case .loaded:
+            .green
+        case .failed:
+            .red
+        }
+    }
+
+    private func refreshProbe() {
+        Task {
+            await model.refreshSonosMusicServiceProbe()
+        }
+    }
+}
+
+private struct SettingsSonosMusicServiceProbeRow: View {
+    let row: SonosMusicServiceProbeRow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label(row.service.name, systemImage: row.service.systemImage)
+                Spacer()
+                Text(row.statusTitle)
+                    .foregroundStyle(statusTint)
+            }
+
+            Text(row.detailText)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            if let sonosService = row.sonosService {
+                if let authPolicy = sonosService.authPolicy {
+                    Text("Auth \(authPolicy)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let secureURI = sonosService.secureURI {
+                    Text(secureURI)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+
+            ForEach(row.accounts) { account in
+                Text(account.redactedDetail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var statusTint: Color {
+        guard row.sonosService != nil else {
+            return .secondary
+        }
+
+        return row.accounts.isEmpty ? .orange : .green
+    }
+}
+
 struct SettingsEmptySelectionSection: View {
     var body: some View {
         Section("Selection") {
