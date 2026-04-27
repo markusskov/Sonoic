@@ -88,6 +88,8 @@ extension SonoicModel {
         }
 
         manualPlaybackContextPayload = nil
+        manualQueueContextPayloads = nil
+        manualRecentPlaybackContextPayload = nil
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
         return await performManualTransportCommand(
@@ -134,6 +136,7 @@ extension SonoicModel {
 
         beginManualPlayTransitionGrace()
         manualQueueContextPayloads = nil
+        manualRecentPlaybackContextPayload = nil
         manualPlaybackContextPayload = displayPayload
         markLocalNowPlaying(from: displayPayload)
         let didStartPlayback = await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
@@ -203,6 +206,7 @@ extension SonoicModel {
 
         beginManualPlayTransitionGrace()
         manualQueueContextPayloads = preparedPayloads
+        manualRecentPlaybackContextPayload = preparedRecentPayload
         manualPlaybackContextPayload = confirmationPayload
         markLocalNowPlaying(from: displayPayload)
         let didStartPlayback = await performManualTransportCommand(
@@ -240,9 +244,13 @@ extension SonoicModel {
         }
 
         if didStartPlayback {
-            recordRecentPlayablePayload(preparedRecentPayload ?? displayPayload)
+            if let preparedRecentPayload {
+                recordRecentPlayablePayload(preparedRecentPayload)
+            }
         } else {
             manualPlaybackContextPayload = nil
+            manualQueueContextPayloads = nil
+            manualRecentPlaybackContextPayload = nil
         }
 
         return didStartPlayback

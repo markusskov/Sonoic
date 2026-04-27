@@ -281,6 +281,10 @@ extension SonoicModel {
             return
         }
 
+        guard !shouldSuppressSnapshotRecentPlayDuringManualQueue() else {
+            return
+        }
+
         upsertRecentPlay(recentPlay)
     }
 
@@ -319,11 +323,15 @@ extension SonoicModel {
                 && ($0.id == recentPlay.id || $0.matchesHomeHistoryIdentity(of: recentPlay))
         }
         let resolvedRecentPlay = existingRecentPlay?.enriched(with: recentPlay) ?? recentPlay
+        let launchedQueueRecentItems = recentPlay.favoriteKind == .collection ? manualQueueRecentItems() : []
 
-        var nextRecentPlays = recentPlays.filter {
-            $0.isVisibleInHomeHistory
-                && $0.id != resolvedRecentPlay.id
-                && !$0.matchesHomeHistoryIdentity(of: resolvedRecentPlay)
+        var nextRecentPlays = recentPlays.filter { item in
+            item.isVisibleInHomeHistory
+                && item.id != resolvedRecentPlay.id
+                && !item.matchesHomeHistoryIdentity(of: resolvedRecentPlay)
+                && !launchedQueueRecentItems.contains { queueItem in
+                    queueItem.matchesHomeHistoryIdentity(of: item)
+                }
         }
         nextRecentPlays.insert(resolvedRecentPlay, at: 0)
 
@@ -351,6 +359,60 @@ extension SonoicModel {
 
             return recentPlay
         }
+    }
+
+    private func shouldSuppressSnapshotRecentPlayDuringManualQueue() -> Bool {
+        guard let payloads = manualQueueContextPayloads,
+              !payloads.isEmpty
+        else {
+            return false
+        }
+
+        let observedURIs = [
+            normalizedRecentPlaybackURI(nowPlayingDiagnostics.currentURI),
+            normalizedRecentPlaybackURI(nowPlayingDiagnostics.trackURI),
+        ].compactMap(\.self)
+
+        return payloads.contains { payload in
+            guard let payloadURI = normalizedRecentPlaybackURI(payload.uri) else {
+                return false
+            }
+
+            if observedURIs.contains(payloadURI) {
+                return true
+            }
+
+            guard let itemID = recentPlaybackItemID(from: payload.uri) else {
+                return false
+            }
+
+            return observedURIs.contains { $0.contains(itemID) }
+        }
+    }
+
+    private func manualQueueRecentItems() -> [SonoicRecentPlayItem] {
+        manualQueueContextPayloads?.map {
+            SonoicRecentPlayItem(payload: $0, playedAt: .now)
+        } ?? []
+    }
+
+    private func normalizedRecentPlaybackURI(_ uri: String?) -> String? {
+        uri?
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .sonoicNonEmptyTrimmed?
+            .lowercased()
+    }
+
+    private func recentPlaybackItemID(from uri: String) -> String? {
+        guard let normalizedURI = normalizedRecentPlaybackURI(uri),
+              let idStartRange = normalizedURI.range(of: "%3a")
+        else {
+            return nil
+        }
+
+        let valueAfterPrefix = normalizedURI[idStartRange.upperBound...]
+        let id = valueAfterPrefix.split(separator: "?", maxSplits: 1).first.map(String.init)
+        return id?.sonoicNonEmptyTrimmed
     }
 
     private func orderedUniqueServices(_ services: [SonosServiceDescriptor]) -> [SonosServiceDescriptor] {

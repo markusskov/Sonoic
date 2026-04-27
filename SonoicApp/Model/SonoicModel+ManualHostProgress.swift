@@ -174,12 +174,7 @@ extension SonoicModel {
         _ snapshot: SonosNowPlayingSnapshot,
         diagnostics: SonosNowPlayingDiagnostics
     ) -> SonosNowPlayingSnapshot {
-        guard let payload = manualPlaybackContextPayload else {
-            return snapshot
-        }
-
-        guard manualPlaybackContextMatches(snapshot, diagnostics: diagnostics, payload: payload) else {
-            clearManualPlaybackContextIfContentChanged(snapshot, diagnostics: diagnostics, payload: payload)
+        guard let payload = manualPlaybackContextPayload(for: snapshot, diagnostics: diagnostics) else {
             return snapshot
         }
 
@@ -217,6 +212,57 @@ extension SonoicModel {
         }
 
         return preservedSnapshot
+    }
+
+    private func manualPlaybackContextPayload(
+        for snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics
+    ) -> SonosPlayablePayload? {
+        if let payload = manualPlaybackContextPayload,
+           manualPlaybackContextMatches(snapshot, diagnostics: diagnostics, payload: payload)
+        {
+            return payload
+        }
+
+        if let payload = manualQueueContextPayload(matching: diagnostics) {
+            manualPlaybackContextPayload = payload
+            return payload
+        }
+
+        if let payload = manualPlaybackContextPayload {
+            clearManualPlaybackContextIfContentChanged(snapshot, diagnostics: diagnostics, payload: payload)
+        }
+
+        return nil
+    }
+
+    private func manualQueueContextPayload(matching diagnostics: SonosNowPlayingDiagnostics) -> SonosPlayablePayload? {
+        guard let payloads = manualQueueContextPayloads,
+              !payloads.isEmpty
+        else {
+            return nil
+        }
+
+        let observedURIs = [
+            normalizedManualPlaybackURI(diagnostics.currentURI),
+            normalizedManualPlaybackURI(diagnostics.trackURI),
+        ].compactMap(\.self)
+
+        return payloads.first { payload in
+            guard let payloadURI = normalizedManualPlaybackURI(payload.uri) else {
+                return false
+            }
+
+            if observedURIs.contains(payloadURI) {
+                return true
+            }
+
+            guard let payloadItemID = manualPlaybackItemID(from: payload.uri) else {
+                return false
+            }
+
+            return observedURIs.contains { $0.contains(payloadItemID) }
+        }
     }
 
     private func shouldPreserveManualPlaybackTitle(
