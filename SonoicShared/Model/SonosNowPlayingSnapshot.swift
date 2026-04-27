@@ -113,7 +113,11 @@ struct SonosNowPlayingSnapshot: Equatable {
     }
 
     var canSeek: Bool {
-        transportActions?.canSeek ?? true
+        if duration != nil, sourceName != "TV Audio" {
+            return true
+        }
+
+        return transportActions?.canSeek ?? true
     }
 }
 
@@ -155,6 +159,20 @@ struct SonosTransportActions: Equatable, Hashable {
 
     var canSkipPrevious: Bool {
         contains("Previous")
+    }
+
+    var diagnosticText: String {
+        [
+            canPlay ? "Play" : nil,
+            canPause ? "Pause" : nil,
+            canStop ? "Stop" : nil,
+            canSeek ? "Seek" : nil,
+            canSkipNext ? "Next" : nil,
+            canSkipPrevious ? "Previous" : nil,
+        ]
+        .compactMap(\.self)
+        .joined(separator: ", ")
+        .sonoicNonEmptyTrimmed ?? "None"
     }
 
     private func contains(_ action: String) -> Bool {

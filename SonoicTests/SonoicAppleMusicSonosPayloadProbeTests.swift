@@ -78,6 +78,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         #expect(candidate.isUserPlayable)
         #expect(candidate.serialNumber == "3")
         #expect(candidate.uri == "x-rincon-cpcontainer:1006206cplaylist%3ap.abc123?sid=204&flags=8300&sn=3")
+        #expect(candidate.metadataXML.contains("<container id=\"playlist:p.abc123\""))
         #expect(candidate.metadataXML.contains("playlist:p.abc123"))
         #expect(candidate.metadataXML.contains("<upnp:class>object.container.playlistContainer</upnp:class>"))
 

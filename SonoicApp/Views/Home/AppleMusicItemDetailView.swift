@@ -267,7 +267,9 @@ private struct AppleMusicItemDetailSectionView: View {
                         AppleMusicItemCollectionView(
                             title: section.title,
                             subtitle: section.subtitle,
-                            items: section.items
+                            items: section.items,
+                            parentItem: parentItem,
+                            sectionID: section.id
                         )
                     } label: {
                         Label("View All", systemImage: "chevron.right")

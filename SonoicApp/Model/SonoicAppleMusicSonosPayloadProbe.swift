@@ -147,8 +147,10 @@ private struct SonoicAppleMusicSonosCandidateMetadataBuilder {
         let album = subtitleParts.dropFirst().first
         let serviceType = SonosServiceDescriptor.appleMusic.sonosServiceType ?? serviceID
 
+        let elementName = didlElementName(for: item.kind)
+
         return """
-        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/"><item id="\(xmlEscaped(itemID))" parentID="" restricted="true"><dc:title>\(xmlEscaped(item.title))</dc:title>\(optionalElement("dc:creator", creator))\(optionalElement("upnp:album", album))\(optionalElement("upnp:albumArtURI", item.artworkURL))<upnp:class>\(upnpClass(for: item.kind))</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON\(serviceType)_X_#Svc\(serviceType)-0-Token</desc></item></DIDL-Lite>
+        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/"><\(elementName) id="\(xmlEscaped(itemID))" parentID="" restricted="true"><dc:title>\(xmlEscaped(item.title))</dc:title>\(optionalElement("dc:creator", creator))\(optionalElement("upnp:album", album))\(optionalElement("upnp:albumArtURI", item.artworkURL))<upnp:class>\(upnpClass(for: item.kind))</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON\(serviceType)_X_#Svc\(serviceType)-0-Token</desc></\(elementName)></DIDL-Lite>
         """
     }
 
@@ -158,6 +160,15 @@ private struct SonoicAppleMusicSonosCandidateMetadataBuilder {
             "object.container.playlistContainer"
         default:
             "object.item.audioItem.musicTrack"
+        }
+    }
+
+    private func didlElementName(for kind: SonoicSourceItem.Kind) -> String {
+        switch kind {
+        case .playlist:
+            "container"
+        default:
+            "item"
         }
     }
 

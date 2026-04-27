@@ -73,6 +73,10 @@ struct SettingsNowPlayingDiagnosticsSection: View {
                 "Queue Editable",
                 value: currentURIOwnership.supportsLocalQueueMutation ? "Yes" : "No"
             )
+            LabeledContent(
+                "Transport Actions",
+                value: model.nowPlaying.transportActions?.diagnosticText ?? "Unavailable"
+            )
             SettingsDiagnosticRow(
                 title: "Current URI Detail",
                 value: currentURIOwnership.diagnosticDetail
