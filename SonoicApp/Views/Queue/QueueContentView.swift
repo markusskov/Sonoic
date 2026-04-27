@@ -29,13 +29,15 @@ struct QueueContentView: View {
             ContentUnavailableView {
                 Label("Loading Queue", systemImage: "arrow.clockwise")
             } description: {
-                Text("Sonoic is reading the active Sonos queue from the selected room.")
+                Text("Reading queue...")
             }
         case let .unavailable(detail):
             ContentUnavailableView {
                 Label("No Active Queue", systemImage: "list.triangle")
             } description: {
                 Text(detail)
+            } actions: {
+                Button("Refresh", action: retryTapped)
             }
         case let .failed(detail):
             ContentUnavailableView {
@@ -62,6 +64,7 @@ struct QueueContentView: View {
             QueueSnapshotList(
                 snapshot: snapshot,
                 nowPlaying: model.nowPlaying,
+                canMutate: snapshot.supportsLocalMutation,
                 playQueueItem: playQueueItem,
                 deleteQueueItems: deleteQueueItems,
                 moveQueueItems: moveQueueItems

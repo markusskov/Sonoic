@@ -5,6 +5,7 @@ struct QueueSnapshotList: View {
 
     let snapshot: SonosQueueSnapshot
     let nowPlaying: SonosNowPlayingSnapshot
+    let canMutate: Bool
     let playQueueItem: (Int) async -> Void
     let deleteQueueItems: (IndexSet) async -> Void
     let moveQueueItems: (IndexSet, Int) async -> Void
@@ -50,23 +51,23 @@ struct QueueSnapshotList: View {
             }
 
             Section(snapshot.itemCountText) {
-                ForEach(Array(snapshot.items.enumerated()), id: \.element.id) { index, item in
-                    QueueItemRow(
-                        position: index + 1,
-                        item: item,
-                        isCurrent: snapshot.currentItemIndex == index,
-                        isEditing: isEditing,
-                        playAction: playQueueItem
-                    )
-                }
-                .onDelete { offsets in
-                    Task {
-                        await deleteQueueItems(offsets)
+                if canMutate {
+                    ForEach(Array(snapshot.items.enumerated()), id: \.element.id) { index, item in
+                        queueItemRow(index: index, item: item)
                     }
-                }
-                .onMove { source, destination in
-                    Task {
-                        await moveQueueItems(source, destination)
+                        .onDelete { offsets in
+                            Task {
+                                await deleteQueueItems(offsets)
+                            }
+                        }
+                        .onMove { source, destination in
+                            Task {
+                                await moveQueueItems(source, destination)
+                            }
+                        }
+                } else {
+                    ForEach(Array(snapshot.items.enumerated()), id: \.element.id) { index, item in
+                        queueItemRow(index: index, item: item)
                     }
                 }
             }
@@ -80,6 +81,17 @@ struct QueueSnapshotList: View {
     private var isEditing: Bool {
         editMode?.wrappedValue.isEditing == true
     }
+
+    private func queueItemRow(index: Int, item: SonosQueueItem) -> QueueItemRow {
+        QueueItemRow(
+            position: index + 1,
+            item: item,
+            isCurrent: snapshot.currentItemIndex == index,
+            isEditing: isEditing,
+            canPlay: canMutate,
+            playAction: playQueueItem
+        )
+    }
 }
 
 private struct QueueItemRow: View {
@@ -87,11 +99,12 @@ private struct QueueItemRow: View {
     let item: SonosQueueItem
     let isCurrent: Bool
     let isEditing: Bool
+    let canPlay: Bool
     let playAction: (Int) async -> Void
 
     var body: some View {
         Group {
-            if isEditing {
+            if isEditing || !canPlay {
                 rowContent
             } else {
                 Button {
