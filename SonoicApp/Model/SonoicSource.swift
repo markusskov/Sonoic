@@ -66,11 +66,11 @@ enum SonoicPlaybackCapability: Equatable {
     var displayTitle: String {
         switch self {
         case .sonosNative:
-            "Playable"
+            "Ready for Sonos"
         case .metadataOnly:
-            "Not Playable"
+            "Unavailable"
         case .unsupported:
-            "Not Playable"
+            "Unavailable"
         }
     }
 
@@ -79,9 +79,9 @@ enum SonoicPlaybackCapability: Equatable {
         case .sonosNative:
             nil
         case .metadataOnly:
-            "Sonoic can show this item, but needs a Sonos-native playback payload before it can start playback."
+            "Needs a Sonos playback match."
         case .unsupported:
-            "This item does not include enough Sonos playback data."
+            "Missing playback data."
         }
     }
 }
