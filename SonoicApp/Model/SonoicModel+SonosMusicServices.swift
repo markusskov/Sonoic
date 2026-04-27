@@ -1,6 +1,16 @@
 import Foundation
 
 extension SonoicModel {
+    func refreshSonosMusicServiceProbeIfNeeded() async {
+        guard sonosMusicServiceProbeState.snapshot == nil,
+              sonosMusicServiceProbeState.status != .loading
+        else {
+            return
+        }
+
+        await refreshSonosMusicServiceProbe()
+    }
+
     func refreshSonosMusicServiceProbe() async {
         guard let host = manualSonosHost.sonoicNonEmptyTrimmed else {
             sonosMusicServiceProbeState = SonosMusicServiceProbeState(

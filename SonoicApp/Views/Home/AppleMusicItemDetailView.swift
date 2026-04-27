@@ -4,6 +4,7 @@ struct AppleMusicItemDetailView: View {
     @Environment(SonoicModel.self) private var model
 
     let item: SonoicSourceItem
+    @State private var generatedPlaybackFailure: GeneratedPlaybackFailure?
 
     private var state: SonoicAppleMusicItemDetailState {
         model.appleMusicItemDetailState(for: item)
@@ -11,6 +12,14 @@ struct AppleMusicItemDetailView: View {
 
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
         model.appleMusicExactPlaybackCandidate(for: item)
+    }
+
+    private var generatedPlaybackCandidates: [SonoicAppleMusicGeneratedPayloadCandidate] {
+        guard exactPlaybackCandidate == nil else {
+            return []
+        }
+
+        return model.appleMusicGeneratedPayloadCandidates(for: item)
     }
 
     var body: some View {
@@ -26,6 +35,14 @@ struct AppleMusicItemDetailView: View {
                         )
                     }
 
+                    if !generatedPlaybackCandidates.isEmpty {
+                        AppleMusicGeneratedPlaybackActionCard(
+                            item: item,
+                            candidates: generatedPlaybackCandidates,
+                            play: playGeneratedCandidate
+                        )
+                    }
+
                     content
                 }
                 .padding(20)
@@ -37,6 +54,14 @@ struct AppleMusicItemDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: item.appleMusicDetailCacheKey) {
             model.loadAppleMusicItemDetail(for: item)
+            await refreshGeneratedPlaybackHintsIfNeeded()
+        }
+        .alert(item: $generatedPlaybackFailure) { failure in
+            Alert(
+                title: Text("Could Not Start"),
+                message: Text(failure.detail),
+                dismissButton: .default(Text("OK"))
+            )
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -110,6 +135,36 @@ struct AppleMusicItemDetailView: View {
     private func playCandidate(_ candidate: SonoicSonosPlaybackCandidate) async {
         _ = await model.playManualSonosPayload(candidate.payload)
     }
+
+    private func playGeneratedCandidate(_ candidate: SonoicAppleMusicGeneratedPayloadCandidate) async {
+        do {
+            let payload = try candidate.preparedPlaybackPayload(for: item)
+            let didStart = await model.playManualSonosPayload(payload)
+
+            if !didStart {
+                generatedPlaybackFailure = GeneratedPlaybackFailure(detail: "Sonos rejected the generated \(candidate.strategy.title) payload.")
+            }
+        } catch {
+            generatedPlaybackFailure = GeneratedPlaybackFailure(detail: error.localizedDescription)
+        }
+    }
+
+    private func refreshGeneratedPlaybackHintsIfNeeded() async {
+        guard item.service.kind == .appleMusic,
+              item.kind == .song,
+              exactPlaybackCandidate == nil,
+              generatedPlaybackCandidates.isEmpty
+        else {
+            return
+        }
+
+        await model.refreshSonosMusicServiceProbeIfNeeded()
+    }
+}
+
+private struct GeneratedPlaybackFailure: Identifiable {
+    let id = UUID()
+    var detail: String
 }
 
 private struct AppleMusicItemDetailHeader: View {
@@ -172,6 +227,35 @@ private struct AppleMusicItemActionCard: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+        }
+    }
+}
+
+private struct AppleMusicGeneratedPlaybackActionCard: View {
+    let item: SonoicSourceItem
+    let candidates: [SonoicAppleMusicGeneratedPayloadCandidate]
+    let play: (SonoicAppleMusicGeneratedPayloadCandidate) async -> Void
+
+    var body: some View {
+        RoomSurfaceCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Sonos Test", systemImage: "wave.3.right")
+                    .font(.headline)
+
+                ForEach(candidates) { candidate in
+                    Button {
+                        Task {
+                            await play(candidate)
+                        }
+                    } label: {
+                        Label("Try \(candidate.strategy.title)", systemImage: "play.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .accessibilityLabel("Try \(candidate.strategy.title) for \(item.title)")
+                }
+            }
         }
     }
 }
