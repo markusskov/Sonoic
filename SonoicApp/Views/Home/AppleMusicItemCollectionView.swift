@@ -62,7 +62,6 @@ struct AppleMusicItemCollectionView: View {
         at index: Int
     ) -> (() async -> Void)? {
         guard parentItem?.kind == .playlist,
-              sectionID == "tracks",
               item.kind == .song
         else {
             return nil
@@ -74,19 +73,17 @@ struct AppleMusicItemCollectionView: View {
     }
 
     private func playPlaylistTrack(_ item: SonoicSourceItem, trackNumber: Int) async {
-        guard let parentItem,
-              let playlistPayload = playlistPlaybackPayload(for: parentItem)
-        else {
+        let queuePayloads = playlistQueuePayloads()
+        guard !queuePayloads.isEmpty else {
             return
         }
 
         let localPayload = localNowPlayingPayload(for: item)
-        let queuePayloads = playlistQueuePayloads()
         _ = await model.playManualSonosQueuePayloads(
             queuePayloads,
             startingTrackNumber: trackNumber,
             localNowPlayingPayload: localPayload,
-            recentPlaybackPayload: playlistPayload
+            recentPlaybackPayload: parentItem.flatMap(playlistPlaybackPayload)
         )
     }
 
