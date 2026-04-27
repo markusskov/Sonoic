@@ -477,6 +477,18 @@ struct SourceItemNavigationRow: View {
         model.appleMusicExactPlaybackCandidate(for: item)
     }
 
+    private var generatedPlaybackCandidate: SonoicAppleMusicGeneratedPayloadCandidate? {
+        guard exactPlaybackCandidate == nil else {
+            return nil
+        }
+
+        return model.appleMusicGeneratedPlaybackCandidate(for: item)
+    }
+
+    private var canPlay: Bool {
+        exactPlaybackCandidate != nil || generatedPlaybackCandidate != nil
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             NavigationLink {
@@ -486,10 +498,10 @@ struct SourceItemNavigationRow: View {
             }
             .buttonStyle(.plain)
 
-            if let exactPlaybackCandidate {
+            if canPlay {
                 Button {
                     Task {
-                        _ = await model.playManualSonosPayload(exactPlaybackCandidate.payload)
+                        await play()
                     }
                 } label: {
                     Image(systemName: "play.fill")
@@ -506,6 +518,21 @@ struct SourceItemNavigationRow: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 12)
+    }
+
+    private func play() async {
+        if let exactPlaybackCandidate {
+            _ = await model.playManualSonosPayload(exactPlaybackCandidate.payload)
+            return
+        }
+
+        guard let generatedPlaybackCandidate,
+              let payload = try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
+        else {
+            return
+        }
+
+        _ = await model.playManualSonosPayload(payload)
     }
 }
 

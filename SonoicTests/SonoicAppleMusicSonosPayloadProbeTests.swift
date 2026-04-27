@@ -19,6 +19,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
 
         let candidate = try #require(candidates.first { $0.strategy == .catalogHLS })
 
+        #expect(candidate.isUserPlayable)
         #expect(candidate.serialNumber == "3")
         #expect(candidate.uri == "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3")
         #expect(candidate.metadataXML.contains("<dc:title>Sweet Jane</dc:title>"))
@@ -45,6 +46,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
 
         let candidate = try #require(candidates.first { $0.strategy == .libraryTrack })
 
+        #expect(!candidate.isUserPlayable)
         #expect(candidate.serialNumber == "7")
         #expect(candidate.uri == "x-sonos-http:librarytrack%3ai.BOVNeOxU6BVbp8.m4p?sid=204&flags=8232&sn=7")
         #expect(candidate.metadataXML.contains("librarytrack:i.BOVNeOxU6BVbp8"))

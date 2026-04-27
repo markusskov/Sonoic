@@ -22,6 +22,14 @@ struct AppleMusicItemDetailView: View {
         return model.appleMusicGeneratedPayloadCandidates(for: item)
     }
 
+    private var generatedPlaybackCandidate: SonoicAppleMusicGeneratedPayloadCandidate? {
+        guard exactPlaybackCandidate == nil else {
+            return nil
+        }
+
+        return model.appleMusicGeneratedPlaybackCandidate(for: item)
+    }
+
     var body: some View {
         ScrollView {
             GlassEffectContainer(spacing: 18) {
@@ -30,16 +38,15 @@ struct AppleMusicItemDetailView: View {
 
                     if let exactPlaybackCandidate {
                         AppleMusicItemActionCard(
-                            playbackCandidate: exactPlaybackCandidate,
-                            play: playCandidate
+                            play: {
+                                await playCandidate(exactPlaybackCandidate)
+                            }
                         )
-                    }
-
-                    if !generatedPlaybackCandidates.isEmpty {
-                        AppleMusicGeneratedPlaybackActionCard(
-                            item: item,
-                            candidates: generatedPlaybackCandidates,
-                            play: playGeneratedCandidate
+                    } else if let generatedPlaybackCandidate {
+                        AppleMusicItemActionCard(
+                            play: {
+                                await playGeneratedCandidate(generatedPlaybackCandidate)
+                            }
                         )
                     }
 
@@ -142,7 +149,7 @@ struct AppleMusicItemDetailView: View {
             let didStart = await model.playManualSonosPayload(payload)
 
             if !didStart {
-                generatedPlaybackFailure = GeneratedPlaybackFailure(detail: "Sonos rejected the generated \(candidate.strategy.title) payload.")
+                generatedPlaybackFailure = GeneratedPlaybackFailure(detail: "Sonos could not start this Apple Music song.")
             }
         } catch {
             generatedPlaybackFailure = GeneratedPlaybackFailure(detail: error.localizedDescription)
@@ -213,49 +220,19 @@ private struct AppleMusicItemDetailHeader: View {
 }
 
 private struct AppleMusicItemActionCard: View {
-    let playbackCandidate: SonoicSonosPlaybackCandidate
-    let play: (SonoicSonosPlaybackCandidate) async -> Void
+    let play: () async -> Void
 
     var body: some View {
         RoomSurfaceCard {
             Button {
                 Task {
-                    await play(playbackCandidate)
+                    await play()
                 }
             } label: {
                 Label("Play", systemImage: "play.fill")
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-        }
-    }
-}
-
-private struct AppleMusicGeneratedPlaybackActionCard: View {
-    let item: SonoicSourceItem
-    let candidates: [SonoicAppleMusicGeneratedPayloadCandidate]
-    let play: (SonoicAppleMusicGeneratedPayloadCandidate) async -> Void
-
-    var body: some View {
-        RoomSurfaceCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Sonos Test", systemImage: "wave.3.right")
-                    .font(.headline)
-
-                ForEach(candidates) { candidate in
-                    Button {
-                        Task {
-                            await play(candidate)
-                        }
-                    } label: {
-                        Label("Try \(candidate.strategy.title)", systemImage: "play.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .accessibilityLabel("Try \(candidate.strategy.title) for \(item.title)")
-                }
-            }
         }
     }
 }

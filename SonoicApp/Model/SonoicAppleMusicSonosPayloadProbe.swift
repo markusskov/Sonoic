@@ -24,6 +24,10 @@ struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
         "\(strategy.rawValue)-\(serialNumber)-\(uri)"
     }
 
+    var isUserPlayable: Bool {
+        strategy == .catalogHLS
+    }
+
     func playbackPayload(for item: SonoicSourceItem) -> SonosPlayablePayload {
         SonosPlayablePayload(
             id: id,
@@ -146,6 +150,11 @@ extension SonoicModel {
     func appleMusicGeneratedPayloadCandidates(for item: SonoicSourceItem) -> [SonoicAppleMusicGeneratedPayloadCandidate] {
         SonoicAppleMusicSonosPayloadProbe()
             .candidates(for: item, playbackHint: appleMusicPlaybackHint)
+    }
+
+    func appleMusicGeneratedPlaybackCandidate(for item: SonoicSourceItem) -> SonoicAppleMusicGeneratedPayloadCandidate? {
+        appleMusicGeneratedPayloadCandidates(for: item)
+            .first { $0.isUserPlayable }
     }
 
     private var appleMusicPlaybackHint: SonosMusicServicePlaybackHint? {
