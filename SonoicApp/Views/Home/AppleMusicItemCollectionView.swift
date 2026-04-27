@@ -81,8 +81,9 @@ struct AppleMusicItemCollectionView: View {
         }
 
         let localPayload = localNowPlayingPayload(for: item)
-        _ = await model.playManualSonosPayload(
-            playlistPayload,
+        let queuePayloads = playlistQueuePayloads()
+        _ = await model.playManualSonosQueuePayloads(
+            queuePayloads,
             startingTrackNumber: trackNumber,
             localNowPlayingPayload: localPayload,
             recentPlaybackPayload: playlistPayload
@@ -103,6 +104,16 @@ struct AppleMusicItemCollectionView: View {
         }
 
         return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
+    }
+
+    private func playlistQueuePayloads() -> [SonosPlayablePayload] {
+        items.compactMap { item in
+            if let generatedQueueCandidate = model.appleMusicGeneratedQueueCandidate(for: item) {
+                return generatedQueueCandidate.playbackPayload(for: item)
+            }
+
+            return model.appleMusicExactPlaybackCandidate(for: item)?.payload
+        }
     }
 }
 

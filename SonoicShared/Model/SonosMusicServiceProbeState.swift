@@ -201,9 +201,9 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
             case .trackURI:
                 "track URI"
             case .favoriteURI:
-                "favorite URI"
+                "saved item URI"
             case .favoriteMetadata:
-                "favorite metadata"
+                "saved metadata"
             case .unknown:
                 nil
             }

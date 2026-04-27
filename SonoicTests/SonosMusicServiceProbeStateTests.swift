@@ -121,7 +121,7 @@ struct SonosMusicServiceProbeStateTests {
 
         let appleMusic = try #require(snapshot.knownServiceRows.first { $0.service == .appleMusic })
 
-        #expect(appleMusic.accounts.first?.redactedDetail == "sn 7 · track URI · favorite URI")
+        #expect(appleMusic.accounts.first?.redactedDetail == "sn 7 · track URI · saved item URI")
     }
 
     @Test("summarizes playback account hints")

@@ -55,6 +55,38 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
     }
 
     @Test
+    func queueCandidatePrefersLibraryTrackWhenAvailable() throws {
+        let item = appleMusicSong(catalogID: "1440857781", libraryID: "i.BOVNeOxU6BVbp8")
+
+        let candidate = try #require(probe.queueCandidate(
+            for: item,
+            playbackHint: SonosMusicServicePlaybackHint(
+                launchSerials: ["3"],
+                trackSerials: ["7"]
+            )
+        ))
+
+        #expect(candidate.strategy == .libraryTrack)
+        #expect(candidate.uri == "x-sonos-http:librarytrack%3ai.BOVNeOxU6BVbp8.m4p?sid=204&flags=8232&sn=7")
+    }
+
+    @Test
+    func queueCandidateFallsBackToCatalogSongWhenLibraryTrackIsUnavailable() throws {
+        let item = appleMusicSong(catalogID: "1440857781", libraryID: nil)
+
+        let candidate = try #require(probe.queueCandidate(
+            for: item,
+            playbackHint: SonosMusicServicePlaybackHint(
+                launchSerials: ["3"],
+                trackSerials: ["7"]
+            )
+        ))
+
+        #expect(candidate.strategy == .catalogHLS)
+        #expect(candidate.uri == "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3")
+    }
+
+    @Test
     func buildsPlaylistContainerCandidateFromLaunchSerial() throws {
         let item = SonoicSourceItem.appleMusicMetadata(
             id: "p.abc123",

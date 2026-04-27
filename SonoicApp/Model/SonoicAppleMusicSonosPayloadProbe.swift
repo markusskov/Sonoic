@@ -127,6 +127,15 @@ struct SonoicAppleMusicSonosPayloadProbe {
         return candidates
     }
 
+    func queueCandidate(
+        for item: SonoicSourceItem,
+        playbackHint: SonosMusicServicePlaybackHint?
+    ) -> SonoicAppleMusicGeneratedPayloadCandidate? {
+        let candidates = candidates(for: item, playbackHint: playbackHint)
+        return candidates.first { $0.strategy == .libraryTrack }
+            ?? candidates.first { $0.strategy == .catalogHLS }
+    }
+
     private func sonosPayloadID(_ value: String) -> String? {
         let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
         return value.addingPercentEncoding(withAllowedCharacters: allowedCharacters)
@@ -199,6 +208,11 @@ extension SonoicModel {
     func appleMusicGeneratedPlaybackCandidate(for item: SonoicSourceItem) -> SonoicAppleMusicGeneratedPayloadCandidate? {
         appleMusicGeneratedPayloadCandidates(for: item)
             .first { $0.isUserPlayable }
+    }
+
+    func appleMusicGeneratedQueueCandidate(for item: SonoicSourceItem) -> SonoicAppleMusicGeneratedPayloadCandidate? {
+        SonoicAppleMusicSonosPayloadProbe()
+            .queueCandidate(for: item, playbackHint: appleMusicPlaybackHint)
     }
 
     private var appleMusicPlaybackHint: SonosMusicServicePlaybackHint? {

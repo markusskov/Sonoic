@@ -162,6 +162,90 @@ extension SonoicModel {
         return didStartPlayback
     }
 
+    func playManualSonosQueuePayloads(
+        _ payloads: [SonosPlayablePayload],
+        startingTrackNumber: Int,
+        localNowPlayingPayload: SonosPlayablePayload? = nil,
+        recentPlaybackPayload: SonosPlayablePayload? = nil
+    ) async -> Bool {
+        guard !payloads.isEmpty,
+              startingTrackNumber > 0,
+              startingTrackNumber <= payloads.count
+        else {
+            return false
+        }
+
+        let preparedPayloads = payloads.compactMap {
+            try? SonosPlayablePayloadPreparer().prepare($0)
+        }
+
+        guard preparedPayloads.count == payloads.count else {
+            return false
+        }
+
+        let preparedLocalPayload = localNowPlayingPayload.flatMap {
+            try? SonosPlayablePayloadPreparer().prepare($0)
+        }
+        let preparedRecentPayload = recentPlaybackPayload.flatMap {
+            try? SonosPlayablePayloadPreparer().prepare($0)
+        }
+        let confirmationPayload = preparedPayloads[startingTrackNumber - 1]
+        let displayPayload = preparedLocalPayload ?? preparedPayloads[startingTrackNumber - 1]
+
+        if let snapshot = queueState.snapshot {
+            queueState = .loaded(SonosQueueSnapshot(
+                items: snapshot.items,
+                currentItemIndex: nil,
+                sourceURI: snapshot.sourceURI
+            ))
+        }
+
+        beginManualPlayTransitionGrace()
+        manualPlaybackContextPayload = confirmationPayload
+        markLocalNowPlaying(from: displayPayload)
+        let didStartPlayback = await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay,
+            refreshQueueAfterSuccess: true
+        ) {
+            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+            let queuePlayerID = await manualSonosQueuePlayerID() ?? ""
+            guard !queuePlayerID.isEmpty else {
+                throw SonosControlTransport.TransportError.invalidResponse
+            }
+
+            try await avTransportClient.removeAllTracksFromQueue(host: playbackHost)
+
+            for payload in preparedPayloads {
+                _ = try await avTransportClient.addURIToQueue(
+                    host: playbackHost,
+                    uri: payload.uri,
+                    metadataXML: payload.metadataXML,
+                    enqueueAsNext: false
+                )
+            }
+
+            try await avTransportClient.setTransportURI(
+                host: playbackHost,
+                uri: "x-rincon-queue:\(queuePlayerID)#0",
+                metadataXML: nil
+            )
+
+            if startingTrackNumber > 1 {
+                try await avTransportClient.seekToTrack(host: playbackHost, trackNumber: startingTrackNumber)
+            }
+
+            try await avTransportClient.play(host: playbackHost)
+        }
+
+        if didStartPlayback {
+            recordRecentPlayablePayload(preparedRecentPayload ?? displayPayload)
+        } else {
+            manualPlaybackContextPayload = nil
+        }
+
+        return didStartPlayback
+    }
+
     func toggleManualSonosMute() async {
         guard hasManualSonosHost else {
             return
