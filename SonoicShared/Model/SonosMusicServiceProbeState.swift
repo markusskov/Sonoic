@@ -131,16 +131,22 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
     }
 
     enum ObservedOrigin: String, Hashable {
-        case currentPlayback
-        case favorite
+        case currentURI
+        case trackURI
+        case favoriteURI
+        case favoriteMetadata
         case unknown
 
         var displayTitle: String? {
             switch self {
-            case .currentPlayback:
-                "now playing"
-            case .favorite:
-                "favorite"
+            case .currentURI:
+                "current URI"
+            case .trackURI:
+                "track URI"
+            case .favoriteURI:
+                "favorite URI"
+            case .favoriteMetadata:
+                "favorite metadata"
             case .unknown:
                 nil
             }
@@ -219,7 +225,7 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
     }
 
     private var observedOriginTitles: [String] {
-        let orderedOrigins: [ObservedOrigin] = [.currentPlayback, .favorite, .unknown]
+        let orderedOrigins: [ObservedOrigin] = [.currentURI, .trackURI, .favoriteURI, .favoriteMetadata, .unknown]
         return orderedOrigins.compactMap { origin in
             observedOrigins.contains(origin) ? origin.displayTitle : nil
         }

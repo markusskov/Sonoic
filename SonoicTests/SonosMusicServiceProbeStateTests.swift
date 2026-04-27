@@ -111,17 +111,17 @@ struct SonosMusicServiceProbeStateTests {
         ).includingObservedAccounts(from: [
             SonosMusicServiceObservedValue(
                 value: "x-sonos-http:librarytrack%3aabc.m4p?sid=204&flags=8232&sn=7",
-                origin: .currentPlayback
+                origin: .trackURI
             ),
             SonosMusicServiceObservedValue(
                 value: "x-rincon-cpcontainer:1006206cplaylist%3aabc?sid=204&amp;flags=8300&amp;sn=7",
-                origin: .favorite
+                origin: .favoriteURI
             ),
         ])
 
         let appleMusic = try #require(snapshot.knownServiceRows.first { $0.service == .appleMusic })
 
-        #expect(appleMusic.accounts.first?.redactedDetail == "sn 7 · now playing · favorite")
+        #expect(appleMusic.accounts.first?.redactedDetail == "sn 7 · track URI · favorite URI")
     }
 
     @Test("service type derives from Sonos service id")
