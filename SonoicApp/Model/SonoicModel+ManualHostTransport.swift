@@ -2,6 +2,7 @@ import Foundation
 
 extension SonoicModel {
     private static let manualTransportSyncDelay: Duration = .milliseconds(300)
+    private static let manualSeekSyncDelay: Duration = .milliseconds(700)
 
     func toggleManualSonosPlayback() async {
         guard hasManualSonosHost else {
@@ -65,9 +66,20 @@ extension SonoicModel {
     }
 
     func seekManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
-        await performManualTransportCommand {
+        let previousNowPlaying = nowPlaying
+        let previousObservedAt = nowPlayingObservedAt
+        markLocalSeek(to: timeInterval)
+
+        let didSeek = await performManualTransportCommand(syncDelay: Self.manualSeekSyncDelay) {
             try await avTransportClient.seek(host: manualSonosHost, timeInterval: timeInterval)
         }
+
+        if !didSeek {
+            nowPlaying = previousNowPlaying
+            nowPlayingObservedAt = previousObservedAt
+        }
+
+        return didSeek
     }
 
     func playManualSonosQueueItem(at position: Int) async -> Bool {
@@ -98,12 +110,16 @@ extension SonoicModel {
     func playManualSonosPayload(
         _ payload: SonosPlayablePayload,
         startingTrackNumber: Int? = nil,
-        localNowPlayingPayload: SonosPlayablePayload? = nil
+        localNowPlayingPayload: SonosPlayablePayload? = nil,
+        recentPlaybackPayload: SonosPlayablePayload? = nil
     ) async -> Bool {
         guard let preparedPayload = try? SonosPlayablePayloadPreparer().prepare(payload) else {
             return false
         }
         let preparedLocalPayload = localNowPlayingPayload.flatMap {
+            try? SonosPlayablePayloadPreparer().prepare($0)
+        }
+        let preparedRecentPayload = recentPlaybackPayload.flatMap {
             try? SonosPlayablePayloadPreparer().prepare($0)
         }
         let displayPayload = preparedLocalPayload ?? preparedPayload
@@ -138,7 +154,7 @@ extension SonoicModel {
         }
 
         if didStartPlayback {
-            recordRecentPlayablePayload(displayPayload)
+            recordRecentPlayablePayload(preparedRecentPayload ?? displayPayload)
         } else {
             manualPlaybackContextPayload = nil
         }

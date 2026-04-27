@@ -49,6 +49,22 @@ extension SonoicModel {
         nowPlaying = nextNowPlaying
     }
 
+    func markLocalSeek(to timeInterval: TimeInterval) {
+        var nextNowPlaying = nowPlaying
+        let boundedElapsedTime: TimeInterval
+
+        if let duration = nowPlaying.duration {
+            boundedElapsedTime = min(max(timeInterval, 0), duration)
+        } else {
+            boundedElapsedTime = max(timeInterval, 0)
+        }
+
+        nextNowPlaying.elapsedTime = boundedElapsedTime
+        nowPlaying = nextNowPlaying
+        nowPlayingObservedAt = .now
+        persistSharedExternalControlState()
+    }
+
     func beginManualPlayTransitionGrace() {
         manualPlayTransitionGraceDeadline = Date().addingTimeInterval(Self.manualPlayTransitionGraceInterval)
         setManualPlayTransitionAwaitingConfirmation(true)

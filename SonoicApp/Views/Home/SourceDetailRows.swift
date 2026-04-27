@@ -414,13 +414,17 @@ struct SourceItemRow: View {
     let selectAction: () -> Void
     let playAction: () async -> Void
 
+    private var shouldPlayOnRowTap: Bool {
+        item.kind == .song && item.playbackCapability.canPlay
+    }
+
     var body: some View {
         HStack(spacing: 14) {
             rowContent
         }
         .padding(.vertical, 12)
         .contentShape(Rectangle())
-        .onTapGesture(perform: selectAction)
+        .onTapGesture(perform: rowTapped)
     }
 
     private var rowContent: some View {
@@ -448,7 +452,16 @@ struct SourceItemRow: View {
 
             Spacer(minLength: 0)
 
-            if item.playbackCapability.canPlay {
+            if shouldPlayOnRowTap {
+                Button(action: selectAction) {
+                    Image(systemName: "ellipsis")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("More options for \(item.title)")
+            } else if item.playbackCapability.canPlay {
                 Button(action: playTapped) {
                     Image(systemName: "play.fill")
                         .font(.caption.weight(.semibold))
@@ -459,6 +472,15 @@ struct SourceItemRow: View {
                 .accessibilityLabel("Play \(item.title)")
             }
         }
+    }
+
+    private func rowTapped() {
+        guard shouldPlayOnRowTap else {
+            selectAction()
+            return
+        }
+
+        playTapped()
     }
 
     private func playTapped() {
@@ -490,16 +512,43 @@ struct SourceItemNavigationRow: View {
         playOverride != nil || exactPlaybackCandidate != nil || generatedPlaybackCandidate != nil
     }
 
+    private var shouldPlayOnRowTap: Bool {
+        item.kind == .song && canPlay
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            NavigationLink {
-                AppleMusicItemDetailView(item: item)
-            } label: {
-                SourceItemMetadataRow(item: item)
+            if shouldPlayOnRowTap {
+                Button {
+                    Task {
+                        await play()
+                    }
+                } label: {
+                    SourceItemMetadataRow(item: item)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Play \(item.title)")
+            } else {
+                NavigationLink {
+                    AppleMusicItemDetailView(item: item)
+                } label: {
+                    SourceItemMetadataRow(item: item)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
-            if canPlay {
+            if shouldPlayOnRowTap {
+                NavigationLink {
+                    AppleMusicItemDetailView(item: item)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("More options for \(item.title)")
+            } else if canPlay {
                 Button {
                     Task {
                         await play()
@@ -514,9 +563,11 @@ struct SourceItemNavigationRow: View {
                 .accessibilityLabel("Play \(item.title)")
             }
 
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.tertiary)
+            if !shouldPlayOnRowTap {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.vertical, 12)
     }

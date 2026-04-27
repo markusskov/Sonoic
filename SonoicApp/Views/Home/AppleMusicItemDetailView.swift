@@ -324,7 +324,8 @@ private struct AppleMusicItemDetailSectionView: View {
         _ = await model.playManualSonosPayload(
             playlistPayload,
             startingTrackNumber: trackNumber,
-            localNowPlayingPayload: localPayload
+            localNowPlayingPayload: localPayload,
+            recentPlaybackPayload: playlistPayload
         )
     }
 
