@@ -42,4 +42,30 @@ struct SonoicRecentPlayItemTests {
 
         #expect(recentPlay.isVisibleInHomeHistory)
     }
+
+    @Test
+    @MainActor
+    func recentAppleMusicCollectionsPreferLibraryRoute() {
+        let recentPlay = SonoicRecentPlayItem(
+            id: "playlist",
+            title: "Chill",
+            artistName: "Apple Music",
+            albumTitle: nil,
+            sourceName: "Apple Music",
+            artworkURL: nil,
+            artworkIdentifier: nil,
+            service: .appleMusic,
+            lastPlayedAt: .now,
+            favoriteKind: .collection,
+            sourceItemID: "library-playlist-id",
+            appleMusicCatalogID: "catalog-playlist-id",
+            appleMusicLibraryID: "library-playlist-id",
+            sourceItemKindRawValue: SonoicSourceItem.Kind.playlist.rawValue
+        )
+
+        let sourceItem = SonoicSourceItem(recentPlay: recentPlay)
+
+        #expect(sourceItem.appleMusicIdentity?.routedID(for: .recentPlay) == "library-playlist-id")
+        #expect(sourceItem.appleMusicIdentity?.routedID(for: .catalogSearch) == "catalog-playlist-id")
+    }
 }

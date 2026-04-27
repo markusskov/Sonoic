@@ -144,7 +144,7 @@ struct SonoicAppleMusicItemIdentity: Hashable, Sendable {
         case .library:
             libraryID ?? catalogID
         case .favorite, .recentPlay:
-            primaryID
+            libraryID ?? catalogID
         }
     }
 
@@ -276,7 +276,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         let playablePayload = recentPlay.replayFavorite?.playablePayload
         let kind = recentPlay.sourceItemKindRawValue.flatMap(SonoicSourceItem.Kind.init(rawValue:)) ?? .unknown
         let appleMusicIdentity = recentPlay.service?.kind == .appleMusic ? SonoicAppleMusicItemIdentity(
-            catalogID: recentPlay.appleMusicCatalogID ?? recentPlay.sourceItemID,
+            catalogID: recentPlay.appleMusicCatalogID ?? (recentPlay.appleMusicLibraryID == nil ? recentPlay.sourceItemID : nil),
             libraryID: recentPlay.appleMusicLibraryID,
             kind: kind
         ) : nil

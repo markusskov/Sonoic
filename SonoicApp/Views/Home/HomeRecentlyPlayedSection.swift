@@ -29,6 +29,8 @@ private struct HomeRecentPlayCard: View {
             ?? parsedReference?.kind
             ?? SonoicSourceItem.Kind(favoriteKind: item.favoriteKind)
         let serviceItemID = item.sourceItemID ?? item.appleMusicCatalogID ?? parsedReference?.id
+        let catalogID = item.appleMusicCatalogID
+            ?? (item.appleMusicLibraryID == nil ? serviceItemID : nil)
 
         return SonoicSourceItem(
             id: "recent-\(item.id)",
@@ -38,7 +40,7 @@ private struct HomeRecentPlayCard: View {
             artworkIdentifier: item.artworkIdentifier,
             serviceItemID: serviceItemID,
             appleMusicIdentity: service.kind == .appleMusic ? SonoicAppleMusicItemIdentity(
-                catalogID: item.appleMusicCatalogID ?? serviceItemID,
+                catalogID: catalogID,
                 libraryID: item.appleMusicLibraryID,
                 kind: kind
             ) : nil,

@@ -357,7 +357,7 @@ struct SonoicAppleMusicCatalogSearchClient {
         case .library:
             .library
         case .recentPlay:
-            identity?.libraryID != nil && identity?.catalogID == nil ? .library : .catalogSearch
+            identity?.libraryID != nil ? .library : .catalogSearch
         case .favorite:
             nil
         }
