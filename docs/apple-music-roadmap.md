@@ -98,7 +98,7 @@ Next:
 
 Shipped first queue action:
 
-- Apple Music detail pages can show "Play Next" for exact favorite-backed item payloads with valid Sonos DIDL metadata.
+- Apple Music detail pages can show "Play Next" for exact favorite-backed item payloads with valid Sonos DIDL metadata when the active source is the Sonos queue.
 - Albums, playlists, stations, and metadata-only items stay disabled until a safe Sonos-native queue payload exists.
 
 Next:

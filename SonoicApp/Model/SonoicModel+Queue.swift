@@ -151,6 +151,7 @@ extension SonoicModel {
 
     func playManualSonosPayloadNext(_ payload: SonosPlayablePayload) async -> Bool {
         guard hasManualSonosHost,
+              queueState.snapshot != nil,
               !isQueueRefreshing,
               !isQueueClearing,
               !isQueueMutating,

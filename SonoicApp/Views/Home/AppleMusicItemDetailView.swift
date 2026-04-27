@@ -22,6 +22,7 @@ struct AppleMusicItemDetailView: View {
                     if let exactPlaybackCandidate {
                         AppleMusicItemActionCard(
                             playbackCandidate: exactPlaybackCandidate,
+                            hasActiveQueue: model.queueState.snapshot != nil,
                             play: playCandidate,
                             playNext: playCandidateNext
                         )
@@ -164,11 +165,16 @@ private struct AppleMusicItemDetailHeader: View {
 
 private struct AppleMusicItemActionCard: View {
     let playbackCandidate: SonoicSonosPlaybackCandidate
+    let hasActiveQueue: Bool
     let play: (SonoicSonosPlaybackCandidate) async -> Void
     let playNext: (SonoicSonosPlaybackCandidate) async -> Void
 
     private var canPlayNext: Bool {
-        (try? SonosPlayablePayloadPreparer().prepare(playbackCandidate.payload.withLaunchMode(.queueNext))) != nil
+        guard hasActiveQueue else {
+            return false
+        }
+
+        return (try? SonosPlayablePayloadPreparer().prepare(playbackCandidate.payload.withLaunchMode(.queueNext))) != nil
     }
 
     var body: some View {
