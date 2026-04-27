@@ -66,6 +66,7 @@ struct SonosPlaybackSourceOwnershipTests {
         let updatedSnapshot = snapshot.removingItems(atOffsets: IndexSet(integer: 1))
 
         #expect(updatedSnapshot.sourceURI == "x-rincon-queue:RINCON_123#0")
+        #expect(updatedSnapshot.supportsLocalMutation)
         #expect(updatedSnapshot.items.map(\.id) == ["one", "three"])
     }
 
@@ -79,6 +80,7 @@ struct SonosPlaybackSourceOwnershipTests {
         )
 
         #expect(updatedSnapshot.sourceURI == "x-rincon-queue:RINCON_123#0")
+        #expect(updatedSnapshot.supportsLocalMutation)
         #expect(updatedSnapshot.items.map(\.id) == ["two", "one", "three"])
     }
 

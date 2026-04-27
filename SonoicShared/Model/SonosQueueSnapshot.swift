@@ -59,6 +59,14 @@ struct SonosQueueSnapshot: Equatable {
         return items[currentItemIndex]
     }
 
+    var sourceOwnership: SonosPlaybackSourceOwnership {
+        SonosPlaybackSourceOwnership(uri: sourceURI)
+    }
+
+    var supportsLocalMutation: Bool {
+        sourceOwnership.supportsLocalQueueMutation
+    }
+
     var itemCountText: String {
         if items.count == 1 {
             return "1 item"

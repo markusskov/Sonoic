@@ -103,6 +103,12 @@ extension SonoicModel {
             return false
         }
 
+        guard let snapshot = queueState.snapshot,
+              snapshot.supportsLocalMutation
+        else {
+            return recordQueueMutationUnavailable(sourceURI: queueState.snapshot?.sourceURI)
+        }
+
         guard !isQueueClearing, !isQueueRefreshing, !isQueueMutating else {
             return false
         }
@@ -116,7 +122,7 @@ extension SonoicModel {
             optimisticSnapshot: SonosQueueSnapshot(
                 items: [],
                 currentItemIndex: nil,
-                sourceURI: queueState.snapshot?.sourceURI
+                sourceURI: snapshot.sourceURI
             )
         ) { clearHost in
             try await avTransportClient.removeAllTracksFromQueue(host: clearHost)
@@ -126,6 +132,10 @@ extension SonoicModel {
     func removeQueueItems(atOffsets offsets: IndexSet) async -> Bool {
         guard let snapshot = queueState.snapshot else {
             return false
+        }
+
+        guard snapshot.supportsLocalMutation else {
+            return recordQueueMutationUnavailable(sourceURI: snapshot.sourceURI)
         }
 
         let removalRanges = queueRemovalRanges(for: offsets)
@@ -149,6 +159,10 @@ extension SonoicModel {
     func moveQueueItems(fromOffsets source: IndexSet, toOffset destination: Int) async -> Bool {
         guard let snapshot = queueState.snapshot else {
             return false
+        }
+
+        guard snapshot.supportsLocalMutation else {
+            return recordQueueMutationUnavailable(sourceURI: snapshot.sourceURI)
         }
 
         let sourceOffsets = source.sorted()
@@ -257,5 +271,13 @@ extension SonoicModel {
         )
 
         return removalRanges
+    }
+
+    private func recordQueueMutationUnavailable(sourceURI: String?) -> Bool {
+        queueOperationErrorDetail = SonosQueueClient.ClientError
+            .unavailableForCurrentSource(currentURI: sourceURI)
+            .localizedDescription
+        queueDiagnostics.lastMutationErrorDetail = queueOperationErrorDetail
+        return false
     }
 }
