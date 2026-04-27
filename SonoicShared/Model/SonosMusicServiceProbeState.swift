@@ -98,6 +98,63 @@ struct SonosMusicServiceProbeRow: Identifiable, Equatable {
         let accountText = accounts.count == 1 ? "1 account" : "\(accounts.count) accounts"
         return "sid \(sonosService.id) · type \(sonosService.serviceTypeText) · \(accountText)"
     }
+
+    var playbackHint: SonosMusicServicePlaybackHint? {
+        guard service.kind == .appleMusic else {
+            return nil
+        }
+
+        let launchSerials = orderedSerials(matching: \.isObservedFromLaunchPayload)
+        let trackSerials = orderedSerials(matching: \.isObservedFromResolvedTrack)
+        guard !launchSerials.isEmpty || !trackSerials.isEmpty else {
+            return nil
+        }
+
+        return SonosMusicServicePlaybackHint(
+            launchSerials: launchSerials,
+            trackSerials: trackSerials
+        )
+    }
+
+    private func orderedSerials(
+        matching predicate: (SonosMusicServiceAccountSummary) -> Bool
+    ) -> [String] {
+        accounts
+            .filter(predicate)
+            .map(\.serialNumber)
+            .reduce(into: [String]()) { result, serialNumber in
+                guard !result.contains(serialNumber) else {
+                    return
+                }
+
+                result.append(serialNumber)
+            }
+    }
+}
+
+struct SonosMusicServicePlaybackHint: Equatable {
+    var launchSerials: [String]
+    var trackSerials: [String]
+
+    var launchText: String? {
+        serialText(prefix: "Launch", serials: launchSerials)
+    }
+
+    var trackText: String? {
+        serialText(prefix: "Track", serials: trackSerials)
+    }
+
+    var preferredLaunchSerial: String? {
+        launchSerials.first
+    }
+
+    private func serialText(prefix: String, serials: [String]) -> String? {
+        guard !serials.isEmpty else {
+            return nil
+        }
+
+        return "\(prefix) sn \(serials.joined(separator: ", "))"
+    }
 }
 
 struct SonosMusicServiceDescriptor: Identifiable, Equatable {
@@ -168,6 +225,14 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
 
     var hasStatusAccount: Bool {
         source == .statusAccounts
+    }
+
+    var isObservedFromLaunchPayload: Bool {
+        !observedOrigins.isDisjoint(with: [.currentURI, .favoriteURI, .favoriteMetadata])
+    }
+
+    var isObservedFromResolvedTrack: Bool {
+        observedOrigins.contains(.trackURI)
     }
 
     var displayName: String {

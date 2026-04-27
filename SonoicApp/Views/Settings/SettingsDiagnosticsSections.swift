@@ -264,6 +264,10 @@ private struct SettingsSonosMusicServiceProbeRow: View {
                     .font(.footnote)
                     .foregroundStyle(accountTint(account))
             }
+
+            if let playbackHint = row.playbackHint {
+                SettingsSonosMusicServicePlaybackHintView(playbackHint: playbackHint)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -282,6 +286,25 @@ private struct SettingsSonosMusicServiceProbeRow: View {
 
     private func accountTint(_ account: SonosMusicServiceAccountSummary) -> Color {
         account.hasStatusAccount ? .secondary : .orange
+    }
+}
+
+private struct SettingsSonosMusicServicePlaybackHintView: View {
+    let playbackHint: SonosMusicServicePlaybackHint
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if let launchText = playbackHint.launchText {
+                Text(launchText)
+            }
+
+            if let trackText = playbackHint.trackText {
+                Text(trackText)
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .padding(.top, 2)
     }
 }
 
