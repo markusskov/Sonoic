@@ -1,14 +1,5 @@
 import SwiftUI
 
-struct SearchHeader: View {
-    var body: some View {
-        Label("Search", systemImage: "magnifyingglass")
-            .font(.largeTitle.weight(.bold))
-            .foregroundStyle(.primary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
 struct SearchServicePicker: View {
     let services: [SonosServiceDescriptor]
     @Binding var selectedServiceID: String
@@ -61,13 +52,15 @@ private struct SearchServiceChip: View {
 
 struct SearchInputCard: View {
     @Binding var query: String
+    @Binding var isFocused: Bool
     let service: SonosServiceDescriptor
     let state: SonoicSourceSearchState
     let supportsCatalogSearch: Bool
     let submit: () -> Void
+    @FocusState private var fieldIsFocused: Bool
 
     var body: some View {
-        RoomSurfaceCard {
+        HStack(spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
                     .font(.title3.weight(.semibold))
@@ -76,37 +69,58 @@ struct SearchInputCard: View {
                 TextField("Search \(service.name)", text: $query)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled(false)
+                    .focused($fieldIsFocused)
                     .onSubmit(submit)
 
-                if query.sonoicNonEmptyTrimmed != nil {
-                    Button(action: clearQuery) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
-                }
+                submitButton
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 56)
+            .frame(maxWidth: .infinity)
+            .background(.quaternary.opacity(0.38), in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(fieldIsFocused ? Color.accentColor.opacity(0.65) : Color.white.opacity(0.08), lineWidth: 1)
+            }
 
-                Button(action: submit) {
-                    if state.isSearching {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 20, height: 20)
-                    } else {
-                        Image(systemName: "arrow.right")
-                            .font(.body.weight(.semibold))
-                            .frame(width: 20, height: 20)
-                    }
+            if fieldIsFocused || query.sonoicNonEmptyTrimmed != nil {
+                Button(action: clearQuery) {
+                    Image(systemName: "xmark")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 48, height: 48)
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
-                .disabled(!supportsCatalogSearch || !state.hasQuery || state.isSearching)
-                .accessibilityLabel("Search \(service.name)")
+                .accessibilityLabel("Clear search")
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
-            .background(.quaternary.opacity(0.35), in: Capsule())
+        }
+        .onChange(of: fieldIsFocused) { _, newValue in
+            isFocused = newValue
+        }
+        .onChange(of: isFocused) { _, newValue in
+            if !newValue {
+                fieldIsFocused = false
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var submitButton: some View {
+        if state.isSearching {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 22, height: 22)
+        } else if supportsCatalogSearch && state.hasQuery {
+            Button(action: submit) {
+                Image(systemName: "arrow.right")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("Search \(service.name)")
         }
     }
 
@@ -116,7 +130,6 @@ struct SearchInputCard: View {
 }
 
 struct SearchRecentQueriesSection: View {
-    let service: SonosServiceDescriptor
     let recentSearches: [SonoicRecentSourceSearch]
     let select: (SonoicRecentSourceSearch) -> Void
     let clear: () -> Void
@@ -136,33 +149,135 @@ struct SearchRecentQueriesSection: View {
                         .foregroundStyle(.secondary)
                 }
 
-                ScrollView(.horizontal) {
-                    HStack(spacing: 10) {
-                        ForEach(recentSearches) { recentSearch in
+                RoomSurfaceCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(recentSearches.prefix(5).enumerated()), id: \.element.id) { index, recentSearch in
                             Button {
                                 select(recentSearch)
                             } label: {
-                                Label(recentSearch.query, systemImage: "clock")
-                                    .font(.subheadline.weight(.semibold))
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 13)
-                                    .padding(.vertical, 9)
+                                SearchRecentQueryRow(recentSearch: recentSearch)
                             }
-                            .buttonStyle(.glass)
-                            .buttonBorderShape(.capsule)
+                            .buttonStyle(.plain)
                             .accessibilityLabel("Search \(recentSearch.query)")
+
+                            if index < min(recentSearches.count, 5) - 1 {
+                                Divider()
+                                    .padding(.leading, 54)
+                            }
                         }
                     }
-                    .padding(.vertical, 2)
                 }
-                .scrollIndicators(.hidden)
             }
         }
     }
 }
 
-struct SearchResultsSection: View {
+private struct SearchRecentQueryRow: View {
+    let recentSearch: SonoicRecentSourceSearch
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "clock")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 42, height: 42)
+
+            Text(recentSearch.query)
+                .font(.body.weight(.medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "ellipsis")
+                .font(.body.weight(.bold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+    }
+}
+
+struct SearchDiscoverySection: View {
     let service: SonosServiceDescriptor
+    let isAppleMusicAvailable: Bool
+
+    private let destinations: [SonoicAppleMusicBrowseDestination] = [
+        .categories,
+        .popularRecommendations,
+        .appleMusicPlaylists,
+        .newReleases
+    ]
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
+    var body: some View {
+        if service.kind == .appleMusic && isAppleMusicAvailable {
+            VStack(alignment: .leading, spacing: 14) {
+                HomeSectionHeader(title: "Browse")
+
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(destinations) { destination in
+                        NavigationLink {
+                            AppleMusicBrowseDestinationView(destination: destination)
+                        } label: {
+                            SearchDiscoveryTile(destination: destination)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct SearchDiscoveryTile: View {
+    let destination: SonoicAppleMusicBrowseDestination
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Image(systemName: destination.systemImage)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.pink)
+                .frame(width: 42, height: 42)
+
+            Spacer(minLength: 0)
+
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+        .padding(16)
+        .background(.quaternary.opacity(0.38), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var title: String {
+        switch destination {
+        case .categories:
+            "Categories"
+        case .popularRecommendations:
+            "Popular"
+        case .appleMusicPlaylists:
+            "Playlists"
+        case .newReleases:
+            "New Releases"
+        default:
+            destination.title
+        }
+    }
+}
+
+struct SearchResultsSection: View {
     let state: SonoicSourceSearchState
     let availabilityMessage: SearchMessage?
     let canRequestAuthorization: Bool
@@ -171,11 +286,9 @@ struct SearchResultsSection: View {
     var body: some View {
         if shouldShowResults {
             VStack(alignment: .leading, spacing: 14) {
-                HomeSectionHeader(title: "Results")
-
-                RoomSurfaceCard {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let availabilityMessage {
+                if let availabilityMessage {
+                    RoomSurfaceCard {
+                        VStack(alignment: .leading, spacing: 14) {
                             SearchMessageRow(message: availabilityMessage)
 
                             if canRequestAuthorization {
@@ -185,28 +298,46 @@ struct SearchResultsSection: View {
                                 .buttonStyle(.glass)
                                 .buttonBorderShape(.capsule)
                             }
-                        } else if let failureDetail = state.failureDetail {
-                            SearchMessageRow(
-                                message: SearchMessage(
-                                    title: "Search Failed",
-                                    detail: staleDetail(failureDetail),
-                                    systemImage: "exclamationmark.triangle"
-                                )
-                            )
-                        }
-
-                        if state.status == .loaded && state.items.isEmpty {
-                            SearchMessageRow(
-                                message: SearchMessage(
-                                    title: "No Results",
-                                    detail: "No matches.",
-                                    systemImage: "magnifyingglass"
-                                )
-                            )
-                        } else if !state.items.isEmpty {
-                            SourceGroupedItemRows(items: state.items)
                         }
                     }
+                } else if let failureDetail = state.failureDetail {
+                    RoomSurfaceCard {
+                        SearchMessageRow(
+                            message: SearchMessage(
+                                title: "Search Failed",
+                                detail: staleDetail(failureDetail),
+                                systemImage: "exclamationmark.triangle"
+                            )
+                        )
+                    }
+                }
+
+                if state.isSearching && state.items.isEmpty {
+                    RoomSurfaceCard {
+                        HStack(spacing: 14) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 44, height: 44)
+
+                            Text("Searching")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(.secondary)
+
+                            Spacer(minLength: 0)
+                        }
+                    }
+                } else if state.status == .loaded && state.items.isEmpty {
+                    RoomSurfaceCard {
+                        SearchMessageRow(
+                            message: SearchMessage(
+                                title: "No Results",
+                                detail: "No matches.",
+                                systemImage: "magnifyingglass"
+                            )
+                        )
+                    }
+                } else if !state.items.isEmpty {
+                    SourceGroupedItemRows(items: state.items)
                 }
             }
         }
@@ -214,8 +345,9 @@ struct SearchResultsSection: View {
 
     private var shouldShowResults: Bool {
         availabilityMessage != nil
-            || state.hasQuery
+            || state.isSearching
             || state.failureDetail != nil
+            || (state.status == .loaded && state.hasQuery)
             || !state.items.isEmpty
     }
 

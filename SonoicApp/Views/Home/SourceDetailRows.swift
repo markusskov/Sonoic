@@ -595,6 +595,8 @@ struct SourceItemNavigationRow: View {
 
 struct SourceGroupedItemRows: View {
     let items: [SonoicSourceItem]
+    var showsSectionTitles = false
+    var usesCompactCards = true
 
     private var sections: [SourceItemSection] {
         SonoicSourceItem.Kind.searchResultOrder.compactMap { kind in
@@ -611,20 +613,38 @@ struct SourceGroupedItemRows: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             ForEach(sections) { section in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(section.kind.pluralTitle)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    VStack(spacing: 0) {
-                        ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
-                            SourceItemNavigationRow(item: item)
-
-                            if index < section.items.count - 1 {
-                                Divider()
-                                    .padding(.leading, 76)
-                            }
+                Group {
+                    if usesCompactCards {
+                        sectionContent(section)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .glassEffect(.regular, in: .rect(cornerRadius: 24))
+                    } else {
+                        RoomSurfaceCard {
+                            sectionContent(section)
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    private func sectionContent(_ section: SourceItemSection) -> some View {
+        VStack(alignment: .leading, spacing: showsSectionTitles ? 6 : 0) {
+            if showsSectionTitles {
+                Text(section.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
+                    SourceItemNavigationRow(item: item)
+
+                    if index < section.items.count - 1 {
+                        Divider()
+                            .padding(.leading, 76)
                     }
                 }
             }
@@ -638,6 +658,10 @@ private struct SourceItemSection: Identifiable {
 
     var id: String {
         kind.rawValue
+    }
+
+    var title: String {
+        items.count == 1 ? kind.title : kind.pluralTitle
     }
 }
 
@@ -687,8 +711,8 @@ private struct SourceItemMetadataRow: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
-                if let subtitle = item.subtitle {
-                    Text(subtitle)
+                if let displaySubtitle {
+                    Text(displaySubtitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -699,6 +723,18 @@ private struct SourceItemMetadataRow: View {
         }
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var displaySubtitle: String? {
+        guard let subtitle = item.subtitle else {
+            return item.kind == .album ? "Album" : nil
+        }
+
+        guard item.kind == .album else {
+            return subtitle
+        }
+
+        return "\(subtitle) • Album"
     }
 
 }
