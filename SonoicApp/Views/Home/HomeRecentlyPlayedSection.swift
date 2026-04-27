@@ -116,6 +116,7 @@ private struct HomeRecentPlayCard: View {
                 .split(separator: "?", maxSplits: 1)
                 .first
                 .map(String.init)?
+                .removingPercentEncoding?
                 .sonoicNonEmptyTrimmed
             else {
                 return nil
