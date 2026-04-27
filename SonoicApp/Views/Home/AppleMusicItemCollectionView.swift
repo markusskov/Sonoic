@@ -79,12 +79,17 @@ struct AppleMusicItemCollectionView: View {
         }
 
         let localPayload = localNowPlayingPayload(for: item)
-        _ = await model.playManualSonosQueuePayloads(
+        let didStartPlayback = await model.playManualSonosQueuePayloads(
             queuePayloads,
             startingTrackNumber: trackNumber,
             localNowPlayingPayload: localPayload,
             recentPlaybackPayload: parentItem.flatMap(playlistPlaybackPayload)
         )
+
+        if didStartPlayback,
+           let parentItem {
+            model.recordRecentSourceItem(parentItem)
+        }
     }
 
     private func playlistPlaybackPayload(for parentItem: SonoicSourceItem) -> SonosPlayablePayload? {

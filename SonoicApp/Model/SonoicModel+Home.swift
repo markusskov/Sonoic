@@ -305,6 +305,32 @@ extension SonoicModel {
         )
     }
 
+    func recordRecentSourceItem(_ item: SonoicSourceItem) {
+        let replayPayload: SonosPlayablePayload?
+        if case .sonosNative(let payload) = item.playbackCapability {
+            replayPayload = payload
+        } else {
+            replayPayload = nil
+        }
+
+        upsertRecentPlay(
+            SonoicRecentPlayItem(
+                id: "source-\(item.service.id)-\(item.kind.rawValue)-\(item.serviceItemID ?? item.id)",
+                title: item.title,
+                artistName: item.subtitle,
+                albumTitle: nil,
+                sourceName: item.service.name,
+                artworkURL: item.artworkURL,
+                artworkIdentifier: item.artworkIdentifier,
+                service: item.service,
+                lastPlayedAt: .now,
+                playbackURI: replayPayload?.uri,
+                playbackMetadataXML: replayPayload?.metadataXML,
+                favoriteKind: recentFavoriteKind(for: item)
+            )
+        )
+    }
+
     func playRecentItem(_ recentItem: SonoicRecentPlayItem) async -> Bool {
         guard let favorite = recentItem.replayFavorite else {
             return false
@@ -368,26 +394,7 @@ extension SonoicModel {
             return false
         }
 
-        let observedURIs = [
-            normalizedRecentPlaybackURI(nowPlayingDiagnostics.currentURI),
-            normalizedRecentPlaybackURI(nowPlayingDiagnostics.trackURI),
-        ].compactMap(\.self)
-
-        return payloads.contains { payload in
-            guard let payloadURI = normalizedRecentPlaybackURI(payload.uri) else {
-                return false
-            }
-
-            if observedURIs.contains(payloadURI) {
-                return true
-            }
-
-            guard let itemID = recentPlaybackItemID(from: payload.uri) else {
-                return false
-            }
-
-            return observedURIs.contains { $0.contains(itemID) }
-        }
+        return true
     }
 
     private func manualQueueRecentItems() -> [SonoicRecentPlayItem] {
@@ -396,23 +403,13 @@ extension SonoicModel {
         } ?? []
     }
 
-    private func normalizedRecentPlaybackURI(_ uri: String?) -> String? {
-        uri?
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .sonoicNonEmptyTrimmed?
-            .lowercased()
-    }
-
-    private func recentPlaybackItemID(from uri: String) -> String? {
-        guard let normalizedURI = normalizedRecentPlaybackURI(uri),
-              let idStartRange = normalizedURI.range(of: "%3a")
-        else {
-            return nil
+    private func recentFavoriteKind(for item: SonoicSourceItem) -> SonosFavoriteItem.Kind {
+        switch item.kind {
+        case .album, .artist, .playlist, .station:
+            .collection
+        case .song, .unknown:
+            .item
         }
-
-        let valueAfterPrefix = normalizedURI[idStartRange.upperBound...]
-        let id = valueAfterPrefix.split(separator: "?", maxSplits: 1).first.map(String.init)
-        return id?.sonoicNonEmptyTrimmed
     }
 
     private func orderedUniqueServices(_ services: [SonosServiceDescriptor]) -> [SonosServiceDescriptor] {
