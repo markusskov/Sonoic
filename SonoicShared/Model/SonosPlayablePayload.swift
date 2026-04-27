@@ -22,23 +22,13 @@ struct SonosPlayablePayload: Identifiable, Equatable {
     var launchMode: LaunchMode
 
     var validationFailureReason: String? {
-        if uri.sonoicNonEmptyTrimmed == nil {
-            return "Missing Sonos playback URI."
-        }
-
-        switch launchMode {
-        case .direct:
+        do {
+            _ = try SonosPlayablePayloadPreparer().prepare(self)
             return nil
-        case .queueNext:
-            guard kind == .item else {
-                return "Only item payloads can be queued next."
-            }
-
-            guard metadataXML.sonoicNonEmptyTrimmed != nil else {
-                return "Queue playback needs Sonos DIDL metadata."
-            }
-
-            return nil
+        } catch let failure as SonosPlayablePayloadPreparer.Failure {
+            return failure.localizedDescription
+        } catch {
+            return error.localizedDescription
         }
     }
 

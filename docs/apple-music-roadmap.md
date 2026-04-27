@@ -79,12 +79,15 @@ This roadmap starts from the current V1 foundation:
 
 ## Milestone 5: Sonos-Native Playback Research
 
-46. Add a `SonosPlayablePayloadPreparer` for existing Sonos-native favorite payloads.
-47. Validate allowed Sonos URI schemes before sending anything to `SetAVTransportURI`.
-48. Preserve and validate DIDL metadata from favorites rather than synthesizing fragile metadata.
-49. Reject ambiguous or queue-owned URIs with a clear unsupported reason.
-50. Add tests for playable favorite payload preparation.
-51. Add tests for rejected payloads.
+Shipped first safety slice:
+
+- `SonosPlayablePayloadPreparer` validates existing Sonos-native favorite payloads before launch.
+- Known Sonos service/container URI families are allowed; queue-owned, group, and generic HTTP URLs are rejected.
+- DIDL metadata from favorites is preserved and trimmed, not synthesized.
+- Tests cover playable favorite payloads and rejected payloads.
+
+Next:
+
 52. Research Sonos Control API authorization and playback-session requirements.
 53. Research whether Apple Music catalog or library IDs can map to Sonos service object IDs with user authorization.
 54. Prototype Apple Music-to-Sonos payload generation behind tests only.
