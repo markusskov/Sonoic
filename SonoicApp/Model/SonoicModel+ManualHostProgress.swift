@@ -270,9 +270,7 @@ extension SonoicModel {
         diagnostics: SonosNowPlayingDiagnostics,
         payload: SonosPlayablePayload
     ) -> Bool {
-        guard !diagnostics.hasTrackMetadata,
-              !diagnostics.hasSourceMetadata
-        else {
+        guard !diagnostics.hasTrackMetadata else {
             return false
         }
 
