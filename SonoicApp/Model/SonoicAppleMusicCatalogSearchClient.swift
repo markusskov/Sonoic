@@ -2,8 +2,8 @@ import Foundation
 @preconcurrency import MusicKit
 
 struct SonoicAppleMusicCatalogSearchClient {
-    private static let allSearchItemLimitPerGroup = 6
-    private static let allSearchTotalLimit = 24
+    private static let allSearchItemLimitPerGroup = 25
+    private static let allSearchTotalLimit = 100
     private static let scopedSearchLimit = 24
 
     enum ClientError: LocalizedError {

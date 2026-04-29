@@ -149,22 +149,18 @@ struct SearchRecentQueriesSection: View {
                         .foregroundStyle(.secondary)
                 }
 
-                RoomSurfaceCard {
-                    VStack(spacing: 0) {
-                        ForEach(Array(recentSearches.prefix(5).enumerated()), id: \.element.id) { index, recentSearch in
-                            Button {
-                                select(recentSearch)
-                            } label: {
-                                SearchRecentQueryRow(recentSearch: recentSearch)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Search \(recentSearch.query)")
-
-                            if index < min(recentSearches.count, 5) - 1 {
-                                Divider()
-                                    .padding(.leading, 54)
-                            }
+                SonoicListCard {
+                    SonoicListRows(
+                        Array(recentSearches.prefix(5)),
+                        dividerLeadingPadding: SonoicTheme.Layout.navigationDividerLeading
+                    ) { recentSearch, _ in
+                        Button {
+                            select(recentSearch)
+                        } label: {
+                            SearchRecentQueryRow(recentSearch: recentSearch)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Search \(recentSearch.query)")
                     }
                 }
             }
@@ -241,14 +237,14 @@ private struct SearchDiscoveryTile: View {
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: destination.systemImage)
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(.pink)
+                .foregroundStyle(SonoicTheme.Colors.serviceAccent)
                 .frame(width: 42, height: 42)
 
             Spacer(minLength: 0)
 
             Text(title)
-                .font(.headline)
-                .foregroundStyle(.primary)
+                .font(SonoicTheme.Typography.sectionTitle)
+                .foregroundStyle(SonoicTheme.Colors.primary)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)

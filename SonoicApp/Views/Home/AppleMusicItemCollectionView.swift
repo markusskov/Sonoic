@@ -15,19 +15,12 @@ struct AppleMusicItemCollectionView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     header
 
-                    RoomSurfaceCard {
-                        VStack(spacing: 0) {
-                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                SourceItemNavigationRow(
-                                    item: item,
-                                    playOverride: playlistTrackPlayAction(for: item, at: index)
-                                )
-
-                                if index < items.count - 1 {
-                                    Divider()
-                                        .padding(.leading, 76)
-                                }
-                            }
+                    SonoicListCard {
+                        SonoicListRows(items) { item, index in
+                            SourceItemNavigationRow(
+                                item: item,
+                                playOverride: playlistTrackPlayAction(for: item, at: index)
+                            )
                         }
                     }
                 }

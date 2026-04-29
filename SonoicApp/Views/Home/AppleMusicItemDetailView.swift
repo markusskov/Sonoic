@@ -281,19 +281,12 @@ private struct AppleMusicItemDetailSectionView: View {
                 }
             }
 
-            RoomSurfaceCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(previewItems.enumerated()), id: \.element.id) { index, item in
-                        SourceItemNavigationRow(
-                            item: item,
-                            playOverride: playlistTrackPlayAction(for: item, at: index)
-                        )
-
-                        if index < previewItems.count - 1 {
-                            Divider()
-                                .padding(.leading, 76)
-                        }
-                    }
+            SonoicListCard {
+                SonoicListRows(previewItems) { item, index in
+                    SourceItemNavigationRow(
+                        item: item,
+                        playOverride: playlistTrackPlayAction(for: item, at: index)
+                    )
                 }
             }
         }

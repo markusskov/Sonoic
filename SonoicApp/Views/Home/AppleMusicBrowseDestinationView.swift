@@ -159,16 +159,9 @@ private struct AppleMusicBrowseSectionView: View {
                 }
             }
 
-            RoomSurfaceCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(previewItems.enumerated()), id: \.element.id) { index, item in
-                        SourceItemNavigationRow(item: item)
-
-                        if index < previewItems.count - 1 {
-                            Divider()
-                                .padding(.leading, 76)
-                        }
-                    }
+            SonoicListCard {
+                SonoicListRows(previewItems) { item, _ in
+                    SourceItemNavigationRow(item: item)
                 }
             }
         }
@@ -184,16 +177,12 @@ private struct AppleMusicBrowseGenreSection: View {
                 title: "Categories"
             )
 
-            RoomSurfaceCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(genres.enumerated()), id: \.element.id) { index, genre in
-                        AppleMusicBrowseGenreRow(genre: genre)
-
-                        if index < genres.count - 1 {
-                            Divider()
-                                .padding(.leading, 46)
-                        }
-                    }
+            SonoicListCard {
+                SonoicListRows(
+                    genres,
+                    dividerLeadingPadding: SonoicTheme.Layout.iconDividerLeading
+                ) { genre, _ in
+                    AppleMusicBrowseGenreRow(genre: genre)
                 }
             }
         }
@@ -207,17 +196,17 @@ private struct AppleMusicBrowseGenreRow: View {
         HStack(spacing: 14) {
             Image(systemName: "square.grid.2x2")
                 .font(.body.weight(.semibold))
-                .foregroundStyle(.pink)
+                .foregroundStyle(SonoicTheme.Colors.serviceAccent)
                 .frame(width: 32, height: 32)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(genre.title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+                    .font(SonoicTheme.Typography.sectionTitle)
+                    .foregroundStyle(SonoicTheme.Colors.primary)
 
                 Text(genre.subtitle)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(SonoicTheme.Colors.secondary)
             }
 
             Spacer(minLength: 0)

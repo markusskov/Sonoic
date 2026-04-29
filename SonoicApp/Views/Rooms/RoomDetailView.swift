@@ -63,14 +63,14 @@ struct RoomDetailView: View {
                             subtitle: groupedRoomSummary
                         )
 
-                        RoomSurfaceCard {
+                        SonoicListCard {
                             VStack(spacing: 0) {
                                 ForEach(Array(activeTarget.memberNames.enumerated()), id: \.offset) { index, roomName in
                                     RoomGroupedRoomRow(roomName: roomName)
 
                                     if index < activeTarget.memberNames.count - 1 {
                                         Divider()
-                                            .padding(.leading, 56)
+                                            .padding(.leading, SonoicTheme.Layout.roomDividerLeading)
                                     }
                                 }
                             }
@@ -90,16 +90,12 @@ struct RoomDetailView: View {
                             subtitle: setupSummary
                         )
 
-                        RoomSurfaceCard {
-                            VStack(spacing: 0) {
-                                ForEach(Array(activeTarget.setupProducts.enumerated()), id: \.element.id) { index, product in
-                                    RoomProductRow(product: product)
-
-                                    if index < activeTarget.setupProducts.count - 1 {
-                                        Divider()
-                                            .padding(.leading, 56)
-                                    }
-                                }
+                        SonoicListCard {
+                            SonoicListRows(
+                                activeTarget.setupProducts,
+                                dividerLeadingPadding: SonoicTheme.Layout.roomDividerLeading
+                            ) { product, _ in
+                                RoomProductRow(product: product)
                             }
                         }
                     }
