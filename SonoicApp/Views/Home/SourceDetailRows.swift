@@ -487,6 +487,9 @@ struct SourceItemNavigationRow: View {
 
     let item: SonoicSourceItem
     var playOverride: (() async -> Void)?
+    var isCompact = false
+    @State private var actionFailure: SourceItemActionFailure?
+    @State private var localFavoriteObjectID: String?
 
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
         model.appleMusicExactPlaybackCandidate(for: item)
@@ -508,6 +511,14 @@ struct SourceItemNavigationRow: View {
         item.kind == .song && canPlay
     }
 
+    private var isFavorited: Bool {
+        favoriteObjectID != nil
+    }
+
+    private var favoriteObjectID: String? {
+        localFavoriteObjectID ?? exactPlaybackCandidate?.payload.id
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             if shouldPlayOnRowTap {
@@ -516,7 +527,7 @@ struct SourceItemNavigationRow: View {
                         await play()
                     }
                 } label: {
-                    SourceItemMetadataRow(item: item)
+                    SourceItemMetadataRow(item: item, isCompact: isCompact)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Play \(item.title)")
@@ -524,14 +535,38 @@ struct SourceItemNavigationRow: View {
                 NavigationLink {
                     AppleMusicItemDetailView(item: item)
                 } label: {
-                    SourceItemMetadataRow(item: item)
+                    SourceItemMetadataRow(item: item, isCompact: isCompact)
                 }
                 .buttonStyle(.plain)
             }
 
             if shouldPlayOnRowTap {
-                NavigationLink {
-                    AppleMusicItemDetailView(item: item)
+                Menu {
+                    Button {
+                        Task {
+                            await play()
+                        }
+                    } label: {
+                        Label("Play", systemImage: "play.fill")
+                    }
+
+                    Button {
+                        Task {
+                            await toggleFavorite()
+                        }
+                    } label: {
+                        Label(
+                            isFavorited ? "Remove Favorite" : "Save to Favorites",
+                            systemImage: isFavorited ? "heart.fill" : "heart"
+                        )
+                        .foregroundStyle(.primary)
+                    }
+
+                    if let externalURL = item.externalURL.flatMap(URL.init(string:)) {
+                        ShareLink(item: externalURL) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.body.weight(.semibold))
@@ -561,7 +596,14 @@ struct SourceItemNavigationRow: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, isCompact ? 8 : 12)
+        .alert(item: $actionFailure) { failure in
+            Alert(
+                title: Text(failure.title),
+                message: Text(failure.detail),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
     private func play() async {
@@ -583,6 +625,47 @@ struct SourceItemNavigationRow: View {
 
         _ = await model.playManualSonosPayload(payload)
     }
+
+    private func toggleFavorite() async {
+        if let favoriteObjectID {
+            do {
+                try await model.removeSonosFavorite(objectID: favoriteObjectID)
+                localFavoriteObjectID = nil
+            } catch {
+                actionFailure = SourceItemActionFailure(
+                    title: "Could Not Remove Favorite",
+                    detail: error.localizedDescription
+                )
+            }
+
+            return
+        }
+
+        guard let generatedPlaybackCandidate,
+              let payload = try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
+        else {
+            actionFailure = SourceItemActionFailure(
+                title: "Could Not Save Favorite",
+                detail: "This song does not have a Sonos favorite payload yet."
+            )
+            return
+        }
+
+        do {
+            localFavoriteObjectID = try await model.addSonosFavorite(payload)
+        } catch {
+            actionFailure = SourceItemActionFailure(
+                title: "Could Not Save Favorite",
+                detail: error.localizedDescription
+            )
+        }
+    }
+}
+
+private struct SourceItemActionFailure: Identifiable {
+    let id = UUID()
+    var title: String
+    var detail: String
 }
 
 struct SourceGroupedItemRows: View {
@@ -712,17 +795,22 @@ private extension SonoicSourceItem.Kind {
 
 private struct SourceItemMetadataRow: View {
     let item: SonoicSourceItem
+    var isCompact = false
+
+    private var artworkDimension: CGFloat {
+        isCompact ? 52 : 58
+    }
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: isCompact ? 12 : 14) {
             HomeFavoriteArtworkView(
                 artworkURL: item.artworkURL,
                 artworkIdentifier: item.artworkIdentifier,
-                maximumDisplayDimension: 58
+                maximumDisplayDimension: artworkDimension
             )
-            .frame(width: 58, height: 58)
+            .frame(width: artworkDimension, height: artworkDimension)
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: isCompact ? 3 : 5) {
                 Text(item.title)
                     .font(SonoicTheme.Typography.listTitle)
                     .foregroundStyle(SonoicTheme.Colors.primary)

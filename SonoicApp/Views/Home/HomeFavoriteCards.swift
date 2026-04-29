@@ -5,39 +5,64 @@ struct HomeFavoriteCard: View {
     let playAction: () async -> Void
 
     var body: some View {
-        Button(action: playTapped) {
-            VStack(alignment: .leading, spacing: 12) {
-                HomeFavoriteArtworkView(
-                    artworkURL: favorite.artworkURL,
-                    artworkIdentifier: nil,
-                    maximumDisplayDimension: 178,
-                    placeholderSystemImage: favorite.isCollectionLike ? "music.note.list" : "music.note"
-                )
-                .frame(width: 178, height: 178)
+        if let detailItem {
+            NavigationLink {
+                AppleMusicItemDetailView(item: detailItem)
+            } label: {
+                content
+            }
+            .buttonStyle(.plain)
+        } else {
+            Button(action: playTapped) {
+                content
+            }
+            .buttonStyle(.plain)
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(favorite.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HomeFavoriteArtworkView(
+                artworkURL: favorite.artworkURL,
+                artworkIdentifier: nil,
+                maximumDisplayDimension: 178,
+                placeholderSystemImage: favorite.isCollectionLike ? "music.note.list" : "music.note"
+            )
+            .frame(width: 178, height: 178)
 
-                    Text(favorite.subtitle ?? favorite.service?.name ?? "Sonos Favorite")
-                        .font(.subheadline)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(favorite.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(favorite.subtitle ?? favorite.service?.name ?? "Sonos Favorite")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let service = favorite.service {
+                    Label(service.name, systemImage: service.systemImage)
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if let service = favorite.service {
-                        Label(service.name, systemImage: service.systemImage)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
                 }
             }
-            .frame(width: 178, alignment: .leading)
         }
-        .buttonStyle(.plain)
+        .frame(width: 178, alignment: .leading)
+    }
+
+    private var detailItem: SonoicSourceItem? {
+        let item = SonoicSourceItem(favorite: favorite)
+        guard item.service.kind == .appleMusic,
+              item.kind != .song,
+              item.kind != .unknown
+        else {
+            return nil
+        }
+
+        return item
     }
 
     private func playTapped() {

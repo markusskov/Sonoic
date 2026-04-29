@@ -261,6 +261,26 @@ extension SonoicModel {
         }
     }
 
+    @discardableResult
+    func addSonosFavorite(_ payload: SonosPlayablePayload) async throws -> String {
+        guard hasManualSonosHost else {
+            throw SonosControlTransport.TransportError.invalidHost
+        }
+
+        let objectID = try await favoritesClient.addFavorite(host: manualSonosHost, payload: payload)
+        await refreshHomeFavorites(showLoading: false)
+        return objectID
+    }
+
+    func removeSonosFavorite(objectID: String) async throws {
+        guard hasManualSonosHost else {
+            throw SonosControlTransport.TransportError.invalidHost
+        }
+
+        try await favoritesClient.removeFavorite(host: manualSonosHost, objectID: objectID)
+        await refreshHomeFavorites(showLoading: false)
+    }
+
     func loadHomeFavoritesIfNeeded() async {
         guard hasManualSonosHost else {
             homeFavoritesState = .idle

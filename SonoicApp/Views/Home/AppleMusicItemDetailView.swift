@@ -4,7 +4,8 @@ struct AppleMusicItemDetailView: View {
     @Environment(SonoicModel.self) private var model
 
     let item: SonoicSourceItem
-    @State private var generatedPlaybackFailure: GeneratedPlaybackFailure?
+    @State private var actionFailure: AppleMusicItemDetailActionFailure?
+    @State private var localPlaylistFavoriteObjectID: String?
 
     private var state: SonoicAppleMusicItemDetailState {
         model.appleMusicItemDetailState(for: item)
@@ -30,42 +31,73 @@ struct AppleMusicItemDetailView: View {
         return model.appleMusicGeneratedPlaybackCandidate(for: item)
     }
 
+    private var isPlaylistFavorited: Bool {
+        playlistFavoriteObjectID != nil
+    }
+
+    private var playlistFavoriteObjectID: String? {
+        localPlaylistFavoriteObjectID ?? exactPlaybackCandidate?.payload.id
+    }
+
     var body: some View {
-        ScrollView {
-            GlassEffectContainer(spacing: 18) {
-                VStack(alignment: .leading, spacing: 24) {
-                    AppleMusicItemDetailHeader(item: item)
+        ZStack {
+            AppleMusicItemDetailBackground(item: item)
 
-                    if let exactPlaybackCandidate {
-                        AppleMusicItemActionCard(
-                            play: {
-                                await playCandidate(exactPlaybackCandidate)
+            ScrollView {
+                GlassEffectContainer(spacing: 18) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        AppleMusicItemDetailHeader(item: item)
+
+                        if item.kind == .playlist {
+                            if canPlayPlaylistQueue {
+                                AppleMusicPlaylistActionRow(
+                                    isFavorite: isPlaylistFavorited,
+                                    shuffle: {
+                                        await playPlaylistQueue(shuffled: true)
+                                    },
+                                    play: {
+                                        await playPlaylistQueue(shuffled: false)
+                                    },
+                                    favorite: {
+                                        await togglePlaylistFavorite()
+                                    }
+                                )
+                            } else {
+                                AppleMusicPlaylistActionSkeletonRow()
                             }
-                        )
-                    } else if let generatedPlaybackCandidate {
-                        AppleMusicItemActionCard(
-                            play: {
-                                await playGeneratedCandidate(generatedPlaybackCandidate)
+                        } else {
+                            if let exactPlaybackCandidate {
+                                AppleMusicItemActionCard(
+                                    play: {
+                                        await playCandidate(exactPlaybackCandidate)
+                                    }
+                                )
+                            } else if let generatedPlaybackCandidate {
+                                AppleMusicItemActionCard(
+                                    play: {
+                                        await playGeneratedCandidate(generatedPlaybackCandidate)
+                                    }
+                                )
                             }
-                        )
+                        }
+
+                        content
                     }
-
-                    content
+                    .padding(20)
                 }
-                .padding(20)
             }
         }
         .miniPlayerContentInset()
         .scrollIndicators(.hidden)
-        .navigationTitle(item.kind.title)
+        .navigationTitle(item.kind == .playlist ? "" : item.kind.title)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: item.appleMusicDetailCacheKey) {
             model.loadAppleMusicItemDetail(for: item)
             await refreshGeneratedPlaybackHintsIfNeeded()
         }
-        .alert(item: $generatedPlaybackFailure) { failure in
+        .alert(item: $actionFailure) { failure in
             Alert(
-                title: Text("Could Not Start"),
+                title: Text(failure.title),
                 message: Text(failure.detail),
                 dismissButton: .default(Text("OK"))
             )
@@ -149,11 +181,115 @@ struct AppleMusicItemDetailView: View {
             let didStart = await model.playManualSonosPayload(payload)
 
             if !didStart {
-                generatedPlaybackFailure = GeneratedPlaybackFailure(detail: "Sonos could not start this Apple Music song.")
+                actionFailure = AppleMusicItemDetailActionFailure(
+                    title: "Could Not Start",
+                    detail: "Sonos could not start this Apple Music song."
+                )
             }
         } catch {
-            generatedPlaybackFailure = GeneratedPlaybackFailure(detail: error.localizedDescription)
+            actionFailure = AppleMusicItemDetailActionFailure(
+                title: "Could Not Start",
+                detail: error.localizedDescription
+            )
         }
+    }
+
+    private var playlistTrackItems: [SonoicSourceItem] {
+        guard item.kind == .playlist else {
+            return []
+        }
+
+        return state.sections.flatMap(\.items).filter { $0.kind == .song }
+    }
+
+    private var playlistQueuePairs: [(item: SonoicSourceItem, payload: SonosPlayablePayload)] {
+        playlistTrackItems.compactMap { track in
+            if let generatedQueueCandidate = model.appleMusicGeneratedQueueCandidate(for: track) {
+                return (track, generatedQueueCandidate.playbackPayload(for: track))
+            }
+
+            if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: track) {
+                return (track, exactPlaybackCandidate.payload)
+            }
+
+            return nil
+        }
+    }
+
+    private var canPlayPlaylistQueue: Bool {
+        !playlistQueuePairs.isEmpty
+    }
+
+    private func playPlaylistQueue(shuffled: Bool) async {
+        let playbackPairs = shuffled ? playlistQueuePairs.shuffled() : playlistQueuePairs
+        let payloads = playbackPairs.map(\.payload)
+
+        guard let firstItem = playbackPairs.first?.item,
+              !payloads.isEmpty
+        else {
+            return
+        }
+
+        let localPayload = localNowPlayingPayload(for: firstItem)
+        let didStart = await model.playManualSonosQueuePayloads(
+            payloads,
+            startingTrackNumber: 1,
+            localNowPlayingPayload: localPayload,
+            recentPlaybackPayload: playlistPlaybackPayload()
+        )
+
+        if didStart {
+            model.recordRecentSourceItem(item, replayPayload: playlistPlaybackPayload())
+        }
+    }
+
+    private func togglePlaylistFavorite() async {
+        if let playlistFavoriteObjectID {
+            do {
+                try await model.removeSonosFavorite(objectID: playlistFavoriteObjectID)
+                localPlaylistFavoriteObjectID = nil
+            } catch {
+                actionFailure = AppleMusicItemDetailActionFailure(
+                    title: "Could Not Remove Favorite",
+                    detail: error.localizedDescription
+                )
+            }
+
+            return
+        }
+
+        guard let payload = playlistPlaybackPayload() else {
+            actionFailure = AppleMusicItemDetailActionFailure(
+                title: "Could Not Save Favorite",
+                detail: "This playlist does not have a Sonos favorite payload yet."
+            )
+            return
+        }
+
+        do {
+            localPlaylistFavoriteObjectID = try await model.addSonosFavorite(payload)
+        } catch {
+            actionFailure = AppleMusicItemDetailActionFailure(
+                title: "Could Not Save Favorite",
+                detail: error.localizedDescription
+            )
+        }
+    }
+
+    private func playlistPlaybackPayload() -> SonosPlayablePayload? {
+        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: item) {
+            return exactPlaybackCandidate.payload
+        }
+
+        return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
+    }
+
+    private func localNowPlayingPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {
+        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: item) {
+            return exactPlaybackCandidate.payload
+        }
+
+        return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
     }
 
     private func refreshGeneratedPlaybackHintsIfNeeded() async {
@@ -169,16 +305,52 @@ struct AppleMusicItemDetailView: View {
     }
 }
 
-private struct GeneratedPlaybackFailure: Identifiable {
+private struct AppleMusicItemDetailActionFailure: Identifiable {
     let id = UUID()
+    var title: String
     var detail: String
+}
+
+private struct AppleMusicItemDetailBackground: View {
+    let item: SonoicSourceItem
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                HomeFavoriteArtworkView(
+                    artworkURL: item.artworkURL,
+                    artworkIdentifier: item.artworkIdentifier,
+                    maximumDisplayDimension: 900,
+                    placeholderSystemImage: item.kind.systemImage
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+                .scaleEffect(1.16)
+                .blur(radius: 54)
+                .saturation(1.28)
+                .opacity(0.54)
+                .clipped()
+
+                LinearGradient(
+                    colors: [
+                        .black.opacity(0.22),
+                        .black.opacity(0.42),
+                        .black.opacity(0.9)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .ignoresSafeArea()
+    }
 }
 
 private struct AppleMusicItemDetailHeader: View {
     let item: SonoicSourceItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             HomeFavoriteArtworkView(
                 artworkURL: item.artworkURL,
                 artworkIdentifier: item.artworkIdentifier,
@@ -188,52 +360,135 @@ private struct AppleMusicItemDetailHeader: View {
             .frame(maxWidth: 260)
             .frame(maxWidth: .infinity, alignment: .center)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Label(item.kind.title, systemImage: item.kind.systemImage)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+            VStack(alignment: item.kind == .playlist ? .center : .leading, spacing: 6) {
+                if item.kind != .playlist {
+                    Label(item.kind.title, systemImage: item.kind.systemImage)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
 
                 Text(item.title)
                     .font(.largeTitle.weight(.bold))
+                    .multilineTextAlignment(item.kind == .playlist ? .center : .leading)
                     .lineLimit(3)
                     .minimumScaleFactor(0.72)
 
-                if let subtitle = item.subtitle {
+                if item.kind != .playlist, let subtitle = item.subtitle {
                     Text(subtitle)
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
 
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        AppleMusicItemDetailChip(title: item.service.name, systemImage: item.service.systemImage)
+                if item.kind != .playlist {
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 8) {
+                            AppleMusicItemDetailChip(title: item.service.name, systemImage: item.service.systemImage)
+                        }
+                        .padding(.vertical, 1)
                     }
-                    .padding(.vertical, 1)
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                alignment: item.kind == .playlist ? .center : .leading
+            )
         }
     }
 
 }
 
-private struct AppleMusicItemActionCard: View {
+private struct AppleMusicPlaylistActionRow: View {
+    let isFavorite: Bool
+    let shuffle: () async -> Void
     let play: () async -> Void
+    let favorite: () async -> Void
 
     var body: some View {
-        RoomSurfaceCard {
+        HStack(spacing: 14) {
+            Button {
+                Task {
+                    await shuffle()
+                }
+            } label: {
+                Image(systemName: "shuffle")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 54, height: 54)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .accessibilityLabel("Shuffle")
+
             Button {
                 Task {
                     await play()
                 }
             } label: {
                 Label("Play", systemImage: "play.fill")
+                    .font(.headline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .accessibilityLabel("Play")
+
+            Button {
+                Task {
+                    await favorite()
+                }
+            } label: {
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 54, height: 54)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .accessibilityLabel(isFavorite ? "Saved to Sonos Favorites" : "Save to Sonos Favorites")
         }
+    }
+}
+
+private struct AppleMusicPlaylistActionSkeletonRow: View {
+    var body: some View {
+        HStack(spacing: 14) {
+            Circle()
+                .fill(.white.opacity(0.16))
+                .frame(width: 54, height: 54)
+
+            Capsule()
+                .fill(.white.opacity(0.16))
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+
+            Circle()
+                .fill(.white.opacity(0.16))
+                .frame(width: 54, height: 54)
+        }
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct AppleMusicItemActionCard: View {
+    let play: () async -> Void
+
+    var body: some View {
+        Button {
+            Task {
+                await play()
+            }
+        } label: {
+            Label("Play", systemImage: "play.fill")
+                .font(.headline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .accessibilityLabel("Play")
     }
 }
 
@@ -245,11 +500,19 @@ private struct AppleMusicItemDetailSectionView: View {
     private let previewLimit = 8
 
     private var previewItems: [SonoicSourceItem] {
-        Array(section.items.prefix(previewLimit))
+        if usesPlainTrackList {
+            return section.items
+        }
+
+        return Array(section.items.prefix(previewLimit))
+    }
+
+    private var usesPlainTrackList: Bool {
+        parentItem.kind == .playlist || parentItem.kind == .album
     }
 
     private var showsViewAll: Bool {
-        section.items.count > previewItems.count
+        !usesPlainTrackList && section.items.count > previewItems.count
     }
 
     var body: some View {
@@ -281,12 +544,22 @@ private struct AppleMusicItemDetailSectionView: View {
                 }
             }
 
-            SonoicListCard {
+            if usesPlainTrackList {
                 SonoicListRows(previewItems) { item, index in
                     SourceItemNavigationRow(
                         item: item,
-                        playOverride: playlistTrackPlayAction(for: item, at: index)
+                        playOverride: playlistTrackPlayAction(for: item, at: index),
+                        isCompact: true
                     )
+                }
+            } else {
+                SonoicListCard {
+                    SonoicListRows(previewItems) { item, index in
+                        SourceItemNavigationRow(
+                            item: item,
+                            playOverride: playlistTrackPlayAction(for: item, at: index)
+                        )
+                    }
                 }
             }
         }
