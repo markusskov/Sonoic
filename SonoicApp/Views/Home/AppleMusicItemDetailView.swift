@@ -36,7 +36,11 @@ struct AppleMusicItemDetailView: View {
     }
 
     private var playlistFavoriteObjectID: String? {
-        localPlaylistFavoriteObjectID ?? exactPlaybackCandidate?.payload.id
+        localPlaylistFavoriteObjectID ?? exactPlaybackCandidate?.verifiedFavoriteObjectID
+    }
+
+    private var canPlayPlaylistFallback: Bool {
+        playlistPlaybackPayload() != nil
     }
 
     var body: some View {
@@ -49,14 +53,15 @@ struct AppleMusicItemDetailView: View {
                         AppleMusicItemDetailHeader(item: item)
 
                         if item.kind == .playlist {
-                            if canPlayPlaylistQueue {
+                            if canPlayPlaylistQueue || canPlayPlaylistFallback {
                                 AppleMusicPlaylistActionRow(
                                     isFavorite: isPlaylistFavorited,
+                                    canShuffle: canPlayPlaylistQueue,
                                     shuffle: {
                                         await playPlaylistQueue(shuffled: true)
                                     },
                                     play: {
-                                        await playPlaylistQueue(shuffled: false)
+                                        await playPlaylist()
                                     },
                                     favorite: {
                                         await togglePlaylistFavorite()
@@ -243,6 +248,31 @@ struct AppleMusicItemDetailView: View {
         }
     }
 
+    private func playPlaylist() async {
+        guard canPlayPlaylistQueue else {
+            await playPlaylistFallback()
+            return
+        }
+
+        await playPlaylistQueue(shuffled: false)
+    }
+
+    private func playPlaylistFallback() async {
+        guard let payload = playlistPlaybackPayload() else {
+            return
+        }
+
+        let didStart = await model.playManualSonosPayload(
+            payload,
+            localNowPlayingPayload: payload,
+            recentPlaybackPayload: payload
+        )
+
+        if didStart {
+            model.recordRecentSourceItem(item, replayPayload: payload)
+        }
+    }
+
     private func togglePlaylistFavorite() async {
         if let playlistFavoriteObjectID {
             do {
@@ -258,7 +288,7 @@ struct AppleMusicItemDetailView: View {
             return
         }
 
-        guard let payload = playlistPlaybackPayload() else {
+        guard let payload = playlistGeneratedPlaybackPayload() else {
             actionFailure = AppleMusicItemDetailActionFailure(
                 title: "Could Not Save Favorite",
                 detail: "This playlist does not have a Sonos favorite payload yet."
@@ -281,6 +311,10 @@ struct AppleMusicItemDetailView: View {
             return exactPlaybackCandidate.payload
         }
 
+        return playlistGeneratedPlaybackPayload()
+    }
+
+    private func playlistGeneratedPlaybackPayload() -> SonosPlayablePayload? {
         return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
     }
 
@@ -401,6 +435,7 @@ private struct AppleMusicItemDetailHeader: View {
 
 private struct AppleMusicPlaylistActionRow: View {
     let isFavorite: Bool
+    var canShuffle = true
     let shuffle: () async -> Void
     let play: () async -> Void
     let favorite: () async -> Void
@@ -418,6 +453,8 @@ private struct AppleMusicPlaylistActionRow: View {
             }
             .buttonStyle(.plain)
             .glassEffect(.regular.interactive(), in: Circle())
+            .disabled(!canShuffle)
+            .opacity(canShuffle ? 1 : 0.42)
             .accessibilityLabel("Shuffle")
 
             Button {

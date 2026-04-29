@@ -122,9 +122,14 @@ struct SonoicSonosPlaybackCandidate: Identifiable, Equatable {
     var payload: SonosPlayablePayload
     var confidence: Confidence
     var detail: String
+    var hasVerifiedPayloadIDMatch = false
 
     var id: String {
         payload.id
+    }
+
+    var verifiedFavoriteObjectID: String? {
+        hasVerifiedPayloadIDMatch ? payload.id : nil
     }
 }
 

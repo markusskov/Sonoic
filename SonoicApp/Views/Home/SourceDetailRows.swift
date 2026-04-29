@@ -516,7 +516,7 @@ struct SourceItemNavigationRow: View {
     }
 
     private var favoriteObjectID: String? {
-        localFavoriteObjectID ?? exactPlaybackCandidate?.payload.id
+        localFavoriteObjectID ?? exactPlaybackCandidate?.verifiedFavoriteObjectID
     }
 
     var body: some View {
@@ -641,8 +641,7 @@ struct SourceItemNavigationRow: View {
             return
         }
 
-        guard let generatedPlaybackCandidate,
-              let payload = try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
+        guard let payload = favoritePlaybackPayload()
         else {
             actionFailure = SourceItemActionFailure(
                 title: "Could Not Save Favorite",
@@ -659,6 +658,18 @@ struct SourceItemNavigationRow: View {
                 detail: error.localizedDescription
             )
         }
+    }
+
+    private func favoritePlaybackPayload() -> SonosPlayablePayload? {
+        if let generatedPlaybackCandidate = model.appleMusicGeneratedPlaybackCandidate(for: item) {
+            return try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
+        }
+
+        guard exactPlaybackCandidate?.verifiedFavoriteObjectID != nil else {
+            return nil
+        }
+
+        return exactPlaybackCandidate?.payload
     }
 }
 

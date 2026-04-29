@@ -74,7 +74,8 @@ struct SonoicAppleMusicPlaybackPayloadResolver {
             return SonoicSonosPlaybackCandidate(
                 payload: payload,
                 confidence: confidence,
-                detail: candidateDetail(confidence: confidence, hasKindMatch: hasKindMatch)
+                detail: candidateDetail(confidence: confidence, hasKindMatch: hasKindMatch),
+                hasVerifiedPayloadIDMatch: hasPayloadIDMatch
             )
         }
         .sorted { lhs, rhs in
