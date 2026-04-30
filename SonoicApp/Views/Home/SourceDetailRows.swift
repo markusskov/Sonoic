@@ -49,21 +49,17 @@ struct AppleMusicLibrarySection: View {
                 title: "Library"
             )
 
-            RoomSurfaceCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(destinations.enumerated()), id: \.element.id) { index, destination in
-                        NavigationLink {
-                            AppleMusicLibraryDestinationView(destination: destination)
-                        } label: {
-                            AppleMusicSourceNavigationRow(row: libraryRow(for: destination))
-                        }
-                        .buttonStyle(.plain)
-
-                        if index < destinations.count - 1 {
-                            Divider()
-                                .padding(.leading, 58)
-                        }
+            SonoicListCard {
+                SonoicListRows(
+                    destinations,
+                    dividerLeadingPadding: SonoicTheme.Layout.navigationDividerLeading
+                ) { destination, _ in
+                    NavigationLink {
+                        AppleMusicLibraryDestinationView(destination: destination)
+                    } label: {
+                        AppleMusicSourceNavigationRow(row: libraryRow(for: destination))
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -100,7 +96,7 @@ struct AppleMusicSearchEntrySection: View {
 
     var body: some View {
         Button(action: openSearch) {
-            RoomSurfaceCard(isInteractive: true) {
+            SonoicListCard(isInteractive: true) {
                 HStack(spacing: 14) {
                     RoomSurfaceIconView(
                         systemImage: "magnifyingglass",
@@ -144,21 +140,17 @@ struct AppleMusicDiscoverySection: View {
                 title: "Browse"
             )
 
-            RoomSurfaceCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(destinations.enumerated()), id: \.element.id) { index, destination in
-                        NavigationLink {
-                            AppleMusicBrowseDestinationView(destination: destination)
-                        } label: {
-                            AppleMusicSourceNavigationRow(row: browseRow(for: destination))
-                        }
-                        .buttonStyle(.plain)
-
-                        if index < destinations.count - 1 {
-                            Divider()
-                                .padding(.leading, 58)
-                        }
+            SonoicListCard {
+                SonoicListRows(
+                    destinations,
+                    dividerLeadingPadding: SonoicTheme.Layout.navigationDividerLeading
+                ) { destination, _ in
+                    NavigationLink {
+                        AppleMusicBrowseDestinationView(destination: destination)
+                    } label: {
+                        AppleMusicSourceNavigationRow(row: browseRow(for: destination))
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -370,19 +362,19 @@ private struct AppleMusicSourceNavigationRow: View {
         HStack(spacing: 14) {
             Image(systemName: row.systemImage)
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(.pink)
+                .foregroundStyle(SonoicTheme.Colors.serviceAccent)
                 .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(row.title)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
+                    .font(SonoicTheme.Typography.listTitle)
+                    .foregroundStyle(SonoicTheme.Colors.primary)
                     .lineLimit(1)
 
                 if let subtitle = row.subtitle {
                     Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(SonoicTheme.Typography.listSubtitle)
+                        .foregroundStyle(SonoicTheme.Colors.secondary)
                         .lineLimit(1)
                 }
             }
@@ -391,8 +383,8 @@ private struct AppleMusicSourceNavigationRow: View {
 
             if let badgeTitle = row.badgeTitle {
                 Text(badgeTitle)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(SonoicTheme.Typography.badge)
+                    .foregroundStyle(SonoicTheme.Colors.secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .background(.quaternary.opacity(0.45), in: Capsule())
@@ -401,7 +393,7 @@ private struct AppleMusicSourceNavigationRow: View {
             if row.showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(SonoicTheme.Colors.tertiary)
             }
         }
         .padding(.vertical, 13)
@@ -495,6 +487,9 @@ struct SourceItemNavigationRow: View {
 
     let item: SonoicSourceItem
     var playOverride: (() async -> Void)?
+    var isCompact = false
+    @State private var actionFailure: SourceItemActionFailure?
+    @State private var localFavoriteObjectID: String?
 
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
         model.appleMusicExactPlaybackCandidate(for: item)
@@ -516,6 +511,14 @@ struct SourceItemNavigationRow: View {
         item.kind == .song && canPlay
     }
 
+    private var isFavorited: Bool {
+        favoriteObjectID != nil
+    }
+
+    private var favoriteObjectID: String? {
+        localFavoriteObjectID ?? exactPlaybackCandidate?.verifiedFavoriteObjectID
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             if shouldPlayOnRowTap {
@@ -524,7 +527,7 @@ struct SourceItemNavigationRow: View {
                         await play()
                     }
                 } label: {
-                    SourceItemMetadataRow(item: item)
+                    SourceItemMetadataRow(item: item, isCompact: isCompact)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Play \(item.title)")
@@ -532,14 +535,38 @@ struct SourceItemNavigationRow: View {
                 NavigationLink {
                     AppleMusicItemDetailView(item: item)
                 } label: {
-                    SourceItemMetadataRow(item: item)
+                    SourceItemMetadataRow(item: item, isCompact: isCompact)
                 }
                 .buttonStyle(.plain)
             }
 
             if shouldPlayOnRowTap {
-                NavigationLink {
-                    AppleMusicItemDetailView(item: item)
+                Menu {
+                    Button {
+                        Task {
+                            await play()
+                        }
+                    } label: {
+                        Label("Play", systemImage: "play.fill")
+                    }
+
+                    Button {
+                        Task {
+                            await toggleFavorite()
+                        }
+                    } label: {
+                        Label(
+                            isFavorited ? "Remove Favorite" : "Save to Favorites",
+                            systemImage: isFavorited ? "heart.fill" : "heart"
+                        )
+                        .foregroundStyle(.primary)
+                    }
+
+                    if let externalURL = item.externalURL.flatMap(URL.init(string:)) {
+                        ShareLink(item: externalURL) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.body.weight(.semibold))
@@ -569,7 +596,14 @@ struct SourceItemNavigationRow: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, isCompact ? 8 : 12)
+        .alert(item: $actionFailure) { failure in
+            Alert(
+                title: Text(failure.title),
+                message: Text(failure.detail),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
     private func play() async {
@@ -591,10 +625,68 @@ struct SourceItemNavigationRow: View {
 
         _ = await model.playManualSonosPayload(payload)
     }
+
+    private func toggleFavorite() async {
+        if let favoriteObjectID {
+            do {
+                try await model.removeSonosFavorite(objectID: favoriteObjectID)
+                localFavoriteObjectID = nil
+            } catch {
+                actionFailure = SourceItemActionFailure(
+                    title: "Could Not Remove Favorite",
+                    detail: error.localizedDescription
+                )
+            }
+
+            return
+        }
+
+        guard let payload = favoritePlaybackPayload()
+        else {
+            actionFailure = SourceItemActionFailure(
+                title: "Could Not Save Favorite",
+                detail: "This song does not have a Sonos favorite payload yet."
+            )
+            return
+        }
+
+        do {
+            localFavoriteObjectID = try await model.addSonosFavorite(payload)
+        } catch {
+            actionFailure = SourceItemActionFailure(
+                title: "Could Not Save Favorite",
+                detail: error.localizedDescription
+            )
+        }
+    }
+
+    private func favoritePlaybackPayload() -> SonosPlayablePayload? {
+        if let generatedPlaybackCandidate = model.appleMusicGeneratedPlaybackCandidate(for: item) {
+            return try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
+        }
+
+        guard exactPlaybackCandidate?.verifiedFavoriteObjectID != nil else {
+            return nil
+        }
+
+        return exactPlaybackCandidate?.payload
+    }
+}
+
+private struct SourceItemActionFailure: Identifiable {
+    let id = UUID()
+    var title: String
+    var detail: String
 }
 
 struct SourceGroupedItemRows: View {
     let items: [SonoicSourceItem]
+    var showsSectionTitles = false
+    var usesCompactCards = true
+    var initialVisibleItemCount = 10
+    var additionalVisibleItemCount = 10
+
+    @State private var visibleItemCounts: [String: Int] = [:]
 
     private var sections: [SourceItemSection] {
         SonoicSourceItem.Kind.searchResultOrder.compactMap { kind in
@@ -609,26 +701,65 @@ struct SourceGroupedItemRows: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: SonoicTheme.Spacing.cardStack) {
             ForEach(sections) { section in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(section.kind.pluralTitle)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    VStack(spacing: 0) {
-                        ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
-                            SourceItemNavigationRow(item: item)
-
-                            if index < section.items.count - 1 {
-                                Divider()
-                                    .padding(.leading, 76)
-                            }
+                Group {
+                    if usesCompactCards {
+                        SonoicListCard {
+                            sectionContent(section)
+                        }
+                    } else {
+                        RoomSurfaceCard {
+                            sectionContent(section)
                         }
                     }
                 }
             }
         }
+        .onChange(of: items) { _, _ in
+            visibleItemCounts = [:]
+        }
+    }
+
+    @ViewBuilder
+    private func sectionContent(_ section: SourceItemSection) -> some View {
+        let visibleItems = visibleItems(for: section)
+
+        VStack(alignment: .leading, spacing: showsSectionTitles ? 6 : 0) {
+            if showsSectionTitles {
+                Text(section.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+
+            SonoicListRows(visibleItems) { item, _ in
+                SourceItemNavigationRow(item: item)
+            }
+
+            if visibleItems.count < section.items.count {
+                SonoicListMoreButton {
+                    showMoreItems(in: section)
+                }
+            }
+        }
+    }
+
+    private func visibleItems(for section: SourceItemSection) -> [SonoicSourceItem] {
+        Array(section.items.prefix(visibleItemCount(for: section)))
+    }
+
+    private func visibleItemCount(for section: SourceItemSection) -> Int {
+        min(
+            section.items.count,
+            visibleItemCounts[section.id] ?? initialVisibleItemCount
+        )
+    }
+
+    private func showMoreItems(in section: SourceItemSection) {
+        visibleItemCounts[section.id] = min(
+            section.items.count,
+            visibleItemCount(for: section) + additionalVisibleItemCount
+        )
     }
 }
 
@@ -638,6 +769,10 @@ private struct SourceItemSection: Identifiable {
 
     var id: String {
         kind.rawValue
+    }
+
+    var title: String {
+        items.count == 1 ? kind.title : kind.pluralTitle
     }
 }
 
@@ -671,26 +806,31 @@ private extension SonoicSourceItem.Kind {
 
 private struct SourceItemMetadataRow: View {
     let item: SonoicSourceItem
+    var isCompact = false
+
+    private var artworkDimension: CGFloat {
+        isCompact ? 52 : 58
+    }
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: isCompact ? 12 : 14) {
             HomeFavoriteArtworkView(
                 artworkURL: item.artworkURL,
                 artworkIdentifier: item.artworkIdentifier,
-                maximumDisplayDimension: 58
+                maximumDisplayDimension: artworkDimension
             )
-            .frame(width: 58, height: 58)
+            .frame(width: artworkDimension, height: artworkDimension)
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: isCompact ? 3 : 5) {
                 Text(item.title)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
+                    .font(SonoicTheme.Typography.listTitle)
+                    .foregroundStyle(SonoicTheme.Colors.primary)
                     .lineLimit(1)
 
-                if let subtitle = item.subtitle {
-                    Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                if let displaySubtitle {
+                    Text(displaySubtitle)
+                        .font(SonoicTheme.Typography.listSubtitle)
+                        .foregroundStyle(SonoicTheme.Colors.secondary)
                         .lineLimit(1)
                 }
             }
@@ -699,6 +839,18 @@ private struct SourceItemMetadataRow: View {
         }
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var displaySubtitle: String? {
+        guard let subtitle = item.subtitle else {
+            return item.kind == .album ? "Album" : nil
+        }
+
+        guard item.kind == .album else {
+            return subtitle
+        }
+
+        return "\(subtitle) • Album"
     }
 
 }

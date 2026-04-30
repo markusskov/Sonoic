@@ -122,9 +122,14 @@ struct SonoicSonosPlaybackCandidate: Identifiable, Equatable {
     var payload: SonosPlayablePayload
     var confidence: Confidence
     var detail: String
+    var hasVerifiedPayloadIDMatch = false
 
     var id: String {
         payload.id
+    }
+
+    var verifiedFavoriteObjectID: String? {
+        hasVerifiedPayloadIDMatch ? payload.id : nil
     }
 }
 
@@ -259,15 +264,26 @@ struct SonoicSourceItem: Identifiable, Equatable {
     }
 
     init(favorite: SonosFavoriteItem) {
+        let parsedReference = Self.appleMusicServiceReference(from: favorite.playbackURI)
+        let kind = parsedReference?.kind ?? SonoicSourceItem.Kind(favoriteKind: favorite.kind)
+        let serviceItemID = parsedReference?.id
+        let appleMusicIdentity = favorite.service?.kind == .appleMusic ? SonoicAppleMusicItemIdentity(
+            catalogID: serviceItemID,
+            libraryID: nil,
+            kind: kind
+        ) : nil
+
         self.init(
             id: "favorite-\(favorite.id)",
             title: favorite.title,
             subtitle: favorite.subtitle ?? favorite.service?.name,
             artworkURL: favorite.artworkURL,
             artworkIdentifier: nil,
+            serviceItemID: serviceItemID,
+            appleMusicIdentity: appleMusicIdentity,
             service: favorite.service ?? .genericStreaming,
             origin: .favorite,
-            kind: favorite.isCollectionLike ? .playlist : .unknown,
+            kind: kind,
             playbackCapability: favorite.playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .unsupported
         )
     }
@@ -308,6 +324,7 @@ struct SonoicSourceItem: Identifiable, Equatable {
         let prefixes = [
             ("playlist%3a", SonoicSourceItem.Kind.playlist),
             ("album%3a", SonoicSourceItem.Kind.album),
+            ("artist%3a", SonoicSourceItem.Kind.artist),
             ("song%3a", SonoicSourceItem.Kind.song),
         ]
 

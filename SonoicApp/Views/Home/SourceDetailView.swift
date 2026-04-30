@@ -87,19 +87,12 @@ struct SourceDetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(title: title)
 
-            RoomSurfaceCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        SourceItemRow(item: item) {
-                            selectedItem = item
-                        } playAction: {
-                            await play(item)
-                        }
-
-                        if index < items.count - 1 {
-                            Divider()
-                                .padding(.leading, 76)
-                        }
+            SonoicListCard {
+                SonoicListRows(items) { item, _ in
+                    SourceItemRow(item: item) {
+                        selectedItem = item
+                    } playAction: {
+                        await play(item)
                     }
                 }
             }

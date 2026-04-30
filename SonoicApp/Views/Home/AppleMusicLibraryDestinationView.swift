@@ -93,16 +93,9 @@ struct AppleMusicLibraryDestinationView: View {
             }
 
             if destination == .songs {
-                RoomSurfaceCard {
-                    VStack(spacing: 0) {
-                        ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
-                            SourceItemNavigationRow(item: item)
-
-                            if index < state.items.count - 1 {
-                                Divider()
-                                    .padding(.leading, 76)
-                            }
-                        }
+                SonoicListCard {
+                    SonoicListRows(state.items) { item, _ in
+                        SourceItemNavigationRow(item: item)
                     }
                 }
             } else {

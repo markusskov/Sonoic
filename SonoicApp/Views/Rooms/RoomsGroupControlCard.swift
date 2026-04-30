@@ -45,7 +45,7 @@ struct RoomsGroupControlCard: View {
     @State private var pendingAction: PendingAction?
 
     var body: some View {
-        RoomSurfaceCard {
+        SonoicListCard {
             VStack(spacing: 0) {
                 if members.isEmpty {
                     Label("Choose a room before editing groups.", systemImage: "speaker.slash")
@@ -91,7 +91,7 @@ struct RoomsGroupControlCard: View {
 
                 if index < members.count - 1 || !options.isEmpty {
                     Divider()
-                        .padding(.leading, 56)
+                        .padding(.leading, SonoicTheme.Layout.roomDividerLeading)
                 }
             }
         }
@@ -111,7 +111,7 @@ struct RoomsGroupControlCard: View {
 
                     if index < options.count - 1 {
                         Divider()
-                            .padding(.leading, 56)
+                            .padding(.leading, SonoicTheme.Layout.roomDividerLeading)
                     }
                 }
             }
