@@ -43,6 +43,14 @@ struct AppleMusicItemDetailView: View {
         playlistPlaybackPayload() != nil
     }
 
+    private var nativePlaybackPayload: SonosPlayablePayload? {
+        if case let .sonosNative(payload) = item.playbackCapability {
+            payload
+        } else {
+            nil
+        }
+    }
+
     var body: some View {
         ZStack {
             AppleMusicItemDetailBackground(item: item)
@@ -81,6 +89,12 @@ struct AppleMusicItemDetailView: View {
                                 AppleMusicItemActionCard(
                                     play: {
                                         await playGeneratedCandidate(generatedPlaybackCandidate)
+                                    }
+                                )
+                            } else if let nativePlaybackPayload {
+                                AppleMusicItemActionCard(
+                                    play: {
+                                        await playNativePayload(nativePlaybackPayload)
                                     }
                                 )
                             }
@@ -199,6 +213,17 @@ struct AppleMusicItemDetailView: View {
         }
     }
 
+    private func playNativePayload(_ payload: SonosPlayablePayload) async {
+        let didStart = await model.playManualSonosPayload(payload)
+
+        if !didStart {
+            actionFailure = AppleMusicItemDetailActionFailure(
+                title: "Could Not Start",
+                detail: "Sonos could not start this Apple Music item."
+            )
+        }
+    }
+
     private var playlistTrackItems: [SonoicSourceItem] {
         guard item.kind == .playlist else {
             return []
@@ -311,7 +336,7 @@ struct AppleMusicItemDetailView: View {
             return exactPlaybackCandidate.payload
         }
 
-        return playlistGeneratedPlaybackPayload()
+        return playlistGeneratedPlaybackPayload() ?? nativePlaybackPayload
     }
 
     private func playlistGeneratedPlaybackPayload() -> SonosPlayablePayload? {

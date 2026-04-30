@@ -504,7 +504,10 @@ struct SourceItemNavigationRow: View {
     }
 
     private var canPlay: Bool {
-        playOverride != nil || exactPlaybackCandidate != nil || generatedPlaybackCandidate != nil
+        playOverride != nil
+            || exactPlaybackCandidate != nil
+            || generatedPlaybackCandidate != nil
+            || nativePlaybackPayload != nil
     }
 
     private var shouldPlayOnRowTap: Bool {
@@ -517,6 +520,14 @@ struct SourceItemNavigationRow: View {
 
     private var favoriteObjectID: String? {
         localFavoriteObjectID ?? exactPlaybackCandidate?.verifiedFavoriteObjectID
+    }
+
+    private var nativePlaybackPayload: SonosPlayablePayload? {
+        if case let .sonosNative(payload) = item.playbackCapability {
+            payload
+        } else {
+            nil
+        }
     }
 
     var body: some View {
@@ -620,6 +631,10 @@ struct SourceItemNavigationRow: View {
         guard let generatedPlaybackCandidate,
               let payload = try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
         else {
+            if let nativePlaybackPayload {
+                _ = await model.playManualSonosPayload(nativePlaybackPayload)
+            }
+
             return
         }
 
