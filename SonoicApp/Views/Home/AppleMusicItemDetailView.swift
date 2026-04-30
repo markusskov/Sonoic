@@ -354,8 +354,7 @@ private struct AppleMusicItemDetailBackground: View {
                 HomeFavoriteArtworkView(
                     artworkURL: item.artworkURL,
                     artworkIdentifier: item.artworkIdentifier,
-                    maximumDisplayDimension: 900,
-                    placeholderSystemImage: item.kind.systemImage
+                    maximumDisplayDimension: 900
                 )
                 .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
                 .scaleEffect(1.16)

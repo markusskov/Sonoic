@@ -48,8 +48,7 @@ private struct HomeRecentPlayCard: View {
             HomeFavoriteArtworkView(
                 artworkURL: item.artworkURL,
                 artworkIdentifier: item.artworkIdentifier,
-                maximumDisplayDimension: 156,
-                placeholderSystemImage: placeholderSystemImage
+                maximumDisplayDimension: 156
             )
             .frame(width: 156, height: 156)
 
@@ -69,21 +68,6 @@ private struct HomeRecentPlayCard: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-        }
-    }
-
-    private var placeholderSystemImage: String {
-        switch sourceItem?.kind {
-        case .album:
-            "rectangle.stack"
-        case .artist:
-            "music.mic"
-        case .playlist:
-            "music.note.list"
-        case .station:
-            "dot.radiowaves.left.and.right"
-        case .song, .unknown, .none:
-            "music.note"
         }
     }
 }

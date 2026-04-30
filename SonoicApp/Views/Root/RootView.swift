@@ -49,6 +49,7 @@ struct RootView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .tint(SonoicTheme.Colors.tabAccent)
         .overlay(alignment: .bottom) {
             if model.hasManualSonosHost {
                 PlayerMiniBar(

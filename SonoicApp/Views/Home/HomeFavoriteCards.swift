@@ -25,8 +25,7 @@ struct HomeFavoriteCard: View {
             HomeFavoriteArtworkView(
                 artworkURL: favorite.artworkURL,
                 artworkIdentifier: nil,
-                maximumDisplayDimension: 178,
-                placeholderSystemImage: favorite.isCollectionLike ? "music.note.list" : "music.note"
+                maximumDisplayDimension: 178
             )
             .frame(width: 178, height: 178)
 
@@ -76,7 +75,6 @@ struct HomeFavoriteArtworkView: View {
     let artworkURL: String?
     let artworkIdentifier: String?
     let maximumDisplayDimension: CGFloat
-    var placeholderSystemImage = "music.note"
 
     var body: some View {
         if let artworkIdentifier {
@@ -108,19 +106,7 @@ struct HomeFavoriteArtworkView: View {
     }
 
     private var placeholder: some View {
-        RoundedRectangle(cornerRadius: 26, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [.orange.opacity(0.85), .pink.opacity(0.7), .indigo.opacity(0.85)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay {
-                Image(systemName: placeholderSystemImage)
-                    .font(.system(size: 42, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.92))
-            }
+        SonoicArtworkPlaceholderView(cornerRadius: 26)
     }
 }
 
