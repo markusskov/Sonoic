@@ -80,7 +80,25 @@ struct SonosPlayablePayloadPreparer {
         return uri
     }
 
+    static func protocolInfo(for uri: String) -> String {
+        let normalizedURI = uri.lowercased()
+
+        if normalizedURI.hasPrefix("x-rincon-cpcontainer:") {
+            return "x-rincon-cpcontainer:*:*:*"
+        }
+
+        if normalizedURI.hasPrefix("x-sonosapi-hls:") {
+            return "sonos.com-http:*:application/vnd.apple.mpegurl:*"
+        }
+
+        return "sonos.com-http:*:audio/mp4:*"
+    }
+
     private var allowedDirectURIPrefixes: [String] {
+        Self.allowedDirectURIPrefixes
+    }
+
+    private static var allowedDirectURIPrefixes: [String] {
         [
             "x-sonosapi-stream:",
             "x-sonosapi-radio:",

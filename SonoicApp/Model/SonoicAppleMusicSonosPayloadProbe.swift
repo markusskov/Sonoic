@@ -194,7 +194,7 @@ private struct SonoicAppleMusicSonosCandidateMetadataBuilder {
     }
 
     private func resourceElement(for item: SonoicSourceItem, uri: String) -> String {
-        var attributes = "protocolInfo=\"\(xmlEscaped(protocolInfo(for: uri)))\""
+        var attributes = "protocolInfo=\"\(xmlEscaped(SonosPlayablePayloadPreparer.protocolInfo(for: uri)))\""
 
         if let duration = item.duration {
             attributes += " duration=\"\(formattedDuration(duration))\""
@@ -202,19 +202,6 @@ private struct SonoicAppleMusicSonosCandidateMetadataBuilder {
 
         return "<res \(attributes)>\(xmlEscaped(uri))</res>"
     }
-
-    private func protocolInfo(for uri: String) -> String {
-        if uri.hasPrefix("x-rincon-cpcontainer:") {
-            return "x-rincon-cpcontainer:*:*:*"
-        }
-
-        if uri.hasPrefix("x-sonosapi-hls:") {
-            return "sonos.com-http:*:application/vnd.apple.mpegurl:*"
-        }
-
-        return "sonos.com-http:*:audio/mp4:*"
-    }
-
     private func formattedDuration(_ duration: TimeInterval) -> String {
         let totalSeconds = max(0, Int(duration.rounded()))
         let hours = totalSeconds / 3600

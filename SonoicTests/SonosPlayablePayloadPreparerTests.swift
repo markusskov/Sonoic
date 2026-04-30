@@ -101,6 +101,25 @@ struct SonosPlayablePayloadPreparerTests {
         #expect(preparedPayload.metadataXML == "<DIDL-Lite />")
     }
 
+    @Test
+    func mapsSonosProtocolInfo() {
+        #expect(
+            SonosPlayablePayloadPreparer.protocolInfo(
+                for: "x-rincon-cpcontainer:1006206cplaylist%3a123?sid=204"
+            ) == "x-rincon-cpcontainer:*:*:*"
+        )
+        #expect(
+            SonosPlayablePayloadPreparer.protocolInfo(
+                for: "x-sonosapi-hls:song%3a1440845464?sid=204"
+            ) == "sonos.com-http:*:application/vnd.apple.mpegurl:*"
+        )
+        #expect(
+            SonosPlayablePayloadPreparer.protocolInfo(
+                for: "x-sonos-http:librarytrack%3ai.BOVNeOxU6BVbp8.m4p?sid=204"
+            ) == "sonos.com-http:*:audio/mp4:*"
+        )
+    }
+
     private func payload(
         uri: String,
         metadataXML: String? = nil,
