@@ -11,12 +11,8 @@ struct AppleMusicItemDetailView: View {
         model.appleMusicItemDetailState(for: item)
     }
 
-    private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicExactPlaybackCandidate(for: item)
-    }
-
     private var generatedPlaybackCandidates: [SonoicAppleMusicGeneratedPayloadCandidate] {
-        guard exactPlaybackCandidate == nil else {
+        guard model.appleMusicExactPlaybackCandidate(for: item) == nil else {
             return []
         }
 
@@ -28,7 +24,7 @@ struct AppleMusicItemDetailView: View {
     }
 
     private var playlistFavoriteObjectID: String? {
-        localPlaylistFavoriteObjectID ?? exactPlaybackCandidate?.verifiedFavoriteObjectID
+        model.appleMusicFavoriteObjectID(for: item, localObjectID: localPlaylistFavoriteObjectID)
     }
 
     private var canPlayPlaylistFallback: Bool {
@@ -254,33 +250,21 @@ struct AppleMusicItemDetailView: View {
     }
 
     private func togglePlaylistFavorite() async {
-        if let playlistFavoriteObjectID {
-            do {
-                try await model.removeSonosFavorite(objectID: playlistFavoriteObjectID)
-                localPlaylistFavoriteObjectID = nil
-            } catch {
-                actionFailure = AppleMusicItemDetailActionFailure(
-                    title: "Could Not Remove Favorite",
-                    detail: error.localizedDescription
-                )
-            }
-
-            return
-        }
-
-        guard let payload = playlistGeneratedPlaybackPayload() else {
-            actionFailure = AppleMusicItemDetailActionFailure(
-                title: "Could Not Save Favorite",
-                detail: "This playlist does not have a Sonos favorite payload yet."
-            )
-            return
-        }
+        let wasFavorited = playlistFavoriteObjectID != nil
 
         do {
-            localPlaylistFavoriteObjectID = try await model.addSonosFavorite(payload)
+            switch try await model.toggleAppleMusicSonosFavorite(
+                for: item,
+                currentObjectID: playlistFavoriteObjectID
+            ) {
+            case .added(let objectID):
+                localPlaylistFavoriteObjectID = objectID
+            case .removed:
+                localPlaylistFavoriteObjectID = nil
+            }
         } catch {
             actionFailure = AppleMusicItemDetailActionFailure(
-                title: "Could Not Save Favorite",
+                title: wasFavorited ? "Could Not Remove Favorite" : "Could Not Save Favorite",
                 detail: error.localizedDescription
             )
         }
@@ -290,14 +274,10 @@ struct AppleMusicItemDetailView: View {
         try? model.appleMusicPlayablePayload(for: item, purpose: .metadata)
     }
 
-    private func playlistGeneratedPlaybackPayload() -> SonosPlayablePayload? {
-        return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
-    }
-
     private func refreshGeneratedPlaybackHintsIfNeeded() async {
         guard item.service.kind == .appleMusic,
               item.kind == .song || item.kind == .playlist,
-              exactPlaybackCandidate == nil,
+              model.appleMusicExactPlaybackCandidate(for: item) == nil,
               generatedPlaybackCandidates.isEmpty
         else {
             return

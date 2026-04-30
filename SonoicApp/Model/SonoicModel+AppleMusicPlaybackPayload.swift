@@ -8,6 +8,22 @@ extension SonoicModel {
         case metadata
     }
 
+    enum AppleMusicFavoriteToggleResult {
+        case added(objectID: String)
+        case removed
+    }
+
+    enum AppleMusicFavoriteError: LocalizedError {
+        case missingPayload
+
+        var errorDescription: String? {
+            switch self {
+            case .missingPayload:
+                "This Apple Music item does not have a Sonos favorite payload yet."
+            }
+        }
+    }
+
     func appleMusicPlaybackCandidate(for item: SonoicSourceItem) -> SonoicSonosPlaybackCandidate? {
         appleMusicPlaybackCandidates(for: item).first
     }
@@ -109,6 +125,27 @@ extension SonoicModel {
             localNowPlayingPayload: try? appleMusicPlayablePayload(for: startingItem, purpose: .metadata),
             recentPlaybackPayload: try? appleMusicPlayablePayload(for: parentItem, purpose: .metadata)
         )
+    }
+
+    func appleMusicFavoriteObjectID(for item: SonoicSourceItem, localObjectID: String? = nil) -> String? {
+        localObjectID ?? appleMusicExactPlaybackCandidate(for: item)?.verifiedFavoriteObjectID
+    }
+
+    func toggleAppleMusicSonosFavorite(
+        for item: SonoicSourceItem,
+        currentObjectID: String?
+    ) async throws -> AppleMusicFavoriteToggleResult {
+        if let currentObjectID {
+            try await removeSonosFavorite(objectID: currentObjectID)
+            return .removed
+        }
+
+        guard let payload = try appleMusicPlayablePayload(for: item, purpose: .favorite) else {
+            throw AppleMusicFavoriteError.missingPayload
+        }
+
+        let objectID = try await addSonosFavorite(payload)
+        return .added(objectID: objectID)
     }
 }
 

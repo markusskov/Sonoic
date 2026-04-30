@@ -491,10 +491,6 @@ struct SourceItemNavigationRow: View {
     @State private var actionFailure: SourceItemActionFailure?
     @State private var localFavoriteObjectID: String?
 
-    private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicExactPlaybackCandidate(for: item)
-    }
-
     private var canPlay: Bool {
         playOverride != nil || (try? model.appleMusicPlayablePayload(for: item, purpose: .directPlay)) != nil
     }
@@ -508,7 +504,7 @@ struct SourceItemNavigationRow: View {
     }
 
     private var favoriteObjectID: String? {
-        localFavoriteObjectID ?? exactPlaybackCandidate?.verifiedFavoriteObjectID
+        model.appleMusicFavoriteObjectID(for: item, localObjectID: localFavoriteObjectID)
     }
 
     private var hasAuxiliaryActions: Bool {
@@ -626,41 +622,24 @@ struct SourceItemNavigationRow: View {
     }
 
     private func toggleFavorite() async {
-        if let favoriteObjectID {
-            do {
-                try await model.removeSonosFavorite(objectID: favoriteObjectID)
-                localFavoriteObjectID = nil
-            } catch {
-                actionFailure = SourceItemActionFailure(
-                    title: "Could Not Remove Favorite",
-                    detail: error.localizedDescription
-                )
-            }
-
-            return
-        }
-
-        guard let payload = favoritePlaybackPayload()
-        else {
-            actionFailure = SourceItemActionFailure(
-                title: "Could Not Save Favorite",
-                detail: "This song does not have a Sonos favorite payload yet."
-            )
-            return
-        }
+        let wasFavorited = favoriteObjectID != nil
 
         do {
-            localFavoriteObjectID = try await model.addSonosFavorite(payload)
+            switch try await model.toggleAppleMusicSonosFavorite(
+                for: item,
+                currentObjectID: favoriteObjectID
+            ) {
+            case .added(let objectID):
+                localFavoriteObjectID = objectID
+            case .removed:
+                localFavoriteObjectID = nil
+            }
         } catch {
             actionFailure = SourceItemActionFailure(
-                title: "Could Not Save Favorite",
+                title: wasFavorited ? "Could Not Remove Favorite" : "Could Not Save Favorite",
                 detail: error.localizedDescription
             )
         }
-    }
-
-    private func favoritePlaybackPayload() -> SonosPlayablePayload? {
-        try? model.appleMusicPlayablePayload(for: item, purpose: .favorite)
     }
 }
 
