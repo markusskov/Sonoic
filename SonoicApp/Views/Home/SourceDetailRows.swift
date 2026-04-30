@@ -511,7 +511,7 @@ struct SourceItemNavigationRow: View {
     }
 
     private var shouldPlayOnRowTap: Bool {
-        item.kind == .song && canPlay
+        item.kind == .song
     }
 
     private var isFavorited: Bool {
@@ -528,6 +528,10 @@ struct SourceItemNavigationRow: View {
         } else {
             nil
         }
+    }
+
+    private var hasAuxiliaryActions: Bool {
+        canPlay || item.externalURL != nil
     }
 
     var body: some View {
@@ -551,7 +555,7 @@ struct SourceItemNavigationRow: View {
                 .buttonStyle(.plain)
             }
 
-            if shouldPlayOnRowTap {
+            if shouldPlayOnRowTap || hasAuxiliaryActions {
                 Menu {
                     Button {
                         Task {
@@ -560,6 +564,7 @@ struct SourceItemNavigationRow: View {
                     } label: {
                         Label("Play", systemImage: "play.fill")
                     }
+                    .disabled(!canPlay)
 
                     Button {
                         Task {
@@ -586,19 +591,6 @@ struct SourceItemNavigationRow: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("More options for \(item.title)")
-            } else if canPlay {
-                Button {
-                    Task {
-                        await play()
-                    }
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.semibold))
-                        .frame(width: 34, height: 34)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Play \(item.title)")
             }
 
             if !shouldPlayOnRowTap {
@@ -624,21 +616,43 @@ struct SourceItemNavigationRow: View {
         }
 
         if let exactPlaybackCandidate {
-            _ = await model.playManualSonosPayload(exactPlaybackCandidate.payload)
+            await playPayload(exactPlaybackCandidate.payload)
             return
         }
 
-        guard let generatedPlaybackCandidate,
-              let payload = try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
-        else {
-            if let nativePlaybackPayload {
-                _ = await model.playManualSonosPayload(nativePlaybackPayload)
+        if let generatedPlaybackCandidate {
+            do {
+                let payload = try generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
+                await playPayload(payload)
+            } catch {
+                actionFailure = SourceItemActionFailure(
+                    title: "Could Not Start",
+                    detail: error.localizedDescription
+                )
             }
-
             return
         }
 
-        _ = await model.playManualSonosPayload(payload)
+        if let nativePlaybackPayload {
+            await playPayload(nativePlaybackPayload)
+            return
+        }
+
+        actionFailure = SourceItemActionFailure(
+            title: "Could Not Start",
+            detail: "This Apple Music item does not have a Sonos playback payload yet."
+        )
+    }
+
+    private func playPayload(_ payload: SonosPlayablePayload) async {
+        let didStart = await model.playManualSonosPayload(payload)
+
+        if !didStart {
+            actionFailure = SourceItemActionFailure(
+                title: "Could Not Start",
+                detail: "Sonos could not start this Apple Music item."
+            )
+        }
     }
 
     private func toggleFavorite() async {
