@@ -3,6 +3,8 @@ import SwiftUI
 struct PlayerFullscreenTitleBlock: View {
     let title: String
     let subtitle: String
+    let artistName: String?
+    let openArtist: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -13,14 +15,28 @@ struct PlayerFullscreenTitleBlock: View {
                 .minimumScaleFactor(0.72)
                 .allowsTightening(true)
 
-            Text(subtitle)
-                .font(.title2)
-                .foregroundStyle(.white.opacity(0.62))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .allowsTightening(true)
+            if let artistName = artistName?.sonoicNonEmptyTrimmed {
+                Button {
+                    openArtist(artistName)
+                } label: {
+                    subtitleText
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open \(artistName)")
+            } else {
+                subtitleText
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var subtitleText: some View {
+        Text(subtitle)
+            .font(.title2)
+            .foregroundStyle(.white.opacity(0.62))
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .allowsTightening(true)
     }
 }
 
