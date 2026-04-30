@@ -198,44 +198,33 @@ struct AppleMusicItemDetailView: View {
         return state.sections.flatMap(\.items).filter { $0.kind == .song }
     }
 
-    private var playlistQueuePairs: [(item: SonoicSourceItem, payload: SonosPlayablePayload)] {
-        playlistTrackItems.compactMap { track in
-            if let generatedQueueCandidate = model.appleMusicGeneratedQueueCandidate(for: track) {
-                return (track, generatedQueueCandidate.playbackPayload(for: track))
-            }
-
-            if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: track) {
-                return (track, exactPlaybackCandidate.payload)
-            }
-
-            return nil
-        }
+    private var playlistPlaybackPlan: SonoicAppleMusicPlaylistPlaybackPlan? {
+        model.appleMusicPlaylistPlaybackPlan(parentItem: item, trackItems: playlistTrackItems)
     }
 
     private var canPlayPlaylistQueue: Bool {
-        !playlistQueuePairs.isEmpty
+        playlistPlaybackPlan != nil
     }
 
     private func playPlaylistQueue(shuffled: Bool) async {
-        let playbackPairs = shuffled ? playlistQueuePairs.shuffled() : playlistQueuePairs
-        let payloads = playbackPairs.map(\.payload)
-
-        guard let firstItem = playbackPairs.first?.item,
-              !payloads.isEmpty
+        guard let plan = model.appleMusicPlaylistPlaybackPlan(
+            parentItem: item,
+            trackItems: playlistTrackItems,
+            shuffled: shuffled
+        )
         else {
             return
         }
 
-        let localPayload = localNowPlayingPayload(for: firstItem)
         let didStart = await model.playManualSonosQueuePayloads(
-            payloads,
-            startingTrackNumber: 1,
-            localNowPlayingPayload: localPayload,
-            recentPlaybackPayload: playlistPlaybackPayload()
+            plan.payloads,
+            startingTrackNumber: plan.startingTrackNumber,
+            localNowPlayingPayload: plan.localNowPlayingPayload,
+            recentPlaybackPayload: plan.recentPlaybackPayload
         )
 
         if didStart {
-            model.recordRecentSourceItem(item, replayPayload: playlistPlaybackPayload())
+            model.recordRecentSourceItem(item, replayPayload: plan.recentPlaybackPayload)
         }
     }
 
@@ -303,10 +292,6 @@ struct AppleMusicItemDetailView: View {
 
     private func playlistGeneratedPlaybackPayload() -> SonosPlayablePayload? {
         return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
-    }
-
-    private func localNowPlayingPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {
-        try? model.appleMusicPlayablePayload(for: item, purpose: .metadata)
     }
 
     private func refreshGeneratedPlaybackHintsIfNeeded() async {
@@ -595,57 +580,28 @@ private struct AppleMusicItemDetailSectionView: View {
         }
 
         return {
-            await playPlaylistTrack(item, trackNumber: index + 1)
+            await playPlaylistTrack(item)
         }
     }
 
-    private func playPlaylistTrack(_ item: SonoicSourceItem, trackNumber: Int) async {
-        let queuePayloads = playlistQueuePayloads()
-        guard !queuePayloads.isEmpty else {
+    private func playPlaylistTrack(_ item: SonoicSourceItem) async {
+        guard let plan = model.appleMusicPlaylistPlaybackPlan(
+            parentItem: parentItem,
+            trackItems: section.items,
+            startingAt: item
+        ) else {
             return
         }
 
-        let localPayload = localNowPlayingPayload(for: item)
-        let recentPayload = playlistPlaybackPayload()
         let didStartPlayback = await model.playManualSonosQueuePayloads(
-            queuePayloads,
-            startingTrackNumber: trackNumber,
-            localNowPlayingPayload: localPayload,
-            recentPlaybackPayload: recentPayload
+            plan.payloads,
+            startingTrackNumber: plan.startingTrackNumber,
+            localNowPlayingPayload: plan.localNowPlayingPayload,
+            recentPlaybackPayload: plan.recentPlaybackPayload
         )
 
         if didStartPlayback {
-            model.recordRecentSourceItem(parentItem, replayPayload: recentPayload)
-        }
-    }
-
-    private func playlistPlaybackPayload() -> SonosPlayablePayload? {
-        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: parentItem) {
-            return exactPlaybackCandidate.payload
-        }
-
-        guard let generatedPlaybackCandidate = model.appleMusicGeneratedPlaybackCandidate(for: parentItem) else {
-            return nil
-        }
-
-        return generatedPlaybackCandidate.playbackPayload(for: parentItem)
-    }
-
-    private func localNowPlayingPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {
-        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: item) {
-            return exactPlaybackCandidate.payload
-        }
-
-        return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
-    }
-
-    private func playlistQueuePayloads() -> [SonosPlayablePayload] {
-        section.items.compactMap { item in
-            if let generatedQueueCandidate = model.appleMusicGeneratedQueueCandidate(for: item) {
-                return generatedQueueCandidate.playbackPayload(for: item)
-            }
-
-            return model.appleMusicExactPlaybackCandidate(for: item)?.payload
+            model.recordRecentSourceItem(parentItem, replayPayload: plan.recentPlaybackPayload)
         }
     }
 }
