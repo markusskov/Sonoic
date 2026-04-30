@@ -495,19 +495,8 @@ struct SourceItemNavigationRow: View {
         model.appleMusicExactPlaybackCandidate(for: item)
     }
 
-    private var generatedPlaybackCandidate: SonoicAppleMusicGeneratedPayloadCandidate? {
-        guard exactPlaybackCandidate == nil else {
-            return nil
-        }
-
-        return model.appleMusicGeneratedPlaybackCandidate(for: item)
-    }
-
     private var canPlay: Bool {
-        playOverride != nil
-            || exactPlaybackCandidate != nil
-            || generatedPlaybackCandidate != nil
-            || nativePlaybackPayload != nil
+        playOverride != nil || (try? model.appleMusicPlayablePayload(for: item, purpose: .directPlay)) != nil
     }
 
     private var shouldPlayOnRowTap: Bool {
@@ -520,14 +509,6 @@ struct SourceItemNavigationRow: View {
 
     private var favoriteObjectID: String? {
         localFavoriteObjectID ?? exactPlaybackCandidate?.verifiedFavoriteObjectID
-    }
-
-    private var nativePlaybackPayload: SonosPlayablePayload? {
-        if case let .sonosNative(payload) = item.playbackCapability {
-            payload
-        } else {
-            nil
-        }
     }
 
     private var hasAuxiliaryActions: Bool {
@@ -615,33 +596,22 @@ struct SourceItemNavigationRow: View {
             return
         }
 
-        if let exactPlaybackCandidate {
-            await playPayload(exactPlaybackCandidate.payload)
-            return
-        }
-
-        if let generatedPlaybackCandidate {
-            do {
-                let payload = try generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
-                await playPayload(payload)
-            } catch {
+        do {
+            guard let nativePlaybackPayload = try model.appleMusicPlayablePayload(for: item, purpose: .directPlay) else {
                 actionFailure = SourceItemActionFailure(
                     title: "Could Not Start",
-                    detail: error.localizedDescription
+                    detail: "This Apple Music item does not have a Sonos playback payload yet."
                 )
+                return
             }
-            return
-        }
 
-        if let nativePlaybackPayload {
             await playPayload(nativePlaybackPayload)
-            return
+        } catch {
+            actionFailure = SourceItemActionFailure(
+                title: "Could Not Start",
+                detail: error.localizedDescription
+            )
         }
-
-        actionFailure = SourceItemActionFailure(
-            title: "Could Not Start",
-            detail: "This Apple Music item does not have a Sonos playback payload yet."
-        )
     }
 
     private func playPayload(_ payload: SonosPlayablePayload) async {
@@ -690,15 +660,7 @@ struct SourceItemNavigationRow: View {
     }
 
     private func favoritePlaybackPayload() -> SonosPlayablePayload? {
-        if let generatedPlaybackCandidate = model.appleMusicGeneratedPlaybackCandidate(for: item) {
-            return try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
-        }
-
-        guard exactPlaybackCandidate?.verifiedFavoriteObjectID != nil else {
-            return nil
-        }
-
-        return exactPlaybackCandidate?.payload
+        try? model.appleMusicPlayablePayload(for: item, purpose: .favorite)
     }
 }
 

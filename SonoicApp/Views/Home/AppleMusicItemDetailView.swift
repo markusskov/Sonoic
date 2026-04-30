@@ -23,14 +23,6 @@ struct AppleMusicItemDetailView: View {
         return model.appleMusicGeneratedPayloadCandidates(for: item)
     }
 
-    private var generatedPlaybackCandidate: SonoicAppleMusicGeneratedPayloadCandidate? {
-        guard exactPlaybackCandidate == nil else {
-            return nil
-        }
-
-        return model.appleMusicGeneratedPlaybackCandidate(for: item)
-    }
-
     private var isPlaylistFavorited: Bool {
         playlistFavoriteObjectID != nil
     }
@@ -43,12 +35,8 @@ struct AppleMusicItemDetailView: View {
         playlistPlaybackPayload() != nil
     }
 
-    private var nativePlaybackPayload: SonosPlayablePayload? {
-        if case let .sonosNative(payload) = item.playbackCapability {
-            payload
-        } else {
-            nil
-        }
+    private var canPlayItem: Bool {
+        (try? model.appleMusicPlayablePayload(for: item, purpose: .directPlay)) != nil
     }
 
     var body: some View {
@@ -78,26 +66,12 @@ struct AppleMusicItemDetailView: View {
                             } else {
                                 AppleMusicPlaylistActionSkeletonRow()
                             }
-                        } else {
-                            if let exactPlaybackCandidate {
-                                AppleMusicItemActionCard(
-                                    play: {
-                                        await playCandidate(exactPlaybackCandidate)
-                                    }
-                                )
-                            } else if let generatedPlaybackCandidate {
-                                AppleMusicItemActionCard(
-                                    play: {
-                                        await playGeneratedCandidate(generatedPlaybackCandidate)
-                                    }
-                                )
-                            } else if let nativePlaybackPayload {
-                                AppleMusicItemActionCard(
-                                    play: {
-                                        await playNativePayload(nativePlaybackPayload)
-                                    }
-                                )
-                            }
+                        } else if canPlayItem {
+                            AppleMusicItemActionCard(
+                                play: {
+                                    await playItem()
+                                }
+                            )
                         }
 
                         content
@@ -190,13 +164,16 @@ struct AppleMusicItemDetailView: View {
         model.loadAppleMusicItemDetail(for: item, force: true)
     }
 
-    private func playCandidate(_ candidate: SonoicSonosPlaybackCandidate) async {
-        _ = await model.playManualSonosPayload(candidate.payload)
-    }
-
-    private func playGeneratedCandidate(_ candidate: SonoicAppleMusicGeneratedPayloadCandidate) async {
+    private func playItem() async {
         do {
-            let payload = try candidate.preparedPlaybackPayload(for: item)
+            guard let payload = try model.appleMusicPlayablePayload(for: item, purpose: .directPlay) else {
+                actionFailure = AppleMusicItemDetailActionFailure(
+                    title: "Could Not Start",
+                    detail: "This Apple Music item does not have a Sonos playback payload yet."
+                )
+                return
+            }
+
             let didStart = await model.playManualSonosPayload(payload)
 
             if !didStart {
@@ -209,17 +186,6 @@ struct AppleMusicItemDetailView: View {
             actionFailure = AppleMusicItemDetailActionFailure(
                 title: "Could Not Start",
                 detail: error.localizedDescription
-            )
-        }
-    }
-
-    private func playNativePayload(_ payload: SonosPlayablePayload) async {
-        let didStart = await model.playManualSonosPayload(payload)
-
-        if !didStart {
-            actionFailure = AppleMusicItemDetailActionFailure(
-                title: "Could Not Start",
-                detail: "Sonos could not start this Apple Music item."
             )
         }
     }
@@ -332,11 +298,7 @@ struct AppleMusicItemDetailView: View {
     }
 
     private func playlistPlaybackPayload() -> SonosPlayablePayload? {
-        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: item) {
-            return exactPlaybackCandidate.payload
-        }
-
-        return playlistGeneratedPlaybackPayload() ?? nativePlaybackPayload
+        try? model.appleMusicPlayablePayload(for: item, purpose: .metadata)
     }
 
     private func playlistGeneratedPlaybackPayload() -> SonosPlayablePayload? {
@@ -344,11 +306,7 @@ struct AppleMusicItemDetailView: View {
     }
 
     private func localNowPlayingPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {
-        if let exactPlaybackCandidate = model.appleMusicExactPlaybackCandidate(for: item) {
-            return exactPlaybackCandidate.payload
-        }
-
-        return model.appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
+        try? model.appleMusicPlayablePayload(for: item, purpose: .metadata)
     }
 
     private func refreshGeneratedPlaybackHintsIfNeeded() async {
