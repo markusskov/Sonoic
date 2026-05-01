@@ -90,15 +90,19 @@ extension SonoicModel {
     func appleMusicPlaylistPlaybackPlan(
         parentItem: SonoicSourceItem,
         trackItems: [SonoicSourceItem],
-        startingAt startItem: SonoicSourceItem? = nil,
+        startingAtIndex startIndex: Int? = nil,
         shuffled: Bool = false
     ) -> SonoicAppleMusicPlaylistPlaybackPlan? {
-        var playablePairs = trackItems.compactMap { item -> (item: SonoicSourceItem, payload: SonosPlayablePayload)? in
+        var playablePairs = trackItems.enumerated().compactMap { index, item -> (
+            sourceIndex: Int,
+            item: SonoicSourceItem,
+            payload: SonosPlayablePayload
+        )? in
             guard let payload = try? appleMusicPlayablePayload(for: item, purpose: .queueEntry) else {
                 return nil
             }
 
-            return (item, payload)
+            return (index, item, payload)
         }
 
         if shuffled {
@@ -110,8 +114,14 @@ extension SonoicModel {
         }
 
         let startingIndex: Int
-        if let startItem,
-           let matchedIndex = playablePairs.firstIndex(where: { $0.item.id == startItem.id }) {
+        if let startIndex {
+            guard startIndex >= 0,
+                  startIndex < trackItems.count,
+                  let matchedIndex = playablePairs.firstIndex(where: { $0.sourceIndex == startIndex })
+            else {
+                return nil
+            }
+
             startingIndex = matchedIndex
         } else {
             startingIndex = 0

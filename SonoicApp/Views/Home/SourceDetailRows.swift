@@ -496,7 +496,7 @@ struct SourceItemNavigationRow: View {
     }
 
     private var shouldPlayOnRowTap: Bool {
-        item.kind == .song
+        item.kind == .song && canPlay
     }
 
     private var isFavorited: Bool {

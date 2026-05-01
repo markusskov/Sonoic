@@ -61,16 +61,16 @@ struct AppleMusicItemCollectionView: View {
         }
 
         return {
-            await playPlaylistTrack(item)
+            await playPlaylistTrack(at: index)
         }
     }
 
-    private func playPlaylistTrack(_ item: SonoicSourceItem) async {
+    private func playPlaylistTrack(at index: Int) async {
         guard let parentItem,
               let plan = model.appleMusicPlaylistPlaybackPlan(
                 parentItem: parentItem,
                 trackItems: items,
-                startingAt: item
+                startingAtIndex: index
               )
         else {
             return
