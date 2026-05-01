@@ -132,7 +132,6 @@ extension PlayerSheetView {
                 return
             }
 
-            model.selectedTab = .search
             model.pendingAppleMusicDetailRoute = item
             dismiss()
         }
