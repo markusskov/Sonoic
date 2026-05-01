@@ -67,6 +67,7 @@ final class SonoicModel {
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
 
     var selectedTab: RootTab = .home
+    var pendingAppleMusicDetailRoute: SonoicSourceItem?
     var manualSonosHost: String {
         didSet {
             settingsStore.saveManualSonosHost(manualSonosHost)

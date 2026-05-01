@@ -3,6 +3,8 @@ import SwiftUI
 struct RootView: View {
     @Environment(SonoicModel.self) private var model
     @State private var isPlayerPresented = false
+    @State private var isAppleMusicDetailRoutePresented = false
+    @State private var routedAppleMusicItem: SonoicSourceItem?
 
     var body: some View {
         @Bindable var model = model
@@ -74,11 +76,25 @@ struct RootView: View {
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.visible)
         }
+        .onChange(of: model.pendingAppleMusicDetailRoute?.id) { _, _ in
+            guard let item = model.pendingAppleMusicDetailRoute else {
+                return
+            }
+
+            routedAppleMusicItem = item
+            model.pendingAppleMusicDetailRoute = nil
+            isAppleMusicDetailRoutePresented = true
+        }
     }
 
     private func rootNavigationView<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         NavigationStack {
             content()
+                .navigationDestination(isPresented: $isAppleMusicDetailRoutePresented) {
+                    if let routedAppleMusicItem {
+                        AppleMusicItemDetailView(item: routedAppleMusicItem)
+                    }
+                }
         }
     }
 }

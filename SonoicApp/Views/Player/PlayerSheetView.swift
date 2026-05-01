@@ -7,91 +7,78 @@ struct PlayerSheetView: View {
     @Environment(SonoicModel.self) var model
     @State var isAdjustingVolume = false
     @State private var artworkImage: UIImage?
-    @State private var isArtistDetailPresented = false
-    @State private var selectedArtistItem: SonoicSourceItem?
     @State var volumeCommitTask: Task<Void, Never>?
     @State var volumeLevel = 0.0
 
     var body: some View {
-        NavigationStack {
-            GeometryReader { geometry in
-                let contentWidth = max(geometry.size.width - 60, 1)
-                let heroSize = CGSize(width: geometry.size.width, height: heroHeight(for: geometry))
+        GeometryReader { geometry in
+            let contentWidth = max(geometry.size.width - 60, 1)
+            let heroSize = CGSize(width: geometry.size.width, height: heroHeight(for: geometry))
 
-                ZStack {
-                    PlayerFullscreenArtworkBackground(
+            ZStack {
+                PlayerFullscreenArtworkBackground(
+                    artworkImage: artworkImage,
+                    size: geometry.size
+                )
+
+                VStack(spacing: 0) {
+                    PlayerFullscreenHeroArtwork(
                         artworkImage: artworkImage,
-                        size: geometry.size
+                        size: heroSize
                     )
 
-                    VStack(spacing: 0) {
-                        PlayerFullscreenHeroArtwork(
-                            artworkImage: artworkImage,
-                            size: heroSize
+                    Spacer(minLength: 0)
+
+                    VStack(spacing: controlSpacing(for: geometry)) {
+                        PlayerFullscreenTitleBlock(
+                            title: model.nowPlaying.title,
+                            subtitle: model.nowPlaying.subtitle ?? model.nowPlaying.sourceName,
+                            artistName: model.nowPlaying.artistName,
+                            openArtist: openArtist
                         )
 
-                        Spacer(minLength: 0)
+                        PlayerProgressSection(
+                            nowPlaying: model.nowPlaying,
+                            observedAt: model.nowPlayingObservedAt,
+                            isEnabled: model.hasManualSonosHost && model.nowPlaying.canSeek,
+                            showsTimeLabels: true,
+                            showsThumb: false,
+                            seek: { timeInterval in
+                                seek(to: timeInterval)
+                            }
+                        )
 
-                        VStack(spacing: controlSpacing(for: geometry)) {
-                            PlayerFullscreenTitleBlock(
-                                title: model.nowPlaying.title,
-                                subtitle: model.nowPlaying.subtitle ?? model.nowPlaying.sourceName,
-                                artistName: model.nowPlaying.artistName,
-                                openArtist: { artistName in
-                                    selectedArtistItem = appleMusicArtistItem(named: artistName)
-                                    isArtistDetailPresented = true
-                                }
-                            )
+                        PlayerTransportControls(
+                            nowPlaying: model.nowPlaying,
+                            skipPrevious: skipToPreviousTrack,
+                            togglePlayback: togglePlayback,
+                            skipNext: skipToNextTrack
+                        )
 
-                            PlayerProgressSection(
-                                nowPlaying: model.nowPlaying,
-                                observedAt: model.nowPlayingObservedAt,
-                                isEnabled: model.hasManualSonosHost && model.nowPlaying.canSeek,
-                                showsTimeLabels: true,
-                                showsThumb: false,
-                                seek: { timeInterval in
-                                    seek(to: timeInterval)
-                                }
-                            )
+                        PlayerFullscreenVolumeBar(
+                            volume: volumeBinding,
+                            isEnabled: model.hasManualSonosHost,
+                            volumeEditingChanged: handleVolumeEditingChanged
+                        )
 
-                            PlayerTransportControls(
-                                nowPlaying: model.nowPlaying,
-                                skipPrevious: skipToPreviousTrack,
-                                togglePlayback: togglePlayback,
-                                skipNext: skipToNextTrack
-                            )
-
-                            PlayerFullscreenVolumeBar(
-                                volume: volumeBinding,
-                                isEnabled: model.hasManualSonosHost,
-                                volumeEditingChanged: handleVolumeEditingChanged
-                            )
-
-                            PlayerFullscreenSonosActions(
-                                activeTargetSystemImage: model.activeTarget.kind.systemImage,
-                                muteButtonSystemImage: muteButtonSystemImage,
-                                isEnabled: model.hasManualSonosHost,
-                                openRooms: openRooms,
-                                toggleMute: toggleMute,
-                                openQueue: openQueue
-                            )
-                        }
-                        .frame(width: contentWidth)
-                        .padding(.bottom, max(geometry.safeAreaInsets.bottom + 16, 28))
+                        PlayerFullscreenSonosActions(
+                            activeTargetSystemImage: model.activeTarget.kind.systemImage,
+                            muteButtonSystemImage: muteButtonSystemImage,
+                            isEnabled: model.hasManualSonosHost,
+                            openRooms: openRooms,
+                            toggleMute: toggleMute,
+                            openQueue: openQueue
+                        )
                     }
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-
+                    .frame(width: contentWidth)
+                    .padding(.bottom, max(geometry.safeAreaInsets.bottom + 16, 28))
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                .clipped()
             }
-            .ignoresSafeArea()
-            .navigationDestination(isPresented: $isArtistDetailPresented) {
-                if let selectedArtistItem {
-                    AppleMusicItemDetailView(item: selectedArtistItem)
-                }
-            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
         }
+        .ignoresSafeArea()
         .task(id: artworkReloadKey) {
             artworkImage = await PlayerArtworkImageLoader.loadArtworkImage(
                 artworkIdentifier: model.nowPlaying.artworkIdentifier,
@@ -122,21 +109,6 @@ struct PlayerSheetView: View {
 
     private func controlSpacing(for geometry: GeometryProxy) -> CGFloat {
         geometry.size.height < 720 ? 20 : 28
-    }
-
-    private func appleMusicArtistItem(named artistName: String) -> SonoicSourceItem {
-        let stableID = artistName.sonoicTrimmed
-            .lowercased()
-            .replacingOccurrences(of: " ", with: "-")
-
-        return SonoicSourceItem.appleMusicMetadata(
-            id: "now-playing-\(stableID)",
-            title: artistName,
-            subtitle: "Artist",
-            artworkURL: nil,
-            kind: .artist,
-            origin: .catalogSearch
-        )
     }
 }
 
