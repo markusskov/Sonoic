@@ -481,52 +481,31 @@ private struct AppleMusicItemDetailSectionView: View {
 
     let parentItem: SonoicSourceItem
     let section: SonoicAppleMusicItemDetailSection
-    private let previewLimit = 8
+    @State private var visibleItemCount = 10
+    private let visibleItemIncrement = 10
 
     private var previewItems: [SonoicSourceItem] {
         if usesPlainTrackList {
             return section.items
         }
 
-        return Array(section.items.prefix(previewLimit))
+        return Array(section.items.prefix(visibleItemCount))
     }
 
     private var usesPlainTrackList: Bool {
         parentItem.kind == .playlist || parentItem.kind == .album
     }
 
-    private var showsViewAll: Bool {
+    private var showsMoreButton: Bool {
         !usesPlainTrackList && section.items.count > previewItems.count
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                HomeSectionHeader(
-                    title: section.title,
-                    subtitle: section.subtitle
-                )
-
-                Spacer(minLength: 0)
-
-                if showsViewAll {
-                    NavigationLink {
-                        AppleMusicItemCollectionView(
-                            title: section.title,
-                            subtitle: section.subtitle,
-                            items: section.items,
-                            parentItem: parentItem,
-                            sectionID: section.id
-                        )
-                    } label: {
-                        Label("View All", systemImage: "chevron.right")
-                            .labelStyle(.titleAndIcon)
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                }
-            }
+            HomeSectionHeader(
+                title: section.title,
+                subtitle: section.subtitle
+            )
 
             if usesPlainTrackList {
                 SonoicListRows(previewItems) { item, index in
@@ -544,9 +523,20 @@ private struct AppleMusicItemDetailSectionView: View {
                             playOverride: playlistTrackPlayAction(for: item, at: index)
                         )
                     }
+
+                    if showsMoreButton {
+                        SonoicListMoreButton(action: showMoreItems)
+                    }
                 }
             }
         }
+        .onChange(of: section.items) { _, _ in
+            visibleItemCount = 10
+        }
+    }
+
+    private func showMoreItems() {
+        visibleItemCount = min(section.items.count, visibleItemCount + visibleItemIncrement)
     }
 
     private func playlistTrackPlayAction(
