@@ -6,7 +6,9 @@ enum SonoicTheme {
         static let secondary = Color.secondary
         static let tertiary = Color.secondary.opacity(0.62)
         static let accent = Color.accentColor
+        static let tabAccent = Color(red: 0.96, green: 0.84, blue: 0.80)
         static let serviceAccent = Color.pink
+        static let artworkPlaceholderBackground = Color(red: 0.15, green: 0.15, blue: 0.15)
     }
 
     enum Typography {
@@ -38,6 +40,30 @@ enum SonoicTheme {
         static let section: CGFloat = 14
         static let cardStack: CGFloat = 18
         static let row: CGFloat = 14
+    }
+}
+
+struct SonoicArtworkPlaceholderView: View {
+    var cornerRadius: CGFloat
+    var markScale: CGFloat = 0.56
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(SonoicTheme.Colors.artworkPlaceholderBackground)
+            .overlay {
+                GeometryReader { proxy in
+                    let length = min(proxy.size.width, proxy.size.height) * markScale
+
+                    Image("SonoicLogoMark")
+                        .renderingMode(.original)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: length, height: length)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
     }
 }
 

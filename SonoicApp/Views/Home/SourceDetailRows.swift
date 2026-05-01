@@ -491,20 +491,8 @@ struct SourceItemNavigationRow: View {
     @State private var actionFailure: SourceItemActionFailure?
     @State private var localFavoriteObjectID: String?
 
-    private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicExactPlaybackCandidate(for: item)
-    }
-
-    private var generatedPlaybackCandidate: SonoicAppleMusicGeneratedPayloadCandidate? {
-        guard exactPlaybackCandidate == nil else {
-            return nil
-        }
-
-        return model.appleMusicGeneratedPlaybackCandidate(for: item)
-    }
-
     private var canPlay: Bool {
-        playOverride != nil || exactPlaybackCandidate != nil || generatedPlaybackCandidate != nil
+        playOverride != nil || (try? model.appleMusicPlayablePayload(for: item, purpose: .directPlay)) != nil
     }
 
     private var shouldPlayOnRowTap: Bool {
@@ -516,7 +504,11 @@ struct SourceItemNavigationRow: View {
     }
 
     private var favoriteObjectID: String? {
-        localFavoriteObjectID ?? exactPlaybackCandidate?.verifiedFavoriteObjectID
+        model.appleMusicFavoriteObjectID(for: item, localObjectID: localFavoriteObjectID)
+    }
+
+    private var hasAuxiliaryActions: Bool {
+        canPlay || item.externalURL != nil
     }
 
     var body: some View {
@@ -540,7 +532,7 @@ struct SourceItemNavigationRow: View {
                 .buttonStyle(.plain)
             }
 
-            if shouldPlayOnRowTap {
+            if shouldPlayOnRowTap || hasAuxiliaryActions {
                 Menu {
                     Button {
                         Task {
@@ -549,6 +541,7 @@ struct SourceItemNavigationRow: View {
                     } label: {
                         Label("Play", systemImage: "play.fill")
                     }
+                    .disabled(!canPlay)
 
                     Button {
                         Task {
@@ -575,19 +568,6 @@ struct SourceItemNavigationRow: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("More options for \(item.title)")
-            } else if canPlay {
-                Button {
-                    Task {
-                        await play()
-                    }
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.semibold))
-                        .frame(width: 34, height: 34)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Play \(item.title)")
             }
 
             if !shouldPlayOnRowTap {
@@ -612,64 +592,54 @@ struct SourceItemNavigationRow: View {
             return
         }
 
-        if let exactPlaybackCandidate {
-            _ = await model.playManualSonosPayload(exactPlaybackCandidate.payload)
-            return
-        }
-
-        guard let generatedPlaybackCandidate,
-              let payload = try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
-        else {
-            return
-        }
-
-        _ = await model.playManualSonosPayload(payload)
-    }
-
-    private func toggleFavorite() async {
-        if let favoriteObjectID {
-            do {
-                try await model.removeSonosFavorite(objectID: favoriteObjectID)
-                localFavoriteObjectID = nil
-            } catch {
+        do {
+            guard let nativePlaybackPayload = try model.appleMusicPlayablePayload(for: item, purpose: .directPlay) else {
                 actionFailure = SourceItemActionFailure(
-                    title: "Could Not Remove Favorite",
-                    detail: error.localizedDescription
+                    title: "Could Not Start",
+                    detail: "This Apple Music item does not have a Sonos playback payload yet."
                 )
+                return
             }
 
-            return
-        }
-
-        guard let payload = favoritePlaybackPayload()
-        else {
-            actionFailure = SourceItemActionFailure(
-                title: "Could Not Save Favorite",
-                detail: "This song does not have a Sonos favorite payload yet."
-            )
-            return
-        }
-
-        do {
-            localFavoriteObjectID = try await model.addSonosFavorite(payload)
+            await playPayload(nativePlaybackPayload)
         } catch {
             actionFailure = SourceItemActionFailure(
-                title: "Could Not Save Favorite",
+                title: "Could Not Start",
                 detail: error.localizedDescription
             )
         }
     }
 
-    private func favoritePlaybackPayload() -> SonosPlayablePayload? {
-        if let generatedPlaybackCandidate = model.appleMusicGeneratedPlaybackCandidate(for: item) {
-            return try? generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
-        }
+    private func playPayload(_ payload: SonosPlayablePayload) async {
+        let didStart = await model.playManualSonosPayload(payload)
 
-        guard exactPlaybackCandidate?.verifiedFavoriteObjectID != nil else {
-            return nil
+        if !didStart {
+            actionFailure = SourceItemActionFailure(
+                title: "Could Not Start",
+                detail: "Sonos could not start this Apple Music item."
+            )
         }
+    }
 
-        return exactPlaybackCandidate?.payload
+    private func toggleFavorite() async {
+        let wasFavorited = favoriteObjectID != nil
+
+        do {
+            switch try await model.toggleAppleMusicSonosFavorite(
+                for: item,
+                currentObjectID: favoriteObjectID
+            ) {
+            case .added(let objectID):
+                localFavoriteObjectID = objectID
+            case .removed:
+                localFavoriteObjectID = nil
+            }
+        } catch {
+            actionFailure = SourceItemActionFailure(
+                title: wasFavorited ? "Could Not Remove Favorite" : "Could Not Save Favorite",
+                detail: error.localizedDescription
+            )
+        }
     }
 }
 

@@ -18,19 +18,7 @@ struct PlayerArtworkView: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [.orange.opacity(0.8), .pink.opacity(0.7), .indigo.opacity(0.85)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 36, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.9))
-                    }
+                SonoicArtworkPlaceholderView(cornerRadius: cornerRadius)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

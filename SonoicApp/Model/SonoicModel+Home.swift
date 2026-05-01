@@ -199,6 +199,35 @@ extension SonoicModel {
         }
     }
 
+    func appleMusicArtistRouteItem(named artistName: String) async -> SonoicSourceItem? {
+        guard let trimmedName = artistName.sonoicNonEmptyTrimmed else {
+            return nil
+        }
+
+        refreshAppleMusicAuthorizationState()
+        guard appleMusicAuthorizationState.allowsCatalogSearch else {
+            return nil
+        }
+
+        do {
+            let items = try await appleMusicCatalogSearchClient.searchCatalog(
+                term: trimmedName,
+                scope: .artists
+            )
+            recordAppleMusicRequestSuccess()
+
+            return items.first { item in
+                item.kind == .artist
+                    && item.title.compare(
+                        trimmedName,
+                        options: [.caseInsensitive, .diacriticInsensitive]
+                    ) == .orderedSame
+            } ?? items.first { $0.kind == .artist }
+        } catch {
+            return nil
+        }
+    }
+
     private func shouldApplySourceSearchResponse(
         serviceID: String,
         query: String,

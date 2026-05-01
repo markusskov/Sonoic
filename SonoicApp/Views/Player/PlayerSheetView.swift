@@ -32,7 +32,9 @@ struct PlayerSheetView: View {
                     VStack(spacing: controlSpacing(for: geometry)) {
                         PlayerFullscreenTitleBlock(
                             title: model.nowPlaying.title,
-                            subtitle: model.nowPlaying.subtitle ?? model.nowPlaying.sourceName
+                            subtitle: model.nowPlaying.subtitle ?? model.nowPlaying.sourceName,
+                            artistName: model.nowPlaying.artistName,
+                            openArtist: openArtist
                         )
 
                         PlayerProgressSection(
@@ -72,7 +74,6 @@ struct PlayerSheetView: View {
                     .padding(.bottom, max(geometry.safeAreaInsets.bottom + 16, 28))
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
-
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .clipped()

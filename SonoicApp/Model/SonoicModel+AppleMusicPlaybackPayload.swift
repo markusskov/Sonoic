@@ -1,6 +1,29 @@
 import Foundation
 
 extension SonoicModel {
+    enum AppleMusicPlayablePayloadPurpose {
+        case directPlay
+        case queueEntry
+        case favorite
+        case metadata
+    }
+
+    enum AppleMusicFavoriteToggleResult {
+        case added(objectID: String)
+        case removed
+    }
+
+    enum AppleMusicFavoriteError: LocalizedError {
+        case missingPayload
+
+        var errorDescription: String? {
+            switch self {
+            case .missingPayload:
+                "This Apple Music item does not have a Sonos favorite payload yet."
+            }
+        }
+    }
+
     func appleMusicPlaybackCandidate(for item: SonoicSourceItem) -> SonoicSonosPlaybackCandidate? {
         appleMusicPlaybackCandidates(for: item).first
     }
@@ -18,6 +41,138 @@ extension SonoicModel {
     func appleMusicPlaybackCandidates(for item: SonoicSourceItem) -> [SonoicSonosPlaybackCandidate] {
         SonoicAppleMusicPlaybackPayloadResolver()
             .candidates(for: item, favorites: homeFavoritesState.snapshot?.items ?? [])
+    }
+
+    func appleMusicPlayablePayload(
+        for item: SonoicSourceItem,
+        purpose: AppleMusicPlayablePayloadPurpose
+    ) throws -> SonosPlayablePayload? {
+        switch purpose {
+        case .directPlay:
+            if let exactPlaybackCandidate = appleMusicExactPlaybackCandidate(for: item) {
+                return exactPlaybackCandidate.payload
+            }
+
+            if let generatedPlaybackCandidate = appleMusicGeneratedPlaybackCandidate(for: item) {
+                return try generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
+            }
+
+            return item.sonosNativePlaybackPayload
+
+        case .queueEntry:
+            if let generatedQueueCandidate = appleMusicGeneratedQueueCandidate(for: item) {
+                return generatedQueueCandidate.playbackPayload(for: item)
+            }
+
+            return appleMusicExactPlaybackCandidate(for: item)?.payload ?? item.sonosNativePlaybackPayload
+
+        case .favorite:
+            if let generatedPlaybackCandidate = appleMusicGeneratedPlaybackCandidate(for: item) {
+                return try generatedPlaybackCandidate.preparedPlaybackPayload(for: item)
+            }
+
+            guard appleMusicExactPlaybackCandidate(for: item)?.verifiedFavoriteObjectID != nil else {
+                return nil
+            }
+
+            return appleMusicExactPlaybackCandidate(for: item)?.payload
+
+        case .metadata:
+            if let exactPlaybackCandidate = appleMusicExactPlaybackCandidate(for: item) {
+                return exactPlaybackCandidate.payload
+            }
+
+            return appleMusicGeneratedPlaybackCandidate(for: item)?.playbackPayload(for: item)
+                ?? item.sonosNativePlaybackPayload
+        }
+    }
+
+    func appleMusicPlaylistPlaybackPlan(
+        parentItem: SonoicSourceItem,
+        trackItems: [SonoicSourceItem],
+        startingAtIndex startIndex: Int? = nil,
+        shuffled: Bool = false
+    ) -> SonoicAppleMusicPlaylistPlaybackPlan? {
+        var playablePairs = trackItems.enumerated().compactMap { index, item -> (
+            sourceIndex: Int,
+            item: SonoicSourceItem,
+            payload: SonosPlayablePayload
+        )? in
+            guard let payload = try? appleMusicPlayablePayload(for: item, purpose: .queueEntry) else {
+                return nil
+            }
+
+            return (index, item, payload)
+        }
+
+        if shuffled {
+            playablePairs.shuffle()
+        }
+
+        guard !playablePairs.isEmpty else {
+            return nil
+        }
+
+        let startingIndex: Int
+        if let startIndex {
+            guard startIndex >= 0,
+                  startIndex < trackItems.count,
+                  let matchedIndex = playablePairs.firstIndex(where: { $0.sourceIndex == startIndex })
+            else {
+                return nil
+            }
+
+            startingIndex = matchedIndex
+        } else {
+            startingIndex = 0
+        }
+
+        let startingItem = playablePairs[startingIndex].item
+
+        return SonoicAppleMusicPlaylistPlaybackPlan(
+            payloads: playablePairs.map(\.payload),
+            startingTrackNumber: startingIndex + 1,
+            localNowPlayingPayload: try? appleMusicPlayablePayload(for: startingItem, purpose: .metadata),
+            recentPlaybackPayload: try? appleMusicPlayablePayload(for: parentItem, purpose: .metadata)
+        )
+    }
+
+    func appleMusicFavoriteObjectID(for item: SonoicSourceItem, localObjectID: String? = nil) -> String? {
+        localObjectID ?? appleMusicExactPlaybackCandidate(for: item)?.verifiedFavoriteObjectID
+    }
+
+    func toggleAppleMusicSonosFavorite(
+        for item: SonoicSourceItem,
+        currentObjectID: String?
+    ) async throws -> AppleMusicFavoriteToggleResult {
+        if let currentObjectID {
+            try await removeSonosFavorite(objectID: currentObjectID)
+            return .removed
+        }
+
+        guard let payload = try appleMusicPlayablePayload(for: item, purpose: .favorite) else {
+            throw AppleMusicFavoriteError.missingPayload
+        }
+
+        let objectID = try await addSonosFavorite(payload)
+        return .added(objectID: objectID)
+    }
+}
+
+struct SonoicAppleMusicPlaylistPlaybackPlan {
+    var payloads: [SonosPlayablePayload]
+    var startingTrackNumber: Int
+    var localNowPlayingPayload: SonosPlayablePayload?
+    var recentPlaybackPayload: SonosPlayablePayload?
+}
+
+private extension SonoicSourceItem {
+    var sonosNativePlaybackPayload: SonosPlayablePayload? {
+        if case let .sonosNative(payload) = playbackCapability {
+            payload
+        } else {
+            nil
+        }
     }
 }
 

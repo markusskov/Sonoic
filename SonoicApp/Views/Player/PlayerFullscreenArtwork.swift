@@ -57,17 +57,8 @@ struct PlayerFullscreenHeroArtwork: View {
                     .aspectRatio(contentMode: .fill)
                     .frame(width: size.width, height: size.height, alignment: .top)
             } else {
-                LinearGradient(
-                    colors: [.orange.opacity(0.75), .pink.opacity(0.72), .indigo.opacity(0.8)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .frame(width: size.width, height: size.height)
-                .overlay {
-                    Image(systemName: "music.note")
-                        .font(.system(size: 72, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.86))
-                }
+                SonoicArtworkPlaceholderView(cornerRadius: 0, markScale: 0.42)
+                    .frame(width: size.width, height: size.height)
             }
         }
         .frame(width: size.width, height: size.height)

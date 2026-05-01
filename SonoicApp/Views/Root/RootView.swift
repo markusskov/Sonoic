@@ -3,13 +3,16 @@ import SwiftUI
 struct RootView: View {
     @Environment(SonoicModel.self) private var model
     @State private var isPlayerPresented = false
+    @State private var isAppleMusicDetailRoutePresented = false
+    @State private var routedAppleMusicItem: SonoicSourceItem?
+    @State private var routedAppleMusicTab: RootTab?
 
     var body: some View {
         @Bindable var model = model
 
         TabView(selection: $model.selectedTab) {
             Tab(value: RootTab.home) {
-                rootNavigationView {
+                rootNavigationView(tab: .home) {
                     HomeView()
                 }
             } label: {
@@ -17,7 +20,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.rooms) {
-                rootNavigationView {
+                rootNavigationView(tab: .rooms) {
                     RoomsView()
                 }
             } label: {
@@ -25,7 +28,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.queue) {
-                rootNavigationView {
+                rootNavigationView(tab: .queue) {
                     QueueView()
                 }
             } label: {
@@ -33,7 +36,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.settings) {
-                rootNavigationView {
+                rootNavigationView(tab: .settings) {
                     SettingsView()
                 }
             } label: {
@@ -41,7 +44,7 @@ struct RootView: View {
             }
 
             Tab(value: RootTab.search, role: .search) {
-                rootNavigationView {
+                rootNavigationView(tab: .search) {
                     SearchView()
                 }
             } label: {
@@ -49,6 +52,7 @@ struct RootView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .tint(SonoicTheme.Colors.tabAccent)
         .overlay(alignment: .bottom) {
             if model.hasManualSonosHost {
                 PlayerMiniBar(
@@ -73,12 +77,49 @@ struct RootView: View {
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.visible)
         }
+        .onChange(of: model.pendingAppleMusicDetailRoute?.id) { _, _ in
+            guard let item = model.pendingAppleMusicDetailRoute else {
+                return
+            }
+
+            routedAppleMusicItem = item
+            routedAppleMusicTab = model.selectedTab
+            model.pendingAppleMusicDetailRoute = nil
+            isAppleMusicDetailRoutePresented = true
+        }
     }
 
-    private func rootNavigationView<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func rootNavigationView<Content: View>(
+        tab: RootTab,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         NavigationStack {
             content()
+                .navigationDestination(isPresented: appleMusicRouteBinding(for: tab)) {
+                    if let routedAppleMusicItem {
+                        AppleMusicItemDetailView(item: routedAppleMusicItem)
+                    }
+                }
         }
+    }
+
+    private func appleMusicRouteBinding(for tab: RootTab) -> Binding<Bool> {
+        Binding(
+            get: {
+                isAppleMusicDetailRoutePresented && routedAppleMusicTab == tab
+            },
+            set: { isPresented in
+                guard routedAppleMusicTab == tab else {
+                    return
+                }
+
+                isAppleMusicDetailRoutePresented = isPresented
+                if !isPresented {
+                    routedAppleMusicItem = nil
+                    routedAppleMusicTab = nil
+                }
+            }
+        )
     }
 }
 

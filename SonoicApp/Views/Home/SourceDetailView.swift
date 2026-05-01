@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SourceDetailView: View {
     @Environment(SonoicModel.self) private var model
-    @State private var selectedItem: SonoicSourceItem?
+    @State private var selectedGenericItem: SonoicSourceItem?
 
     let source: SonoicSource
 
@@ -71,7 +71,7 @@ struct SourceDetailView: View {
                 model.loadAppleMusicRecentlyAdded()
             }
         }
-        .sheet(item: $selectedItem) { item in
+        .sheet(item: $selectedGenericItem) { item in
             SourceItemDetailSheet(item: item) {
                 await play(item)
             }
@@ -89,10 +89,14 @@ struct SourceDetailView: View {
 
             SonoicListCard {
                 SonoicListRows(items) { item, _ in
-                    SourceItemRow(item: item) {
-                        selectedItem = item
-                    } playAction: {
-                        await play(item)
+                    if isAppleMusic {
+                        SourceItemNavigationRow(item: item)
+                    } else {
+                        SourceItemRow(item: item) {
+                            selectedGenericItem = item
+                        } playAction: {
+                            await play(item)
+                        }
                     }
                 }
             }

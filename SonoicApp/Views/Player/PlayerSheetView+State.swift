@@ -125,4 +125,15 @@ extension PlayerSheetView {
         model.selectedTab = .queue
         dismiss()
     }
+
+    func openArtist(_ artistName: String) {
+        Task { @MainActor in
+            guard let item = await model.appleMusicArtistRouteItem(named: artistName) else {
+                return
+            }
+
+            model.pendingAppleMusicDetailRoute = item
+            dismiss()
+        }
+    }
 }
