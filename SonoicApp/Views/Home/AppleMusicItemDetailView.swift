@@ -508,7 +508,7 @@ private struct AppleMusicItemDetailSectionView: View {
             )
 
             if usesPlainTrackList {
-                SonoicListRows(previewItems) { item, index in
+                SonoicLazyListRows(previewItems) { item, index in
                     SourceItemNavigationRow(
                         item: item,
                         playOverride: playlistTrackPlayAction(for: item, at: index),

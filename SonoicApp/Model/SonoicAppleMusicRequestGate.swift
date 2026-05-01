@@ -4,6 +4,7 @@ import Foundation
 actor SonoicMusicKitRequestGate {
     private static let artistArtworkFallbackLimit = 12
     private static let playlistArtworkFallbackLimit = 12
+    private static let relatedTrackPageLimit = 100
 
     private var cachedStorefrontCountryCode: String?
 
@@ -295,12 +296,11 @@ actor SonoicMusicKitRequestGate {
     func fetchItemDetailSections(for lookup: AppleMusicItemLookup) async throws -> [AppleMusicItemMetadataSection] {
         switch lookup.kind {
         case .album:
-            let tracks = try await fetchRelatedItems(
+            let tracks = try await fetchAllRelatedItems(
                 origin: lookup.origin,
                 path: "albums",
                 id: lookup.serviceItemID,
-                relation: "tracks",
-                limit: 40
+                relation: "tracks"
             )
 
             return tracks.isEmpty ? [] : [
@@ -312,12 +312,11 @@ actor SonoicMusicKitRequestGate {
                 )
             ]
         case .playlist:
-            let tracks = try await fetchRelatedItems(
+            let tracks = try await fetchAllRelatedItems(
                 origin: lookup.origin,
                 path: "playlists",
                 id: lookup.serviceItemID,
-                relation: "tracks",
-                limit: 40
+                relation: "tracks"
             )
 
             return tracks.isEmpty ? [] : [
@@ -446,6 +445,62 @@ actor SonoicMusicKitRequestGate {
         relation: String,
         limit: Int
     ) async throws -> [AppleMusicItemMetadata] {
+        let response = try await fetchRelatedItemsResponse(
+            origin: origin,
+            path: path,
+            id: id,
+            relation: relation,
+            limit: limit
+        )
+
+        return response.data.compactMap { resource in
+            metadata(from: resource, origin: origin)
+        }
+    }
+
+    private func fetchAllRelatedItems(
+        origin: AppleMusicItemOrigin,
+        path: String,
+        id: String,
+        relation: String
+    ) async throws -> [AppleMusicItemMetadata] {
+        var items: [AppleMusicItemMetadata] = []
+        var nextOffset: Int?
+        var seenOffsets = Set<Int>()
+
+        while true {
+            let response = try await fetchRelatedItemsResponse(
+                origin: origin,
+                path: path,
+                id: id,
+                relation: relation,
+                limit: Self.relatedTrackPageLimit,
+                offset: nextOffset
+            )
+            items.append(contentsOf: response.data.compactMap { resource in
+                metadata(from: resource, origin: origin)
+            })
+
+            guard let offset = response.nextOffset,
+                  !response.data.isEmpty,
+                  !seenOffsets.contains(offset)
+            else {
+                return items
+            }
+
+            seenOffsets.insert(offset)
+            nextOffset = offset
+        }
+    }
+
+    private func fetchRelatedItemsResponse(
+        origin: AppleMusicItemOrigin,
+        path: String,
+        id: String,
+        relation: String,
+        limit: Int,
+        offset: Int? = nil
+    ) async throws -> AppleMusicLibraryResponse {
         let response: AppleMusicLibraryResponse
 
         switch origin {
@@ -454,20 +509,20 @@ actor SonoicMusicKitRequestGate {
                 path: path,
                 id: id,
                 relation: relation,
-                limit: limit
+                limit: limit,
+                offset: offset
             )
         case .catalogSearch:
             response = try await fetchCatalogRelationshipResponse(
                 path: path,
                 id: id,
                 relation: relation,
-                limit: limit
+                limit: limit,
+                offset: offset
             )
         }
 
-        return response.data.compactMap { resource in
-            metadata(from: resource, origin: origin)
-        }
+        return response
     }
 
     private func metadata(
@@ -481,12 +536,14 @@ actor SonoicMusicKitRequestGate {
         path: String,
         id: String,
         relation: String,
-        limit: Int
+        limit: Int,
+        offset: Int? = nil
     ) async throws -> AppleMusicLibraryResponse {
         let storefrontCountryCode = try await storefrontCountryCode()
         return try await fetchResourceResponse(
             path: "/v1/catalog/\(storefrontCountryCode)/\(path)/\(id)/\(relation)",
-            limit: limit
+            limit: limit,
+            offset: offset
         )
     }
 
@@ -494,11 +551,13 @@ actor SonoicMusicKitRequestGate {
         path: String,
         id: String,
         relation: String,
-        limit: Int
+        limit: Int,
+        offset: Int? = nil
     ) async throws -> AppleMusicLibraryResponse {
         try await fetchResourceResponse(
             path: "/v1/me/library/\(path)/\(id)/\(relation)",
-            limit: limit
+            limit: limit,
+            offset: offset
         )
     }
 
@@ -506,11 +565,21 @@ actor SonoicMusicKitRequestGate {
         try await fetchResourceResponse(path: "/v1/me/library/recently-added")
     }
 
-    private func fetchResourceResponse(path: String, limit: Int? = nil) async throws -> AppleMusicLibraryResponse {
-        try await fetchDecoded(
+    private func fetchResourceResponse(
+        path: String,
+        limit: Int? = nil,
+        offset: Int? = nil
+    ) async throws -> AppleMusicLibraryResponse {
+        var queryItems = limit.map { [URLQueryItem(name: "limit", value: "\($0)")] } ?? []
+        if let offset {
+            queryItems.append(URLQueryItem(name: "offset", value: "\(offset)"))
+        }
+
+        let response: AppleMusicLibraryResponse = try await fetchDecoded(
             path: path,
-            queryItems: limit.map { [URLQueryItem(name: "limit", value: "\($0)")] } ?? []
+            queryItems: queryItems
         )
+        return response
     }
 
     private func fetchCatalogArtistArtworkURL(

@@ -133,6 +133,36 @@ struct SonoicListRows<Item: Identifiable, RowContent: View>: View {
     }
 }
 
+struct SonoicLazyListRows<Item, RowContent: View>: View {
+    let items: [Item]
+    var dividerLeadingPadding = SonoicTheme.Layout.artworkDividerLeading
+
+    private let rowContent: (Item, Int) -> RowContent
+
+    init(
+        _ items: [Item],
+        dividerLeadingPadding: CGFloat = SonoicTheme.Layout.artworkDividerLeading,
+        @ViewBuilder rowContent: @escaping (Item, Int) -> RowContent
+    ) {
+        self.items = items
+        self.dividerLeadingPadding = dividerLeadingPadding
+        self.rowContent = rowContent
+    }
+
+    var body: some View {
+        LazyVStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                rowContent(item, index)
+
+                if index < items.count - 1 {
+                    Divider()
+                        .padding(.leading, dividerLeadingPadding)
+                }
+            }
+        }
+    }
+}
+
 struct SonoicListMoreButton: View {
     let action: () -> Void
 
