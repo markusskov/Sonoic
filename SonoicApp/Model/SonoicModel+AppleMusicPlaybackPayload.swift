@@ -221,6 +221,7 @@ extension SonoicModel {
     private func appleMusicFavoriteOverrideKey(for item: SonoicSourceItem) -> String {
         [
             "apple-music-favorite",
+            normalizedManualSonosHost(manualSonosHost),
             item.service.id,
             item.kind.rawValue,
             item.appleMusicIdentity?.catalogID ?? "no-catalog-id",
