@@ -285,6 +285,7 @@ extension SonoicModel {
         do {
             let snapshot = try await favoritesClient.fetchSnapshot(host: manualSonosHost)
             homeFavoritesState = snapshot.items.isEmpty ? .empty : .loaded(snapshot)
+            reconcileAppleMusicFavoriteOverrides()
         } catch {
             homeFavoritesState = .failed(error.localizedDescription)
         }

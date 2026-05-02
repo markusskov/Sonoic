@@ -2,7 +2,7 @@ import Foundation
 
 enum SonoicAppleMusicFavoriteOverride: Equatable {
     case added(objectID: String)
-    case removed
+    case removed(objectID: String)
 }
 
 extension SonoicModel {
@@ -165,12 +165,11 @@ extension SonoicModel {
         let currentObjectID = appleMusicFavoriteObjectID(for: item)
 
         if let currentObjectID {
-            appleMusicFavoriteOverrides[overrideKey] = .removed
+            appleMusicFavoriteOverrides[overrideKey] = .removed(objectID: currentObjectID)
 
             do {
                 try await favoritesClient.removeFavorite(host: manualSonosHost, objectID: currentObjectID)
                 await refreshHomeFavorites(showLoading: false)
-                reconcileAppleMusicFavoriteOverride(for: item)
             } catch {
                 appleMusicFavoriteOverrides[overrideKey] = .added(objectID: currentObjectID)
                 throw error
@@ -188,7 +187,6 @@ extension SonoicModel {
             objectID = try await favoritesClient.addFavorite(host: manualSonosHost, payload: payload)
             appleMusicFavoriteOverrides[overrideKey] = .added(objectID: objectID)
             await refreshHomeFavorites(showLoading: false)
-            reconcileAppleMusicFavoriteOverride(for: item)
         } catch {
             appleMusicFavoriteOverrides[overrideKey] = nil
             throw error
@@ -201,20 +199,24 @@ extension SonoicModel {
         appleMusicExactPlaybackCandidate(for: item)?.verifiedFavoriteObjectID
     }
 
-    private func reconcileAppleMusicFavoriteOverride(for item: SonoicSourceItem) {
-        let overrideKey = appleMusicFavoriteOverrideKey(for: item)
+    func reconcileAppleMusicFavoriteOverrides() {
+        guard !appleMusicFavoriteOverrides.isEmpty else {
+            return
+        }
 
-        switch appleMusicFavoriteOverrides[overrideKey] {
-        case .added(let objectID):
-            if appleMusicFavoriteObjectIDFromSnapshot(for: item) == objectID {
-                appleMusicFavoriteOverrides[overrideKey] = nil
+        let snapshotObjectIDs = Set(homeFavoritesState.snapshot?.items.map(\.id) ?? [])
+
+        for (overrideKey, override) in appleMusicFavoriteOverrides {
+            switch override {
+            case .added(let objectID):
+                if snapshotObjectIDs.contains(objectID) {
+                    appleMusicFavoriteOverrides[overrideKey] = nil
+                }
+            case .removed(let objectID):
+                if !snapshotObjectIDs.contains(objectID) {
+                    appleMusicFavoriteOverrides[overrideKey] = nil
+                }
             }
-        case .removed:
-            if appleMusicFavoriteObjectIDFromSnapshot(for: item) == nil {
-                appleMusicFavoriteOverrides[overrideKey] = nil
-            }
-        case nil:
-            break
         }
     }
 
