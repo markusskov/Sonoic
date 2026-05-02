@@ -5,7 +5,6 @@ struct AppleMusicItemDetailView: View {
 
     let item: SonoicSourceItem
     @State private var actionFailure: AppleMusicItemDetailActionFailure?
-    @State private var localPlaylistFavoriteObjectID: String?
 
     private var state: SonoicAppleMusicItemDetailState {
         model.appleMusicItemDetailState(for: item)
@@ -24,7 +23,7 @@ struct AppleMusicItemDetailView: View {
     }
 
     private var playlistFavoriteObjectID: String? {
-        model.appleMusicFavoriteObjectID(for: item, localObjectID: localPlaylistFavoriteObjectID)
+        model.appleMusicFavoriteObjectID(for: item)
     }
 
     private var canPlayPlaylistFallback: Bool {
@@ -253,15 +252,7 @@ struct AppleMusicItemDetailView: View {
         let wasFavorited = playlistFavoriteObjectID != nil
 
         do {
-            switch try await model.toggleAppleMusicSonosFavorite(
-                for: item,
-                currentObjectID: playlistFavoriteObjectID
-            ) {
-            case .added(let objectID):
-                localPlaylistFavoriteObjectID = objectID
-            case .removed:
-                localPlaylistFavoriteObjectID = nil
-            }
+            _ = try await model.toggleAppleMusicSonosFavorite(for: item)
         } catch {
             actionFailure = AppleMusicItemDetailActionFailure(
                 title: wasFavorited ? "Could Not Remove Favorite" : "Could Not Save Favorite",

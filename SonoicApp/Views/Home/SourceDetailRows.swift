@@ -489,7 +489,6 @@ struct SourceItemNavigationRow: View {
     var playOverride: (() async -> Void)?
     var isCompact = false
     @State private var actionFailure: SourceItemActionFailure?
-    @State private var localFavoriteObjectID: String?
 
     private var canPlay: Bool {
         playOverride != nil || (try? model.appleMusicPlayablePayload(for: item, purpose: .directPlay)) != nil
@@ -504,7 +503,7 @@ struct SourceItemNavigationRow: View {
     }
 
     private var favoriteObjectID: String? {
-        model.appleMusicFavoriteObjectID(for: item, localObjectID: localFavoriteObjectID)
+        model.appleMusicFavoriteObjectID(for: item)
     }
 
     private var hasAuxiliaryActions: Bool {
@@ -625,15 +624,7 @@ struct SourceItemNavigationRow: View {
         let wasFavorited = favoriteObjectID != nil
 
         do {
-            switch try await model.toggleAppleMusicSonosFavorite(
-                for: item,
-                currentObjectID: favoriteObjectID
-            ) {
-            case .added(let objectID):
-                localFavoriteObjectID = objectID
-            case .removed:
-                localFavoriteObjectID = nil
-            }
+            _ = try await model.toggleAppleMusicSonosFavorite(for: item)
         } catch {
             actionFailure = SourceItemActionFailure(
                 title: wasFavorited ? "Could Not Remove Favorite" : "Could Not Save Favorite",

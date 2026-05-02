@@ -117,6 +117,7 @@ final class SonoicModel {
     var appleMusicLibraryStates: [SonoicAppleMusicLibraryDestination: SonoicAppleMusicLibraryState] = [:]
     var appleMusicBrowseStates: [SonoicAppleMusicBrowseDestination: SonoicAppleMusicBrowseState] = [:]
     var appleMusicItemDetailStates: [String: SonoicAppleMusicItemDetailState] = [:]
+    var appleMusicFavoriteOverrides: [String: SonoicAppleMusicFavoriteOverride] = [:]
     var appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
     var appleMusicServiceDetails = SonoicAppleMusicServiceDetails.idle

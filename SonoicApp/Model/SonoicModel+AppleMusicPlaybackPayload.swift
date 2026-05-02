@@ -1,5 +1,10 @@
 import Foundation
 
+enum SonoicAppleMusicFavoriteOverride: Equatable {
+    case added(objectID: String)
+    case removed
+}
+
 extension SonoicModel {
     enum AppleMusicPlayablePayloadPurpose {
         case directPlay
@@ -137,16 +142,40 @@ extension SonoicModel {
         )
     }
 
-    func appleMusicFavoriteObjectID(for item: SonoicSourceItem, localObjectID: String? = nil) -> String? {
-        localObjectID ?? appleMusicExactPlaybackCandidate(for: item)?.verifiedFavoriteObjectID
+    func appleMusicFavoriteObjectID(for item: SonoicSourceItem) -> String? {
+        switch appleMusicFavoriteOverrides[appleMusicFavoriteOverrideKey(for: item)] {
+        case .added(let objectID):
+            objectID
+        case .removed:
+            nil
+        case nil:
+            appleMusicFavoriteObjectIDFromSnapshot(for: item)
+        }
     }
 
     func toggleAppleMusicSonosFavorite(
-        for item: SonoicSourceItem,
-        currentObjectID: String?
+        for item: SonoicSourceItem
     ) async throws -> AppleMusicFavoriteToggleResult {
+        let overrideKey = appleMusicFavoriteOverrideKey(for: item)
+
+        guard hasManualSonosHost else {
+            throw SonosControlTransport.TransportError.invalidHost
+        }
+
+        let currentObjectID = appleMusicFavoriteObjectID(for: item)
+
         if let currentObjectID {
-            try await removeSonosFavorite(objectID: currentObjectID)
+            appleMusicFavoriteOverrides[overrideKey] = .removed
+
+            do {
+                try await favoritesClient.removeFavorite(host: manualSonosHost, objectID: currentObjectID)
+                await refreshHomeFavorites(showLoading: false)
+                reconcileAppleMusicFavoriteOverride(for: item)
+            } catch {
+                appleMusicFavoriteOverrides[overrideKey] = .added(objectID: currentObjectID)
+                throw error
+            }
+
             return .removed
         }
 
@@ -154,8 +183,50 @@ extension SonoicModel {
             throw AppleMusicFavoriteError.missingPayload
         }
 
-        let objectID = try await addSonosFavorite(payload)
+        let objectID: String
+        do {
+            objectID = try await favoritesClient.addFavorite(host: manualSonosHost, payload: payload)
+            appleMusicFavoriteOverrides[overrideKey] = .added(objectID: objectID)
+            await refreshHomeFavorites(showLoading: false)
+            reconcileAppleMusicFavoriteOverride(for: item)
+        } catch {
+            appleMusicFavoriteOverrides[overrideKey] = nil
+            throw error
+        }
+
         return .added(objectID: objectID)
+    }
+
+    private func appleMusicFavoriteObjectIDFromSnapshot(for item: SonoicSourceItem) -> String? {
+        appleMusicExactPlaybackCandidate(for: item)?.verifiedFavoriteObjectID
+    }
+
+    private func reconcileAppleMusicFavoriteOverride(for item: SonoicSourceItem) {
+        let overrideKey = appleMusicFavoriteOverrideKey(for: item)
+
+        switch appleMusicFavoriteOverrides[overrideKey] {
+        case .added(let objectID):
+            if appleMusicFavoriteObjectIDFromSnapshot(for: item) == objectID {
+                appleMusicFavoriteOverrides[overrideKey] = nil
+            }
+        case .removed:
+            if appleMusicFavoriteObjectIDFromSnapshot(for: item) == nil {
+                appleMusicFavoriteOverrides[overrideKey] = nil
+            }
+        case nil:
+            break
+        }
+    }
+
+    private func appleMusicFavoriteOverrideKey(for item: SonoicSourceItem) -> String {
+        [
+            "apple-music-favorite",
+            item.service.id,
+            item.kind.rawValue,
+            item.appleMusicIdentity?.catalogID ?? "no-catalog-id",
+            item.appleMusicIdentity?.libraryID ?? "no-library-id",
+            item.serviceItemID ?? item.id
+        ].joined(separator: ":")
     }
 }
 
