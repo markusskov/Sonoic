@@ -89,6 +89,61 @@ struct SonoicSourceSearchSessionTests {
         #expect(!metadataOnlyItem.playbackCapability.canPlay)
     }
 
+    @Test
+    func updatingSameQueryPreservesCachedResults() {
+        let model = SonoicModel()
+        let appleMusicSource = source(.appleMusic)
+        let cachedItem = item(
+            id: "cached-song",
+            title: "One",
+            kind: .song,
+            service: .appleMusic
+        )
+        let lastUpdatedAt = Date(timeIntervalSince1970: 1_800_000_000)
+
+        model.sourceSearchStates[SonosServiceDescriptor.appleMusic.id] = SonoicSourceSearchState(
+            query: "Metallica",
+            service: .appleMusic,
+            items: [cachedItem],
+            status: .loaded,
+            lastUpdatedAt: lastUpdatedAt
+        )
+
+        model.updateSourceSearchQuery("metallica", for: appleMusicSource)
+
+        let state = model.sourceSearchState(for: appleMusicSource)
+        #expect(state.items == [cachedItem])
+        #expect(state.status == .loaded)
+        #expect(state.lastUpdatedAt == lastUpdatedAt)
+    }
+
+    @Test
+    func updatingNewQueryClearsCachedResults() {
+        let model = SonoicModel()
+        let appleMusicSource = source(.appleMusic)
+        let cachedItem = item(
+            id: "cached-song",
+            title: "One",
+            kind: .song,
+            service: .appleMusic
+        )
+
+        model.sourceSearchStates[SonosServiceDescriptor.appleMusic.id] = SonoicSourceSearchState(
+            query: "Metallica",
+            service: .appleMusic,
+            items: [cachedItem],
+            status: .loaded,
+            lastUpdatedAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        model.updateSourceSearchQuery("Nirvana", for: appleMusicSource)
+
+        let state = model.sourceSearchState(for: appleMusicSource)
+        #expect(state.items.isEmpty)
+        #expect(state.status == .idle)
+        #expect(state.lastUpdatedAt == nil)
+    }
+
     private func source(_ service: SonosServiceDescriptor) -> SonoicSource {
         SonoicSource(
             service: service,

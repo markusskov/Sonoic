@@ -45,10 +45,14 @@ extension SonoicModel {
 
     func updateSourceSearchQuery(_ query: String, for source: SonoicSource) {
         let currentState = sourceSearchState(for: source)
+        let shouldPreserveResults = currentState.query.sonoicNonEmptyTrimmed == query.sonoicNonEmptyTrimmed
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
             query: query,
             service: source.service,
-            scope: currentState.scope
+            scope: currentState.scope,
+            items: shouldPreserveResults ? currentState.items : [],
+            status: shouldPreserveResults ? currentState.status : .idle,
+            lastUpdatedAt: shouldPreserveResults ? currentState.lastUpdatedAt : nil
         )
     }
 
