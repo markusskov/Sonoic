@@ -26,14 +26,14 @@ What works today:
 - widget backed by shared app state
 - native Apple now-playing integration with play/pause, next/previous, artwork, progress, and lock-screen scrubbing when Sonos exposes duration
 - home theater controls for EQ, sub level, speech enhancement, and night sound
-- Apple Music source surface with quiet authorization state, catalog search, saved library lanes, recently added items, grouped search results, and item detail pages
-- explicit service playback capability labels so metadata-only Apple Music items are not presented as Sonos-playable
+- shared source browsing surface with Apple Music as the first live adapter, multi-source search state, saved library lanes, recently added items, grouped search results, and shared artist/album/playlist detail pages
+- explicit service playback capability labels so metadata-only service items are not presented as Sonos-playable
 
 What is still in progress:
 
 - stable Lock Screen / Control Center ownership through Apple’s native now-playing surfaces
-- Sonos-native playback payloads for Apple Music catalog and library items
-- deeper music-service integrations for Spotify, playlists, and source destinations
+- Sonos-native playback payloads for more Apple Music catalog and library items
+- live adapters for Spotify, Tidal, Sonos Radio, SoundCloud, and other source destinations
 - queue-derived flows from `Home`
 - broader home theater validation across more Sonos products
 - App Intents, shortcuts, and richer outside-app entry points
@@ -113,7 +113,7 @@ Before running on your own Apple developer account:
 Notes:
 
 - Sonoic uses Bonjour discovery first and keeps manual host entry as a fallback in `Settings`.
-- `Home` is now a music hub for favorites, collections, recent plays, sources, and the current session. Apple Music can show authorized metadata, library lanes, search results, item details, and recently added items, while playback stays Sonos-owned.
+- `Home` is now a music hub for favorites, collections, recent plays, sources, and the current session. Source browsing uses shared artist/album/playlist routes, with Apple Music as the first live catalog adapter while playback stays Sonos-owned.
 - `Rooms` can show discovered rooms, current groups, selected target state, bonded home theater setup, and home theater controls.
 - `Queue` can inspect, jump, clear, remove, and reorder the active Sonos queue. Adding new queue items from arbitrary services is still future work.
 - `Settings` keeps everyday configuration quiet, with fallback connection and diagnostics available from Advanced.
@@ -131,7 +131,7 @@ The short version:
 
 1. finish the native now-playing path cleanly
 2. validate discovery, queue, Home, and home theater controls on more real Sonos households
-3. expand Apple Music service browsing into Sonos-native playback payload research and playlist/source flows
+3. expand shared source browsing into Sonos-native playback payload research and additional service adapters
 4. add App Intents, shortcuts, and deeper outside-app entry points
 
 ## Open Source Notes

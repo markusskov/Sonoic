@@ -81,41 +81,6 @@ nonisolated enum AppleMusicSearchResultBalancer {
         return items
     }
 
-    static func balancedItems(
-        groups: [[AppleMusicItemMetadata]],
-        limit: Int
-    ) -> [AppleMusicItemMetadata] {
-        guard limit > 0 else {
-            return []
-        }
-
-        var indexes = Array(repeating: 0, count: groups.count)
-        var items: [AppleMusicItemMetadata] = []
-        items.reserveCapacity(limit)
-
-        while items.count < limit {
-            let countBeforePass = items.count
-
-            for groupIndex in groups.indices {
-                guard indexes[groupIndex] < groups[groupIndex].count else {
-                    continue
-                }
-
-                items.append(groups[groupIndex][indexes[groupIndex]])
-                indexes[groupIndex] += 1
-
-                if items.count == limit {
-                    break
-                }
-            }
-
-            if items.count == countBeforePass {
-                break
-            }
-        }
-
-        return items
-    }
 }
 
 nonisolated struct AppleMusicGenreMetadata: Sendable {

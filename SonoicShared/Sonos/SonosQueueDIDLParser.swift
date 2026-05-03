@@ -8,16 +8,19 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         var albumTitle: String?
         var artworkURL: String?
         var duration: TimeInterval?
+        var nestedMetadataXML: String?
     }
 
-    private var items: [SonosQueueItem] = []
+    private var items: [PartialItem] = []
     private var currentItem: PartialItem?
+    private var currentItemDepth = 0
     private var currentFieldName: String?
     private var capturedValue = ""
 
     func parse(_ xmlString: String) throws -> [SonosQueueItem] {
         items = []
         currentItem = nil
+        currentItemDepth = 0
         currentFieldName = nil
         capturedValue = ""
 
@@ -32,7 +35,9 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
             throw parser.parserError ?? SonosControlTransport.TransportError.invalidResponse
         }
 
-        return items
+        return items.enumerated().map { index, item in
+            queueItem(from: item, at: index)
+        }
     }
 
     func parser(
@@ -45,7 +50,12 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
         let localName = localName(for: qName ?? elementName)
 
         if localName == "item" {
-            currentItem = PartialItem(id: attributeDict["id"].sonoicNonEmptyTrimmed)
+            if currentItem == nil {
+                currentItem = PartialItem(id: attributeDict["id"].sonoicNonEmptyTrimmed)
+                currentItemDepth = 1
+            } else {
+                currentItemDepth += 1
+            }
             return
         }
 
@@ -86,23 +96,21 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
             self.currentFieldName = nil
         }
 
-        guard localName == "item",
+        guard localName == "item" else {
+            return
+        }
+
+        currentItemDepth = max(0, currentItemDepth - 1)
+
+        guard currentItemDepth == 0,
               let currentItem
         else {
             return
         }
 
-        items.append(
-            SonosQueueItem(
-                id: currentItem.id ?? "queue-item-\(items.count + 1)",
-                title: currentItem.title ?? "Unknown Track",
-                artistName: currentItem.artistName,
-                albumTitle: currentItem.albumTitle,
-                artworkURL: currentItem.artworkURL,
-                duration: currentItem.duration
-            )
-        )
-        self.currentItem = nil
+        items.append(currentItem)
+
+        resetCurrentItem()
     }
 
     private func localName(for elementName: String) -> String {
@@ -141,31 +149,32 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
                 currentItem?.artworkURL = value
             }
         case "resMD":
-            mergeNestedMetadata(from: value)
+            if currentItem?.nestedMetadataXML == nil {
+                currentItem?.nestedMetadataXML = value
+            }
         default:
             break
         }
     }
 
-    private func mergeNestedMetadata(from value: String) {
-        guard let metadata = try? SonosDIDLMetadataParser().parse(value), !metadata.isEmpty else {
-            return
-        }
+    private func queueItem(from partialItem: PartialItem, at index: Int) -> SonosQueueItem {
+        let nestedMetadata = partialItem.nestedMetadataXML
+            .flatMap { try? SonosDIDLMetadataParser().parse($0) }
 
-        if currentItem?.title == nil {
-            currentItem?.title = metadata.title
-        }
+        return SonosQueueItem(
+            id: partialItem.id ?? "queue-item-\(index + 1)",
+            title: partialItem.title ?? nestedMetadata?.title ?? "Unknown Track",
+            artistName: partialItem.artistName ?? nestedMetadata?.artistName,
+            albumTitle: partialItem.albumTitle ?? nestedMetadata?.albumTitle,
+            artworkURL: partialItem.artworkURL ?? nestedMetadata?.albumArtURI,
+            duration: partialItem.duration
+        )
+    }
 
-        if currentItem?.artistName == nil {
-            currentItem?.artistName = metadata.artistName
-        }
-
-        if currentItem?.albumTitle == nil {
-            currentItem?.albumTitle = metadata.albumTitle
-        }
-
-        if currentItem?.artworkURL == nil {
-            currentItem?.artworkURL = metadata.albumArtURI
-        }
+    private func resetCurrentItem() {
+        currentItem = nil
+        currentItemDepth = 0
+        currentFieldName = nil
+        capturedValue = ""
     }
 }

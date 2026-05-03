@@ -2,77 +2,63 @@ import SwiftUI
 
 struct SearchView: View {
     @Environment(SonoicModel.self) private var model
-    @State private var selectedServiceID = SonosServiceDescriptor.appleMusic.id
     @State private var isSearchFieldFocused = false
 
-    private var services: [SonosServiceDescriptor] {
+    private var searchableSources: [SonoicSource] {
         orderedServices(model.homeSources.map(\.service) + SonosServiceCatalog.browsableServices)
-            .filter(supportsCatalogSearch)
+            .filter { model.sourceAdapter(for: $0).capabilities.supportsCatalogSearch }
+            .map { service in
+                model.homeSources.first { $0.service.id == service.id } ?? SonoicSource(
+                    service: service,
+                    favoriteCount: 0,
+                    collectionCount: 0,
+                    recentCount: 0,
+                    isCurrent: false,
+                    status: .availableForSetup
+                )
+            }
     }
 
-    private var selectedService: SonosServiceDescriptor {
-        services.first { $0.id == selectedServiceID } ?? .appleMusic
-    }
-
-    private var selectedSource: SonoicSource {
-        model.homeSources.first { $0.service.id == selectedService.id } ?? SonoicSource(
-            service: selectedService,
-            favoriteCount: 0,
-            collectionCount: 0,
-            recentCount: 0,
-            isCurrent: false,
-            status: .availableForSetup
-        )
-    }
-
-    private var searchState: SonoicSourceSearchState {
-        model.sourceSearchState(for: selectedSource)
-    }
-
-    private var supportsSelectedCatalogSearch: Bool {
-        supportsCatalogSearch(selectedService)
-    }
-
-    private var selectedRecentSearches: [SonoicRecentSourceSearch] {
-        model.recentSourceSearches(for: selectedSource)
+    private var recentSearches: [SonoicRecentSourceSearch] {
+        model.recentSourceSearches(for: searchableSources)
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                if services.count > 1 {
-                    SearchServicePicker(
-                        services: services,
-                        selectedServiceID: $selectedServiceID
-                    )
-                }
-
-                if supportsSelectedCatalogSearch {
+                if !searchableSources.isEmpty {
                     SearchInputCard(
                         query: searchQueryBinding,
                         isFocused: $isSearchFieldFocused,
-                        service: selectedService,
-                        state: searchState,
-                        supportsCatalogSearch: supportsSelectedCatalogSearch,
+                        placeholder: searchPlaceholder,
+                        isSearching: model.sourceSearchSession.isSearching(
+                            in: model.sourceSearchStates,
+                            sources: searchableSources
+                        ),
+                        hasQuery: model.sourceSearchSession.hasQuery,
                         submit: searchCatalog
                     )
 
                     if shouldShowSearchResults {
                         SearchResultsSection(
-                            state: searchState,
+                            session: model.sourceSearchSession,
+                            sources: searchableSources,
+                            states: model.sourceSearchStates,
                             availabilityMessage: appleMusicAvailabilityMessage,
                             canRequestAuthorization: model.appleMusicAuthorizationState.canRequestAuthorization,
-                            requestAuthorization: requestAppleMusicAuthorization
+                            requestAuthorization: requestAppleMusicAuthorization,
+                            selectSource: selectSource,
+                            selectScope: selectScope
                         )
-                    } else if isSearchFieldFocused && !selectedRecentSearches.isEmpty {
+                    } else if isSearchFieldFocused && !recentSearches.isEmpty {
                         SearchRecentQueriesSection(
-                            recentSearches: selectedRecentSearches,
+                            recentSearches: recentSearches,
                             select: selectRecentSearch,
                             clear: clearRecentSearches
                         )
                     } else {
                         SearchDiscoverySection(
-                            service: selectedService,
+                            service: .appleMusic,
                             isAppleMusicAvailable: model.appleMusicAuthorizationState.allowsCatalogSearch
                         )
                     }
@@ -86,8 +72,8 @@ struct SearchView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Search")
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: selectedServiceID) {
-            if selectedService.kind == .appleMusic {
+        .task {
+            if searchableSources.contains(where: { $0.service.kind == .appleMusic }) {
                 await model.refreshSonosMusicServiceProbeIfNeeded()
             }
         }
@@ -105,44 +91,65 @@ struct SearchView: View {
         }
     }
 
-    private func supportsCatalogSearch(_ service: SonosServiceDescriptor) -> Bool {
-        service.kind == .appleMusic
-    }
-
     private var searchQueryBinding: Binding<String> {
         Binding(
             get: {
-                model.sourceSearchState(for: selectedSource).query
+                model.sourceSearchSession.query
             },
             set: { query in
-                model.updateSourceSearchQuery(query, for: selectedSource)
+                model.updateSourceSearchSessionQuery(query)
             }
         )
     }
 
+    private var searchPlaceholder: String {
+        guard searchableSources.count == 1,
+              let source = searchableSources.first
+        else {
+            return "Search"
+        }
+
+        return "Search \(source.service.name)"
+    }
+
     private var shouldShowSearchResults: Bool {
         appleMusicAvailabilityMessage != nil
-            || searchState.isSearching
-            || searchState.failureDetail != nil
-            || (searchState.status == .loaded && searchState.hasQuery)
-            || !searchState.items.isEmpty
+            || model.sourceSearchSession.hasSubmittedQuery
+            || model.sourceSearchSession.isSearching(
+                in: model.sourceSearchStates,
+                sources: searchableSources
+            )
+            || model.sourceSearchSession.failureDetail(
+                in: model.sourceSearchStates,
+                sources: searchableSources
+            ) != nil
+            || !model.sourceSearchSession.visibleItems(
+                in: model.sourceSearchStates,
+                sources: searchableSources
+            ).isEmpty
     }
 
     private func searchCatalog() {
-        model.updateSourceSearchScope(.all, for: selectedSource)
-
         Task {
-            await model.searchSourceCatalog(for: selectedSource)
+            await model.searchSourceCatalog(in: searchableSources)
         }
     }
 
     private func selectRecentSearch(_ recentSearch: SonoicRecentSourceSearch) {
-        model.updateSourceSearchQuery(recentSearch.query, for: selectedSource)
+        model.updateSourceSearchSessionQuery(recentSearch.query)
         searchCatalog()
     }
 
     private func clearRecentSearches() {
-        model.clearRecentSourceSearches(for: selectedSource)
+        model.clearRecentSourceSearches(for: searchableSources)
+    }
+
+    private func selectSource(_ serviceID: String?) {
+        model.updateSourceSearchSessionServiceFilter(serviceID)
+    }
+
+    private func selectScope(_ scope: SonoicSourceSearchScope) {
+        model.updateSourceSearchSessionScope(scope)
     }
 
     private func requestAppleMusicAuthorization() {
@@ -152,7 +159,7 @@ struct SearchView: View {
     }
 
     private var appleMusicAvailabilityMessage: SearchMessage? {
-        guard selectedService.kind == .appleMusic,
+        guard searchableSources.contains(where: { $0.service.kind == .appleMusic }),
               !model.appleMusicAuthorizationState.allowsCatalogSearch
         else {
             return nil

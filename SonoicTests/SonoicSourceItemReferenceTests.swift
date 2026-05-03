@@ -3,7 +3,7 @@ import Testing
 @testable import Sonoic
 
 @MainActor
-struct SonoicAppleMusicIdentityTests {
+struct SonoicSourceItemReferenceTests {
     @Test
     func decodesLibraryPlayParametersCatalogID() throws {
         let json = """
@@ -55,9 +55,10 @@ struct SonoicAppleMusicIdentityTests {
         )
 
         #expect(item.serviceItemID == "i.abc123")
-        #expect(item.appleMusicIdentity?.catalogID == "1440857781")
-        #expect(item.appleMusicIdentity?.libraryID == "i.abc123")
-        #expect(item.appleMusicIdentity?.kind == .song)
+        #expect(item.sourceReference?.serviceID == SonosServiceDescriptor.appleMusic.id)
+        #expect(item.sourceReference?.catalogID == "1440857781")
+        #expect(item.sourceReference?.libraryID == "i.abc123")
+        #expect(item.sourceReference?.kind == .song)
         #expect(item.externalURL == "https://music.apple.com/us/song/sweet-jane/1440857781")
     }
 
@@ -73,7 +74,7 @@ struct SonoicAppleMusicIdentityTests {
             catalogID: "1440857781",
             libraryID: "i.abc123"
         )
-        let identity = try #require(item.appleMusicIdentity)
+        let identity = try #require(item.sourceReference)
 
         #expect(identity.routedID(for: .library) == "i.abc123")
         #expect(identity.routedID(for: .catalogSearch) == "1440857781")
@@ -102,7 +103,9 @@ struct SonoicAppleMusicIdentityTests {
             libraryID: nil
         )
 
-        #expect(libraryItem.appleMusicDetailCacheKey != catalogItem.appleMusicDetailCacheKey)
+        #expect(libraryItem.sourceDetailCacheKey != catalogItem.sourceDetailCacheKey)
+        #expect(libraryItem.sourceDetailCacheKey.hasPrefix("apple-music:library:song:"))
+        #expect(catalogItem.sourceDetailCacheKey.hasPrefix("apple-music:catalogSearch:song:"))
     }
 
     @Test

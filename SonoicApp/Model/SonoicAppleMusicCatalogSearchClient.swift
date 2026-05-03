@@ -137,7 +137,7 @@ struct SonoicAppleMusicCatalogSearchClient {
             switch destination {
             case .popularRecommendations, .appleMusicPlaylists:
                 let sections = try await requestGate.fetchTopCharts(for: destination).map { section in
-                    SonoicAppleMusicItemDetailSection(
+                    SonoicSourceItemDetailSection(
                         id: section.id,
                         title: section.title,
                         subtitle: section.subtitle,
@@ -172,21 +172,21 @@ struct SonoicAppleMusicCatalogSearchClient {
         }
     }
 
-    func fetchItemDetailSections(for item: SonoicSourceItem) async throws -> [SonoicAppleMusicItemDetailSection] {
+    func fetchItemDetailSections(for item: SonoicSourceItem) async throws -> [SonoicSourceItemDetailSection] {
         guard MusicAuthorization.currentStatus == .authorized else {
             throw unauthorizedError(endpointFamily: .itemDetail)
         }
 
         guard let kind = appleMusicKind(for: item.kind),
-              let origin = appleMusicOrigin(for: item.origin, identity: item.appleMusicIdentity),
-              let serviceItemID = item.appleMusicIdentity?.routedID(for: item.origin) ?? item.serviceItemID
+              let origin = appleMusicOrigin(for: item.origin, identity: item.sourceReference),
+              let serviceItemID = item.sourceReference?.routedID(for: item.origin) ?? item.serviceItemID
         else {
             return []
         }
         let lookup = AppleMusicItemLookup(
             serviceItemID: serviceItemID,
-            catalogItemID: item.appleMusicIdentity?.catalogID,
-            libraryItemID: item.appleMusicIdentity?.libraryID,
+            catalogItemID: item.sourceReference?.catalogID,
+            libraryItemID: item.sourceReference?.libraryID,
             title: item.title,
             kind: kind,
             origin: origin
@@ -194,7 +194,7 @@ struct SonoicAppleMusicCatalogSearchClient {
 
         do {
             return try await requestGate.fetchItemDetailSections(for: lookup).map { section in
-                SonoicAppleMusicItemDetailSection(
+                SonoicSourceItemDetailSection(
                     id: section.id,
                     title: section.title,
                     subtitle: section.subtitle,
@@ -321,7 +321,7 @@ struct SonoicAppleMusicCatalogSearchClient {
         SonoicAppleMusicBrowseState(
             destination: destination,
             sections: sections.map { section in
-                SonoicAppleMusicItemDetailSection(
+                SonoicSourceItemDetailSection(
                     id: section.id,
                     title: section.title,
                     subtitle: section.subtitle,
@@ -349,7 +349,7 @@ struct SonoicAppleMusicCatalogSearchClient {
 
     private func appleMusicOrigin(
         for sourceOrigin: SonoicSourceItem.Origin,
-        identity: SonoicAppleMusicItemIdentity?
+        identity: SonoicSourceItemReference?
     ) -> AppleMusicItemOrigin? {
         switch sourceOrigin {
         case .catalogSearch:

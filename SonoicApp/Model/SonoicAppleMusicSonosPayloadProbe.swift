@@ -59,7 +59,7 @@ struct SonoicAppleMusicSonosPayloadProbe {
     ) -> [SonoicAppleMusicGeneratedPayloadCandidate] {
         guard item.service.kind == .appleMusic,
               let playbackHint,
-              let identity = item.appleMusicIdentity
+              let identity = item.sourceReference
         else {
             return []
         }

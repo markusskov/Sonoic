@@ -3,9 +3,9 @@ import SwiftUI
 struct RootView: View {
     @Environment(SonoicModel.self) private var model
     @State private var isPlayerPresented = false
-    @State private var isAppleMusicDetailRoutePresented = false
-    @State private var routedAppleMusicItem: SonoicSourceItem?
-    @State private var routedAppleMusicTab: RootTab?
+    @State private var isSourceItemDetailRoutePresented = false
+    @State private var routedSourceItem: SonoicSourceItem?
+    @State private var routedSourceTab: RootTab?
 
     var body: some View {
         @Bindable var model = model
@@ -77,15 +77,15 @@ struct RootView: View {
                 .presentationBackground(.clear)
                 .presentationDragIndicator(.visible)
         }
-        .onChange(of: model.pendingAppleMusicDetailRoute?.id) { _, _ in
-            guard let item = model.pendingAppleMusicDetailRoute else {
+        .onChange(of: model.pendingSourceItemDetailRoute?.id) { _, _ in
+            guard let item = model.pendingSourceItemDetailRoute else {
                 return
             }
 
-            routedAppleMusicItem = item
-            routedAppleMusicTab = model.selectedTab
-            model.pendingAppleMusicDetailRoute = nil
-            isAppleMusicDetailRoutePresented = true
+            routedSourceItem = item
+            routedSourceTab = model.selectedTab
+            model.pendingSourceItemDetailRoute = nil
+            isSourceItemDetailRoutePresented = true
         }
     }
 
@@ -95,28 +95,28 @@ struct RootView: View {
     ) -> some View {
         NavigationStack {
             content()
-                .navigationDestination(isPresented: appleMusicRouteBinding(for: tab)) {
-                    if let routedAppleMusicItem {
-                        AppleMusicItemDetailView(item: routedAppleMusicItem)
+                .navigationDestination(isPresented: sourceItemRouteBinding(for: tab)) {
+                    if let routedSourceItem {
+                        SourceItemDetailView(item: routedSourceItem)
                     }
                 }
         }
     }
 
-    private func appleMusicRouteBinding(for tab: RootTab) -> Binding<Bool> {
+    private func sourceItemRouteBinding(for tab: RootTab) -> Binding<Bool> {
         Binding(
             get: {
-                isAppleMusicDetailRoutePresented && routedAppleMusicTab == tab
+                isSourceItemDetailRoutePresented && routedSourceTab == tab
             },
             set: { isPresented in
-                guard routedAppleMusicTab == tab else {
+                guard routedSourceTab == tab else {
                     return
                 }
 
-                isAppleMusicDetailRoutePresented = isPresented
+                isSourceItemDetailRoutePresented = isPresented
                 if !isPresented {
-                    routedAppleMusicItem = nil
-                    routedAppleMusicTab = nil
+                    routedSourceItem = nil
+                    routedSourceTab = nil
                 }
             }
         )

@@ -1,61 +1,11 @@
 import SwiftUI
 
-struct SearchServicePicker: View {
-    let services: [SonosServiceDescriptor]
-    @Binding var selectedServiceID: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(title: "Service")
-
-            ScrollView(.horizontal) {
-                HStack(spacing: 10) {
-                    ForEach(services) { service in
-                        SearchServiceChip(
-                            service: service,
-                            isSelected: selectedServiceID == service.id
-                        ) {
-                            selectedServiceID = service.id
-                        }
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-            .scrollIndicators(.hidden)
-        }
-    }
-}
-
-private struct SearchServiceChip: View {
-    let service: SonosServiceDescriptor
-    let isSelected: Bool
-    let select: () -> Void
-
-    var body: some View {
-        Button(action: select) {
-            Label(service.name, systemImage: service.systemImage)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isSelected ? .primary : .secondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .frame(minHeight: 42)
-        }
-        .buttonStyle(.plain)
-        .glassEffect(
-            isSelected ? .regular.interactive() : .regular,
-            in: .capsule
-        )
-        .accessibilityLabel("Search \(service.name)")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-}
-
 struct SearchInputCard: View {
     @Binding var query: String
     @Binding var isFocused: Bool
-    let service: SonosServiceDescriptor
-    let state: SonoicSourceSearchState
-    let supportsCatalogSearch: Bool
+    let placeholder: String
+    let isSearching: Bool
+    let hasQuery: Bool
     let submit: () -> Void
     @FocusState private var fieldIsFocused: Bool
 
@@ -66,7 +16,7 @@ struct SearchInputCard: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                TextField("Search \(service.name)", text: $query)
+                TextField(placeholder, text: $query)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled(false)
                     .focused($fieldIsFocused)
@@ -107,11 +57,11 @@ struct SearchInputCard: View {
 
     @ViewBuilder
     private var submitButton: some View {
-        if state.isSearching {
+        if isSearching {
             ProgressView()
                 .controlSize(.small)
                 .frame(width: 22, height: 22)
-        } else if supportsCatalogSearch && state.hasQuery {
+        } else if hasQuery {
             Button(action: submit) {
                 Image(systemName: "arrow.right")
                     .font(.body.weight(.semibold))
@@ -120,7 +70,7 @@ struct SearchInputCard: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .accessibilityLabel("Search \(service.name)")
+            .accessibilityLabel("Search")
         }
     }
 
@@ -274,14 +224,43 @@ private struct SearchDiscoveryTile: View {
 }
 
 struct SearchResultsSection: View {
-    let state: SonoicSourceSearchState
+    let session: SonoicSourceSearchSessionState
+    let sources: [SonoicSource]
+    let states: [String: SonoicSourceSearchState]
     let availabilityMessage: SearchMessage?
     let canRequestAuthorization: Bool
     let requestAuthorization: () -> Void
+    let selectSource: (String?) -> Void
+    let selectScope: (SonoicSourceSearchScope) -> Void
+
+    private var visibleItems: [SonoicSourceItem] {
+        session.visibleItems(in: states, sources: sources)
+    }
+
+    private var isSearching: Bool {
+        session.isSearching(in: states, sources: sources)
+    }
+
+    private var failureDetail: String? {
+        session.failureDetail(in: states, sources: sources)
+    }
 
     var body: some View {
         if shouldShowResults {
             VStack(alignment: .leading, spacing: 14) {
+                if shouldShowFilters {
+                    SearchSourceFilterRow(
+                        sources: sources,
+                        selectedServiceID: session.selectedServiceID,
+                        select: selectSource
+                    )
+
+                    SearchScopeFilterRow(
+                        selectedScope: session.scope,
+                        select: selectScope
+                    )
+                }
+
                 if let availabilityMessage {
                     RoomSurfaceCard {
                         VStack(alignment: .leading, spacing: 14) {
@@ -296,7 +275,7 @@ struct SearchResultsSection: View {
                             }
                         }
                     }
-                } else if let failureDetail = state.failureDetail {
+                } else if let failureDetail {
                     RoomSurfaceCard {
                         SearchMessageRow(
                             message: SearchMessage(
@@ -308,7 +287,7 @@ struct SearchResultsSection: View {
                     }
                 }
 
-                if state.isSearching && state.items.isEmpty {
+                if isSearching && visibleItems.isEmpty {
                     RoomSurfaceCard {
                         HStack(spacing: 14) {
                             ProgressView()
@@ -322,7 +301,7 @@ struct SearchResultsSection: View {
                             Spacer(minLength: 0)
                         }
                     }
-                } else if state.status == .loaded && state.items.isEmpty {
+                } else if session.hasLoadedEmptyResults(in: states, sources: sources) {
                     RoomSurfaceCard {
                         SearchMessageRow(
                             message: SearchMessage(
@@ -332,8 +311,8 @@ struct SearchResultsSection: View {
                             )
                         )
                     }
-                } else if !state.items.isEmpty {
-                    SourceGroupedItemRows(items: state.items)
+                } else if !visibleItems.isEmpty {
+                    SourceGroupedItemRows(items: visibleItems)
                 }
             }
         }
@@ -341,20 +320,126 @@ struct SearchResultsSection: View {
 
     private var shouldShowResults: Bool {
         availabilityMessage != nil
-            || state.isSearching
-            || state.failureDetail != nil
-            || (state.status == .loaded && state.hasQuery)
-            || !state.items.isEmpty
+            || isSearching
+            || failureDetail != nil
+            || session.hasSubmittedQuery
+            || !visibleItems.isEmpty
+    }
+
+    private var shouldShowFilters: Bool {
+        session.hasSubmittedQuery || isSearching || !visibleItems.isEmpty
     }
 
     private func staleDetail(_ failureDetail: String) -> String {
-        guard !state.items.isEmpty,
-              let lastUpdatedAt = state.lastUpdatedAt
+        guard !visibleItems.isEmpty,
+              let lastUpdatedAt = latestUpdatedAt
         else {
             return failureDetail
         }
 
-        return "Showing previous results from \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
+        return sourceStaleDetail(
+            failureDetail,
+            lastUpdatedAt: lastUpdatedAt,
+            prefix: "Showing previous results from"
+        )
+    }
+
+    private var latestUpdatedAt: Date? {
+        session.sourceIDs(from: sources)
+            .compactMap { states[$0]?.lastUpdatedAt }
+            .max()
+    }
+}
+
+private struct SearchSourceFilterRow: View {
+    let sources: [SonoicSource]
+    let selectedServiceID: String?
+    let select: (String?) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 9) {
+                if sources.count > 1 {
+                    SearchFilterChip(
+                        title: "All",
+                        systemImage: "square.grid.2x2",
+                        isSelected: selectedServiceID == nil
+                    ) {
+                        select(nil)
+                    }
+                }
+
+                ForEach(sources) { source in
+                    SearchFilterChip(
+                        title: sources.count == 1 ? source.service.name : nil,
+                        systemImage: source.service.systemImage,
+                        isSelected: selectedServiceID == source.service.id || sources.count == 1
+                    ) {
+                        select(source.service.id)
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct SearchScopeFilterRow: View {
+    let selectedScope: SonoicSourceSearchScope
+    let select: (SonoicSourceSearchScope) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 9) {
+                ForEach(SonoicSourceSearchScope.allCases) { scope in
+                    SearchFilterChip(
+                        title: scope.title,
+                        systemImage: nil,
+                        isSelected: selectedScope == scope
+                    ) {
+                        select(scope)
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct SearchFilterChip: View {
+    let title: String?
+    let systemImage: String?
+    let isSelected: Bool
+    let select: () -> Void
+
+    var body: some View {
+        Button(action: select) {
+            HStack(spacing: 7) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.subheadline.weight(.semibold))
+                }
+
+                if let title {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+            .foregroundStyle(isSelected ? SonoicTheme.Colors.primary : SonoicTheme.Colors.secondary)
+            .padding(.horizontal, title == nil ? 12 : 14)
+            .padding(.vertical, 9)
+            .frame(minWidth: title == nil ? 44 : nil)
+            .frame(minHeight: 40)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(
+            isSelected ? .regular.interactive() : .regular,
+            in: .capsule
+        )
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

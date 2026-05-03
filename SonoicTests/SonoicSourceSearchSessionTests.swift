@@ -1,0 +1,120 @@
+import Foundation
+import Testing
+@testable import Sonoic
+
+@MainActor
+struct SonoicSourceSearchSessionTests {
+    @Test
+    func filtersVisibleItemsBySelectedSource() {
+        let appleMusicSource = source(.appleMusic)
+        let spotifySource = source(.spotify)
+        let appleMusicSong = item(
+            id: "apple-song",
+            title: "Whiskey In the Jar",
+            kind: .song,
+            service: .appleMusic
+        )
+        let spotifySong = item(
+            id: "spotify-song",
+            title: "Nothing Else Matters",
+            kind: .song,
+            service: .spotify
+        )
+        let session = SonoicSourceSearchSessionState(
+            query: "metallica",
+            selectedServiceID: SonosServiceDescriptor.appleMusic.id,
+            scope: .all,
+            lastSubmittedQuery: "metallica"
+        )
+
+        let visibleItems = session.visibleItems(
+            in: [
+                SonosServiceDescriptor.appleMusic.id: SonoicSourceSearchState(
+                    query: "metallica",
+                    service: .appleMusic,
+                    items: [appleMusicSong],
+                    status: .loaded
+                ),
+                SonosServiceDescriptor.spotify.id: SonoicSourceSearchState(
+                    query: "metallica",
+                    service: .spotify,
+                    items: [spotifySong],
+                    status: .loaded
+                ),
+            ],
+            sources: [appleMusicSource, spotifySource]
+        )
+
+        #expect(visibleItems == [appleMusicSong])
+    }
+
+    @Test
+    func filtersVisibleItemsByKindWithoutClearingQuery() {
+        let appleMusicSource = source(.appleMusic)
+        let song = item(id: "song", title: "Enter Sandman", kind: .song, service: .appleMusic)
+        let album = item(id: "album", title: "Metallica", kind: .album, service: .appleMusic)
+        let session = SonoicSourceSearchSessionState(
+            query: "metallica",
+            selectedServiceID: SonosServiceDescriptor.appleMusic.id,
+            scope: .albums,
+            lastSubmittedQuery: "metallica"
+        )
+
+        let visibleItems = session.visibleItems(
+            in: [
+                SonosServiceDescriptor.appleMusic.id: SonoicSourceSearchState(
+                    query: "metallica",
+                    service: .appleMusic,
+                    items: [song, album],
+                    status: .loaded
+                ),
+            ],
+            sources: [appleMusicSource]
+        )
+
+        #expect(visibleItems == [album])
+        #expect(session.query == "metallica")
+        #expect(session.lastSubmittedQuery == "metallica")
+    }
+
+    @Test
+    func reportsMetadataOnlyItemsAsNotPlayable() {
+        let metadataOnlyItem = item(
+            id: "metadata-only",
+            title: "Stressed Out",
+            kind: .song,
+            service: .appleMusic
+        )
+
+        #expect(!metadataOnlyItem.playbackCapability.canPlay)
+    }
+
+    private func source(_ service: SonosServiceDescriptor) -> SonoicSource {
+        SonoicSource(
+            service: service,
+            favoriteCount: 0,
+            collectionCount: 0,
+            recentCount: 0,
+            isCurrent: false
+        )
+    }
+
+    private func item(
+        id: String,
+        title: String,
+        kind: SonoicSourceItem.Kind,
+        service: SonosServiceDescriptor
+    ) -> SonoicSourceItem {
+        SonoicSourceItem(
+            id: id,
+            title: title,
+            subtitle: service.name,
+            artworkURL: nil,
+            artworkIdentifier: nil,
+            service: service,
+            origin: .catalogSearch,
+            kind: kind,
+            playbackCapability: .metadataOnly
+        )
+    }
+}

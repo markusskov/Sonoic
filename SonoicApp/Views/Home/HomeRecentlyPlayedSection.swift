@@ -29,9 +29,9 @@ private struct HomeRecentPlayCard: View {
 
     var body: some View {
         Group {
-            if let sourceItem {
+            if let sourceItem, sourceItem.kind != .song {
                 NavigationLink {
-                    AppleMusicItemDetailView(item: sourceItem)
+                    SourceItemDetailView(item: sourceItem)
                 } label: {
                     cardContent
                 }
@@ -44,30 +44,18 @@ private struct HomeRecentPlayCard: View {
     }
 
     private var cardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HomeFavoriteArtworkView(
-                artworkURL: item.artworkURL,
-                artworkIdentifier: item.artworkIdentifier,
-                maximumDisplayDimension: 156
-            )
-            .frame(width: 156, height: 156)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(item.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                Text(item.subtitle ?? item.sourceName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Label(item.sourceName, systemImage: item.service?.systemImage ?? "music.note")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-        }
+        SourceArtworkCaptionTile(
+            title: item.title,
+            subtitle: item.subtitle ?? item.sourceName,
+            badgeTitle: item.sourceName,
+            badgeSystemImage: item.service?.systemImage ?? "music.note",
+            artworkURL: item.artworkURL,
+            artworkIdentifier: item.artworkIdentifier,
+            artworkDimension: 156,
+            width: 156,
+            titleFont: .subheadline.weight(.semibold),
+            subtitleFont: .caption,
+            badgeFont: .caption2.weight(.medium)
+        )
     }
 }
