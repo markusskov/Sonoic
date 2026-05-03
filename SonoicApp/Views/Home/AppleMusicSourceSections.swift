@@ -252,12 +252,22 @@ struct AppleMusicRecentlyAddedSection: View {
 }
 
 private struct AppleMusicRecentlyAddedCard: View {
+    @Environment(SonoicModel.self) private var model
     let item: SonoicSourceItem
+    @State private var actionFailure: SourceActionFailure?
 
     var body: some View {
         Group {
             if item.kind == .song {
-                cardContent
+                Button {
+                    Task {
+                        await play()
+                    }
+                } label: {
+                    cardContent
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Play \(item.title)")
             } else {
                 NavigationLink {
                     SourceItemDetailView(item: item)
@@ -268,6 +278,13 @@ private struct AppleMusicRecentlyAddedCard: View {
             }
         }
         .accessibilityLabel(item.title)
+        .alert(item: $actionFailure) { failure in
+            Alert(
+                title: Text(failure.title),
+                message: Text(failure.detail),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
     private var cardContent: some View {
@@ -282,5 +299,23 @@ private struct AppleMusicRecentlyAddedCard: View {
             spacing: 9
         )
         .contentShape(Rectangle())
+    }
+
+    private func play() async {
+        do {
+            let didStart = try await model.playSourceItem(item)
+
+            if !didStart {
+                actionFailure = SourceActionFailure(
+                    title: "Could Not Start",
+                    detail: "Sonos could not start this item."
+                )
+            }
+        } catch {
+            actionFailure = SourceActionFailure(
+                title: "Could Not Start",
+                detail: error.localizedDescription
+            )
+        }
     }
 }

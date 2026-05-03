@@ -17,7 +17,9 @@ struct HomeRecentlyPlayedSection: View {
 }
 
 private struct HomeRecentPlayCard: View {
+    @Environment(SonoicModel.self) private var model
     let item: SonoicRecentPlayItem
+    @State private var actionFailure: SourceActionFailure?
 
     private var sourceItem: SonoicSourceItem? {
         guard item.service != nil else {
@@ -29,7 +31,17 @@ private struct HomeRecentPlayCard: View {
 
     var body: some View {
         Group {
-            if let sourceItem, sourceItem.kind != .song {
+            if let sourceItem, sourceItem.kind == .song {
+                Button {
+                    Task {
+                        await play(sourceItem)
+                    }
+                } label: {
+                    cardContent
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Play \(item.title)")
+            } else if let sourceItem {
                 NavigationLink {
                     SourceItemDetailView(item: sourceItem)
                 } label: {
@@ -41,6 +53,13 @@ private struct HomeRecentPlayCard: View {
             }
         }
         .frame(width: 156, alignment: .leading)
+        .alert(item: $actionFailure) { failure in
+            Alert(
+                title: Text(failure.title),
+                message: Text(failure.detail),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
     private var cardContent: some View {
@@ -57,5 +76,23 @@ private struct HomeRecentPlayCard: View {
             subtitleFont: .caption,
             badgeFont: .caption2.weight(.medium)
         )
+    }
+
+    private func play(_ sourceItem: SonoicSourceItem) async {
+        do {
+            let didStart = try await model.playSourceItem(sourceItem)
+
+            if !didStart {
+                actionFailure = SourceActionFailure(
+                    title: "Could Not Start",
+                    detail: "Sonos could not start this item."
+                )
+            }
+        } catch {
+            actionFailure = SourceActionFailure(
+                title: "Could Not Start",
+                detail: error.localizedDescription
+            )
+        }
     }
 }
