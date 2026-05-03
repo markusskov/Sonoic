@@ -131,7 +131,8 @@ struct SourceItemNavigationRow: View {
         item.kind == .song && canPlay
     }
 
-    private var canOpenDetail: Bool {
+    private var opensContainerDetail: Bool {
+        // Songs act from rows and the player; detail screens are reserved for browsable source containers.
         item.kind != .song
     }
 
@@ -159,7 +160,7 @@ struct SourceItemNavigationRow: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Play \(item.title)")
-            } else if canOpenDetail {
+            } else if opensContainerDetail {
                 NavigationLink {
                     SourceItemDetailView(item: item)
                 } label: {
@@ -205,7 +206,7 @@ struct SourceItemNavigationRow: View {
                 .accessibilityLabel("More options for \(item.title)")
             }
 
-            if canOpenDetail && !shouldPlayOnRowTap {
+            if opensContainerDetail && !shouldPlayOnRowTap {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.tertiary)

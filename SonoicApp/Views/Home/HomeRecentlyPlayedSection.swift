@@ -29,9 +29,13 @@ private struct HomeRecentPlayCard: View {
         return SonoicSourceItem(recentPlay: item)
     }
 
+    private var canPlaySourceItem: Bool {
+        sourceItem.map(model.canPlaySourceItem) ?? false
+    }
+
     var body: some View {
         Group {
-            if let sourceItem, sourceItem.kind == .song {
+            if let sourceItem, sourceItem.kind == .song, canPlaySourceItem {
                 Button {
                     Task {
                         await play(sourceItem)
@@ -41,7 +45,7 @@ private struct HomeRecentPlayCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Play \(item.title)")
-            } else if let sourceItem {
+            } else if let sourceItem, sourceItem.kind != .song {
                 NavigationLink {
                     SourceItemDetailView(item: sourceItem)
                 } label: {

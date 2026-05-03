@@ -256,9 +256,13 @@ private struct AppleMusicRecentlyAddedCard: View {
     let item: SonoicSourceItem
     @State private var actionFailure: SourceActionFailure?
 
+    private var canPlay: Bool {
+        model.canPlaySourceItem(item)
+    }
+
     var body: some View {
         Group {
-            if item.kind == .song {
+            if item.kind == .song && canPlay {
                 Button {
                     Task {
                         await play()
@@ -268,13 +272,15 @@ private struct AppleMusicRecentlyAddedCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Play \(item.title)")
-            } else {
+            } else if item.kind != .song {
                 NavigationLink {
                     SourceItemDetailView(item: item)
                 } label: {
                     cardContent
                 }
                 .buttonStyle(.plain)
+            } else {
+                cardContent
             }
         }
         .accessibilityLabel(item.title)
