@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SourceDetailView: View {
     @Environment(SonoicModel.self) private var model
-    @State private var selectedGenericItem: SonoicSourceItem?
 
     let source: SonoicSource
 
@@ -71,13 +70,6 @@ struct SourceDetailView: View {
                 model.loadAppleMusicRecentlyAdded()
             }
         }
-        .sheet(item: $selectedGenericItem) { item in
-            SourceItemDetailSheet(item: item) {
-                await play(item)
-            }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
     }
 
     private func sourceSection(
@@ -89,26 +81,10 @@ struct SourceDetailView: View {
 
             SonoicListCard {
                 SonoicListRows(items) { item, _ in
-                    if isAppleMusic {
-                        SourceItemNavigationRow(item: item)
-                    } else {
-                        SourceItemRow(item: item) {
-                            selectedGenericItem = item
-                        } playAction: {
-                            await play(item)
-                        }
-                    }
+                    SourceItemNavigationRow(item: item)
                 }
             }
         }
-    }
-
-    private func play(_ item: SonoicSourceItem) async {
-        guard case let .sonosNative(payload) = item.playbackCapability else {
-            return
-        }
-
-        _ = await model.playManualSonosPayload(payload)
     }
 
     private func requestAppleMusicAuthorization() {
