@@ -144,8 +144,12 @@ struct SourceItemNavigationRow: View {
         model.sourceFavoriteObjectID(for: item)
     }
 
+    private var canFavorite: Bool {
+        model.sourceAdapter(for: item).capabilities.supportsFavorites
+    }
+
     private var hasAuxiliaryActions: Bool {
-        canPlay || model.sourceAdapter(for: item).capabilities.supportsFavorites || item.externalURL != nil
+        canPlay || canFavorite || item.externalURL != nil
     }
 
     var body: some View {
@@ -182,16 +186,18 @@ struct SourceItemNavigationRow: View {
                     }
                     .disabled(!canPlay)
 
-                    Button {
-                        Task {
-                            await toggleFavorite()
+                    if canFavorite {
+                        Button {
+                            Task {
+                                await toggleFavorite()
+                            }
+                        } label: {
+                            Label(
+                                isFavorited ? "Remove Favorite" : "Save to Favorites",
+                                systemImage: isFavorited ? "heart.fill" : "heart"
+                            )
+                            .foregroundStyle(.primary)
                         }
-                    } label: {
-                        Label(
-                            isFavorited ? "Remove Favorite" : "Save to Favorites",
-                            systemImage: isFavorited ? "heart.fill" : "heart"
-                        )
-                        .foregroundStyle(.primary)
                     }
 
                     if let externalURL = item.externalURL.flatMap(URL.init(string:)) {

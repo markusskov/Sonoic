@@ -34,6 +34,10 @@ struct SourceItemDetailView: View {
         model.canPlaySourceItem(item)
     }
 
+    private var canFavoriteItem: Bool {
+        model.sourceAdapter(for: item).capabilities.supportsFavorites
+    }
+
     var body: some View {
         ZStack {
             SourceItemDetailBackground(item: item)
@@ -48,6 +52,7 @@ struct SourceItemDetailView: View {
                                 SourcePlaylistActionRow(
                                     isFavorite: isPlaylistFavorited,
                                     canShuffle: canPlayPlaylistQueue,
+                                    canFavorite: canFavoriteItem,
                                     shuffle: {
                                         await playPlaylistQueue(shuffled: true)
                                     },
@@ -58,8 +63,8 @@ struct SourceItemDetailView: View {
                                         await togglePlaylistFavorite()
                                     }
                                 )
-                            } else {
-                                SourcePlaylistActionSkeletonRow()
+                            } else if canFavoriteItem {
+                                SourcePlaylistActionSkeletonRow(canFavorite: canFavoriteItem)
                             }
                         } else if canPlayItem {
                             SourceItemActionCard(
