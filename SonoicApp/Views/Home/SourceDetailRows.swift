@@ -98,7 +98,11 @@ struct SourceItemNavigationRow: View {
     }
 
     private var hasAuxiliaryActions: Bool {
-        canPlay || canFavorite || item.externalURL != nil
+        canPlay || canFavorite || item.externalURL != nil || hasUnavailableContext
+    }
+
+    private var hasUnavailableContext: Bool {
+        item.kind == .song && !canPlay
     }
 
     var body: some View {
@@ -126,14 +130,20 @@ struct SourceItemNavigationRow: View {
 
             if shouldPlayOnRowTap || hasAuxiliaryActions {
                 Menu {
-                    Button {
-                        Task {
-                            await play()
+                    if canPlay {
+                        Button {
+                            Task {
+                                await play()
+                            }
+                        } label: {
+                            Label("Play", systemImage: "play.fill")
                         }
-                    } label: {
-                        Label("Play", systemImage: "play.fill")
+                    } else {
+                        Button {} label: {
+                            Label("Unavailable", systemImage: "lock")
+                        }
+                        .disabled(true)
                     }
-                    .disabled(!canPlay)
 
                     if canFavorite {
                         Button {
