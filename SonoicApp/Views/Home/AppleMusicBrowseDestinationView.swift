@@ -51,7 +51,6 @@ struct AppleMusicBrowseDestinationView: View {
         if state.isLoading && state.sections.isEmpty && state.genres.isEmpty {
             SourceMessageCard(
                 title: "Loading \(destination.title)",
-                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.sections.isEmpty && state.genres.isEmpty {
@@ -64,7 +63,6 @@ struct AppleMusicBrowseDestinationView: View {
             if state.isLoading {
                 SourceMessageCard(
                     title: "Refreshing",
-                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }
@@ -84,7 +82,6 @@ struct AppleMusicBrowseDestinationView: View {
             if state.isLoading {
                 SourceMessageCard(
                     title: "Refreshing Categories",
-                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }
@@ -101,7 +98,6 @@ struct AppleMusicBrowseDestinationView: View {
         } else {
             SourceMessageCard(
                 title: "No Items",
-                detail: "Nothing here yet.",
                 systemImage: destination.systemImage
             )
         }
@@ -115,49 +111,45 @@ struct AppleMusicBrowseDestinationView: View {
 
 private struct AppleMusicBrowseSectionView: View {
     let section: SonoicSourceItemDetailSection
-    private let previewLimit = 8
+    @State private var visibleItemCount = 10
+
+    private let visibleItemIncrement = 10
 
     private var previewItems: [SonoicSourceItem] {
-        Array(section.items.prefix(previewLimit))
+        Array(section.items.prefix(visibleItemCount))
     }
 
-    private var showsViewAll: Bool {
+    private var showsMoreButton: Bool {
         section.items.count > previewItems.count
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                HomeSectionHeader(
-                    title: section.title,
-                    subtitle: section.subtitle
-                )
-
-                Spacer(minLength: 0)
-
-                if showsViewAll {
-                    NavigationLink {
-                        SourceItemCollectionView(
-                            title: section.title,
-                            subtitle: section.subtitle,
-                            items: section.items
-                        )
-                    } label: {
-                        Label("View All", systemImage: "chevron.right")
-                            .labelStyle(.titleAndIcon)
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                }
-            }
+            HomeSectionHeader(
+                title: section.title,
+                subtitle: section.subtitle
+            )
 
             SonoicListCard {
                 SonoicListRows(previewItems) { item, _ in
                     SourceItemNavigationRow(item: item)
                 }
+
+                if showsMoreButton {
+                    SonoicListMoreButton(action: showMoreItems)
+                }
             }
         }
+        .onChange(of: section.items) { _, _ in
+            visibleItemCount = 10
+        }
+    }
+
+    private func showMoreItems() {
+        visibleItemCount = min(
+            section.items.count,
+            visibleItemCount + visibleItemIncrement
+        )
     }
 }
 

@@ -51,7 +51,6 @@ struct AppleMusicLibraryDestinationView: View {
         if state.isLoading && state.items.isEmpty {
             SourceMessageCard(
                 title: "Loading \(destination.title)",
-                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.items.isEmpty {
@@ -63,7 +62,6 @@ struct AppleMusicLibraryDestinationView: View {
         } else if state.status == .loaded && state.items.isEmpty {
             SourceMessageCard(
                 title: "No \(destination.title)",
-                detail: "Nothing here yet.",
                 systemImage: "music.note.list"
             )
         } else if state.status == .loaded || !state.items.isEmpty {
@@ -71,7 +69,6 @@ struct AppleMusicLibraryDestinationView: View {
         } else {
             SourceMessageCard(
                 title: destination.title,
-                detail: "Pull to refresh.",
                 systemImage: destination.systemImage
             )
         }
