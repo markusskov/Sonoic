@@ -130,7 +130,7 @@ final class SonoicNowPlayableSessionController: NSObject {
         currentPlaybackState = .paused
         nowPlayingSession.nowPlayingInfoCenter.nowPlayingInfo = nil
         nowPlayingSession.nowPlayingInfoCenter.playbackState = .stopped
-        updateCommandAvailability(isEnabled: false)
+        SonoicNowPlayableCommandAvailability.disabled.apply(to: nowPlayingSession.remoteCommandCenter)
 
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
@@ -277,23 +277,11 @@ final class SonoicNowPlayableSessionController: NSObject {
     }
 
     private func updateCommandAvailability(for nowPlaying: SonosNowPlayingSnapshot) {
-        let commandCenter = nowPlayingSession.remoteCommandCenter
-        commandCenter.playCommand.isEnabled = nowPlaying.canPlay
-        commandCenter.pauseCommand.isEnabled = nowPlaying.canPause
-        commandCenter.togglePlayPauseCommand.isEnabled = nowPlaying.canTogglePlayback
-        commandCenter.nextTrackCommand.isEnabled = nowPlaying.canSkipNext
-        commandCenter.previousTrackCommand.isEnabled = nowPlaying.canSkipPrevious
-        commandCenter.changePlaybackPositionCommand.isEnabled = seekHandler != nil && nowPlaying.duration != nil && nowPlaying.canSeek
-    }
-
-    private func updateCommandAvailability(isEnabled: Bool) {
-        let commandCenter = nowPlayingSession.remoteCommandCenter
-        commandCenter.playCommand.isEnabled = isEnabled
-        commandCenter.pauseCommand.isEnabled = isEnabled
-        commandCenter.togglePlayPauseCommand.isEnabled = isEnabled
-        commandCenter.nextTrackCommand.isEnabled = isEnabled
-        commandCenter.previousTrackCommand.isEnabled = isEnabled
-        commandCenter.changePlaybackPositionCommand.isEnabled = isEnabled
+        SonoicNowPlayableCommandAvailability(
+            nowPlaying: nowPlaying,
+            hasSeekHandler: seekHandler != nil
+        )
+        .apply(to: nowPlayingSession.remoteCommandCenter)
     }
 
     private func handleCommand(_ handler: PlaybackCommandHandler?) -> MPRemoteCommandHandlerStatus {
@@ -424,5 +412,57 @@ final class SonoicNowPlayableSessionController: NSObject {
         }
 
         return advancedElapsedTime
+    }
+}
+
+private struct SonoicNowPlayableCommandAvailability {
+    var canPlay: Bool
+    var canPause: Bool
+    var canTogglePlayback: Bool
+    var canSkipNext: Bool
+    var canSkipPrevious: Bool
+    var canChangePlaybackPosition: Bool
+
+    static let disabled = SonoicNowPlayableCommandAvailability(
+        canPlay: false,
+        canPause: false,
+        canTogglePlayback: false,
+        canSkipNext: false,
+        canSkipPrevious: false,
+        canChangePlaybackPosition: false
+    )
+
+    init(nowPlaying: SonosNowPlayingSnapshot, hasSeekHandler: Bool) {
+        canPlay = nowPlaying.canPlay
+        canPause = nowPlaying.canPause
+        canTogglePlayback = nowPlaying.canTogglePlayback
+        canSkipNext = nowPlaying.canSkipNext
+        canSkipPrevious = nowPlaying.canSkipPrevious
+        canChangePlaybackPosition = hasSeekHandler && nowPlaying.duration != nil && nowPlaying.canSeek
+    }
+
+    private init(
+        canPlay: Bool,
+        canPause: Bool,
+        canTogglePlayback: Bool,
+        canSkipNext: Bool,
+        canSkipPrevious: Bool,
+        canChangePlaybackPosition: Bool
+    ) {
+        self.canPlay = canPlay
+        self.canPause = canPause
+        self.canTogglePlayback = canTogglePlayback
+        self.canSkipNext = canSkipNext
+        self.canSkipPrevious = canSkipPrevious
+        self.canChangePlaybackPosition = canChangePlaybackPosition
+    }
+
+    func apply(to commandCenter: MPRemoteCommandCenter) {
+        commandCenter.playCommand.isEnabled = canPlay
+        commandCenter.pauseCommand.isEnabled = canPause
+        commandCenter.togglePlayPauseCommand.isEnabled = canTogglePlayback
+        commandCenter.nextTrackCommand.isEnabled = canSkipNext
+        commandCenter.previousTrackCommand.isEnabled = canSkipPrevious
+        commandCenter.changePlaybackPositionCommand.isEnabled = canChangePlaybackPosition
     }
 }
