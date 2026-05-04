@@ -54,7 +54,7 @@ struct SourceDetailView: View {
                     }
 
                     if !isAppleMusic {
-                        SourceCatalogPlaceholderCard(serviceName: source.service.name)
+                        SourceCatalogPlaceholderCard()
                     }
                 }
                 .padding(20)
