@@ -78,6 +78,24 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
+    func submittedQueryIsActiveOnlyWhileCurrentQueryMatches() {
+        var session = SonoicSourceSearchSessionState(
+            query: "metallica",
+            selectedServiceID: SonosServiceDescriptor.appleMusic.id,
+            scope: .all,
+            lastSubmittedQuery: "metallica"
+        )
+
+        #expect(session.hasActiveSubmittedQuery)
+
+        session.query = ""
+        #expect(!session.hasActiveSubmittedQuery)
+
+        session.query = "metal"
+        #expect(!session.hasActiveSubmittedQuery)
+    }
+
+    @Test
     func reportsMetadataOnlyItemsAsNotPlayable() {
         let metadataOnlyItem = item(
             id: "metadata-only",

@@ -68,6 +68,16 @@ struct SonoicSourceSearchSessionState: Equatable {
         lastSubmittedQuery?.sonoicNonEmptyTrimmed != nil
     }
 
+    var hasActiveSubmittedQuery: Bool {
+        guard let currentQuery = query.sonoicNonEmptyTrimmed,
+              let submittedQuery = lastSubmittedQuery?.sonoicNonEmptyTrimmed
+        else {
+            return false
+        }
+
+        return currentQuery == submittedQuery
+    }
+
     func sourceIDs(from sources: [SonoicSource]) -> Set<String> {
         if let selectedServiceID {
             return [selectedServiceID]

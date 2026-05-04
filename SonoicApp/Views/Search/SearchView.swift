@@ -113,8 +113,15 @@ struct SearchView: View {
     }
 
     private var shouldShowSearchResults: Bool {
-        appleMusicAvailabilityMessage != nil
-            || model.sourceSearchSession.hasSubmittedQuery
+        if appleMusicAvailabilityMessage != nil {
+            return true
+        }
+
+        guard model.sourceSearchSession.hasActiveSubmittedQuery else {
+            return false
+        }
+
+        return model.sourceSearchSession.hasSubmittedQuery
             || model.sourceSearchSession.isSearching(
                 in: model.sourceSearchStates,
                 sources: searchableSources
