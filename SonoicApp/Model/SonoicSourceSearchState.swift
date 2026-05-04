@@ -86,6 +86,14 @@ struct SonoicSourceSearchSessionState: Equatable {
         return Set(sources.map(\.service.id))
     }
 
+    func filteredSources(from sources: [SonoicSource]) -> [SonoicSource] {
+        guard let selectedServiceID else {
+            return sources
+        }
+
+        return sources.filter { $0.service.id == selectedServiceID }
+    }
+
     func isSearching(in states: [String: SonoicSourceSearchState], sources: [SonoicSource]) -> Bool {
         sourceIDs(from: sources).contains { serviceID in
             states[serviceID]?.isSearching == true

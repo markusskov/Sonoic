@@ -320,14 +320,22 @@ struct SearchResultsSection: View {
 
     private var shouldShowResults: Bool {
         availabilityMessage != nil
-            || isSearching
-            || failureDetail != nil
-            || session.hasSubmittedQuery
-            || !visibleItems.isEmpty
+            || (
+                session.hasActiveSubmittedQuery && (
+                    isSearching
+                        || failureDetail != nil
+                        || session.hasLoadedEmptyResults(in: states, sources: sources)
+                        || !visibleItems.isEmpty
+                )
+            )
     }
 
     private var shouldShowFilters: Bool {
-        session.hasSubmittedQuery || isSearching || !visibleItems.isEmpty
+        session.hasActiveSubmittedQuery && (
+            isSearching
+                || session.hasLoadedEmptyResults(in: states, sources: sources)
+                || !visibleItems.isEmpty
+        )
     }
 
     private func staleDetail(_ failureDetail: String) -> String {

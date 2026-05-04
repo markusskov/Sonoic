@@ -49,6 +49,20 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
+    func selectedSourceFiltersSubmittedSearchSources() {
+        let appleMusicSource = source(.appleMusic)
+        let spotifySource = source(.spotify)
+        let session = SonoicSourceSearchSessionState(
+            query: "metallica",
+            selectedServiceID: SonosServiceDescriptor.spotify.id,
+            scope: .all,
+            lastSubmittedQuery: "metallica"
+        )
+
+        #expect(session.filteredSources(from: [appleMusicSource, spotifySource]) == [spotifySource])
+    }
+
+    @Test
     func filtersVisibleItemsByKindWithoutClearingQuery() {
         let appleMusicSource = source(.appleMusic)
         let song = item(id: "song", title: "Enter Sandman", kind: .song, service: .appleMusic)

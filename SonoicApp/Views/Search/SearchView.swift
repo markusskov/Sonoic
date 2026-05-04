@@ -121,8 +121,7 @@ struct SearchView: View {
             return false
         }
 
-        return model.sourceSearchSession.hasSubmittedQuery
-            || model.sourceSearchSession.isSearching(
+        return model.sourceSearchSession.isSearching(
                 in: model.sourceSearchStates,
                 sources: searchableSources
             )
@@ -130,6 +129,10 @@ struct SearchView: View {
                 in: model.sourceSearchStates,
                 sources: searchableSources
             ) != nil
+            || model.sourceSearchSession.hasLoadedEmptyResults(
+                in: model.sourceSearchStates,
+                sources: searchableSources
+            )
             || !model.sourceSearchSession.visibleItems(
                 in: model.sourceSearchStates,
                 sources: searchableSources

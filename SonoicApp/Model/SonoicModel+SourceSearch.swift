@@ -93,13 +93,14 @@ extension SonoicModel {
                   !searchableSources.contains(where: { $0.service.id == selectedServiceID }) {
             sourceSearchSession.selectedServiceID = nil
         }
+        let submittedSources = sourceSearchSession.filteredSources(from: searchableSources)
 
-        for source in searchableSources {
+        for source in submittedSources {
             updateSourceSearchQuery(query, for: source)
             updateSourceSearchScope(submittedScope, for: source)
         }
 
-        for source in searchableSources {
+        for source in submittedSources {
             await searchSourceCatalog(for: source)
         }
     }
