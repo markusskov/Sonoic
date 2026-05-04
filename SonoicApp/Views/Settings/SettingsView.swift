@@ -16,6 +16,7 @@ struct SettingsView: View {
             }
 
             SettingsMusicServicesSection(model: model)
+            SettingsPlusSection(model: model)
 
             if model.hasManualSonosHost {
                 SettingsSelectedPlayerSection(model: model)
