@@ -83,8 +83,9 @@ extension SonoicModel {
             return
         }
 
+        let submittedScope = sourceSearchSession.scope
         sourceSearchSession.query = query
-        sourceSearchSession.scope = .all
+        sourceSearchSession.scope = submittedScope
         sourceSearchSession.lastSubmittedQuery = query
         if searchableSources.count == 1 {
             sourceSearchSession.selectedServiceID = searchableSources.first?.service.id
@@ -95,7 +96,7 @@ extension SonoicModel {
 
         for source in searchableSources {
             updateSourceSearchQuery(query, for: source)
-            updateSourceSearchScope(.all, for: source)
+            updateSourceSearchScope(submittedScope, for: source)
         }
 
         for source in searchableSources {
