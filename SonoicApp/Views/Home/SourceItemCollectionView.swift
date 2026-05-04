@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct AppleMusicItemCollectionView: View {
+struct SourceItemCollectionView: View {
     @Environment(SonoicModel.self) private var model
 
     let title: String
@@ -66,32 +66,21 @@ struct AppleMusicItemCollectionView: View {
     }
 
     private func playPlaylistTrack(at index: Int) async {
-        guard let parentItem,
-              let plan = model.appleMusicPlaylistPlaybackPlan(
-                parentItem: parentItem,
-                trackItems: items,
-                startingAtIndex: index
-              )
-        else {
+        guard let parentItem else {
             return
         }
 
-        let didStartPlayback = await model.playManualSonosQueuePayloads(
-            plan.payloads,
-            startingTrackNumber: plan.startingTrackNumber,
-            localNowPlayingPayload: plan.localNowPlayingPayload,
-            recentPlaybackPayload: plan.recentPlaybackPayload
+        await model.playSourcePlaylistQueue(
+            parentItem: parentItem,
+            trackItems: items,
+            startingAtIndex: index
         )
-
-        if didStartPlayback {
-            model.recordRecentSourceItem(parentItem, replayPayload: plan.recentPlaybackPayload)
-        }
     }
 }
 
 #Preview {
     NavigationStack {
-        AppleMusicItemCollectionView(
+        SourceItemCollectionView(
             title: "Tracks",
             subtitle: nil,
             items: [

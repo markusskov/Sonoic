@@ -28,6 +28,17 @@ SonoicWidgets/
 - App state orchestration belongs in `SonoicApp/Model`.
 - UI composition belongs in `SonoicApp/Views/<Feature>`.
 
+## Source Browsing
+
+Source browsing stays inside `SonoicApp` because it combines app navigation, MusicKit metadata, Sonos-native playback payloads, and user-facing capability decisions.
+
+- `SonoicModel` remains the top-level owner of source state.
+- `SonoicSourceAdapter` centralizes source capabilities, search, detail loading, favorite toggles, and Sonos playback payload lookup.
+- Apple Music is the first live adapter. Other services can be metadata-only until they have real auth, catalog, or Sonos payload support.
+- Search uses one session state with query, source filter, kind filter, and per-source result states.
+- Artists, albums, and playlists route to one shared source detail screen regardless of whether the entry point is Search, Home, Recently Played, Favorites, a row menu, or the player.
+- Songs do not have a detail route. Song rows play only when the adapter can provide a trustworthy Sonos-owned payload.
+
 ## Design Bias
 
 Sonoic should look more like a focused Apple sample app than a layered enterprise app.

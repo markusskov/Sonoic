@@ -65,8 +65,9 @@ struct SonoicRecentPlayItemTests {
 
         let sourceItem = SonoicSourceItem(recentPlay: recentPlay)
 
-        #expect(sourceItem.appleMusicIdentity?.routedID(for: .recentPlay) == "library-playlist-id")
-        #expect(sourceItem.appleMusicIdentity?.routedID(for: .catalogSearch) == "catalog-playlist-id")
+        #expect(sourceItem.sourceReference?.serviceID == SonosServiceDescriptor.appleMusic.id)
+        #expect(sourceItem.sourceReference?.routedID(for: .recentPlay) == "library-playlist-id")
+        #expect(sourceItem.sourceReference?.routedID(for: .catalogSearch) == "catalog-playlist-id")
     }
 
     @Test
@@ -90,6 +91,7 @@ struct SonoicRecentPlayItemTests {
 
         #expect(sourceItem.kind == .playlist)
         #expect(sourceItem.serviceItemID == "12345")
-        #expect(sourceItem.appleMusicIdentity?.catalogID == "12345")
+        #expect(sourceItem.sourceReference?.serviceID == SonosServiceDescriptor.appleMusic.id)
+        #expect(sourceItem.sourceReference?.catalogID == "12345")
     }
 }

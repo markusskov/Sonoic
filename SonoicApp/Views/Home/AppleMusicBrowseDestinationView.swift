@@ -49,20 +49,20 @@ struct AppleMusicBrowseDestinationView: View {
     @ViewBuilder
     private var content: some View {
         if state.isLoading && state.sections.isEmpty && state.genres.isEmpty {
-            AppleMusicBrowseMessageCard(
+            SourceMessageCard(
                 title: "Loading \(destination.title)",
                 detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.sections.isEmpty && state.genres.isEmpty {
-            AppleMusicBrowseMessageCard(
+            SourceMessageCard(
                 title: "Could Not Load \(destination.title)",
                 detail: failureDetail,
                 systemImage: "exclamationmark.triangle"
             )
         } else if !state.sections.isEmpty {
             if state.isLoading {
-                AppleMusicBrowseMessageCard(
+                SourceMessageCard(
                     title: "Refreshing",
                     detail: "Updating...",
                     systemImage: "arrow.clockwise"
@@ -70,9 +70,9 @@ struct AppleMusicBrowseDestinationView: View {
             }
 
             if let failureDetail = state.failureDetail {
-                AppleMusicBrowseMessageCard(
+                SourceMessageCard(
                     title: "Showing Cached \(destination.title)",
-                    detail: staleDetail(failureDetail),
+                    detail: sourceStaleDetail(failureDetail, lastUpdatedAt: state.lastUpdatedAt),
                     systemImage: "exclamationmark.triangle"
                 )
             }
@@ -82,7 +82,7 @@ struct AppleMusicBrowseDestinationView: View {
             }
         } else if !state.genres.isEmpty {
             if state.isLoading {
-                AppleMusicBrowseMessageCard(
+                SourceMessageCard(
                     title: "Refreshing Categories",
                     detail: "Updating...",
                     systemImage: "arrow.clockwise"
@@ -90,16 +90,16 @@ struct AppleMusicBrowseDestinationView: View {
             }
 
             if let failureDetail = state.failureDetail {
-                AppleMusicBrowseMessageCard(
+                SourceMessageCard(
                     title: "Showing Cached Categories",
-                    detail: staleDetail(failureDetail),
+                    detail: sourceStaleDetail(failureDetail, lastUpdatedAt: state.lastUpdatedAt),
                     systemImage: "exclamationmark.triangle"
                 )
             }
 
             AppleMusicBrowseGenreSection(genres: state.genres)
         } else {
-            AppleMusicBrowseMessageCard(
+            SourceMessageCard(
                 title: "No Items",
                 detail: "Nothing here yet.",
                 systemImage: destination.systemImage
@@ -111,17 +111,10 @@ struct AppleMusicBrowseDestinationView: View {
         model.loadAppleMusicBrowseDestination(destination, force: true)
     }
 
-    private func staleDetail(_ failureDetail: String) -> String {
-        guard let lastUpdatedAt = state.lastUpdatedAt else {
-            return failureDetail
-        }
-
-        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
-    }
 }
 
 private struct AppleMusicBrowseSectionView: View {
-    let section: SonoicAppleMusicItemDetailSection
+    let section: SonoicSourceItemDetailSection
     private let previewLimit = 8
 
     private var previewItems: [SonoicSourceItem] {
@@ -144,7 +137,7 @@ private struct AppleMusicBrowseSectionView: View {
 
                 if showsViewAll {
                     NavigationLink {
-                        AppleMusicItemCollectionView(
+                        SourceItemCollectionView(
                             title: section.title,
                             subtitle: section.subtitle,
                             items: section.items
@@ -213,34 +206,6 @@ private struct AppleMusicBrowseGenreRow: View {
         }
         .padding(.vertical, 13)
         .accessibilityElement(children: .combine)
-    }
-}
-
-private struct AppleMusicBrowseMessageCard: View {
-    let title: String
-    let detail: String
-    let systemImage: String
-
-    var body: some View {
-        RoomSurfaceCard {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: systemImage)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 32, height: 32)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    Text(detail)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
     }
 }
 

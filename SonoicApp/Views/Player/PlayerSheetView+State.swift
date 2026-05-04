@@ -132,7 +132,7 @@ extension PlayerSheetView {
                 return
             }
 
-            model.pendingAppleMusicDetailRoute = item
+            model.pendingSourceItemDetailRoute = item
             dismiss()
         }
     }

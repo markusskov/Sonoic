@@ -7,7 +7,7 @@ struct HomeFavoriteCard: View {
     var body: some View {
         if let detailItem {
             NavigationLink {
-                AppleMusicItemDetailView(item: detailItem)
+                SourceItemDetailView(item: detailItem)
             } label: {
                 content
             }
@@ -21,35 +21,18 @@ struct HomeFavoriteCard: View {
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HomeFavoriteArtworkView(
-                artworkURL: favorite.artworkURL,
-                artworkIdentifier: nil,
-                maximumDisplayDimension: 178
-            )
-            .frame(width: 178, height: 178)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(favorite.title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                Text(favorite.subtitle ?? favorite.service?.name ?? "Sonos Favorite")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if let service = favorite.service {
-                    Label(service.name, systemImage: service.systemImage)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-        }
-        .frame(width: 178, alignment: .leading)
+        SourceArtworkCaptionTile(
+            title: favorite.title,
+            subtitle: favorite.subtitle ?? favorite.service?.name ?? "Sonos Favorite",
+            badgeTitle: favorite.service?.name,
+            badgeSystemImage: favorite.service?.systemImage,
+            artworkURL: favorite.artworkURL,
+            artworkIdentifier: nil,
+            artworkDimension: 178,
+            width: 178,
+            spacing: 12,
+            textSpacing: 6
+        )
     }
 
     private var detailItem: SonoicSourceItem? {
@@ -75,13 +58,14 @@ struct HomeFavoriteArtworkView: View {
     let artworkURL: String?
     let artworkIdentifier: String?
     let maximumDisplayDimension: CGFloat
+    var cornerRadius: CGFloat = 26
 
     var body: some View {
         if let artworkIdentifier {
             PlayerArtworkView(
                 artworkIdentifier: artworkIdentifier,
                 reloadKey: artworkIdentifier,
-                cornerRadius: 26,
+                cornerRadius: cornerRadius,
                 maximumDisplayDimension: maximumDisplayDimension
             )
         } else {
@@ -97,16 +81,72 @@ struct HomeFavoriteArtworkView: View {
                     Color.secondary.opacity(0.12)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(.white.opacity(0.08))
             }
         }
     }
 
     private var placeholder: some View {
-        SonoicArtworkPlaceholderView(cornerRadius: 26)
+        SonoicArtworkPlaceholderView(cornerRadius: cornerRadius)
+    }
+}
+
+struct SourceArtworkCaptionTile: View {
+    let title: String
+    let subtitle: String?
+    var badgeTitle: String?
+    var badgeSystemImage: String?
+    let artworkURL: String?
+    let artworkIdentifier: String?
+    var artworkDimension: CGFloat
+    var width: CGFloat?
+    var artworkCornerRadius: CGFloat = 26
+    var titleFont: Font = .headline
+    var subtitleFont: Font = .subheadline
+    var badgeFont: Font = .caption.weight(.medium)
+    var spacing: CGFloat = 10
+    var textSpacing: CGFloat = 5
+
+    private var tileWidth: CGFloat {
+        width ?? artworkDimension
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            HomeFavoriteArtworkView(
+                artworkURL: artworkURL,
+                artworkIdentifier: artworkIdentifier,
+                maximumDisplayDimension: artworkDimension,
+                cornerRadius: artworkCornerRadius
+            )
+            .frame(width: artworkDimension, height: artworkDimension)
+
+            VStack(alignment: .leading, spacing: textSpacing) {
+                Text(title)
+                    .font(titleFont)
+                    .foregroundStyle(SonoicTheme.Colors.primary)
+                    .lineLimit(1)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(subtitleFont)
+                        .foregroundStyle(SonoicTheme.Colors.secondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if let badgeTitle, let badgeSystemImage {
+                    Label(badgeTitle, systemImage: badgeSystemImage)
+                        .font(badgeFont)
+                        .foregroundStyle(SonoicTheme.Colors.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .frame(width: tileWidth, alignment: .leading)
     }
 }
 

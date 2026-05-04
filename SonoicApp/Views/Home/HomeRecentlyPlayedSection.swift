@@ -17,7 +17,9 @@ struct HomeRecentlyPlayedSection: View {
 }
 
 private struct HomeRecentPlayCard: View {
+    @Environment(SonoicModel.self) private var model
     let item: SonoicRecentPlayItem
+    @State private var actionFailure: SourceActionFailure?
 
     private var sourceItem: SonoicSourceItem? {
         guard item.service != nil else {
@@ -27,11 +29,25 @@ private struct HomeRecentPlayCard: View {
         return SonoicSourceItem(recentPlay: item)
     }
 
+    private var canPlaySourceItem: Bool {
+        sourceItem.map(model.canPlaySourceItem) ?? false
+    }
+
     var body: some View {
         Group {
-            if let sourceItem {
+            if let sourceItem, sourceItem.kind == .song, canPlaySourceItem {
+                Button {
+                    Task {
+                        await play(sourceItem)
+                    }
+                } label: {
+                    cardContent
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Play \(item.title)")
+            } else if let sourceItem, sourceItem.kind != .song {
                 NavigationLink {
-                    AppleMusicItemDetailView(item: sourceItem)
+                    SourceItemDetailView(item: sourceItem)
                 } label: {
                     cardContent
                 }
@@ -41,33 +57,46 @@ private struct HomeRecentPlayCard: View {
             }
         }
         .frame(width: 156, alignment: .leading)
+        .alert(item: $actionFailure) { failure in
+            Alert(
+                title: Text(failure.title),
+                message: Text(failure.detail),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
     private var cardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HomeFavoriteArtworkView(
-                artworkURL: item.artworkURL,
-                artworkIdentifier: item.artworkIdentifier,
-                maximumDisplayDimension: 156
-            )
-            .frame(width: 156, height: 156)
+        SourceArtworkCaptionTile(
+            title: item.title,
+            subtitle: item.subtitle ?? item.sourceName,
+            badgeTitle: item.sourceName,
+            badgeSystemImage: item.service?.systemImage ?? "music.note",
+            artworkURL: item.artworkURL,
+            artworkIdentifier: item.artworkIdentifier,
+            artworkDimension: 156,
+            width: 156,
+            titleFont: .subheadline.weight(.semibold),
+            subtitleFont: .caption,
+            badgeFont: .caption2.weight(.medium)
+        )
+    }
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(item.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+    private func play(_ sourceItem: SonoicSourceItem) async {
+        do {
+            let didStart = try await model.playSourceItem(sourceItem)
 
-                Text(item.subtitle ?? item.sourceName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Label(item.sourceName, systemImage: item.service?.systemImage ?? "music.note")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            if !didStart {
+                actionFailure = SourceActionFailure(
+                    title: "Could Not Start",
+                    detail: "Sonos could not start this item."
+                )
             }
+        } catch {
+            actionFailure = SourceActionFailure(
+                title: "Could Not Start",
+                detail: error.localizedDescription
+            )
         }
     }
 }

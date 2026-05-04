@@ -34,7 +34,7 @@ final class SonoicModel {
     @ObservationIgnored var lastSharedStorePersistAt: Date?
     @ObservationIgnored var appleMusicLibraryLoadTasks: [SonoicAppleMusicLibraryDestination: Task<Void, Never>] = [:]
     @ObservationIgnored var appleMusicBrowseLoadTasks: [SonoicAppleMusicBrowseDestination: Task<Void, Never>] = [:]
-    @ObservationIgnored var appleMusicItemDetailLoadTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored var sourceItemDetailLoadTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored var appleMusicRecentlyAddedLoadTask: Task<Void, Never>?
     @ObservationIgnored var isManualTransportCommandInFlight = false
     @ObservationIgnored var isManualVolumeCommandInFlight = false
@@ -67,7 +67,7 @@ final class SonoicModel {
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
 
     var selectedTab: RootTab = .home
-    var pendingAppleMusicDetailRoute: SonoicSourceItem?
+    var pendingSourceItemDetailRoute: SonoicSourceItem?
     var manualSonosHost: String {
         didSet {
             settingsStore.saveManualSonosHost(manualSonosHost)
@@ -113,10 +113,11 @@ final class SonoicModel {
     var roomVolumeState: SonosRoomVolumeState = .idle
     var recentPlays: [SonoicRecentPlayItem] = []
     var recentSourceSearches: [SonoicRecentSourceSearch] = []
+    var sourceSearchSession = SonoicSourceSearchSessionState()
     var sourceSearchStates: [String: SonoicSourceSearchState] = [:]
     var appleMusicLibraryStates: [SonoicAppleMusicLibraryDestination: SonoicAppleMusicLibraryState] = [:]
     var appleMusicBrowseStates: [SonoicAppleMusicBrowseDestination: SonoicAppleMusicBrowseState] = [:]
-    var appleMusicItemDetailStates: [String: SonoicAppleMusicItemDetailState] = [:]
+    var sourceItemDetailStates: [String: SonoicSourceItemDetailState] = [:]
     var appleMusicFavoriteOverrides: [String: SonoicAppleMusicFavoriteOverride] = [:]
     var appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown

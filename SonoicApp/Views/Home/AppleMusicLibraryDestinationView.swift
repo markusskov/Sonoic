@@ -49,19 +49,19 @@ struct AppleMusicLibraryDestinationView: View {
     @ViewBuilder
     private var content: some View {
         if state.isLoading && state.items.isEmpty {
-            AppleMusicLibraryMessageCard(
+            SourceMessageCard(
                 title: "Loading \(destination.title)",
                 detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.items.isEmpty {
-            AppleMusicLibraryMessageCard(
+            SourceMessageCard(
                 title: "Could Not Load \(destination.title)",
                 detail: failureDetail,
                 systemImage: "exclamationmark.triangle"
             )
         } else if state.status == .loaded && state.items.isEmpty {
-            AppleMusicLibraryMessageCard(
+            SourceMessageCard(
                 title: "No \(destination.title)",
                 detail: "Nothing here yet.",
                 systemImage: "music.note.list"
@@ -69,7 +69,7 @@ struct AppleMusicLibraryDestinationView: View {
         } else if state.status == .loaded || !state.items.isEmpty {
             libraryItemsSection
         } else {
-            AppleMusicLibraryMessageCard(
+            SourceMessageCard(
                 title: destination.title,
                 detail: "Pull to refresh.",
                 systemImage: destination.systemImage
@@ -85,9 +85,9 @@ struct AppleMusicLibraryDestinationView: View {
             )
 
             if let failureDetail = state.failureDetail {
-                AppleMusicLibraryMessageCard(
+                SourceMessageCard(
                     title: "Showing Cached \(destination.title)",
-                    detail: staleDetail(failureDetail),
+                    detail: sourceStaleDetail(failureDetail, lastUpdatedAt: state.lastUpdatedAt),
                     systemImage: "exclamationmark.triangle"
                 )
             }
@@ -120,14 +120,6 @@ struct AppleMusicLibraryDestinationView: View {
                 .accessibilityLabel("Load more \(destination.title)")
             }
         }
-    }
-
-    private func staleDetail(_ failureDetail: String) -> String {
-        guard let lastUpdatedAt = state.lastUpdatedAt else {
-            return failureDetail
-        }
-
-        return "Last successful load was \(lastUpdatedAt.formatted(.dateTime.hour().minute())).\n\n\(failureDetail)"
     }
 
     private func refreshTapped() {
@@ -168,7 +160,7 @@ private struct AppleMusicLibraryGridCard: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             NavigationLink {
-                AppleMusicItemDetailView(item: item)
+                SourceItemDetailView(item: item)
             } label: {
                 VStack(alignment: .leading, spacing: 9) {
                     HomeFavoriteArtworkView(
@@ -201,10 +193,10 @@ private struct AppleMusicLibraryGridCard: View {
             .buttonStyle(.plain)
             .accessibilityLabel(item.title)
 
-            if let exactPlaybackCandidate {
+            if exactPlaybackCandidate != nil {
                 Button {
                     Task {
-                        _ = await model.playManualSonosPayload(exactPlaybackCandidate.payload)
+                        _ = try? await model.playSourceItem(item)
                     }
                 } label: {
                     Image(systemName: "play.fill")
@@ -216,34 +208,6 @@ private struct AppleMusicLibraryGridCard: View {
                 .buttonBorderShape(.circle)
                 .padding(8)
                 .accessibilityLabel("Play \(item.title)")
-            }
-        }
-    }
-}
-
-private struct AppleMusicLibraryMessageCard: View {
-    let title: String
-    let detail: String
-    let systemImage: String
-
-    var body: some View {
-        RoomSurfaceCard {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: systemImage)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 32, height: 32)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    Text(detail)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
         }
     }

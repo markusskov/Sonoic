@@ -33,8 +33,8 @@ Implemented so far:
 - native Apple now-playing integration for playback commands, artwork, progress, and lock-screen scrubbing when duration is available
 - home theater controls for EQ, sub level, speech enhancement, and night sound; TV audio details stay behind Advanced until they become useful controls
 - Swift Testing target for focused Sonos parser coverage
-- Apple Music source surface with quiet authorization state, catalog search, saved playlists/artists/albums/songs, recently added library items, search/library item detail pages, and structured Browse destinations
-- explicit playback capability states so service metadata does not pretend to be Sonos-playable until Sonoic has a Sonos-native payload
+- shared source surface with Apple Music as the first live adapter, quiet authorization state, multi-source search state, saved playlists/artists/albums/songs, recently added library items, shared artist/album/playlist detail pages, and structured Browse destinations
+- explicit playback capability states so service metadata does not pretend to be Sonos-playable until a source adapter can provide a Sonos-native payload
 
 ## Architecture Guardrails
 
@@ -96,14 +96,14 @@ The next work here should be careful:
 
 Home now has enough gravity to become the center of Sonoic.
 
-Apple Music V1 is now a real service surface. It can search Apple Music, browse saved library lanes, open item details, show recently added library content, and start playback only when Sonoic has a proven Sonos-owned payload. Search should feel like one search with grouped results, not a mode picker.
+Apple Music V1 is now the first live adapter in a shared source surface. It can search Apple Music, browse saved library lanes, open shared artist/album/playlist details, show recently added library content, and start playback only when Sonoic has a proven Sonos-owned payload. Search is one query with source and kind filters instead of separate service screens.
 
 The next meaningful work here is:
 
 - wire real Apple Music Browse lanes for recommendations, categories, curated playlists, new releases, and radio metadata
 - harden Sonos-owned Apple Music payload generation for catalog and library items
 - decide which Apple Music playlist, album, and song starts can preserve queue/session context safely
-- keep Spotify as a separate integration path because Spotify iOS SDK/App Remote is app-owned control, not Sonos-native playback
+- add future Spotify, Tidal, Sonos Radio, SoundCloud, and other adapters through the shared source registry without new detail screens
 - add queue-derived actions from recent plays, favorites, and service metadata once payload ownership is clear
 - keep playback affordances visible only when each item has a trustworthy playback path
 
