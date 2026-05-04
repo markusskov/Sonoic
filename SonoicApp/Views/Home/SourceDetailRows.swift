@@ -64,57 +64,6 @@ struct SourceNavigationRow: View {
     }
 }
 
-struct SourceItemRow: View {
-    let item: SonoicSourceItem
-    let selectAction: () -> Void
-    let playAction: () async -> Void
-
-    private var shouldPlayOnRowTap: Bool {
-        item.kind == .song && item.playbackCapability.canPlay
-    }
-
-    var body: some View {
-        HStack(spacing: 14) {
-            SourceItemMetadataRow(item: item)
-
-            if shouldPlayOnRowTap {
-                Button(action: selectAction) {
-                    SourceItemOptionsIcon()
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("More options for \(item.title)")
-            } else if item.playbackCapability.canPlay {
-                Button(action: playTapped) {
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.semibold))
-                        .frame(width: 34, height: 34)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Play \(item.title)")
-            }
-        }
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
-        .onTapGesture(perform: rowTapped)
-    }
-
-    private func rowTapped() {
-        guard shouldPlayOnRowTap else {
-            selectAction()
-            return
-        }
-
-        playTapped()
-    }
-
-    private func playTapped() {
-        Task {
-            await playAction()
-        }
-    }
-}
-
 struct SourceItemNavigationRow: View {
     @Environment(SonoicModel.self) private var model
 
@@ -149,7 +98,11 @@ struct SourceItemNavigationRow: View {
     }
 
     private var hasAuxiliaryActions: Bool {
-        canPlay || canFavorite || item.externalURL != nil
+        canPlay || canFavorite || item.externalURL != nil || hasUnavailableContext
+    }
+
+    private var hasUnavailableContext: Bool {
+        item.kind == .song && !canPlay
     }
 
     var body: some View {
@@ -177,14 +130,20 @@ struct SourceItemNavigationRow: View {
 
             if shouldPlayOnRowTap || hasAuxiliaryActions {
                 Menu {
-                    Button {
-                        Task {
-                            await play()
+                    if canPlay {
+                        Button {
+                            Task {
+                                await play()
+                            }
+                        } label: {
+                            Label("Play", systemImage: "play.fill")
                         }
-                    } label: {
-                        Label("Play", systemImage: "play.fill")
+                    } else {
+                        Button {} label: {
+                            Label("Unavailable", systemImage: "lock")
+                        }
+                        .disabled(true)
                     }
-                    .disabled(!canPlay)
 
                     if canFavorite {
                         Button {

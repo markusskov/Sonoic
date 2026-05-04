@@ -97,24 +97,12 @@ struct AppleMusicSearchEntrySection: View {
     var body: some View {
         Button(action: openSearch) {
             SonoicListCard(isInteractive: true) {
-                HStack(spacing: 14) {
-                    RoomSurfaceIconView(
-                        systemImage: "magnifyingglass",
-                        size: 44,
-                        cornerRadius: 14,
-                        font: .body.weight(.semibold)
+                SourceNavigationRow(
+                    row: SourceNavigationRow.Model(
+                        title: "Search",
+                        systemImage: "magnifyingglass"
                     )
-
-                    Text("Search Apple Music")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.primary)
-
-                    Spacer(minLength: 0)
-
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                }
+                )
             }
             .contentShape(Rectangle())
         }

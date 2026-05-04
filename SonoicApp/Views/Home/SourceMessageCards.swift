@@ -42,34 +42,21 @@ struct SourceEmptyCard: View {
 }
 
 struct SourceCatalogPlaceholderCard: View {
-    let serviceName: String
-
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HomeSectionHeader(
                 title: "Search"
             )
 
-            RoomSurfaceCard {
-                HStack(spacing: 14) {
-                    RoomSurfaceIconView(
+            SonoicListCard {
+                SourceNavigationRow(
+                    row: SourceNavigationRow.Model(
+                        title: "Search",
+                        subtitle: "Not connected yet",
                         systemImage: "magnifyingglass",
-                        size: 44,
-                        cornerRadius: 14,
-                        font: .body.weight(.semibold)
+                        showsChevron: false
                     )
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("\(serviceName) Search")
-                            .font(.body.weight(.medium))
-
-                        Text("Not connected yet")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer(minLength: 0)
-                }
+                )
                 .foregroundStyle(.secondary)
             }
         }
