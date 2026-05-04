@@ -51,7 +51,6 @@ struct AppleMusicBrowseDestinationView: View {
         if state.isLoading && state.sections.isEmpty && state.genres.isEmpty {
             SourceMessageCard(
                 title: "Loading \(destination.title)",
-                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.sections.isEmpty && state.genres.isEmpty {
@@ -64,7 +63,6 @@ struct AppleMusicBrowseDestinationView: View {
             if state.isLoading {
                 SourceMessageCard(
                     title: "Refreshing",
-                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }
@@ -84,7 +82,6 @@ struct AppleMusicBrowseDestinationView: View {
             if state.isLoading {
                 SourceMessageCard(
                     title: "Refreshing Categories",
-                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }
@@ -101,7 +98,6 @@ struct AppleMusicBrowseDestinationView: View {
         } else {
             SourceMessageCard(
                 title: "No Items",
-                detail: "Nothing here yet.",
                 systemImage: destination.systemImage
             )
         }

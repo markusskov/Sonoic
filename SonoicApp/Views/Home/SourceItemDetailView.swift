@@ -114,7 +114,6 @@ struct SourceItemDetailView: View {
         if state.isLoading && state.sections.isEmpty {
             SourceMessageCard(
                 title: "Loading \(item.kind.title)",
-                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.sections.isEmpty {
@@ -126,14 +125,12 @@ struct SourceItemDetailView: View {
         } else if state.sections.isEmpty {
             SourceMessageCard(
                 title: "No Details",
-                detail: "Nothing else here yet.",
                 systemImage: item.kind.systemImage
             )
         } else {
             if state.isLoading {
                 SourceMessageCard(
                     title: "Refreshing",
-                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }

@@ -205,7 +205,6 @@ struct AppleMusicRecentlyAddedSection: View {
         if state.isLoading && state.items.isEmpty {
             SourceMessageCard(
                 title: "Loading Library",
-                detail: "Loading...",
                 systemImage: "icloud.and.arrow.down"
             )
         } else if let failureDetail = state.failureDetail, state.items.isEmpty {
@@ -217,14 +216,12 @@ struct AppleMusicRecentlyAddedSection: View {
         } else if state.status == .loaded && state.items.isEmpty {
             SourceMessageCard(
                 title: "No Items",
-                detail: "Nothing here yet.",
                 systemImage: "music.note.list"
             )
         } else if state.status == .loaded || !state.items.isEmpty {
             if state.isLoading {
                 SourceMessageCard(
                     title: "Refreshing",
-                    detail: "Updating...",
                     systemImage: "arrow.clockwise"
                 )
             }

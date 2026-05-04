@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SourceMessageCard: View {
     let title: String
-    let detail: String
+    var detail: String? = nil
     let systemImage: String
 
     var body: some View {
@@ -18,10 +18,12 @@ struct SourceMessageCard: View {
                         .font(.headline)
                         .foregroundStyle(.primary)
 
-                    Text(detail)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if let detail {
+                        Text(detail)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
