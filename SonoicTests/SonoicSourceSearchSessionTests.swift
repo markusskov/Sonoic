@@ -90,6 +90,35 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
+    func nonAppleSonosNativeItemsRemainPlayable() throws {
+        let model = SonoicModel()
+        let payload = playablePayload(service: .spotify)
+        let spotifyItem = item(
+            id: "spotify-native",
+            title: "Sweet Jane",
+            kind: .song,
+            service: .spotify,
+            playbackCapability: .sonosNative(payload)
+        )
+
+        #expect(model.canPlaySourceItem(spotifyItem))
+        #expect(try model.sourcePlayablePayload(for: spotifyItem, purpose: .directPlay) == payload)
+    }
+
+    @Test
+    func nonAppleMetadataOnlyItemsRemainNonPlayable() {
+        let model = SonoicModel()
+        let spotifyItem = item(
+            id: "spotify-metadata",
+            title: "Sweet Jane",
+            kind: .song,
+            service: .spotify
+        )
+
+        #expect(!model.canPlaySourceItem(spotifyItem))
+    }
+
+    @Test
     func updatingSameQueryPreservesCachedResults() {
         let model = SonoicModel()
         let appleMusicSource = source(.appleMusic)
@@ -158,7 +187,8 @@ struct SonoicSourceSearchSessionTests {
         id: String,
         title: String,
         kind: SonoicSourceItem.Kind,
-        service: SonosServiceDescriptor
+        service: SonosServiceDescriptor,
+        playbackCapability: SonoicPlaybackCapability = .metadataOnly
     ) -> SonoicSourceItem {
         SonoicSourceItem(
             id: id,
@@ -169,7 +199,19 @@ struct SonoicSourceSearchSessionTests {
             service: service,
             origin: .catalogSearch,
             kind: kind,
-            playbackCapability: .metadataOnly
+            playbackCapability: playbackCapability
+        )
+    }
+
+    private func playablePayload(service: SonosServiceDescriptor) -> SonosPlayablePayload {
+        SonosPlayablePayload(
+            id: "payload",
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato",
+            artworkURL: nil,
+            service: service,
+            uri: "x-sonos-spotify:spotify%3atrack%3a1",
+            metadataXML: nil
         )
     }
 }

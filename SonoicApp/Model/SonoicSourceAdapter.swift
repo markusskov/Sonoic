@@ -123,18 +123,18 @@ extension SonoicModel {
         for item: SonoicSourceItem,
         purpose: SonoicSourcePlayablePayloadPurpose
     ) throws -> SonosPlayablePayload? {
-        guard sourceAdapter(for: item).capabilities.supportsSonosPlaybackPayloads else {
-            return nil
-        }
-
         switch item.service.kind {
         case .appleMusic:
+            guard sourceAdapter(for: item).capabilities.supportsSonosPlaybackPayloads else {
+                return item.sonosNativePlaybackPayload
+            }
+
             return try appleMusicPlayablePayload(
                 for: item,
                 purpose: purpose
             )
         case .spotify, .sonosRadio, .genericStreaming:
-            return nil
+            return item.sonosNativePlaybackPayload
         }
     }
 
@@ -203,4 +203,14 @@ extension SonoicModel {
         }
     }
 
+}
+
+private extension SonoicSourceItem {
+    var sonosNativePlaybackPayload: SonosPlayablePayload? {
+        if case let .sonosNative(payload) = playbackCapability {
+            payload
+        } else {
+            nil
+        }
+    }
 }
