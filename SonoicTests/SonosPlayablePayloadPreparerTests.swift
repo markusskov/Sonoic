@@ -111,7 +111,7 @@ struct SonosPlayablePayloadPreparerTests {
         #expect(
             SonosPlayablePayloadPreparer.protocolInfo(
                 for: "x-sonosapi-hls:song%3a1440845464?sid=204"
-            ) == "sonos.com-http:*:application/x-mpegURL:*"
+            ) == "sonos.com-http:*:application/vnd.apple.mpegurl:*"
         )
         #expect(
             SonosPlayablePayloadPreparer.protocolInfo(
