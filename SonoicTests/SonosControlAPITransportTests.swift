@@ -273,6 +273,28 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
+    func buildsPlaybackSessionCommandPaths() {
+        #expect(
+            SonosControlAPIClient.playbackSessionCommandPath(
+                sessionID: "session-1",
+                command: "loadCloudQueue"
+            ) == "/playbackSessions/session-1/playbackSession/loadCloudQueue"
+        )
+        #expect(
+            SonosControlAPIClient.playbackSessionCommandPath(
+                sessionID: "session-1",
+                command: "skipToItem"
+            ) == "/playbackSessions/session-1/playbackSession/skipToItem"
+        )
+        #expect(
+            SonosControlAPIClient.playbackSessionCommandPath(
+                sessionID: "session-1",
+                command: "refreshCloudQueue"
+            ) == "/playbackSessions/session-1/playbackSession/refreshCloudQueue"
+        )
+    }
+
+    @Test
     func settingsRoundTripThroughUserDefaults() {
         let defaults = UserDefaults(suiteName: "SonosControlAPITransportTests-\(UUID().uuidString)")!
         let store = SonoicSettingsStore(userDefaults: defaults)

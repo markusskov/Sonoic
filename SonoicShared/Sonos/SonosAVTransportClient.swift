@@ -23,6 +23,11 @@ struct SonosAVTransportClient {
         case dlnaRelativeTime = "X_DLNA_REL_TIME"
     }
 
+    struct SeekPositionConfirmation: Equatable {
+        var relativeTime: TimeInterval
+        var trackDuration: TimeInterval?
+    }
+
     private let transport: SonosControlTransport
 
     init(transport: SonosControlTransport = SonosControlTransport()) {
@@ -376,11 +381,55 @@ struct SonosAVTransportClient {
     }
 
     private func didReachSeekTarget(host: String, target: TimeInterval) async throws -> Bool {
-        guard let observedTime = SonosDurationParser.parseTimeInterval(from: try await fetchRelativeTime(host: host)) else {
+        guard let position = try await fetchSeekPositionConfirmation(host: host) else {
             return false
         }
 
-        return abs(observedTime - target) <= 4
+        return Self.didConfirmSeekTarget(position, target: target)
+    }
+
+    static func didConfirmSeekTarget(
+        _ position: SeekPositionConfirmation,
+        target: TimeInterval
+    ) -> Bool {
+        if abs(position.relativeTime - target) <= 4 {
+            return true
+        }
+
+        guard let trackDuration = position.trackDuration,
+              trackDuration > 0,
+              target >= trackDuration - 4
+        else {
+            return false
+        }
+
+        return position.relativeTime <= 4
+    }
+
+    private func fetchSeekPositionConfirmation(host: String) async throws -> SeekPositionConfirmation? {
+        let data = try await transport.performAction(
+            service: .avTransport,
+            named: "GetPositionInfo",
+            body: """
+            <u:GetPositionInfo xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+            </u:GetPositionInfo>
+            """,
+            host: host
+        )
+
+        let values = try SonosSOAPValuesParser(
+            expectedElements: ["RelTime", "TrackDuration"]
+        ).parse(data)
+
+        guard let relativeTime = SonosDurationParser.parseTimeInterval(from: values["RelTime"]) else {
+            return nil
+        }
+
+        return SeekPositionConfirmation(
+            relativeTime: relativeTime,
+            trackDuration: SonosDurationParser.parseTimeInterval(from: values["TrackDuration"])
+        )
     }
 
     private func fetchRelativeTime(host: String) async throws -> String {

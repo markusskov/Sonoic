@@ -7,6 +7,10 @@ struct SonosControlAPIClient {
         self.transport = transport
     }
 
+    static func playbackSessionCommandPath(sessionID: String, command: String) -> String {
+        "/playbackSessions/\(sessionID)/playbackSession/\(command)"
+    }
+
     func households(accessToken: String) async throws -> SonosControlAPIHouseholdsResponse {
         try await transport.get(
             "/households",
@@ -181,7 +185,7 @@ struct SonosControlAPIClient {
         accessToken: String
     ) async throws {
         try await transport.post(
-            "/sessions/\(sessionID)/playbackSession/loadCloudQueue",
+            Self.playbackSessionCommandPath(sessionID: sessionID, command: "loadCloudQueue"),
             accessToken: accessToken,
             body: request
         )
@@ -197,7 +201,7 @@ struct SonosControlAPIClient {
         accessToken: String
     ) async throws {
         try await transport.post(
-            "/sessions/\(sessionID)/playbackSession/skipToItem",
+            Self.playbackSessionCommandPath(sessionID: sessionID, command: "skipToItem"),
             accessToken: accessToken,
             body: SonosControlAPISkipToItemRequest(
                 itemId: itemID,
@@ -211,7 +215,7 @@ struct SonosControlAPIClient {
 
     func refreshCloudQueue(sessionID: String, accessToken: String) async throws {
         try await transport.post(
-            "/sessions/\(sessionID)/playbackSession/refreshCloudQueue",
+            Self.playbackSessionCommandPath(sessionID: sessionID, command: "refreshCloudQueue"),
             accessToken: accessToken
         )
     }
