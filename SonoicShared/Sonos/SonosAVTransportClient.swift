@@ -142,6 +142,7 @@ struct SonosAVTransportClient {
         let target = max(0, timeInterval)
         let targetText = formattedSeekTarget(for: target)
         let wasPlaying = (try? await fetchPlaybackState(host: host)) == .playing
+        var didPauseForFallback = false
         var lastError: Error?
 
         if await seekAndConfirmIgnoringFailure(
@@ -155,6 +156,7 @@ struct SonosAVTransportClient {
 
         if wasPlaying {
             try? await pause(host: host)
+            didPauseForFallback = true
             try? await Task.sleep(for: .milliseconds(120))
         }
 
@@ -165,17 +167,17 @@ struct SonosAVTransportClient {
                 unit: unit,
                 lastError: &lastError
             ) {
-                if wasPlaying {
-                    try? await play(host: host)
-                }
+                await resumeAfterSeekFallbackIfNeeded(host: host, didPauseForFallback: didPauseForFallback)
                 return
             }
         }
 
         if let lastError {
+            await resumeAfterSeekFallbackIfNeeded(host: host, didPauseForFallback: didPauseForFallback)
             throw lastError
         }
 
+        await resumeAfterSeekFallbackIfNeeded(host: host, didPauseForFallback: didPauseForFallback)
         throw ClientError.seekDidNotTakeEffect(
             target: targetText,
             observed: try? await fetchRelativeTime(host: host)
@@ -346,6 +348,16 @@ struct SonosAVTransportClient {
         try await performSeek(host: host, target: target, unit: unit)
         try? await Task.sleep(for: .milliseconds(450))
         return try await didReachSeekTarget(host: host, target: target)
+    }
+
+    private func resumeAfterSeekFallbackIfNeeded(host: String, didPauseForFallback: Bool) async {
+        guard didPauseForFallback,
+              (try? await fetchPlaybackState(host: host)) == .paused
+        else {
+            return
+        }
+
+        try? await play(host: host)
     }
 
     private func performSeek(host: String, target: TimeInterval, unit: SeekUnit) async throws {

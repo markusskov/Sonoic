@@ -472,8 +472,8 @@ extension SonoicModel {
         diagnostics: SonosNowPlayingDiagnostics
     ) -> String {
         [
-            diagnostics.trackURI?.sonoicTrimmed ?? "",
-            diagnostics.currentURI?.sonoicTrimmed ?? "",
+            normalizedManualPlaybackURI(diagnostics.trackURI) ?? "",
+            normalizedManualPlaybackURI(diagnostics.currentURI) ?? "",
             snapshot.title.sonoicTrimmed,
             snapshot.artistName?.sonoicTrimmed ?? "",
             snapshot.albumTitle?.sonoicTrimmed ?? "",
