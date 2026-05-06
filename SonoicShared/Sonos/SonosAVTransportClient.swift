@@ -23,6 +23,11 @@ struct SonosAVTransportClient {
         case dlnaRelativeTime = "X_DLNA_REL_TIME"
     }
 
+    private enum SeekConfirmation {
+        static let attempts = 12
+        static let interval: Duration = .milliseconds(250)
+    }
+
     struct SeekPositionConfirmation: Equatable {
         var relativeTime: TimeInterval
         var trackDuration: TimeInterval?
@@ -351,8 +356,7 @@ struct SonosAVTransportClient {
 
     private func seekAndConfirm(host: String, target: TimeInterval, unit: SeekUnit) async throws -> Bool {
         try await performSeek(host: host, target: target, unit: unit)
-        try? await Task.sleep(for: .milliseconds(450))
-        return try await didReachSeekTarget(host: host, target: target)
+        return try await waitForSeekConfirmation(host: host, target: target)
     }
 
     private func resumeAfterSeekFallbackIfNeeded(host: String, didPauseForFallback: Bool) async {
@@ -386,6 +390,20 @@ struct SonosAVTransportClient {
         }
 
         return Self.didConfirmSeekTarget(position, target: target)
+    }
+
+    private func waitForSeekConfirmation(host: String, target: TimeInterval) async throws -> Bool {
+        for attempt in 0 ..< SeekConfirmation.attempts {
+            if attempt > 0 {
+                try? await Task.sleep(for: SeekConfirmation.interval)
+            }
+
+            if try await didReachSeekTarget(host: host, target: target) {
+                return true
+            }
+        }
+
+        return false
     }
 
     static func didConfirmSeekTarget(
