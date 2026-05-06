@@ -35,6 +35,7 @@ Implemented so far:
 - Swift Testing target for focused Sonos parser coverage
 - shared source surface with Apple Music as the first live adapter, quiet authorization state, multi-source search state, saved playlists/artists/albums/songs, recently added library items, shared artist/album/playlist detail pages, and structured Browse destinations
 - explicit playback capability states so service metadata does not pretend to be Sonos-playable until a source adapter can provide a Sonos-native payload
+- RevenueCat-backed Sonoic Plus foundation for future support and personalization features; core Sonos control remains free
 
 ## Architecture Guardrails
 
@@ -139,6 +140,20 @@ Next slices:
 - move TV audio inspection into Advanced if more HTControl state proves available
 - product-specific tuning for Arc, Beam, Ray, Amp, Sub, and surround setups
 - fast room switching without stale theater state
+
+### 6. Add tasteful Sonoic Plus personalization
+
+Sonoic Plus should feel like support and personalization, not withheld control.
+
+The foundation is in place through RevenueCat, but Plus features should land only when they make the app feel more personal:
+
+- alternate app icons
+- theme and accent choices
+- custom Home ordering
+- extra widget styles
+- saved room presets for volume, EQ, speech enhancement, and night sound
+
+Core playback, queue editing, discovery, source browsing, Lock Screen, Control Center, and the default Home quality stay free.
 
 ## Open Questions
 

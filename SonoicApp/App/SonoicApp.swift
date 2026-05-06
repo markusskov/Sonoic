@@ -11,6 +11,9 @@ struct SonoicApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
+                .task {
+                    model.configurePlusIfPossible()
+                }
                 .onChange(of: scenePhase, initial: true) { _, newPhase in
                     model.handleScenePhase(newPhase)
                 }

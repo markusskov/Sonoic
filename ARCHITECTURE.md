@@ -39,6 +39,16 @@ Source browsing stays inside `SonoicApp` because it combines app navigation, Mus
 - Artists, albums, and playlists route to one shared source detail screen regardless of whether the entry point is Search, Home, Recently Played, Favorites, a row menu, or the player.
 - Songs do not have a detail route. Song rows play only when the adapter can provide a trustworthy Sonos-owned payload.
 
+## Sonoic Plus
+
+Sonoic Plus is an app-only purchase and personalization layer. It must not gate core Sonos control: discovery, playback, queue, rooms, Lock Screen, Control Center, and the default Home experience stay free.
+
+- `SonoicModel` owns the observable Plus state.
+- `SonoicPlusController` wraps RevenueCat and RevenueCatUI behind Sonoic-owned types.
+- Plus feature checks use `SonoicPlusFeature` so future UI can ask one small question without depending on RevenueCat directly.
+- RevenueCat setup is driven by bundle configuration. When `RevenueCatAPIKey` is absent, the app stays in a not-configured state instead of failing startup.
+- Personalization features should be added as narrow product slices, not as broad paywall plumbing.
+
 ## Design Bias
 
 Sonoic should look more like a focused Apple sample app than a layered enterprise app.
