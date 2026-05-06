@@ -72,7 +72,10 @@ extension SonoicModel {
     func beginManualSeekConfirmation(to elapsedTime: TimeInterval) {
         manualSeekConfirmationDeadline = Date().addingTimeInterval(Self.manualSeekConfirmationGraceInterval)
         manualSeekTargetElapsedTime = elapsedTime
-        manualSeekContentKey = manualSeekContentKey(for: nowPlaying)
+        manualSeekContentKey = manualSeekContentKey(
+            for: nowPlaying,
+            diagnostics: nowPlayingDiagnostics
+        )
     }
 
     func clearManualSeekConfirmation() {
@@ -149,8 +152,14 @@ extension SonoicModel {
         }
     }
 
-    func smoothedNowPlayingSnapshot(_ snapshot: SonosNowPlayingSnapshot) -> SonosNowPlayingSnapshot {
-        if let seekPreservedSnapshot = snapshotPreservingManualSeekIfNeeded(snapshot) {
+    func smoothedNowPlayingSnapshot(
+        _ snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics
+    ) -> SonosNowPlayingSnapshot {
+        if let seekPreservedSnapshot = snapshotPreservingManualSeekIfNeeded(
+            snapshot,
+            diagnostics: diagnostics
+        ) {
             return seekPreservedSnapshot
         }
 
@@ -191,12 +200,13 @@ extension SonoicModel {
     }
 
     private func snapshotPreservingManualSeekIfNeeded(
-        _ snapshot: SonosNowPlayingSnapshot
+        _ snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics
     ) -> SonosNowPlayingSnapshot? {
         guard let manualSeekConfirmationDeadline,
               manualSeekConfirmationDeadline > .now,
               let manualSeekTargetElapsedTime,
-              manualSeekContentKey == manualSeekContentKey(for: snapshot)
+              manualSeekContentKey == manualSeekContentKey(for: snapshot, diagnostics: diagnostics)
         else {
             clearManualSeekConfirmation()
             return nil
@@ -457,8 +467,13 @@ extension SonoicModel {
         return id?.sonoicNonEmptyTrimmed
     }
 
-    private func manualSeekContentKey(for snapshot: SonosNowPlayingSnapshot) -> String {
+    private func manualSeekContentKey(
+        for snapshot: SonosNowPlayingSnapshot,
+        diagnostics: SonosNowPlayingDiagnostics
+    ) -> String {
         [
+            diagnostics.trackURI?.sonoicTrimmed ?? "",
+            diagnostics.currentURI?.sonoicTrimmed ?? "",
             snapshot.title.sonoicTrimmed,
             snapshot.artistName?.sonoicTrimmed ?? "",
             snapshot.albumTitle?.sonoicTrimmed ?? "",

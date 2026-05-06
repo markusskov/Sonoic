@@ -99,7 +99,10 @@ extension SonoicModel {
                 nextNowPlaying,
                 diagnostics: nowPlayingResult.diagnostics
             )
-            nextNowPlaying = smoothedNowPlayingSnapshot(nextNowPlaying)
+            nextNowPlaying = smoothedNowPlayingSnapshot(
+                nextNowPlaying,
+                diagnostics: nowPlayingResult.diagnostics
+            )
             nextNowPlaying.artworkIdentifier = try? await syncArtworkIdentifier(for: nextNowPlaying)
             nextNowPlaying.transportActions = await refreshedTransportActions ?? nowPlaying.transportActions
 

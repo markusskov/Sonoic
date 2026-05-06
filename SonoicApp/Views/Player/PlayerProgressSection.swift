@@ -10,7 +10,6 @@ struct PlayerProgressSection: View {
 
     @State private var isScrubbing = false
     @State private var scrubElapsedSeconds = 0.0
-    @State private var seekReleaseTask: Task<Void, Never>?
 
     var body: some View {
         TimelineView(.periodic(from: observedAt, by: 1)) { context in
@@ -53,7 +52,6 @@ struct PlayerProgressSection: View {
             resetScrubbingState()
         }
         .onChange(of: nowPlaying.title, initial: false) { _, _ in
-            seekReleaseTask?.cancel()
             resetScrubbingState()
         }
         .onChange(of: nowPlaying.playbackState, initial: false) { _, _ in
@@ -64,7 +62,7 @@ struct PlayerProgressSection: View {
             resetScrubbingState()
         }
         .onDisappear {
-            seekReleaseTask?.cancel()
+            resetScrubbingState()
         }
     }
 
@@ -93,8 +91,8 @@ struct PlayerProgressSection: View {
 
         let targetElapsedSeconds = scrubElapsedSeconds
         scrubElapsedSeconds = targetElapsedSeconds
+        isScrubbing = false
         seek(targetElapsedSeconds)
-        scheduleSeekReleaseReset()
     }
 
     private func displayedElapsedSeconds(at date: Date) -> Double {
@@ -115,22 +113,6 @@ struct PlayerProgressSection: View {
     private func resetScrubbingState() {
         isScrubbing = false
         scrubElapsedSeconds = baseElapsedSeconds
-    }
-
-    private func scheduleSeekReleaseReset() {
-        seekReleaseTask?.cancel()
-        seekReleaseTask = Task {
-            do {
-                try await Task.sleep(for: .milliseconds(1_500))
-            } catch {
-                return
-            }
-
-            await MainActor.run {
-                resetScrubbingState()
-                seekReleaseTask = nil
-            }
-        }
     }
 
     private func formatTime(_ timeInterval: TimeInterval) -> String {

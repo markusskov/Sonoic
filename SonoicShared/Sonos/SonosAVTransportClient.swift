@@ -158,14 +158,6 @@ struct SonosAVTransportClient {
             try? await Task.sleep(for: .milliseconds(120))
         }
 
-        defer {
-            if wasPlaying {
-                Task {
-                    try? await play(host: host)
-                }
-            }
-        }
-
         for unit in SeekUnit.allCases {
             if await seekAndConfirmIgnoringFailure(
                 host: host,
@@ -173,6 +165,9 @@ struct SonosAVTransportClient {
                 unit: unit,
                 lastError: &lastError
             ) {
+                if wasPlaying {
+                    try? await play(host: host)
+                }
                 return
             }
         }
