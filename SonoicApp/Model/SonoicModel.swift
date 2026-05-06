@@ -172,6 +172,7 @@ final class SonoicModel {
 
     var nowPlayingObservedAt = Date()
     var nowPlayingDiagnostics = SonosNowPlayingDiagnostics.empty
+    var seekDiagnostics = SonosSeekDiagnostics.empty
 
     var nowPlaying = SonosNowPlayingSnapshot.unconfigured {
         didSet {

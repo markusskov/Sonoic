@@ -214,6 +214,10 @@ struct SonosAVTransportClient {
         )
     }
 
+    func fetchSeekPosition(host: String) async throws -> SeekPositionConfirmation? {
+        try await fetchSeekPositionConfirmation(host: host)
+    }
+
     func setTransportURI(host: String, uri: String, metadataXML: String?) async throws {
         _ = try await transport.performAction(
             service: .avTransport,

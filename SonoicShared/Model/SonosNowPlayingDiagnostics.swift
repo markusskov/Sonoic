@@ -27,3 +27,41 @@ struct SonosNowPlayingDiagnostics: Equatable {
         usedFallbackSnapshot: false
     )
 }
+
+struct SonosSeekDiagnostics: Equatable {
+    enum Status: Equatable {
+        case idle
+        case pending
+        case succeeded
+        case failed
+
+        var title: String {
+            switch self {
+            case .idle:
+                "Idle"
+            case .pending:
+                "Pending"
+            case .succeeded:
+                "Succeeded"
+            case .failed:
+                "Failed"
+            }
+        }
+    }
+
+    var status: Status
+    var requestedAt: Date?
+    var host: String?
+    var target: TimeInterval?
+    var observed: TimeInterval?
+    var errorDetail: String?
+
+    static let empty = SonosSeekDiagnostics(
+        status: .idle,
+        requestedAt: nil,
+        host: nil,
+        target: nil,
+        observed: nil,
+        errorDetail: nil
+    )
+}

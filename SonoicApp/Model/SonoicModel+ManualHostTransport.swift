@@ -70,19 +70,76 @@ extension SonoicModel {
         let previousObservedAt = nowPlayingObservedAt
         let boundedElapsedTime = markLocalSeek(to: timeInterval)
         beginManualSeekConfirmation(to: boundedElapsedTime)
+        let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+        recordSeekDiagnostics(
+            status: .pending,
+            host: playbackHost,
+            target: boundedElapsedTime,
+            observed: nil,
+            errorDetail: nil
+        )
 
         let didSeek = await performManualTransportCommand(syncDelay: Self.manualSeekSyncDelay) {
-            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
-            try await avTransportClient.seek(host: playbackHost, timeInterval: timeInterval)
+            do {
+                try await avTransportClient.seek(host: playbackHost, timeInterval: timeInterval)
+                let observed = try? await avTransportClient.fetchSeekPosition(host: playbackHost)?.relativeTime
+                await MainActor.run {
+                    self.recordSeekDiagnostics(
+                        status: .succeeded,
+                        host: playbackHost,
+                        target: boundedElapsedTime,
+                        observed: observed,
+                        errorDetail: nil
+                    )
+                }
+            } catch {
+                let observed = try? await avTransportClient.fetchSeekPosition(host: playbackHost)?.relativeTime
+                await MainActor.run {
+                    self.recordSeekDiagnostics(
+                        status: .failed,
+                        host: playbackHost,
+                        target: boundedElapsedTime,
+                        observed: observed,
+                        errorDetail: error.localizedDescription
+                    )
+                }
+                throw error
+            }
         }
 
         if !didSeek {
             clearManualSeekConfirmation()
             nowPlaying = previousNowPlaying
             nowPlayingObservedAt = previousObservedAt
+            if seekDiagnostics.status == .pending {
+                recordSeekDiagnostics(
+                    status: .failed,
+                    host: playbackHost,
+                    target: boundedElapsedTime,
+                    observed: nil,
+                    errorDetail: "The seek command did not run."
+                )
+            }
         }
 
         return didSeek
+    }
+
+    func recordSeekDiagnostics(
+        status: SonosSeekDiagnostics.Status,
+        host: String?,
+        target: TimeInterval?,
+        observed: TimeInterval?,
+        errorDetail: String?
+    ) {
+        seekDiagnostics = SonosSeekDiagnostics(
+            status: status,
+            requestedAt: .now,
+            host: host,
+            target: target,
+            observed: observed,
+            errorDetail: errorDetail
+        )
     }
 
     func playManualSonosQueueItem(at position: Int) async -> Bool {
