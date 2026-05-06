@@ -28,9 +28,11 @@ What works today:
 - home theater controls for EQ, sub level, speech enhancement, and night sound
 - shared source browsing surface with Apple Music as the first live adapter, multi-source search state, saved library lanes, recently added items, grouped search results, and shared artist/album/playlist detail pages
 - explicit service playback capability labels so metadata-only service items are not presented as Sonos-playable
+- RevenueCat-backed Sonoic Plus foundation for future support and personalization features
 
 What is still in progress:
 
+- actual Sonoic Plus personalization features such as themes, alternate icons, Home ordering, widgets, and room presets
 - stable Lock Screen / Control Center ownership through Apple’s native now-playing surfaces
 - Sonos-native playback payloads for more Apple Music catalog and library items
 - live adapters for Spotify, Tidal, Sonos Radio, SoundCloud, and other source destinations
@@ -119,6 +121,7 @@ Notes:
 - `Settings` keeps everyday configuration quiet, with fallback connection and diagnostics available from Advanced.
 - The app requests local-network access because Sonos control currently happens over the LAN.
 - The app requests Apple Music access for metadata and service browsing. Sonoic does not use MusicKit app-owned playback as the main path because Sonos should remain the audio owner.
+- Sonoic Plus uses RevenueCat. To preview the paywall path, add a `RevenueCatAPIKey` bundle value and keep the Plus entitlement identifier as `plus`, or override it with `SonoicPlusEntitlementIdentifier`.
 - Lock Screen and Control Center support depend on what Sonos exposes for the current source, especially duration, progress, and queue ownership.
 
 ## Development Roadmap

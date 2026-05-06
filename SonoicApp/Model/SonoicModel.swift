@@ -65,6 +65,7 @@ final class SonoicModel {
     @ObservationIgnored let contentDirectoryProbeClient: SonosContentDirectoryProbeClient
     @ObservationIgnored let appleMusicCatalogSearchClient: SonoicAppleMusicCatalogSearchClient
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
+    @ObservationIgnored let plusController: SonoicPlusController
 
     var selectedTab: RootTab = .home
     var pendingSourceItemDetailRoute: SonoicSourceItem?
@@ -120,6 +121,7 @@ final class SonoicModel {
     var sourceItemDetailStates: [String: SonoicSourceItemDetailState] = [:]
     var appleMusicFavoriteOverrides: [String: SonoicAppleMusicFavoriteOverride] = [:]
     var appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
+    var plusState = SonoicPlusState.notConfigured
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
     var appleMusicServiceDetails = SonoicAppleMusicServiceDetails.idle
     var appleMusicRequestReadiness = SonoicAppleMusicRequestReadiness.idle
@@ -255,6 +257,7 @@ final class SonoicModel {
         contentDirectoryProbeClient = SonosContentDirectoryProbeClient(transport: sonosControlTransport)
         appleMusicCatalogSearchClient = SonoicAppleMusicCatalogSearchClient()
         nowPlayableSessionController = SonoicNowPlayableSessionController()
+        plusController = SonoicPlusController()
         manualSonosHost = settingsStore.loadManualSonosHost()
         recentPlays = settingsStore.loadRecentPlays()
         recentSourceSearches = settingsStore.loadRecentSourceSearches()
