@@ -72,6 +72,24 @@ struct SonosControlAPITransport {
         _ = try await perform(request)
     }
 
+    func post<Request: Encodable, Response: Decodable>(
+        _ path: String,
+        accessToken: String,
+        correlationID: UUID = UUID(),
+        body: Request
+    ) async throws -> Response {
+        let bodyData = try jsonEncoder.encode(body)
+        let request = try makeRequest(
+            path: path,
+            method: "POST",
+            accessToken: accessToken,
+            correlationID: correlationID,
+            body: bodyData
+        )
+        let data = try await perform(request)
+        return try jsonDecoder.decode(Response.self, from: data)
+    }
+
     func post(
         _ path: String,
         accessToken: String,

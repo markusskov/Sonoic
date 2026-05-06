@@ -78,6 +78,16 @@ struct SonosControlAPIClient {
         )
     }
 
+    func playbackMetadata(
+        groupID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIMetadataStatus {
+        try await transport.get(
+            "/groups/\(groupID)/playbackMetadata",
+            accessToken: accessToken
+        )
+    }
+
     func play(groupID: String, accessToken: String) async throws {
         try await transport.post(
             "/groups/\(groupID)/playback/play",
@@ -142,6 +152,67 @@ struct SonosControlAPIClient {
                 deltaMillis: deltaMillis,
                 itemId: itemID?.sonoicNonEmptyTrimmed
             )
+        )
+    }
+
+    func createPlaybackSession(
+        groupID: String,
+        appID: String,
+        appContext: String,
+        accountID: String?,
+        customData: String?,
+        accessToken: String
+    ) async throws -> SonosControlAPISessionStatus {
+        try await transport.post(
+            "/groups/\(groupID)/playbackSession",
+            accessToken: accessToken,
+            body: SonosControlAPICreateSessionRequest(
+                appId: appID,
+                appContext: appContext,
+                accountId: accountID?.sonoicNonEmptyTrimmed,
+                customData: customData?.sonoicNonEmptyTrimmed
+            )
+        )
+    }
+
+    func loadCloudQueue(
+        sessionID: String,
+        request: SonosControlAPILoadCloudQueueRequest,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/sessions/\(sessionID)/playbackSession/loadCloudQueue",
+            accessToken: accessToken,
+            body: request
+        )
+    }
+
+    func skipToItem(
+        sessionID: String,
+        itemID: String,
+        queueVersion: String?,
+        positionMillis: Int?,
+        playOnCompletion: Bool?,
+        trackMetadata: SonosControlAPITrack?,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/sessions/\(sessionID)/playbackSession/skipToItem",
+            accessToken: accessToken,
+            body: SonosControlAPISkipToItemRequest(
+                itemId: itemID,
+                queueVersion: queueVersion?.sonoicNonEmptyTrimmed,
+                positionMillis: positionMillis.map { max(0, $0) },
+                playOnCompletion: playOnCompletion,
+                trackMetadata: trackMetadata
+            )
+        )
+    }
+
+    func refreshCloudQueue(sessionID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/sessions/\(sessionID)/playbackSession/refreshCloudQueue",
+            accessToken: accessToken
         )
     }
 }
