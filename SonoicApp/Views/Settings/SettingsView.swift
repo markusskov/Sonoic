@@ -16,6 +16,9 @@ struct SettingsView: View {
             }
 
             SettingsMusicServicesSection(model: model)
+            if model.sonosOAuthConfiguration.isConfigured {
+                SettingsSonosAccountSection(model: model)
+            }
             SettingsPlusSection(model: model)
 
             if model.hasManualSonosHost {
@@ -38,6 +41,7 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .task {
             model.refreshAppleMusicAuthorizationState()
+            model.refreshSonosControlAPIAuthorizationState()
             if model.appleMusicServiceDetails.isLoading {
                 model.appleMusicServiceDetails = .idle
             }

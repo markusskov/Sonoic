@@ -1,0 +1,10 @@
+// Default Sonos OAuth build settings.
+// Keep real local values in Config/SonoicOAuth.local.xcconfig.
+
+SONOIC_EMPTY =
+SONOS_OAUTH_CLIENT_ID =
+SONOS_OAUTH_REDIRECT_URI =
+SONOS_OAUTH_TOKEN_EXCHANGE_URL =
+SONOS_OAUTH_TOKEN_REFRESH_URL =
+
+#include? "SonoicOAuth.local.xcconfig"

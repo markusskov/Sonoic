@@ -16,3 +16,10 @@ Package.resolved
 
 # Local debug artifacts
 *.xcbkptlist
+.firecrawl/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+Config/*.local.xcconfig
