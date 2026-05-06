@@ -28,6 +28,11 @@ struct SonosAVTransportClient {
         static let interval: Duration = .milliseconds(250)
     }
 
+    private enum PlaybackStateConfirmation {
+        static let attempts = 10
+        static let interval: Duration = .milliseconds(150)
+    }
+
     struct SeekPositionConfirmation: Equatable {
         var relativeTime: TimeInterval
         var trackDuration: TimeInterval?
@@ -167,7 +172,7 @@ struct SonosAVTransportClient {
         if wasPlaying {
             try? await pause(host: host)
             didPauseForFallback = true
-            try? await Task.sleep(for: .milliseconds(120))
+            _ = try? await waitForPlaybackState(.paused, host: host)
         }
 
         for unit in SeekUnit.allCases {
@@ -367,6 +372,23 @@ struct SonosAVTransportClient {
         }
 
         try? await play(host: host)
+    }
+
+    private func waitForPlaybackState(
+        _ playbackState: SonosNowPlayingSnapshot.PlaybackState,
+        host: String
+    ) async throws -> Bool {
+        for attempt in 0 ..< PlaybackStateConfirmation.attempts {
+            if attempt > 0 {
+                try? await Task.sleep(for: PlaybackStateConfirmation.interval)
+            }
+
+            if (try? await fetchPlaybackState(host: host)) == playbackState {
+                return true
+            }
+        }
+
+        return false
     }
 
     private func performSeek(host: String, target: TimeInterval, unit: SeekUnit) async throws {
