@@ -7,7 +7,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
     private let probe = SonoicAppleMusicSonosPayloadProbe()
 
     @Test
-    func buildsCatalogCandidateFromLaunchSerial() throws {
+    func buildsCatalogCandidateFromTrackSerial() throws {
         let item = appleMusicSong(catalogID: "1440857781", libraryID: nil)
         let candidates = probe.candidates(
             for: item,
@@ -20,11 +20,11 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         let candidate = try #require(candidates.first { $0.strategy == .catalogHLS })
 
         #expect(candidate.isUserPlayable)
-        #expect(candidate.serialNumber == "3")
-        #expect(candidate.uri == "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3")
+        #expect(candidate.serialNumber == "7")
+        #expect(candidate.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
         #expect(candidate.metadataXML.contains("<dc:title>Sweet Jane</dc:title>"))
         #expect(candidate.metadataXML.contains("<dc:creator>Garrett Kato</dc:creator>"))
-        #expect(candidate.metadataXML.contains("<res protocolInfo=\"sonos.com-http:*:application/vnd.apple.mpegurl:*\" duration=\"00:03:34\">x-sonosapi-hls:song%3a1440857781?sid=204&amp;sn=3</res>"))
+        #expect(candidate.metadataXML.contains("<res protocolInfo=\"sonos.com-http:*:application/x-mpegURL:*\" duration=\"00:03:34\">x-sonosapi-hls-static:song%3a1440857781?sid=204&amp;flags=0&amp;sn=7</res>"))
         #expect(candidate.metadataXML.contains("SA_RINCON52231_X_#Svc52231-0-Token"))
 
         let payload = try candidate.preparedPlaybackPayload(for: item)
@@ -85,7 +85,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         ))
 
         #expect(candidate.strategy == .catalogHLS)
-        #expect(candidate.uri == "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3")
+        #expect(candidate.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
     }
 
     @Test

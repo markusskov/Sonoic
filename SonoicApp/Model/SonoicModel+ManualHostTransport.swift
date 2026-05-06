@@ -68,13 +68,16 @@ extension SonoicModel {
     func seekManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
         let previousNowPlaying = nowPlaying
         let previousObservedAt = nowPlayingObservedAt
-        markLocalSeek(to: timeInterval)
+        let boundedElapsedTime = markLocalSeek(to: timeInterval)
+        beginManualSeekConfirmation(to: boundedElapsedTime)
 
         let didSeek = await performManualTransportCommand(syncDelay: Self.manualSeekSyncDelay) {
-            try await avTransportClient.seek(host: manualSonosHost, timeInterval: timeInterval)
+            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+            try await avTransportClient.seek(host: playbackHost, timeInterval: timeInterval)
         }
 
         if !didSeek {
+            clearManualSeekConfirmation()
             nowPlaying = previousNowPlaying
             nowPlayingObservedAt = previousObservedAt
         }
@@ -358,6 +361,7 @@ extension SonoicModel {
         } catch {
             manualPlayTransitionGraceDeadline = nil
             setManualPlayTransitionAwaitingConfirmation(false)
+            clearManualSeekConfirmation()
             startManualHostRefreshLoopIfPossible()
             manualHostRefreshStatus = .failed(error.localizedDescription)
             return false

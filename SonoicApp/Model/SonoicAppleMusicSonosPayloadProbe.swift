@@ -69,9 +69,10 @@ struct SonoicAppleMusicSonosPayloadProbe {
 
         if item.kind == .song,
            let catalogID = identity.catalogID.sonoicNonEmptyTrimmed,
-           let launchSerial = playbackHint.preferredLaunchSerial?.sonoicNonEmptyTrimmed,
+           let serialNumber = playbackHint.trackSerials.first?.sonoicNonEmptyTrimmed
+                ?? playbackHint.preferredLaunchSerial?.sonoicNonEmptyTrimmed,
            let encodedCatalogID = sonosPayloadID(catalogID) {
-            let uri = "x-sonosapi-hls:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&sn=\(launchSerial)"
+            let uri = "x-sonosapi-hls-static:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&flags=0&sn=\(serialNumber)"
             candidates.append(
                 SonoicAppleMusicGeneratedPayloadCandidate(
                     strategy: .catalogHLS,
@@ -82,7 +83,7 @@ struct SonoicAppleMusicSonosPayloadProbe {
                         serviceID: appleMusicServiceID,
                         resourceURI: uri
                     ),
-                    serialNumber: launchSerial
+                    serialNumber: serialNumber
                 )
             )
         }

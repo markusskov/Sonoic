@@ -2,6 +2,7 @@ import Foundation
 
 extension SonoicModel {
     private static let manualPlayConfirmationRetryDelay: Duration = .milliseconds(300)
+    private static let manualSeekConfirmationGraceInterval: TimeInterval = 3
 
     func markLocalPlaybackState(_ playbackState: SonosNowPlayingSnapshot.PlaybackState) {
         guard nowPlaying.playbackState != playbackState else {
@@ -49,7 +50,8 @@ extension SonoicModel {
         nowPlaying = nextNowPlaying
     }
 
-    func markLocalSeek(to timeInterval: TimeInterval) {
+    @discardableResult
+    func markLocalSeek(to timeInterval: TimeInterval) -> TimeInterval {
         var nextNowPlaying = nowPlaying
         let boundedElapsedTime: TimeInterval
 
@@ -63,6 +65,20 @@ extension SonoicModel {
         nowPlaying = nextNowPlaying
         nowPlayingObservedAt = .now
         persistSharedExternalControlState()
+
+        return boundedElapsedTime
+    }
+
+    func beginManualSeekConfirmation(to elapsedTime: TimeInterval) {
+        manualSeekConfirmationDeadline = Date().addingTimeInterval(Self.manualSeekConfirmationGraceInterval)
+        manualSeekTargetElapsedTime = elapsedTime
+        manualSeekContentKey = manualSeekContentKey(for: nowPlaying)
+    }
+
+    func clearManualSeekConfirmation() {
+        manualSeekConfirmationDeadline = nil
+        manualSeekTargetElapsedTime = nil
+        manualSeekContentKey = nil
     }
 
     func beginManualPlayTransitionGrace() {
@@ -134,6 +150,10 @@ extension SonoicModel {
     }
 
     func smoothedNowPlayingSnapshot(_ snapshot: SonosNowPlayingSnapshot) -> SonosNowPlayingSnapshot {
+        if let seekPreservedSnapshot = snapshotPreservingManualSeekIfNeeded(snapshot) {
+            return seekPreservedSnapshot
+        }
+
         guard snapshot.playbackState == .playing || snapshot.playbackState == .paused,
               snapshot.title == nowPlaying.title,
               snapshot.artistName == nowPlaying.artistName,
@@ -168,6 +188,37 @@ extension SonoicModel {
         }
 
         return smoothedSnapshot
+    }
+
+    private func snapshotPreservingManualSeekIfNeeded(
+        _ snapshot: SonosNowPlayingSnapshot
+    ) -> SonosNowPlayingSnapshot? {
+        guard let manualSeekConfirmationDeadline,
+              manualSeekConfirmationDeadline > .now,
+              let manualSeekTargetElapsedTime,
+              manualSeekContentKey == manualSeekContentKey(for: snapshot)
+        else {
+            clearManualSeekConfirmation()
+            return nil
+        }
+
+        let localElapsedTime = effectiveLocalElapsedTime() ?? manualSeekTargetElapsedTime
+
+        if let incomingElapsedTime = snapshot.elapsedTime,
+           abs(incomingElapsedTime - localElapsedTime) <= 1.25
+        {
+            clearManualSeekConfirmation()
+            return nil
+        }
+
+        var preservedSnapshot = snapshot
+        if let duration = snapshot.duration {
+            preservedSnapshot.elapsedTime = min(max(localElapsedTime, 0), duration)
+        } else {
+            preservedSnapshot.elapsedTime = max(localElapsedTime, 0)
+        }
+
+        return preservedSnapshot
     }
 
     func snapshotPreservingManualPlaybackContext(
@@ -404,5 +455,16 @@ extension SonoicModel {
         let valueAfterPrefix = normalizedURI[idStartRange.upperBound...]
         let id = valueAfterPrefix.split(separator: "?", maxSplits: 1).first.map(String.init)
         return id?.sonoicNonEmptyTrimmed
+    }
+
+    private func manualSeekContentKey(for snapshot: SonosNowPlayingSnapshot) -> String {
+        [
+            snapshot.title.sonoicTrimmed,
+            snapshot.artistName?.sonoicTrimmed ?? "",
+            snapshot.albumTitle?.sonoicTrimmed ?? "",
+            snapshot.sourceName.sonoicTrimmed,
+        ]
+        .joined(separator: "\t")
+        .lowercased()
     }
 }

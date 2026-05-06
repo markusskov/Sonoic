@@ -113,11 +113,11 @@ struct SonosNowPlayingSnapshot: Equatable {
     }
 
     var canSeek: Bool {
-        if duration != nil, sourceName != "TV Audio" {
-            return true
+        guard duration != nil, sourceName != "TV Audio" else {
+            return false
         }
 
-        return transportActions?.canSeek ?? true
+        return true
     }
 }
 
@@ -150,7 +150,15 @@ struct SonosTransportActions: Equatable, Hashable {
     }
 
     var canSeek: Bool {
-        contains("Seek")
+        canSeekTime
+    }
+
+    var canSeekTime: Bool {
+        contains("Seek") || contains("SeekTime") || contains("X_DLNA_SeekTime")
+    }
+
+    var canSeekTrack: Bool {
+        contains("SeekTrackNr") || contains("X_DLNA_SeekTrackNr")
     }
 
     var canSkipNext: Bool {
@@ -166,7 +174,8 @@ struct SonosTransportActions: Equatable, Hashable {
             canPlay ? "Play" : nil,
             canPause ? "Pause" : nil,
             canStop ? "Stop" : nil,
-            canSeek ? "Seek" : nil,
+            canSeekTime ? "Seek Time" : nil,
+            canSeekTrack ? "Seek Track" : nil,
             canSkipNext ? "Next" : nil,
             canSkipPrevious ? "Previous" : nil,
         ]

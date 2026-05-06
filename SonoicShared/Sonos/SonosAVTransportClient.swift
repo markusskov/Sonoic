@@ -4,6 +4,7 @@ struct SonosAVTransportClient {
     enum ClientError: LocalizedError {
         case invalidTransportState(String)
         case invalidQueueTrackNumber(String)
+        case seekDidNotTakeEffect(target: String, observed: String?)
 
         var errorDescription: String? {
             switch self {
@@ -11,8 +12,15 @@ struct SonosAVTransportClient {
                 "The Sonos player returned an invalid transport state: \(value)."
             case let .invalidQueueTrackNumber(value):
                 "The Sonos player returned an invalid queue track number: \(value)."
+            case let .seekDidNotTakeEffect(target, observed):
+                "The Sonos player did not move to \(target). Current position: \(observed ?? "unknown")."
             }
         }
+    }
+
+    private enum SeekUnit: String, CaseIterable {
+        case relativeTime = "REL_TIME"
+        case dlnaRelativeTime = "X_DLNA_REL_TIME"
     }
 
     private let transport: SonosControlTransport
@@ -131,17 +139,51 @@ struct SonosAVTransportClient {
     }
 
     func seek(host: String, timeInterval: TimeInterval) async throws {
-        _ = try await transport.performAction(
-            service: .avTransport,
-            named: "Seek",
-            body: """
-            <u:Seek xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
-              <InstanceID>0</InstanceID>
-              <Unit>REL_TIME</Unit>
-              <Target>\(formattedSeekTarget(for: timeInterval))</Target>
-            </u:Seek>
-            """,
-            host: host
+        let target = max(0, timeInterval)
+        let targetText = formattedSeekTarget(for: target)
+        let wasPlaying = (try? await fetchPlaybackState(host: host)) == .playing
+        var lastError: Error?
+
+        if await seekAndConfirmIgnoringFailure(
+            host: host,
+            target: target,
+            unit: .relativeTime,
+            lastError: &lastError
+        ) {
+            return
+        }
+
+        if wasPlaying {
+            try? await pause(host: host)
+            try? await Task.sleep(for: .milliseconds(120))
+        }
+
+        defer {
+            if wasPlaying {
+                Task {
+                    try? await play(host: host)
+                }
+            }
+        }
+
+        for unit in SeekUnit.allCases {
+            if await seekAndConfirmIgnoringFailure(
+                host: host,
+                target: target,
+                unit: unit,
+                lastError: &lastError
+            ) {
+                return
+            }
+        }
+
+        if let lastError {
+            throw lastError
+        }
+
+        throw ClientError.seekDidNotTakeEffect(
+            target: targetText,
+            observed: try? await fetchRelativeTime(host: host)
         )
     }
 
@@ -289,6 +331,64 @@ struct SonosAVTransportClient {
         let minutes = (totalSeconds % 3600) / 60
         let seconds = totalSeconds % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    private func seekAndConfirmIgnoringFailure(
+        host: String,
+        target: TimeInterval,
+        unit: SeekUnit,
+        lastError: inout Error?
+    ) async -> Bool {
+        do {
+            return try await seekAndConfirm(host: host, target: target, unit: unit)
+        } catch {
+            lastError = error
+            return false
+        }
+    }
+
+    private func seekAndConfirm(host: String, target: TimeInterval, unit: SeekUnit) async throws -> Bool {
+        try await performSeek(host: host, target: target, unit: unit)
+        try? await Task.sleep(for: .milliseconds(450))
+        return try await didReachSeekTarget(host: host, target: target)
+    }
+
+    private func performSeek(host: String, target: TimeInterval, unit: SeekUnit) async throws {
+        _ = try await transport.performAction(
+            service: .avTransport,
+            named: "Seek",
+            body: """
+            <u:Seek xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+              <Unit>\(unit.rawValue)</Unit>
+              <Target>\(formattedSeekTarget(for: target))</Target>
+            </u:Seek>
+            """,
+            host: host
+        )
+    }
+
+    private func didReachSeekTarget(host: String, target: TimeInterval) async throws -> Bool {
+        guard let observedTime = SonosDurationParser.parseTimeInterval(from: try await fetchRelativeTime(host: host)) else {
+            return false
+        }
+
+        return abs(observedTime - target) <= 4
+    }
+
+    private func fetchRelativeTime(host: String) async throws -> String {
+        let data = try await transport.performAction(
+            service: .avTransport,
+            named: "GetPositionInfo",
+            body: """
+            <u:GetPositionInfo xmlns:u="\(SonosControlTransport.Service.avTransport.soapNamespace)">
+              <InstanceID>0</InstanceID>
+            </u:GetPositionInfo>
+            """,
+            host: host
+        )
+
+        return try SonosSOAPValueParser(expectedElement: "RelTime").parse(data)
     }
 
     private func escapedSOAPValue(_ value: String) -> String {

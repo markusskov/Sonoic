@@ -44,6 +44,9 @@ final class SonoicModel {
     @ObservationIgnored var isHomeFavoritesRefreshing = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
     @ObservationIgnored var isManualPlayTransitionAwaitingConfirmation = false
+    @ObservationIgnored var manualSeekConfirmationDeadline: Date?
+    @ObservationIgnored var manualSeekTargetElapsedTime: TimeInterval?
+    @ObservationIgnored var manualSeekContentKey: String?
     @ObservationIgnored var manualPlaybackContextPayload: SonosPlayablePayload?
     @ObservationIgnored var manualQueueContextPayloads: [SonosPlayablePayload]?
     @ObservationIgnored var manualRecentPlaybackContextPayload: SonosPlayablePayload?
@@ -93,6 +96,7 @@ final class SonoicModel {
             homeTheaterOperationErrorDetail = nil
             roomVolumeOperationErrorDetail = nil
             nowPlayingDiagnostics = .empty
+            clearManualSeekConfirmation()
             manualPlaybackContextPayload = nil
             manualQueueContextPayloads = nil
             manualRecentPlaybackContextPayload = nil

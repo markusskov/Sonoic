@@ -38,6 +38,7 @@ enum SonosServiceCatalog {
 
         if normalizedURI.hasPrefix("x-sonosapi-stream:")
             || normalizedURI.hasPrefix("x-sonosapi-radio:")
+            || normalizedURI.hasPrefix("x-sonosapi-hls-static:")
             || normalizedURI.hasPrefix("x-sonosapi-hls:")
             || normalizedURI.hasPrefix("x-sonosapi-http:")
             || normalizedURI.hasPrefix("x-sonosapi-static:")

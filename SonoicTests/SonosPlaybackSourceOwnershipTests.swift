@@ -8,6 +8,7 @@ struct SonosPlaybackSourceOwnershipTests {
         ("x-rincon-queue:RINCON_123#0", SonosPlaybackSourceOwnership.sonosQueue, true),
         ("x-rincon-cpcontainer:1006206cplaylist%3a123?sid=204", .serviceContainer, false),
         ("x-sonosapi-hls:song%3a1440845464?sid=204", .directServiceStream, false),
+        ("x-sonosapi-hls-static:song%3a1440845464?sid=204", .directServiceStream, false),
         ("x-sonosapi-radio:station%3aabc?sid=254", .directServiceStream, false),
         ("x-sonos-htastream:RINCON_123:spdif", .tvAudio, false),
         ("x-rincon-stream:RINCON_456", .lineIn, false),
