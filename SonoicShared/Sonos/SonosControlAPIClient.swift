@@ -67,4 +67,81 @@ struct SonosControlAPIClient {
             body: SonosControlAPILoadPlaylistRequest(playlistId: playlistID)
         )
     }
+
+    func playbackStatus(
+        groupID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIPlaybackStatus {
+        try await transport.get(
+            "/groups/\(groupID)/playback",
+            accessToken: accessToken
+        )
+    }
+
+    func play(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/play",
+            accessToken: accessToken
+        )
+    }
+
+    func pause(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/pause",
+            accessToken: accessToken
+        )
+    }
+
+    func togglePlayPause(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/togglePlayPause",
+            accessToken: accessToken
+        )
+    }
+
+    func skipToNextTrack(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/skipToNextTrack",
+            accessToken: accessToken
+        )
+    }
+
+    func skipToPreviousTrack(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/skipToPreviousTrack",
+            accessToken: accessToken
+        )
+    }
+
+    func seek(
+        groupID: String,
+        positionMillis: Int,
+        itemID: String?,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/seek",
+            accessToken: accessToken,
+            body: SonosControlAPISeekRequest(
+                positionMillis: max(0, positionMillis),
+                itemId: itemID?.sonoicNonEmptyTrimmed
+            )
+        )
+    }
+
+    func seekRelative(
+        groupID: String,
+        deltaMillis: Int,
+        itemID: String?,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/seekRelative",
+            accessToken: accessToken,
+            body: SonosControlAPISeekRelativeRequest(
+                deltaMillis: deltaMillis,
+                itemId: itemID?.sonoicNonEmptyTrimmed
+            )
+        )
+    }
 }

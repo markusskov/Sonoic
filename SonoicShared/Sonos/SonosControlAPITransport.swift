@@ -72,6 +72,21 @@ struct SonosControlAPITransport {
         _ = try await perform(request)
     }
 
+    func post(
+        _ path: String,
+        accessToken: String,
+        correlationID: UUID = UUID()
+    ) async throws {
+        let request = try makeRequest(
+            path: path,
+            method: "POST",
+            accessToken: accessToken,
+            correlationID: correlationID,
+            body: nil
+        )
+        _ = try await perform(request)
+    }
+
     func makeRequest(
         path: String,
         method: String,

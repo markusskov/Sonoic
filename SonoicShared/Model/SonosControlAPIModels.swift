@@ -114,12 +114,67 @@ struct SonosControlAPIService: Codable, Equatable {
     var name: String?
 }
 
+enum SonosControlAPIPlaybackState: String, Codable, Equatable {
+    case idle = "PLAYBACK_STATE_IDLE"
+    case buffering = "PLAYBACK_STATE_BUFFERING"
+    case paused = "PLAYBACK_STATE_PAUSED"
+    case playing = "PLAYBACK_STATE_PLAYING"
+}
+
+struct SonosControlAPIPlaybackStatus: Codable, Equatable {
+    var playbackState: SonosControlAPIPlaybackState
+    var isDucking: Bool?
+    var queueVersion: String?
+    var itemId: String?
+    var positionMillis: Int?
+    var previousItemId: String?
+    var previousPositionMillis: Int?
+    var playModes: SonosControlAPIPlayModes?
+    var availablePlaybackActions: SonosControlAPIPlaybackActions?
+}
+
+struct SonosControlAPIPlayModes: Codable, Equatable {
+    var repeatEnabled: Bool?
+    var repeatOne: Bool?
+    var shuffle: Bool?
+    var crossfade: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case repeatEnabled = "repeat"
+        case repeatOne
+        case shuffle
+        case crossfade
+    }
+}
+
+struct SonosControlAPIPlaybackActions: Codable, Equatable {
+    var canSkip: Bool?
+    var canSkipBack: Bool?
+    var canSeek: Bool?
+    var canPause: Bool?
+    var canStop: Bool?
+    var canRepeat: Bool?
+    var canRepeatOne: Bool?
+    var canCrossfade: Bool?
+    var canShuffle: Bool?
+}
+
 struct SonosControlAPILoadFavoriteRequest: Codable, Equatable {
     var favoriteId: String
 }
 
 struct SonosControlAPILoadPlaylistRequest: Codable, Equatable {
     var playlistId: String
+}
+
+struct SonosControlAPISeekRequest: Codable, Equatable {
+    var positionMillis: Int
+    var itemId: String?
+}
+
+struct SonosControlAPISeekRelativeRequest: Codable, Equatable {
+    var deltaMillis: Int
+    var itemId: String?
 }
 
 struct SonosControlAPIErrorResponse: Codable, Equatable {

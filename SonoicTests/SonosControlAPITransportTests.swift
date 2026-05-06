@@ -60,6 +60,60 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
+    func decodesPlaybackStatusResponse() throws {
+        let data = """
+        {
+          "playbackState": "PLAYBACK_STATE_PLAYING",
+          "queueVersion": "queue-1",
+          "itemId": "item-1",
+          "positionMillis": 42000,
+          "previousItemId": "item-0",
+          "previousPositionMillis": 120000,
+          "playModes": {
+            "repeat": true,
+            "repeatOne": false,
+            "shuffle": true,
+            "crossfade": false
+          },
+          "availablePlaybackActions": {
+            "canSkip": true,
+            "canSkipBack": true,
+            "canSeek": true,
+            "canPause": true,
+            "canStop": false
+          }
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(SonosControlAPIPlaybackStatus.self, from: data)
+
+        #expect(response.playbackState == .playing)
+        #expect(response.queueVersion == "queue-1")
+        #expect(response.itemId == "item-1")
+        #expect(response.positionMillis == 42_000)
+        #expect(response.playModes?.repeatEnabled == true)
+        #expect(response.availablePlaybackActions?.canSeek == true)
+    }
+
+    @Test
+    func encodesSeekRequestsWithOptionalItemID() throws {
+        let absolute = SonosControlAPISeekRequest(positionMillis: 30_000, itemId: "item-1")
+        let relative = SonosControlAPISeekRelativeRequest(deltaMillis: -5_000, itemId: nil)
+
+        let absoluteObject = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(absolute)
+        ) as? [String: Any]
+        let relativeObject = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(relative)
+        ) as? [String: Any]
+
+        #expect(absoluteObject?["positionMillis"] as? Int == 30_000)
+        #expect(absoluteObject?["itemId"] as? String == "item-1")
+        #expect(relativeObject?["deltaMillis"] as? Int == -5_000)
+        #expect(relativeObject?["itemId"] == nil)
+    }
+
+    @Test
     func settingsRoundTripThroughUserDefaults() {
         let defaults = UserDefaults(suiteName: "SonosControlAPITransportTests-\(UUID().uuidString)")!
         let store = SonoicSettingsStore(userDefaults: defaults)
