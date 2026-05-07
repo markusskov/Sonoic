@@ -252,7 +252,7 @@ def required_env(name: str) -> str:
 
 
 def timestamp() -> str:
-    return datetime.datetime.now(tz=datetime.UTC).isoformat(timespec="seconds")
+    return datetime.datetime.now(tz=datetime.timezone.utc).isoformat(timespec="seconds")
 
 
 def redacted(value: str) -> str:
