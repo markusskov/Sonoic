@@ -41,9 +41,9 @@ nonisolated struct SonosOAuthConfiguration: Equatable, Sendable {
         !clientID.isEmpty
             && isSecureRedirectURI
             && !callbackScheme.isEmpty
-            && authorizationEndpoint.scheme == "https"
-            && tokenExchangeURL?.scheme == "https"
-            && (tokenRefreshURL == nil || tokenRefreshURL?.scheme == "https")
+            && isSecureEndpoint(authorizationEndpoint)
+            && tokenExchangeURL.map(isSecureEndpoint) == true
+            && (tokenRefreshURL == nil || tokenRefreshURL.map(isSecureEndpoint) == true)
     }
 
     private var isSecureRedirectURI: Bool {
@@ -52,6 +52,10 @@ nonisolated struct SonosOAuthConfiguration: Equatable, Sendable {
         }
 
         return url.scheme == "https" && url.host?.isEmpty == false
+    }
+
+    private func isSecureEndpoint(_ url: URL) -> Bool {
+        url.scheme == "https" && url.host?.isEmpty == false
     }
 
     var scopeValue: String {
