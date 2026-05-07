@@ -1,8 +1,8 @@
 // Copy this file to Config/SonoicOAuth.local.xcconfig for local testing.
-// Do not commit local credentials or tunnel URLs.
+// Do not commit local credentials.
 
 SONOS_OAUTH_CLIENT_ID = <Sonos Key>
 // xcconfig treats // as a comment, so HTTPS URLs must use the empty-variable slash escape.
-SONOS_OAUTH_REDIRECT_URI = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/oauth
-SONOS_OAUTH_TOKEN_EXCHANGE_URL = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/api/sonos/token
-SONOS_OAUTH_TOKEN_REFRESH_URL = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/api/sonos/token/refresh
+SONOS_OAUTH_REDIRECT_URI = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/oauth/sonos/callback
+SONOS_OAUTH_TOKEN_EXCHANGE_URL = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/api/sonos/token
+SONOS_OAUTH_TOKEN_REFRESH_URL = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/api/sonos/token/refresh
