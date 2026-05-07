@@ -101,6 +101,9 @@ extension SonoicModel {
 
             let snapshot = try await sonosControlAPIClient.fetchCloudSnapshot(tokenSet: tokenSet)
             sonosControlAPICloudState = SonosControlAPICloudState(status: .verified(snapshot))
+        } catch let error as SonosControlAPIClient.ClientError where error.isAuthorizationFailure {
+            sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
+            sonosControlAPICloudState = SonosControlAPICloudState(status: .failed(error.localizedDescription))
         } catch {
             sonosControlAPICloudState = SonosControlAPICloudState(status: .failed(error.localizedDescription))
         }

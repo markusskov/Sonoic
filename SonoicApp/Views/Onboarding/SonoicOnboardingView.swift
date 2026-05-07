@@ -51,9 +51,9 @@ struct SonoicOnboardingView: View {
             .foregroundStyle(.black)
             .disabled(isButtonDisabled)
 
-            if canSkipSonosAccount {
-                Button("Skip for Now") {
-                    step = .locatingSpeakers
+            if canShowSonosAccountSecondaryAction {
+                Button(sonosAccountSecondaryTitle) {
+                    handleSonosAccountSecondaryAction()
                 }
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -143,7 +143,7 @@ struct SonoicOnboardingView: View {
         case .splash:
             return "Continue"
         case .sonosAccount:
-            if model.sonosControlAPIAuthorizationState.isConnected {
+            if model.sonosControlAPIAuthorizationState.isConnected || sonosAccountDidFail {
                 return "Continue"
             }
 
@@ -180,19 +180,13 @@ struct SonoicOnboardingView: View {
         case .splash:
             step = shouldShowSonosAccount ? .sonosAccount : .locatingSpeakers
         case .sonosAccount:
-            guard model.sonosOAuthConfiguration.isConfigured,
-                  !model.sonosControlAPIAuthorizationState.isConnected
+            guard shouldTrySonosAccountConnection
             else {
                 step = .locatingSpeakers
                 return
             }
 
-            Task {
-                await model.connectSonosAccount()
-                if model.sonosControlAPIAuthorizationState.isConnected {
-                    step = .locatingSpeakers
-                }
-            }
+            tryConnectSonosAccount()
         case .locatingSpeakers:
             model.markOnboardingComplete()
         }
@@ -203,10 +197,45 @@ struct SonoicOnboardingView: View {
             && !model.sonosControlAPIAuthorizationState.isConnected
     }
 
-    private var canSkipSonosAccount: Bool {
+    private var shouldTrySonosAccountConnection: Bool {
+        model.sonosOAuthConfiguration.isConfigured
+            && !model.sonosControlAPIAuthorizationState.isConnected
+            && !sonosAccountDidFail
+    }
+
+    private var sonosAccountDidFail: Bool {
+        if case .failed = model.sonosControlAPIAuthorizationState.status {
+            return true
+        }
+
+        return false
+    }
+
+    private var canShowSonosAccountSecondaryAction: Bool {
         step == .sonosAccount
             && model.sonosOAuthConfiguration.isConfigured
             && !model.sonosControlAPIAuthorizationState.isConnected
+    }
+
+    private var sonosAccountSecondaryTitle: String {
+        sonosAccountDidFail ? "Try Again" : "Skip for Now"
+    }
+
+    private func handleSonosAccountSecondaryAction() {
+        if sonosAccountDidFail {
+            tryConnectSonosAccount()
+        } else {
+            step = .locatingSpeakers
+        }
+    }
+
+    private func tryConnectSonosAccount() {
+        Task {
+            await model.connectSonosAccount()
+            if model.sonosControlAPIAuthorizationState.isConnected {
+                step = .locatingSpeakers
+            }
+        }
     }
 }
 

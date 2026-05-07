@@ -89,6 +89,21 @@ struct SonosOAuthClientTests {
     }
 
     @Test
+    func rejectsInsecureRedirectURIConfiguration() {
+        let configuration = SonosOAuthConfiguration(
+            clientID: "client-1",
+            redirectURI: "http://sonoic.example.com/oauth/sonos",
+            callbackScheme: "sonoic",
+            tokenExchangeURL: URL(string: "https://sonoic.example.com/api/sonos/token"),
+            tokenRefreshURL: URL(string: "https://sonoic.example.com/api/sonos/token/refresh"),
+            authorizationEndpoint: URL(string: "https://api.sonos.com/login/v3/oauth")!,
+            scopes: ["playback-control-all"]
+        )
+
+        #expect(!configuration.isConfigured)
+    }
+
+    @Test
     func treatsTokenAsExpiredInsideLeeway() {
         let token = SonosOAuthTokenSet(
             accessToken: "access",

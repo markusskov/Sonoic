@@ -5,6 +5,14 @@ struct SonosControlAPIClient {
         case invalidResponse
         case httpStatus(Int)
 
+        var isAuthorizationFailure: Bool {
+            if case let .httpStatus(status) = self {
+                return status == 401 || status == 403
+            }
+
+            return false
+        }
+
         var errorDescription: String? {
             switch self {
             case .invalidResponse:

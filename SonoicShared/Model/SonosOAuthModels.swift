@@ -39,11 +39,19 @@ nonisolated struct SonosOAuthConfiguration: Equatable, Sendable {
 
     var isConfigured: Bool {
         !clientID.isEmpty
-            && !redirectURI.isEmpty
+            && isSecureRedirectURI
             && !callbackScheme.isEmpty
             && authorizationEndpoint.scheme == "https"
             && tokenExchangeURL?.scheme == "https"
             && (tokenRefreshURL == nil || tokenRefreshURL?.scheme == "https")
+    }
+
+    private var isSecureRedirectURI: Bool {
+        guard let url = URL(string: redirectURI) else {
+            return false
+        }
+
+        return url.scheme == "https" && url.host?.isEmpty == false
     }
 
     var scopeValue: String {

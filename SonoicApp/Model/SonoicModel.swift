@@ -277,7 +277,12 @@ final class SonoicModel {
         manualSonosHost = savedManualSonosHost
         recentPlays = settingsStore.loadRecentPlays()
         recentSourceSearches = settingsStore.loadRecentSourceSearches()
-        hasCompletedOnboarding = settingsStore.loadHasCompletedOnboarding() || !savedManualSonosHost.isEmpty
+        let savedHasCompletedOnboarding = settingsStore.loadHasCompletedOnboarding()
+        let migratedHasCompletedOnboarding = savedHasCompletedOnboarding || !savedManualSonosHost.isEmpty
+        hasCompletedOnboarding = migratedHasCompletedOnboarding
+        if migratedHasCompletedOnboarding && !savedHasCompletedOnboarding {
+            settingsStore.saveHasCompletedOnboarding(true)
+        }
         appleMusicAuthorizationState = appleMusicCatalogSearchClient.currentAuthorizationState()
 
         do {
