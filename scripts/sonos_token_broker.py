@@ -25,6 +25,7 @@ from typing import Any
 
 SONOS_TOKEN_URL = "https://api.sonos.com/login/v3/oauth/access"
 BROKER_CODE_TTL_SECONDS = 300
+OAUTH_CALLBACK_PATHS = {"/oauth/sonos/callback", "/oauth"}
 
 
 @dataclass
@@ -116,7 +117,7 @@ class SonosTokenBrokerHandler(BaseHTTPRequestHandler):
         if parsed.path == "/healthz":
             self.write_json(200, {"ok": True})
             return
-        if parsed.path == "/oauth/sonos/callback":
+        if parsed.path in OAUTH_CALLBACK_PATHS:
             self.handle_oauth_callback(parsed)
             return
 
@@ -279,9 +280,9 @@ def main() -> None:
     SonosTokenBrokerHandler.config = config
     SonosTokenBrokerHandler.store = BrokerStore()
     server = ThreadingHTTPServer((config.host, config.port), SonosTokenBrokerHandler)
-    event_callback_url = config.redirect_uri.replace(
-        "/oauth/sonos/callback",
-        "/api/sonos/events",
+    parsed_redirect = urllib.parse.urlparse(config.redirect_uri)
+    event_callback_url = urllib.parse.urlunparse(
+        parsed_redirect._replace(path="/api/sonos/events", query="", fragment="")
     )
     print(f"[sonos-token-broker] listening on http://{config.host}:{config.port}")
     print(f"[sonos-token-broker] client id: {redacted(config.client_id)}")

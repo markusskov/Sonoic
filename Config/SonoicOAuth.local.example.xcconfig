@@ -3,6 +3,6 @@
 
 SONOS_OAUTH_CLIENT_ID = <Sonos Key>
 // xcconfig treats // as a comment, so HTTPS URLs must use the empty-variable slash escape.
-SONOS_OAUTH_REDIRECT_URI = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/oauth/sonos/callback
+SONOS_OAUTH_REDIRECT_URI = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/oauth
 SONOS_OAUTH_TOKEN_EXCHANGE_URL = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/api/sonos/token
 SONOS_OAUTH_TOKEN_REFRESH_URL = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/api/sonos/token/refresh

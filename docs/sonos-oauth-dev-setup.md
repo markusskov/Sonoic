@@ -11,7 +11,7 @@ credentials and the current Cloudflare tunnel URL.
 ```bash
 export SONOS_CLIENT_ID="<Sonos Key>"
 export SONOS_CLIENT_SECRET="<Sonos Secret>"
-export SONOS_REDIRECT_URI="https://<tunnel>.trycloudflare.com/oauth/sonos/callback"
+export SONOS_REDIRECT_URI="https://<tunnel>.trycloudflare.com/oauth"
 export SONOIC_APP_REDIRECT_URI="sonoic://sonos-auth"
 python3 scripts/sonos_token_broker.py
 ```
@@ -33,7 +33,7 @@ Use the HTTPS URL printed by Cloudflare everywhere below.
 Set the redirect URI to:
 
 ```text
-https://<tunnel>.trycloudflare.com/oauth/sonos/callback
+https://<tunnel>.trycloudflare.com/oauth
 ```
 
 Set the event callback URL to:
@@ -46,7 +46,8 @@ Save the client credential after changing either URL. If Sonos shows the generic
 problem page after sign-in and the broker never logs `oauth callback received`,
 Sonos failed before redirecting back to Sonoic. In that case, re-check that the
 saved portal URLs exactly match the broker startup output, including path and no
-trailing slash.
+trailing slash. The broker also accepts `/oauth/sonos/callback`, but `/oauth`
+matches the official Sonos sample app and is the preferred development path.
 
 ## Xcode Build Settings
 
@@ -61,7 +62,7 @@ development:
 
 ```text
 SONOS_OAUTH_CLIENT_ID = <Sonos Key>
-SONOS_OAUTH_REDIRECT_URI = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/oauth/sonos/callback
+SONOS_OAUTH_REDIRECT_URI = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/oauth
 SONOS_OAUTH_TOKEN_EXCHANGE_URL = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/api/sonos/token
 SONOS_OAUTH_TOKEN_REFRESH_URL = https:/$(SONOIC_EMPTY)/<tunnel>.trycloudflare.com/api/sonos/token/refresh
 ```
@@ -74,7 +75,7 @@ is parsed as `https:` because `//` starts a comment in `.xcconfig` files.
 ## Flow
 
 1. Sonoic opens the Sonos authorization URL.
-2. Sonos redirects to `/oauth/sonos/callback` on the broker.
+2. Sonos redirects to `/oauth` on the broker.
 3. The broker creates a short-lived one-time `broker_code`.
 4. The broker redirects back to `sonoic://sonos-auth`.
 5. Sonoic posts the `broker_code` to `/api/sonos/token`.
