@@ -15,11 +15,16 @@ describe('Sonos OAuth worker', () => {
 		);
 		const ctx = createExecutionContext();
 
-		const response = await worker.fetch(request, env, ctx);
+		const response = await worker.fetch(request, testEnv(), ctx);
 		await waitOnExecutionContext(ctx);
 
 		expect(response.status).toBe(302);
-		expect(response.headers.get('location')).toBe('sonoic://sonos-auth?code=sonos-code&state=state-1');
+		const location = new URL(response.headers.get('location') ?? '');
+		expect(location.protocol).toBe('sonoic:');
+		expect(location.host).toBe('sonos-auth');
+		expect(location.searchParams.get('state')).toBe('state-1');
+		expect(location.searchParams.get('broker_code')).toBeTruthy();
+		expect(location.searchParams.get('code')).toBeNull();
 		expect(response.headers.get('cache-control')).toBe('no-store');
 	});
 
@@ -37,11 +42,12 @@ describe('Sonos OAuth worker', () => {
 		);
 		vi.stubGlobal('fetch', fetchMock);
 
+		const brokerCode = await makeBrokerCode('sonos-code', 'state-1');
 		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				code: 'sonos-code',
+				code: brokerCode,
 				state: 'state-1',
 				redirect_uri: env.SONOS_REDIRECT_URI,
 			}),
@@ -65,6 +71,29 @@ describe('Sonos OAuth worker', () => {
 			'grant_type=authorization_code&code=sonos-code&redirect_uri=https%3A%2F%2Fsonos.ryvus.app%2Foauth%2Fsonos%2Fcallback',
 		);
 	});
+
+	it('rejects raw authorization codes that were not issued by the worker', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				code: 'raw-sonos-code',
+				state: 'state-1',
+				redirect_uri: env.SONOS_REDIRECT_URI,
+			}),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(400);
+		await expect(response.json()).resolves.toMatchObject({ error: 'invalid_broker_code' });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
 });
 
 function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
@@ -72,4 +101,32 @@ function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
 		...env,
 		SONOS_CLIENT_SECRET: 'secret-1',
 	};
+}
+
+async function makeBrokerCode(code: string, state: string): Promise<string> {
+	const payload = {
+		code,
+		state,
+		expiresAt: Math.floor(Date.now() / 1_000) + 300,
+	};
+	const payloadPart = base64URLEncode(new TextEncoder().encode(JSON.stringify(payload)));
+	const signaturePart = await hmacSignature(payloadPart);
+	return `${payloadPart}.${signaturePart}`;
+}
+
+async function hmacSignature(value: string): Promise<string> {
+	const key = await crypto.subtle.importKey('raw', new TextEncoder().encode('secret-1'), { name: 'HMAC', hash: 'SHA-256' }, false, [
+		'sign',
+	]);
+	const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
+	return base64URLEncode(new Uint8Array(signature));
+}
+
+function base64URLEncode(bytes: Uint8Array): string {
+	let binary = '';
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
+
+	return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }

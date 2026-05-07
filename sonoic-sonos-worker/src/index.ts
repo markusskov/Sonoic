@@ -1,11 +1,20 @@
 const SONOS_TOKEN_URL = 'https://api.sonos.com/login/v3/oauth/access';
 const OAUTH_CALLBACK_PATHS = new Set(['/oauth/sonos/callback', '/oauth']);
+const BROKER_CODE_TTL_SECONDS = 5 * 60;
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 
 type WorkerEnv = Env & {
 	SONOS_CLIENT_SECRET?: string;
 };
 
 type JsonObject = Record<string, unknown>;
+
+type BrokerCodePayload = {
+	code: string;
+	state: string;
+	expiresAt: number;
+};
 
 class HTTPError extends Error {
 	constructor(
@@ -26,7 +35,7 @@ export default {
 			}
 
 			if (request.method === 'GET' && OAUTH_CALLBACK_PATHS.has(url.pathname)) {
-				return handleOAuthCallback(url, env as WorkerEnv);
+				return await handleOAuthCallback(url, env as WorkerEnv);
 			}
 
 			if (request.method === 'POST' && url.pathname === '/api/sonos/token') {
@@ -52,7 +61,7 @@ export default {
 	},
 } satisfies ExportedHandler<Env>;
 
-function handleOAuthCallback(url: URL, env: WorkerEnv): Response {
+async function handleOAuthCallback(url: URL, env: WorkerEnv): Promise<Response> {
 	const state = url.searchParams.get('state') ?? '';
 	const sonosError = url.searchParams.get('error');
 	if (sonosError) {
@@ -71,18 +80,21 @@ function handleOAuthCallback(url: URL, env: WorkerEnv): Response {
 		});
 	}
 
-	return redirectToApp(env, { code, state });
+	const brokerCode = await makeBrokerCode(env, { code, state, expiresAt: currentEpochSeconds() + BROKER_CODE_TTL_SECONDS });
+	return redirectToApp(env, { broker_code: brokerCode, state });
 }
 
 async function handleTokenExchange(request: Request, env: WorkerEnv): Promise<Response> {
 	const body = await readJson(request);
-	const code = requiredString(body, 'code');
+	const brokerCode = requiredString(body, 'code');
+	const state = requiredString(body, 'state');
 	const redirectURI = requiredString(body, 'redirect_uri');
 	validateRedirectURI(env, redirectURI);
+	const payload = await readBrokerCode(env, brokerCode, state);
 
 	const tokenResponse = await requestSonosToken(env, {
 		grant_type: 'authorization_code',
-		code,
+		code: payload.code,
 		redirect_uri: redirectURI,
 	});
 	return jsonResponse(200, tokenResponse);
@@ -186,6 +198,105 @@ function validateRedirectURI(env: WorkerEnv, redirectURI: string): void {
 	if (redirectURI !== expected) {
 		throw new HTTPError(400, 'redirect_uri_mismatch');
 	}
+}
+
+async function makeBrokerCode(env: WorkerEnv, payload: BrokerCodePayload): Promise<string> {
+	const payloadPart = base64URLEncode(textEncoder.encode(JSON.stringify(payload)));
+	const signaturePart = await hmacSignature(env, payloadPart);
+	return `${payloadPart}.${signaturePart}`;
+}
+
+async function readBrokerCode(env: WorkerEnv, brokerCode: string, expectedState: string): Promise<BrokerCodePayload> {
+	const [payloadPart, signaturePart, extraPart] = brokerCode.split('.');
+	if (!payloadPart || !signaturePart || extraPart !== undefined) {
+		throw new HTTPError(400, 'invalid_broker_code');
+	}
+
+	const expectedSignature = await hmacSignature(env, payloadPart);
+	if (!constantTimeEqual(signaturePart, expectedSignature)) {
+		throw new HTTPError(400, 'invalid_broker_code');
+	}
+
+	let payload: unknown;
+	try {
+		payload = JSON.parse(textDecoder.decode(base64URLDecode(payloadPart)));
+	} catch {
+		throw new HTTPError(400, 'invalid_broker_code');
+	}
+
+	if (!isBrokerCodePayload(payload)) {
+		throw new HTTPError(400, 'invalid_broker_code');
+	}
+
+	if (payload.state !== expectedState) {
+		throw new HTTPError(400, 'state_mismatch');
+	}
+
+	if (payload.expiresAt < currentEpochSeconds()) {
+		throw new HTTPError(400, 'expired_broker_code');
+	}
+
+	return payload;
+}
+
+function isBrokerCodePayload(payload: unknown): payload is BrokerCodePayload {
+	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+		return false;
+	}
+
+	const candidate = payload as Record<string, unknown>;
+	return (
+		typeof candidate.code === 'string' &&
+		candidate.code.length > 0 &&
+		typeof candidate.state === 'string' &&
+		candidate.state.length > 0 &&
+		typeof candidate.expiresAt === 'number' &&
+		Number.isFinite(candidate.expiresAt)
+	);
+}
+
+async function hmacSignature(env: WorkerEnv, value: string): Promise<string> {
+	const secret = requiredEnv(env, 'SONOS_CLIENT_SECRET');
+	const key = await crypto.subtle.importKey('raw', textEncoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+	const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(value));
+	return base64URLEncode(new Uint8Array(signature));
+}
+
+function base64URLEncode(bytes: Uint8Array): string {
+	let binary = '';
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
+
+	return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+}
+
+function base64URLDecode(value: string): Uint8Array {
+	const padded = value.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - (value.length % 4)) % 4);
+	const binary = atob(padded);
+	const bytes = new Uint8Array(binary.length);
+	for (let index = 0; index < binary.length; index += 1) {
+		bytes[index] = binary.charCodeAt(index);
+	}
+
+	return bytes;
+}
+
+function constantTimeEqual(left: string, right: string): boolean {
+	if (left.length !== right.length) {
+		return false;
+	}
+
+	let mismatch = 0;
+	for (let index = 0; index < left.length; index += 1) {
+		mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+	}
+
+	return mismatch === 0;
+}
+
+function currentEpochSeconds(): number {
+	return Math.floor(Date.now() / 1_000);
 }
 
 function jsonResponse(status: number, body: JsonObject): Response {
