@@ -21,6 +21,13 @@ The documented Sonos-native path for service playback points toward Sonos cloud/
 4. Provide a cloud queue or playback object that Sonos can resolve through a real Sonos music service identity.
 5. Load the cloud queue or playback object into the Sonos playback session.
 
+The official `api-web-sample-app` makes two boundaries clearer:
+
+- Normal transport control is group-scoped: read `/groups/{groupId}/playback`, read `/groups/{groupId}/playbackMetadata`, then issue play/pause/skip/seek commands against the same group.
+- App-owned arbitrary playback is session-scoped: create `/groups/{groupId}/playbackSession`, load a cloud queue into `/playbackSessions/{sessionId}/playbackSession/loadCloudQueue`, and use `skipToItem`/`refreshCloudQueue` from that session.
+
+That distinction matters for Sonoic. We can add typed Control API support now, but real arbitrary Apple Music playback requires a Sonoic-owned cloud queue endpoint plus Sonos OAuth. The iPhone app should not embed a Sonos client secret, and MusicKit catalog IDs alone are not a complete Sonos playback payload.
+
 Useful docs:
 
 - [Sonos Control API](https://docs.sonos.com/docs/control)
@@ -45,7 +52,7 @@ Those Apple IDs are valuable for UI, search, detail screens, and matching agains
 
 ## Current Sonoic Rule
 
-Sonoic should only show direct Play for Apple Music rows when it has an exact Sonos-native payload from an existing Sonos favorite or another proven Sonos-owned source. Everything else stays metadata-only.
+Sonoic should only show direct Play for Apple Music rows when it has an exact Sonos-native payload from an existing Sonos favorite, a device-tested Sonos HLS payload, or a future Control API/cloud-queue payload. Everything else stays metadata-only.
 
 Queue actions should be gated even more strictly:
 
@@ -58,6 +65,7 @@ Queue actions should be gated even more strictly:
 1. Keep source ownership diagnostics visible under Settings -> Advanced.
 2. Add device logs for current URI, track URI, and queue edit attempts before another queue-action PR.
 3. Spike Sonos Control API auth separately from local SOAP playback.
-4. Keep comparing generated Apple Music payloads against Sonos-app-started playback for songs, albums, playlists, and library items.
-5. Add tests around generated payload metadata, queue context, and source ownership.
-6. If the mapping requires cloud queue/service infrastructure, design that as a separate backend-backed milestone.
+4. Add a cloud group/session diagnostics pass that reads Control API playback status and metadata without changing the live control path.
+5. Keep comparing generated Apple Music payloads against Sonos-app-started playback for songs, albums, playlists, and library items.
+6. Add tests around generated payload metadata, queue context, and source ownership.
+7. Design Sonoic-owned cloud queue endpoints before expanding arbitrary catalog playback.

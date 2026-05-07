@@ -47,27 +47,4 @@ struct SonosControlAPICloudSnapshot: Equatable {
     }
 }
 
-struct SonosControlAPIHousehold: Decodable, Equatable, Identifiable {
-    var id: String
-}
-
-struct SonosControlAPIGroupSnapshot: Decodable, Equatable {
-    var groups: [SonosControlAPIGroup]
-    var players: [SonosControlAPIPlayer]
-}
-
-struct SonosControlAPIGroup: Decodable, Equatable, Identifiable {
-    var id: String
-    var name: String?
-    var coordinatorId: String?
-    var playbackState: String?
-    var playerIds: [String]
-}
-
-struct SonosControlAPIPlayer: Decodable, Equatable, Identifiable {
-    var id: String
-    var name: String?
-    var icon: String?
-    var webSocketUrl: String?
-    var capabilities: [String]?
-}
+typealias SonosControlAPIGroupSnapshot = SonosControlAPIGroupsResponse

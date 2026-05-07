@@ -98,6 +98,35 @@ struct SettingsNowPlayingDiagnosticsSection: View {
                 value: model.nowPlayingDiagnostics.rawDuration ?? "Unavailable"
             )
         }
+
+        Section("Seek Diagnostics") {
+            LabeledContent("Status", value: model.seekDiagnostics.status.title)
+            LabeledContent("Requested At", value: refreshTimingText(model.seekDiagnostics.requestedAt))
+            LabeledContent("Host", value: model.seekDiagnostics.host ?? "Unavailable")
+            LabeledContent("Target", value: seekTimeText(model.seekDiagnostics.target))
+            LabeledContent("Observed", value: seekTimeText(model.seekDiagnostics.observed))
+
+            if let errorDetail = model.seekDiagnostics.errorDetail {
+                SettingsDiagnosticRow(title: "Error", value: errorDetail)
+            }
+        }
+    }
+
+    private func seekTimeText(_ timeInterval: TimeInterval?) -> String {
+        guard let timeInterval else {
+            return "Unavailable"
+        }
+
+        let totalSeconds = max(0, Int(timeInterval.rounded()))
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        }
+
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 

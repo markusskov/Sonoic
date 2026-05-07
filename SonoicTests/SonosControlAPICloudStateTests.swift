@@ -15,7 +15,6 @@ struct SonosControlAPICloudStateTests {
                             id: "group-1",
                             name: "Stue",
                             coordinatorId: "player-1",
-                            playbackState: "PLAYBACK_STATE_PLAYING",
                             playerIds: ["player-1"]
                         )
                     ],
@@ -23,9 +22,8 @@ struct SonosControlAPICloudStateTests {
                         SonosControlAPIPlayer(
                             id: "player-1",
                             name: "Stue",
-                            icon: nil,
-                            webSocketUrl: nil,
-                            capabilities: nil
+                            roomName: "Stue",
+                            deviceIds: nil
                         )
                     ]
                 )

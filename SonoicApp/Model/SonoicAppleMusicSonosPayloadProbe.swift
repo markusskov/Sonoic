@@ -3,6 +3,7 @@ import Foundation
 struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
     enum Strategy: String, Equatable {
         case catalogHLS
+        case catalogStaticHLS
         case catalogPlaylistContainer
         case libraryTrack
 
@@ -10,6 +11,8 @@ struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
             switch self {
             case .catalogHLS:
                 "Catalog HLS"
+            case .catalogStaticHLS:
+                "Catalog Static HLS"
             case .catalogPlaylistContainer:
                 "Catalog Playlist"
             case .libraryTrack:
@@ -83,6 +86,26 @@ struct SonoicAppleMusicSonosPayloadProbe {
                         resourceURI: uri
                     ),
                     serialNumber: launchSerial
+                )
+            )
+        }
+
+        if item.kind == .song,
+           let catalogID = identity.catalogID.sonoicNonEmptyTrimmed,
+           let trackSerial = playbackHint.trackSerials.first?.sonoicNonEmptyTrimmed,
+           let encodedCatalogID = sonosPayloadID(catalogID) {
+            let uri = "x-sonosapi-hls-static:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&flags=0&sn=\(trackSerial)"
+            candidates.append(
+                SonoicAppleMusicGeneratedPayloadCandidate(
+                    strategy: .catalogStaticHLS,
+                    uri: uri,
+                    metadataXML: metadataBuilder.metadataXML(
+                        for: item,
+                        itemID: "song:\(catalogID)",
+                        serviceID: appleMusicServiceID,
+                        resourceURI: uri
+                    ),
+                    serialNumber: trackSerial
                 )
             )
         }

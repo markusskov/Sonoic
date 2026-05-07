@@ -1,51 +1,29 @@
 import Foundation
 
 struct SonosControlAPIClient {
-    enum ClientError: LocalizedError {
-        case invalidResponse
-        case httpStatus(Int)
+    private let transport: SonosControlAPITransport
 
-        var isAuthorizationFailure: Bool {
-            if case let .httpStatus(status) = self {
-                return status == 401 || status == 403
-            }
-
-            return false
-        }
-
-        var errorDescription: String? {
-            switch self {
-            case .invalidResponse:
-                "Sonos cloud returned an unreadable response."
-            case let .httpStatus(status):
-                "Sonos cloud returned HTTP \(status)."
-            }
-        }
+    init(transport: SonosControlAPITransport = SonosControlAPITransport()) {
+        self.transport = transport
     }
 
-    private let baseURL: URL
-    private let session: URLSession
-    private let decoder: JSONDecoder
-
-    init(
-        baseURL: URL = URL(string: "https://api.ws.sonos.com/control/api/v1")!,
-        session: URLSession = .shared
-    ) {
-        self.baseURL = baseURL
-        self.session = session
-        decoder = JSONDecoder()
+    static func playbackSessionCommandPath(sessionID: String, command: String) -> String {
+        "/playbackSessions/\(sessionID)/playbackSession/\(command)"
     }
 
     func fetchCloudSnapshot(tokenSet: SonosOAuthTokenSet) async throws -> SonosControlAPICloudSnapshot {
-        let householdsResponse: HouseholdsResponse = try await get("households", tokenSet: tokenSet)
+        let householdsResponse = try await households(accessToken: tokenSet.accessToken)
         var groupsByHouseholdID: [String: SonosControlAPIGroupSnapshot] = [:]
 
         for household in householdsResponse.households {
-            let groups: SonosControlAPIGroupSnapshot = try await get(
-                "households/\(household.id)/groups",
-                tokenSet: tokenSet
+            let groupsResponse = try await groups(
+                householdID: household.id,
+                accessToken: tokenSet.accessToken
             )
-            groupsByHouseholdID[household.id] = groups
+            groupsByHouseholdID[household.id] = SonosControlAPIGroupSnapshot(
+                groups: groupsResponse.groups,
+                players: groupsResponse.players
+            )
         }
 
         return SonosControlAPICloudSnapshot(
@@ -54,31 +32,212 @@ struct SonosControlAPIClient {
         )
     }
 
-    private func get<Response: Decodable>(_ path: String, tokenSet: SonosOAuthTokenSet) async throws -> Response {
-        let url = baseURL.appending(path: path)
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 15
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(tokenSet.authorizationHeaderValue, forHTTPHeaderField: "Authorization")
-        request.setValue("Sonoic iOS", forHTTPHeaderField: "User-Agent")
-
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw ClientError.invalidResponse
-        }
-
-        guard (200 ..< 300).contains(httpResponse.statusCode) else {
-            throw ClientError.httpStatus(httpResponse.statusCode)
-        }
-
-        do {
-            return try decoder.decode(Response.self, from: data)
-        } catch {
-            throw ClientError.invalidResponse
-        }
+    func households(accessToken: String) async throws -> SonosControlAPIHouseholdsResponse {
+        try await transport.get(
+            "/households",
+            accessToken: accessToken
+        )
     }
-}
 
-private struct HouseholdsResponse: Decodable {
-    var households: [SonosControlAPIHousehold]
+    func groups(
+        householdID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIGroupsResponse {
+        try await transport.get(
+            "/households/\(householdID)/groups",
+            accessToken: accessToken
+        )
+    }
+
+    func favorites(
+        householdID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIFavoritesResponse {
+        try await transport.get(
+            "/households/\(householdID)/favorites",
+            accessToken: accessToken
+        )
+    }
+
+    func playlists(
+        householdID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIPlaylistsResponse {
+        try await transport.get(
+            "/households/\(householdID)/playlists",
+            accessToken: accessToken
+        )
+    }
+
+    func loadFavorite(
+        groupID: String,
+        favoriteID: String,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/favorites",
+            accessToken: accessToken,
+            body: SonosControlAPILoadFavoriteRequest(favoriteId: favoriteID)
+        )
+    }
+
+    func loadPlaylist(
+        groupID: String,
+        playlistID: String,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playlists",
+            accessToken: accessToken,
+            body: SonosControlAPILoadPlaylistRequest(playlistId: playlistID)
+        )
+    }
+
+    func playbackStatus(
+        groupID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIPlaybackStatus {
+        try await transport.get(
+            "/groups/\(groupID)/playback",
+            accessToken: accessToken
+        )
+    }
+
+    func playbackMetadata(
+        groupID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIMetadataStatus {
+        try await transport.get(
+            "/groups/\(groupID)/playbackMetadata",
+            accessToken: accessToken
+        )
+    }
+
+    func play(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/play",
+            accessToken: accessToken
+        )
+    }
+
+    func pause(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/pause",
+            accessToken: accessToken
+        )
+    }
+
+    func togglePlayPause(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/togglePlayPause",
+            accessToken: accessToken
+        )
+    }
+
+    func skipToNextTrack(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/skipToNextTrack",
+            accessToken: accessToken
+        )
+    }
+
+    func skipToPreviousTrack(groupID: String, accessToken: String) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/skipToPreviousTrack",
+            accessToken: accessToken
+        )
+    }
+
+    func seek(
+        groupID: String,
+        positionMillis: Int,
+        itemID: String?,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/seek",
+            accessToken: accessToken,
+            body: SonosControlAPISeekRequest(
+                positionMillis: max(0, positionMillis),
+                itemId: itemID?.sonoicNonEmptyTrimmed
+            )
+        )
+    }
+
+    func seekRelative(
+        groupID: String,
+        deltaMillis: Int,
+        itemID: String?,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/playback/seekRelative",
+            accessToken: accessToken,
+            body: SonosControlAPISeekRelativeRequest(
+                deltaMillis: deltaMillis,
+                itemId: itemID?.sonoicNonEmptyTrimmed
+            )
+        )
+    }
+
+    func createPlaybackSession(
+        groupID: String,
+        appID: String,
+        appContext: String,
+        accountID: String?,
+        customData: String?,
+        accessToken: String
+    ) async throws -> SonosControlAPISessionStatus {
+        try await transport.post(
+            "/groups/\(groupID)/playbackSession",
+            accessToken: accessToken,
+            body: SonosControlAPICreateSessionRequest(
+                appId: appID,
+                appContext: appContext,
+                accountId: accountID?.sonoicNonEmptyTrimmed,
+                customData: customData?.sonoicNonEmptyTrimmed
+            )
+        )
+    }
+
+    func loadCloudQueue(
+        sessionID: String,
+        request: SonosControlAPILoadCloudQueueRequest,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            Self.playbackSessionCommandPath(sessionID: sessionID, command: "loadCloudQueue"),
+            accessToken: accessToken,
+            body: request
+        )
+    }
+
+    func skipToItem(
+        sessionID: String,
+        itemID: String,
+        queueVersion: String?,
+        positionMillis: Int?,
+        playOnCompletion: Bool?,
+        trackMetadata: SonosControlAPITrack?,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            Self.playbackSessionCommandPath(sessionID: sessionID, command: "skipToItem"),
+            accessToken: accessToken,
+            body: SonosControlAPISkipToItemRequest(
+                itemId: itemID,
+                queueVersion: queueVersion?.sonoicNonEmptyTrimmed,
+                positionMillis: positionMillis.map { max(0, $0) },
+                playOnCompletion: playOnCompletion,
+                trackMetadata: trackMetadata
+            )
+        )
+    }
+
+    func refreshCloudQueue(sessionID: String, accessToken: String) async throws {
+        try await transport.post(
+            Self.playbackSessionCommandPath(sessionID: sessionID, command: "refreshCloudQueue"),
+            accessToken: accessToken
+        )
+    }
 }

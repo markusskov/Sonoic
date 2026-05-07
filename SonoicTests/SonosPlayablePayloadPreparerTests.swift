@@ -115,6 +115,11 @@ struct SonosPlayablePayloadPreparerTests {
         )
         #expect(
             SonosPlayablePayloadPreparer.protocolInfo(
+                for: "x-sonosapi-hls-static:song%3a1440845464?sid=204"
+            ) == "sonos.com-http:*:application/x-mpegURL:*"
+        )
+        #expect(
+            SonosPlayablePayloadPreparer.protocolInfo(
                 for: "x-sonos-http:librarytrack%3ai.BOVNeOxU6BVbp8.m4p?sid=204"
             ) == "sonos.com-http:*:audio/mp4:*"
         )
