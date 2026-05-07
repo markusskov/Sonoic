@@ -27,6 +27,8 @@ struct SonosOAuthClientTests {
         #expect(queryItems["state"] == "state-1")
         #expect(queryItems["scope"] == "playback-control-all")
         #expect(queryItems["redirect_uri"] == "https://sonoic.example.com/oauth/sonos")
+        #expect(url.absoluteString.contains("redirect_uri=https://sonoic.example.com/oauth/sonos") == false)
+        #expect(url.absoluteString.contains("redirect_uri=https%3A%2F%2Fsonoic.example.com%2Foauth%2Fsonos"))
     }
 
     @Test
