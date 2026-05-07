@@ -254,7 +254,7 @@ struct SettingsSonosAccountSection: View {
             SettingsStatusRow(
                 title: "Sonos Account",
                 statusTitle: model.sonosControlAPIAuthorizationState.title,
-                detail: model.sonosControlAPIAuthorizationState.detail,
+                detail: detail,
                 systemImage: model.sonosControlAPIAuthorizationState.systemImage,
                 tint: tint
             )
@@ -290,6 +290,11 @@ struct SettingsSonosAccountSection: View {
         case .failed:
             .red
         }
+    }
+
+    private var detail: String? {
+        model.sonosControlAPICloudState.detail
+            ?? model.sonosControlAPIAuthorizationState.detail
     }
 
     private func connect() {

@@ -42,6 +42,7 @@ struct SettingsView: View {
         .task {
             model.refreshAppleMusicAuthorizationState()
             model.refreshSonosControlAPIAuthorizationState()
+            model.refreshSonosControlAPICloudSnapshotIfConnected()
             if model.appleMusicServiceDetails.isLoading {
                 model.appleMusicServiceDetails = .idle
             }

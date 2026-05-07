@@ -67,6 +67,7 @@ final class SonoicModel {
     @ObservationIgnored let sonosOAuthConfiguration: SonosOAuthConfiguration
     @ObservationIgnored let sonosOAuthClient: SonosOAuthClient
     @ObservationIgnored let sonosTokenBrokerClient: SonosTokenBrokerClient
+    @ObservationIgnored let sonosControlAPIClient: SonosControlAPIClient
     @ObservationIgnored let keychainStore: SonoicKeychainStore
     @ObservationIgnored let sonosOAuthWebAuthenticator: SonosOAuthWebAuthenticator
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
@@ -130,6 +131,7 @@ final class SonoicModel {
     var plusState = SonoicPlusState.notConfigured
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
     var sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState.notConfigured
+    var sonosControlAPICloudState = SonosControlAPICloudState.idle
     var appleMusicServiceDetails = SonoicAppleMusicServiceDetails.idle
     var appleMusicRequestReadiness = SonoicAppleMusicRequestReadiness.idle
     var musicKitDiagnostics = SonoicMusicKitDiagnostics.current
@@ -266,6 +268,7 @@ final class SonoicModel {
         sonosOAuthConfiguration = SonosOAuthConfiguration.load()
         sonosOAuthClient = SonosOAuthClient()
         sonosTokenBrokerClient = SonosTokenBrokerClient()
+        sonosControlAPIClient = SonosControlAPIClient()
         keychainStore = SonoicKeychainStore()
         sonosOAuthWebAuthenticator = SonosOAuthWebAuthenticator()
         nowPlayableSessionController = SonoicNowPlayableSessionController()

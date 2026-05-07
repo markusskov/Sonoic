@@ -99,11 +99,17 @@ struct SonoicOnboardingView: View {
 
         case .locatingSpeakers:
             VStack(spacing: 18) {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(SonoicTheme.Colors.tabAccent)
+                if model.hasDiscoveredPlayers {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 54, weight: .semibold))
+                        .foregroundStyle(.green)
+                } else {
+                    ProgressView()
+                        .controlSize(.large)
+                        .tint(SonoicTheme.Colors.tabAccent)
+                }
 
-                Text("Locating Speakers")
+                Text(model.hasDiscoveredPlayers ? "Speakers Found" : "Locating Speakers")
                     .font(.largeTitle.bold())
 
                 Text(discoveryText)

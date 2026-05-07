@@ -10,12 +10,16 @@ extension SonoicModel {
         do {
             guard let tokenSet = try keychainStore.loadSonosTokenSet() else {
                 sonosControlAPIAuthorizationState = .disconnected
+                sonosControlAPICloudState = .idle
                 return
             }
 
             sonosControlAPIAuthorizationState = tokenSet.isExpired(leeway: 0)
                 ? SonosControlAPIAuthorizationState(status: .expired)
                 : SonosControlAPIAuthorizationState(status: .connected(expiresAt: tokenSet.expiresAt))
+            if !sonosControlAPIAuthorizationState.isConnected {
+                sonosControlAPICloudState = .idle
+            }
         } catch {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .failed(error.localizedDescription))
         }
@@ -50,6 +54,7 @@ extension SonoicModel {
 
             try keychainStore.saveSonosTokenSet(tokenSet)
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .connected(expiresAt: tokenSet.expiresAt))
+            await refreshSonosControlAPICloudSnapshot()
         } catch {
             refreshSonosControlAPIAuthorizationState()
             if !sonosControlAPIAuthorizationState.isConnected {
@@ -62,8 +67,42 @@ extension SonoicModel {
         do {
             try keychainStore.deleteSonosTokenSet()
             sonosControlAPIAuthorizationState = sonosOAuthConfiguration.isConfigured ? .disconnected : .notConfigured
+            sonosControlAPICloudState = .idle
         } catch {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .failed(error.localizedDescription))
+        }
+    }
+
+    func refreshSonosControlAPICloudSnapshotIfConnected() {
+        guard sonosControlAPIAuthorizationState.isConnected else {
+            sonosControlAPICloudState = .idle
+            return
+        }
+
+        Task {
+            await refreshSonosControlAPICloudSnapshot()
+        }
+    }
+
+    func refreshSonosControlAPICloudSnapshot() async {
+        guard sonosControlAPIAuthorizationState.isConnected else {
+            sonosControlAPICloudState = .idle
+            return
+        }
+
+        sonosControlAPICloudState = SonosControlAPICloudState(status: .loading)
+
+        do {
+            guard let tokenSet = try keychainStore.loadSonosTokenSet() else {
+                sonosControlAPIAuthorizationState = .disconnected
+                sonosControlAPICloudState = .idle
+                return
+            }
+
+            let snapshot = try await sonosControlAPIClient.fetchCloudSnapshot(tokenSet: tokenSet)
+            sonosControlAPICloudState = SonosControlAPICloudState(status: .verified(snapshot))
+        } catch {
+            sonosControlAPICloudState = SonosControlAPICloudState(status: .failed(error.localizedDescription))
         }
     }
 

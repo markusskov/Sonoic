@@ -46,7 +46,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		3B8C6A7D31B9000000010001 /* SonoicOAuth.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/SonoicOAuth.xcconfig; sourceTree = "<group>"; };
+		3B8C6A7D31B9000000010001 /* Config/SonoicOAuth.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/SonoicOAuth.xcconfig; sourceTree = "<group>"; };
 		509374062F8902BC0029EF88 /* Sonoic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sonoic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5093741E2F8903DC0029EF88 /* SonoicWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SonoicWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		509374202F8903DC0029EF88 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -152,7 +152,7 @@
 		509373FD2F8902BC0029EF88 = {
 			isa = PBXGroup;
 			children = (
-				3B8C6A7D31B9000000010001 /* SonoicOAuth.xcconfig */,
+				3B8C6A7D31B9000000010001 /* Config/SonoicOAuth.xcconfig */,
 				5093743C2F89055E0029EF88 /* SonoicWidgetsExtension.entitlements */,
 				509374082F8902BC0029EF88 /* SonoicApp */,
 				60AF4D362F8D6CB000C3E321 /* SonoicShared */,
@@ -489,7 +489,7 @@
 		};
 		509374122F8902BE0029EF88 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3B8C6A7D31B9000000010001 /* SonoicOAuth.xcconfig */;
+			baseConfigurationReference = 3B8C6A7D31B9000000010001 /* Config/SonoicOAuth.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -521,7 +521,7 @@
 		};
 		509374132F8902BE0029EF88 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3B8C6A7D31B9000000010001 /* SonoicOAuth.xcconfig */;
+			baseConfigurationReference = 3B8C6A7D31B9000000010001 /* Config/SonoicOAuth.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

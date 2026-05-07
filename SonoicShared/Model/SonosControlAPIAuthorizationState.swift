@@ -65,8 +65,8 @@ struct SonosControlAPIAuthorizationState: Equatable {
             nil
         case .connecting:
             nil
-        case let .connected(expiresAt):
-            "Token expires \(expiresAt.formatted(.dateTime.hour().minute()))"
+        case .connected:
+            nil
         case .expired:
             "Connect again to refresh Sonos access."
         case let .failed(detail):
