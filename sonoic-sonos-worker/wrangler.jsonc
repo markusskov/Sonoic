@@ -24,8 +24,23 @@
 			"pattern": "sonos.ryvus.app",
 			"custom_domain": true
 		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "SONOS_BROKER_CODE_REDEMPTIONS",
+				"class_name": "BrokerCodeRedemptions"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"BrokerCodeRedemptions"
+			]
+		}
 	]
-
 
 	/**
 	 * Smart Placement

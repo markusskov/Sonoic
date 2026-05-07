@@ -22,6 +22,7 @@ extension SonoicModel {
             }
         } catch {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .failed(error.localizedDescription))
+            sonosControlAPICloudState = .idle
         }
     }
 

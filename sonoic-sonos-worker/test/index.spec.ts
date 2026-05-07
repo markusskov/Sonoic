@@ -72,6 +72,51 @@ describe('Sonos OAuth worker', () => {
 		);
 	});
 
+	it('rejects replayed broker codes before calling Sonos again', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					access_token: 'access-1',
+					refresh_token: 'refresh-1',
+					token_type: 'Bearer',
+					expires_in: 3600,
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } },
+			),
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const brokerCode = await makeBrokerCode('sonos-code', 'state-1');
+		const localEnv = testEnv();
+		const requestBody = {
+			code: brokerCode,
+			state: 'state-1',
+			redirect_uri: env.SONOS_REDIRECT_URI,
+		};
+		const firstRequest = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(requestBody),
+		});
+		const secondRequest = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(requestBody),
+		});
+		const firstContext = createExecutionContext();
+		const secondContext = createExecutionContext();
+
+		const firstResponse = await worker.fetch(firstRequest, localEnv, firstContext);
+		await waitOnExecutionContext(firstContext);
+		const secondResponse = await worker.fetch(secondRequest, localEnv, secondContext);
+		await waitOnExecutionContext(secondContext);
+
+		expect(firstResponse.status).toBe(200);
+		expect(secondResponse.status).toBe(400);
+		await expect(secondResponse.json()).resolves.toMatchObject({ error: 'broker_code_redeemed' });
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
 	it('rejects raw authorization codes that were not issued by the worker', async () => {
 		const fetchMock = vi.fn();
 		vi.stubGlobal('fetch', fetchMock);
@@ -100,7 +145,31 @@ function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
 	return {
 		...env,
 		SONOS_CLIENT_SECRET: 'secret-1',
+		SONOS_BROKER_CODE_REDEMPTIONS: makeRedemptionNamespace(),
 	};
+}
+
+function makeRedemptionNamespace(): DurableObjectNamespace {
+	const redeemedDigests = new Set<string>();
+	return {
+		idFromName: () => ({}) as DurableObjectId,
+		get: () =>
+			({
+				fetch: async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+					const body = JSON.parse(String(init?.body ?? '{}')) as { digest?: string };
+					if (!body.digest) {
+						return new Response(JSON.stringify({ error: 'missing_required_field:digest' }), { status: 400 });
+					}
+
+					if (redeemedDigests.has(body.digest)) {
+						return new Response(JSON.stringify({ error: 'broker_code_redeemed' }), { status: 409 });
+					}
+
+					redeemedDigests.add(body.digest);
+					return new Response(JSON.stringify({ success: true }), { status: 201 });
+				},
+			}) as DurableObjectStub,
+	} as DurableObjectNamespace;
 }
 
 async function makeBrokerCode(code: string, state: string): Promise<string> {

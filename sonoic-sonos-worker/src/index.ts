@@ -6,6 +6,7 @@ const textDecoder = new TextDecoder();
 
 type WorkerEnv = Env & {
 	SONOS_CLIENT_SECRET?: string;
+	SONOS_BROKER_CODE_REDEMPTIONS?: DurableObjectNamespace;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -23,6 +24,28 @@ class HTTPError extends Error {
 		readonly body?: JsonObject,
 	) {
 		super(message);
+	}
+}
+
+export class BrokerCodeRedemptions {
+	constructor(private readonly state: DurableObjectState) {}
+
+	async fetch(request: Request): Promise<Response> {
+		if (request.method !== 'POST') {
+			return jsonResponse(405, { error: 'method_not_allowed' });
+		}
+
+		const body = await readJson(request);
+		const digest = requiredString(body, 'digest');
+		const expiresAt = requiredNumber(body, 'expires_at');
+		const storageKey = `broker-code:${digest}`;
+		const existing = await this.state.storage.get(storageKey);
+		if (existing !== undefined) {
+			return jsonResponse(409, { error: 'broker_code_redeemed' });
+		}
+
+		await this.state.storage.put(storageKey, expiresAt);
+		return jsonResponse(201, { success: true });
 	}
 }
 
@@ -91,6 +114,7 @@ async function handleTokenExchange(request: Request, env: WorkerEnv): Promise<Re
 	const redirectURI = requiredString(body, 'redirect_uri');
 	validateRedirectURI(env, redirectURI);
 	const payload = await readBrokerCode(env, brokerCode, state);
+	await markBrokerCodeRedeemed(env, brokerCode, payload.expiresAt);
 
 	const tokenResponse = await requestSonosToken(env, {
 		grant_type: 'authorization_code',
@@ -184,6 +208,15 @@ function requiredString(body: JsonObject, key: string): string {
 	return value;
 }
 
+function requiredNumber(body: JsonObject, key: string): number {
+	const value = body[key];
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		throw new HTTPError(400, `missing_required_field:${key}`);
+	}
+
+	return value;
+}
+
 function requiredEnv(env: WorkerEnv, key: keyof WorkerEnv & string): string {
 	const value = env[key];
 	if (typeof value !== 'string' || value.length === 0) {
@@ -239,6 +272,32 @@ async function readBrokerCode(env: WorkerEnv, brokerCode: string, expectedState:
 	return payload;
 }
 
+async function markBrokerCodeRedeemed(env: WorkerEnv, brokerCode: string, expiresAt: number): Promise<void> {
+	const namespace = env.SONOS_BROKER_CODE_REDEMPTIONS;
+	if (!namespace) {
+		throw new HTTPError(500, 'missing_required_env:SONOS_BROKER_CODE_REDEMPTIONS');
+	}
+
+	const id = namespace.idFromName('global');
+	const stub = namespace.get(id);
+	const response = await stub.fetch('https://broker-code-redemptions/redeem', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			digest: await sha256Digest(brokerCode),
+			expires_at: expiresAt,
+		}),
+	});
+
+	if (response.status === 409) {
+		throw new HTTPError(400, 'broker_code_redeemed');
+	}
+
+	if (!response.ok) {
+		throw new HTTPError(500, 'broker_code_redemption_failed');
+	}
+}
+
 function isBrokerCodePayload(payload: unknown): payload is BrokerCodePayload {
 	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
 		return false;
@@ -260,6 +319,11 @@ async function hmacSignature(env: WorkerEnv, value: string): Promise<string> {
 	const key = await crypto.subtle.importKey('raw', textEncoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 	const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(value));
 	return base64URLEncode(new Uint8Array(signature));
+}
+
+async function sha256Digest(value: string): Promise<string> {
+	const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(value));
+	return base64URLEncode(new Uint8Array(digest));
 }
 
 function base64URLEncode(bytes: Uint8Array): string {
