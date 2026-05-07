@@ -1,6 +1,8 @@
 const SONOS_TOKEN_URL = 'https://api.sonos.com/login/v3/oauth/access';
 const OAUTH_CALLBACK_PATHS = new Set(['/oauth/sonos/callback', '/oauth']);
 const BROKER_CODE_TTL_SECONDS = 5 * 60;
+const BROKER_CODE_STORAGE_PREFIX = 'broker-code:';
+const BROKER_CODE_PRUNE_GRACE_SECONDS = 60;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -38,14 +40,54 @@ export class BrokerCodeRedemptions {
 		const body = await readJson(request);
 		const digest = requiredString(body, 'digest');
 		const expiresAt = requiredNumber(body, 'expires_at');
-		const storageKey = `broker-code:${digest}`;
+		await this.pruneExpiredRedemptions();
+		const storageKey = `${BROKER_CODE_STORAGE_PREFIX}${digest}`;
 		const existing = await this.state.storage.get(storageKey);
 		if (existing !== undefined) {
 			return jsonResponse(409, { error: 'broker_code_redeemed' });
 		}
 
 		await this.state.storage.put(storageKey, expiresAt);
+		await this.schedulePrune(expiresAt);
 		return jsonResponse(201, { success: true });
+	}
+
+	async alarm(): Promise<void> {
+		await this.pruneExpiredRedemptions();
+		await this.scheduleNextStoredExpiration();
+	}
+
+	private async pruneExpiredRedemptions(): Promise<void> {
+		const now = currentEpochSeconds();
+		const entries = await this.state.storage.list<number>({ prefix: BROKER_CODE_STORAGE_PREFIX });
+		const expiredKeys = [...entries]
+			.filter(([, expiresAt]) => expiresAt <= now)
+			.map(([key]) => key);
+
+		await Promise.all(expiredKeys.map((key) => this.state.storage.delete(key)));
+	}
+
+	private async schedulePrune(expiresAt: number): Promise<void> {
+		const alarmAt = (expiresAt + BROKER_CODE_PRUNE_GRACE_SECONDS) * 1_000;
+		const currentAlarm = await this.state.storage.getAlarm();
+		if (currentAlarm === null || alarmAt < currentAlarm) {
+			await this.state.storage.setAlarm(alarmAt);
+		}
+	}
+
+	private async scheduleNextStoredExpiration(): Promise<void> {
+		const entries = await this.state.storage.list<number>({ prefix: BROKER_CODE_STORAGE_PREFIX });
+		const nextExpiration = [...entries].reduce<number | undefined>((next, [, expiresAt]) => {
+			if (next === undefined || expiresAt < next) {
+				return expiresAt;
+			}
+
+			return next;
+		}, undefined);
+
+		if (nextExpiration !== undefined) {
+			await this.schedulePrune(nextExpiration);
+		}
 	}
 }
 

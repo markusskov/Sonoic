@@ -150,22 +150,29 @@ function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
 }
 
 function makeRedemptionNamespace(): DurableObjectNamespace {
-	const redeemedDigests = new Set<string>();
+	const redeemedDigests = new Map<string, number>();
 	return {
 		idFromName: () => ({}) as DurableObjectId,
 		get: () =>
 			({
 				fetch: async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-					const body = JSON.parse(String(init?.body ?? '{}')) as { digest?: string };
+					const body = JSON.parse(String(init?.body ?? '{}')) as { digest?: string; expires_at?: number };
 					if (!body.digest) {
 						return new Response(JSON.stringify({ error: 'missing_required_field:digest' }), { status: 400 });
+					}
+
+					const now = Math.floor(Date.now() / 1_000);
+					for (const [digest, expiresAt] of redeemedDigests) {
+						if (expiresAt <= now) {
+							redeemedDigests.delete(digest);
+						}
 					}
 
 					if (redeemedDigests.has(body.digest)) {
 						return new Response(JSON.stringify({ error: 'broker_code_redeemed' }), { status: 409 });
 					}
 
-					redeemedDigests.add(body.digest);
+					redeemedDigests.set(body.digest, body.expires_at ?? now);
 					return new Response(JSON.stringify({ success: true }), { status: 201 });
 				},
 			}) as DurableObjectStub,
