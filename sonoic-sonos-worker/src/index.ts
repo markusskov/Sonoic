@@ -19,6 +19,11 @@ type BrokerCodePayload = {
 	expiresAt: number;
 };
 
+type BrokerCodeRedemptionRecord = {
+	status: 'pending' | 'redeemed';
+	expiresAt: number;
+};
+
 class HTTPError extends Error {
 	constructor(
 		readonly status: number,
@@ -39,17 +44,51 @@ export class BrokerCodeRedemptions {
 
 		const body = await readJson(request);
 		const digest = requiredString(body, 'digest');
-		const expiresAt = requiredNumber(body, 'expires_at');
 		await this.pruneExpiredRedemptions();
 		const storageKey = `${BROKER_CODE_STORAGE_PREFIX}${digest}`;
+
+		const url = new URL(request.url);
+		switch (url.pathname) {
+			case '/reserve':
+				return await this.reserve(storageKey, body);
+			case '/complete':
+				return await this.complete(storageKey);
+			case '/release':
+				return await this.release(storageKey);
+			default:
+				return jsonResponse(404, { error: 'not_found' });
+		}
+	}
+
+	private async reserve(storageKey: string, body: JsonObject): Promise<Response> {
 		const existing = await this.state.storage.get(storageKey);
 		if (existing !== undefined) {
 			return jsonResponse(409, { error: 'broker_code_redeemed' });
 		}
 
-		await this.state.storage.put(storageKey, expiresAt);
+		const expiresAt = requiredNumber(body, 'expires_at');
+		await this.state.storage.put(storageKey, { status: 'pending', expiresAt } satisfies BrokerCodeRedemptionRecord);
 		await this.schedulePrune(expiresAt);
 		return jsonResponse(201, { success: true });
+	}
+
+	private async complete(storageKey: string): Promise<Response> {
+		const existing = await this.state.storage.get<BrokerCodeRedemptionRecord>(storageKey);
+		if (!existing) {
+			return jsonResponse(409, { error: 'broker_code_not_reserved' });
+		}
+
+		await this.state.storage.put(storageKey, { ...existing, status: 'redeemed' } satisfies BrokerCodeRedemptionRecord);
+		return jsonResponse(200, { success: true });
+	}
+
+	private async release(storageKey: string): Promise<Response> {
+		const existing = await this.state.storage.get<BrokerCodeRedemptionRecord>(storageKey);
+		if (existing?.status === 'pending') {
+			await this.state.storage.delete(storageKey);
+		}
+
+		return jsonResponse(200, { success: true });
 	}
 
 	async alarm(): Promise<void> {
@@ -59,9 +98,9 @@ export class BrokerCodeRedemptions {
 
 	private async pruneExpiredRedemptions(): Promise<void> {
 		const now = currentEpochSeconds();
-		const entries = await this.state.storage.list<number>({ prefix: BROKER_CODE_STORAGE_PREFIX });
+		const entries = await this.state.storage.list<BrokerCodeRedemptionRecord>({ prefix: BROKER_CODE_STORAGE_PREFIX });
 		const expiredKeys = [...entries]
-			.filter(([, expiresAt]) => expiresAt <= now)
+			.filter(([, record]) => record.expiresAt <= now)
 			.map(([key]) => key);
 
 		await Promise.all(expiredKeys.map((key) => this.state.storage.delete(key)));
@@ -76,10 +115,10 @@ export class BrokerCodeRedemptions {
 	}
 
 	private async scheduleNextStoredExpiration(): Promise<void> {
-		const entries = await this.state.storage.list<number>({ prefix: BROKER_CODE_STORAGE_PREFIX });
-		const nextExpiration = [...entries].reduce<number | undefined>((next, [, expiresAt]) => {
-			if (next === undefined || expiresAt < next) {
-				return expiresAt;
+		const entries = await this.state.storage.list<BrokerCodeRedemptionRecord>({ prefix: BROKER_CODE_STORAGE_PREFIX });
+		const nextExpiration = [...entries].reduce<number | undefined>((next, [, record]) => {
+			if (next === undefined || record.expiresAt < next) {
+				return record.expiresAt;
 			}
 
 			return next;
@@ -156,13 +195,21 @@ async function handleTokenExchange(request: Request, env: WorkerEnv): Promise<Re
 	const redirectURI = requiredString(body, 'redirect_uri');
 	validateRedirectURI(env, redirectURI);
 	const payload = await readBrokerCode(env, brokerCode, state);
-	await markBrokerCodeRedeemed(env, brokerCode, payload.expiresAt);
+	await reserveBrokerCodeRedemption(env, brokerCode, payload.expiresAt);
 
-	const tokenResponse = await requestSonosToken(env, {
-		grant_type: 'authorization_code',
-		code: payload.code,
-		redirect_uri: redirectURI,
-	});
+	let tokenResponse: JsonObject;
+	try {
+		tokenResponse = await requestSonosToken(env, {
+			grant_type: 'authorization_code',
+			code: payload.code,
+			redirect_uri: redirectURI,
+		});
+	} catch (error) {
+		await releaseBrokerCodeRedemption(env, brokerCode);
+		throw error;
+	}
+
+	await completeBrokerCodeRedemption(env, brokerCode);
 	return jsonResponse(200, tokenResponse);
 }
 
@@ -314,23 +361,8 @@ async function readBrokerCode(env: WorkerEnv, brokerCode: string, expectedState:
 	return payload;
 }
 
-async function markBrokerCodeRedeemed(env: WorkerEnv, brokerCode: string, expiresAt: number): Promise<void> {
-	const namespace = env.SONOS_BROKER_CODE_REDEMPTIONS;
-	if (!namespace) {
-		throw new HTTPError(500, 'missing_required_env:SONOS_BROKER_CODE_REDEMPTIONS');
-	}
-
-	const id = namespace.idFromName('global');
-	const stub = namespace.get(id);
-	const response = await stub.fetch('https://broker-code-redemptions/redeem', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			digest: await sha256Digest(brokerCode),
-			expires_at: expiresAt,
-		}),
-	});
-
+async function reserveBrokerCodeRedemption(env: WorkerEnv, brokerCode: string, expiresAt: number): Promise<void> {
+	const response = await callBrokerCodeRedemptions(env, brokerCode, '/reserve', { expires_at: expiresAt });
 	if (response.status === 409) {
 		throw new HTTPError(400, 'broker_code_redeemed');
 	}
@@ -338,6 +370,43 @@ async function markBrokerCodeRedeemed(env: WorkerEnv, brokerCode: string, expire
 	if (!response.ok) {
 		throw new HTTPError(500, 'broker_code_redemption_failed');
 	}
+}
+
+async function completeBrokerCodeRedemption(env: WorkerEnv, brokerCode: string): Promise<void> {
+	const response = await callBrokerCodeRedemptions(env, brokerCode, '/complete');
+	if (!response.ok) {
+		throw new HTTPError(500, 'broker_code_redemption_failed');
+	}
+}
+
+async function releaseBrokerCodeRedemption(env: WorkerEnv, brokerCode: string): Promise<void> {
+	const response = await callBrokerCodeRedemptions(env, brokerCode, '/release');
+	if (!response.ok) {
+		throw new HTTPError(500, 'broker_code_redemption_failed');
+	}
+}
+
+async function callBrokerCodeRedemptions(
+	env: WorkerEnv,
+	brokerCode: string,
+	path: '/reserve' | '/complete' | '/release',
+	extraBody: JsonObject = {},
+): Promise<Response> {
+	const namespace = env.SONOS_BROKER_CODE_REDEMPTIONS;
+	if (!namespace) {
+		throw new HTTPError(500, 'missing_required_env:SONOS_BROKER_CODE_REDEMPTIONS');
+	}
+
+	const id = namespace.idFromName('global');
+	const stub = namespace.get(id);
+	return await stub.fetch(`https://broker-code-redemptions${path}`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			digest: await sha256Digest(brokerCode),
+			...extraBody,
+		}),
+	});
 }
 
 function isBrokerCodePayload(payload: unknown): payload is BrokerCodePayload {

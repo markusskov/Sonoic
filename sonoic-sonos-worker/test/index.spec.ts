@@ -117,6 +117,63 @@ describe('Sonos OAuth worker', () => {
 		expect(fetchMock).toHaveBeenCalledOnce();
 	});
 
+	it('releases broker code reservations when the Sonos exchange fails', async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ error: 'temporarily_unavailable' }), {
+					status: 503,
+					headers: { 'Content-Type': 'application/json' },
+				}),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						access_token: 'access-1',
+						refresh_token: 'refresh-1',
+						token_type: 'Bearer',
+						expires_in: 3600,
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } },
+				),
+			);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const brokerCode = await makeBrokerCode('sonos-code', 'state-1');
+		const localEnv = testEnv();
+		const requestBody = {
+			code: brokerCode,
+			state: 'state-1',
+			redirect_uri: env.SONOS_REDIRECT_URI,
+		};
+		const failedRequest = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(requestBody),
+		});
+		const retryRequest = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(requestBody),
+		});
+		const failedContext = createExecutionContext();
+		const retryContext = createExecutionContext();
+
+		const failedResponse = await worker.fetch(failedRequest, localEnv, failedContext);
+		await waitOnExecutionContext(failedContext);
+		const retryResponse = await worker.fetch(retryRequest, localEnv, retryContext);
+		await waitOnExecutionContext(retryContext);
+
+		expect(failedResponse.status).toBe(503);
+		await expect(failedResponse.json()).resolves.toMatchObject({ error: 'sonos_error' });
+		expect(retryResponse.status).toBe(200);
+		await expect(retryResponse.json()).resolves.toMatchObject({
+			access_token: 'access-1',
+			refresh_token: 'refresh-1',
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
 	it('rejects raw authorization codes that were not issued by the worker', async () => {
 		const fetchMock = vi.fn();
 		vi.stubGlobal('fetch', fetchMock);
@@ -150,30 +207,54 @@ function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
 }
 
 function makeRedemptionNamespace(): DurableObjectNamespace {
-	const redeemedDigests = new Map<string, number>();
+	type TestRedemptionRecord = { status: 'pending' | 'redeemed'; expiresAt: number };
+	const redemptions = new Map<string, TestRedemptionRecord>();
 	return {
 		idFromName: () => ({}) as DurableObjectId,
 		get: () =>
 			({
-				fetch: async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+				fetch: async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
 					const body = JSON.parse(String(init?.body ?? '{}')) as { digest?: string; expires_at?: number };
 					if (!body.digest) {
 						return new Response(JSON.stringify({ error: 'missing_required_field:digest' }), { status: 400 });
 					}
 
 					const now = Math.floor(Date.now() / 1_000);
-					for (const [digest, expiresAt] of redeemedDigests) {
-						if (expiresAt <= now) {
-							redeemedDigests.delete(digest);
+					for (const [digest, record] of redemptions) {
+						if (record.expiresAt <= now) {
+							redemptions.delete(digest);
 						}
 					}
 
-					if (redeemedDigests.has(body.digest)) {
-						return new Response(JSON.stringify({ error: 'broker_code_redeemed' }), { status: 409 });
-					}
+					const path = new URL(String(input)).pathname;
+					switch (path) {
+						case '/reserve':
+							if (redemptions.has(body.digest)) {
+								return new Response(JSON.stringify({ error: 'broker_code_redeemed' }), { status: 409 });
+							}
 
-					redeemedDigests.set(body.digest, body.expires_at ?? now);
-					return new Response(JSON.stringify({ success: true }), { status: 201 });
+							redemptions.set(body.digest, { status: 'pending', expiresAt: body.expires_at ?? now });
+							return new Response(JSON.stringify({ success: true }), { status: 201 });
+						case '/complete': {
+							const existing = redemptions.get(body.digest);
+							if (!existing) {
+								return new Response(JSON.stringify({ error: 'broker_code_not_reserved' }), { status: 409 });
+							}
+
+							redemptions.set(body.digest, { ...existing, status: 'redeemed' });
+							return new Response(JSON.stringify({ success: true }), { status: 200 });
+						}
+						case '/release': {
+							const existing = redemptions.get(body.digest);
+							if (existing?.status === 'pending') {
+								redemptions.delete(body.digest);
+							}
+
+							return new Response(JSON.stringify({ success: true }), { status: 200 });
+						}
+						default:
+							return new Response(JSON.stringify({ error: 'not_found' }), { status: 404 });
+					}
 				},
 			}) as DurableObjectStub,
 	} as DurableObjectNamespace;
