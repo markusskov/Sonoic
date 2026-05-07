@@ -165,6 +165,10 @@ struct SonosFavoritesClient {
             return "x-rincon-cpcontainer:*:*:*"
         }
 
+        if uri.hasPrefix("x-sonosapi-hls-static:") {
+            return "sonos.com-http:*:application/x-mpegURL:*"
+        }
+
         if uri.hasPrefix("x-sonosapi-hls:") {
             return "sonos.com-http:*:application/vnd.apple.mpegurl:*"
         }

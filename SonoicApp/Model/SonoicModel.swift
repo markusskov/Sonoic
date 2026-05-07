@@ -44,6 +44,9 @@ final class SonoicModel {
     @ObservationIgnored var isHomeFavoritesRefreshing = false
     @ObservationIgnored var manualPlayTransitionGraceDeadline: Date?
     @ObservationIgnored var isManualPlayTransitionAwaitingConfirmation = false
+    @ObservationIgnored var manualSeekConfirmationDeadline: Date?
+    @ObservationIgnored var manualSeekTargetElapsedTime: TimeInterval?
+    @ObservationIgnored var manualSeekContentKey: String?
     @ObservationIgnored var manualPlaybackContextPayload: SonosPlayablePayload?
     @ObservationIgnored var manualQueueContextPayloads: [SonosPlayablePayload]?
     @ObservationIgnored var manualRecentPlaybackContextPayload: SonosPlayablePayload?
@@ -63,6 +66,7 @@ final class SonoicModel {
     @ObservationIgnored let favoritesClient: SonosFavoritesClient
     @ObservationIgnored let musicServicesClient: SonosMusicServicesClient
     @ObservationIgnored let contentDirectoryProbeClient: SonosContentDirectoryProbeClient
+    @ObservationIgnored let sonosControlAPIClient: SonosControlAPIClient
     @ObservationIgnored let appleMusicCatalogSearchClient: SonoicAppleMusicCatalogSearchClient
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
     @ObservationIgnored let plusController: SonoicPlusController
@@ -93,6 +97,7 @@ final class SonoicModel {
             homeTheaterOperationErrorDetail = nil
             roomVolumeOperationErrorDetail = nil
             nowPlayingDiagnostics = .empty
+            clearManualSeekConfirmation()
             manualPlaybackContextPayload = nil
             manualQueueContextPayloads = nil
             manualRecentPlaybackContextPayload = nil
@@ -128,6 +133,7 @@ final class SonoicModel {
     var musicKitDiagnostics = SonoicMusicKitDiagnostics.current
     var sonosMusicServiceProbeState = SonosMusicServiceProbeState.idle
     var sonosContentDirectoryProbeState = SonosContentDirectoryProbeState.idle
+    var sonosControlAPIState = SonosControlAPIState.disabled
     var isQueueRefreshing = false
     var isQueueClearing = false
     var isQueueMutating = false
@@ -166,6 +172,7 @@ final class SonoicModel {
 
     var nowPlayingObservedAt = Date()
     var nowPlayingDiagnostics = SonosNowPlayingDiagnostics.empty
+    var seekDiagnostics = SonosSeekDiagnostics.empty
 
     var nowPlaying = SonosNowPlayingSnapshot.unconfigured {
         didSet {
@@ -255,12 +262,20 @@ final class SonoicModel {
         favoritesClient = SonosFavoritesClient(transport: sonosControlTransport)
         musicServicesClient = SonosMusicServicesClient(transport: sonosControlTransport)
         contentDirectoryProbeClient = SonosContentDirectoryProbeClient(transport: sonosControlTransport)
+        sonosControlAPIClient = SonosControlAPIClient()
         appleMusicCatalogSearchClient = SonoicAppleMusicCatalogSearchClient()
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         plusController = SonoicPlusController()
         manualSonosHost = settingsStore.loadManualSonosHost()
         recentPlays = settingsStore.loadRecentPlays()
         recentSourceSearches = settingsStore.loadRecentSourceSearches()
+        sonosControlAPIState = SonosControlAPIState(
+            settings: settingsStore.loadSonosControlAPISettings(),
+            authorizationStatus: .notConfigured,
+            lastErrorDetail: nil,
+            lastCommandDescription: nil,
+            lastUpdatedAt: nil
+        )
         appleMusicAuthorizationState = appleMusicCatalogSearchClient.currentAuthorizationState()
 
         do {

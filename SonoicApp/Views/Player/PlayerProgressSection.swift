@@ -45,12 +45,23 @@ struct PlayerProgressSection: View {
             }
         }
         .onChange(of: observedAt, initial: false) { _, _ in
+            guard !isScrubbing else {
+                return
+            }
+
             resetScrubbingState()
         }
         .onChange(of: nowPlaying.title, initial: false) { _, _ in
             resetScrubbingState()
         }
         .onChange(of: nowPlaying.playbackState, initial: false) { _, _ in
+            guard !isScrubbing else {
+                return
+            }
+
+            resetScrubbingState()
+        }
+        .onDisappear {
             resetScrubbingState()
         }
     }
@@ -79,7 +90,8 @@ struct PlayerProgressSection: View {
         }
 
         let targetElapsedSeconds = scrubElapsedSeconds
-        resetScrubbingState()
+        scrubElapsedSeconds = targetElapsedSeconds
+        isScrubbing = false
         seek(targetElapsedSeconds)
     }
 

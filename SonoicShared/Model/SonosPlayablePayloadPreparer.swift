@@ -87,6 +87,10 @@ struct SonosPlayablePayloadPreparer {
             return "x-rincon-cpcontainer:*:*:*"
         }
 
+        if normalizedURI.hasPrefix("x-sonosapi-hls-static:") {
+            return "sonos.com-http:*:application/x-mpegURL:*"
+        }
+
         if normalizedURI.hasPrefix("x-sonosapi-hls:") {
             return "sonos.com-http:*:application/vnd.apple.mpegurl:*"
         }
@@ -102,6 +106,7 @@ struct SonosPlayablePayloadPreparer {
         [
             "x-sonosapi-stream:",
             "x-sonosapi-radio:",
+            "x-sonosapi-hls-static:",
             "x-sonosapi-hls:",
             "x-sonosapi-http:",
             "x-sonosapi-static:",

@@ -4,6 +4,7 @@ struct SonoicSettingsStore {
     static let manualSonosHostKey = "manualSonosHost"
     static let recentPlaysKey = "recentPlays"
     static let recentSourceSearchesKey = "recentSourceSearches"
+    static let sonosControlAPISettingsKey = "sonosControlAPISettings"
 
     private let userDefaults: UserDefaults
 
@@ -53,5 +54,23 @@ struct SonoicSettingsStore {
         }
 
         userDefaults.set(data, forKey: Self.recentSourceSearchesKey)
+    }
+
+    func loadSonosControlAPISettings() -> SonosControlAPISettings {
+        guard let data = userDefaults.data(forKey: Self.sonosControlAPISettingsKey),
+              let settings = try? JSONDecoder().decode(SonosControlAPISettings.self, from: data)
+        else {
+            return .disabled
+        }
+
+        return settings
+    }
+
+    func saveSonosControlAPISettings(_ settings: SonosControlAPISettings) {
+        guard let data = try? JSONEncoder().encode(settings) else {
+            return
+        }
+
+        userDefaults.set(data, forKey: Self.sonosControlAPISettingsKey)
     }
 }

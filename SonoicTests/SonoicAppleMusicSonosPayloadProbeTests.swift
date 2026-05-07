@@ -36,6 +36,24 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
     }
 
     @Test
+    func buildsStaticCatalogCandidateFromTrackSerialForDiagnostics() throws {
+        let item = appleMusicSong(catalogID: "1440857781", libraryID: nil)
+        let candidates = probe.candidates(
+            for: item,
+            playbackHint: SonosMusicServicePlaybackHint(
+                launchSerials: ["3"],
+                trackSerials: ["7"]
+            )
+        )
+
+        let candidate = try #require(candidates.first { $0.strategy == .catalogStaticHLS })
+
+        #expect(!candidate.isUserPlayable)
+        #expect(candidate.serialNumber == "7")
+        #expect(candidate.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
+    }
+
+    @Test
     func buildsLibraryTrackCandidateFromTrackSerial() throws {
         let item = appleMusicSong(catalogID: nil, libraryID: "i.BOVNeOxU6BVbp8")
         let candidates = probe.candidates(

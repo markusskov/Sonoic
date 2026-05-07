@@ -99,7 +99,10 @@ extension SonoicModel {
                 nextNowPlaying,
                 diagnostics: nowPlayingResult.diagnostics
             )
-            nextNowPlaying = smoothedNowPlayingSnapshot(nextNowPlaying)
+            nextNowPlaying = smoothedNowPlayingSnapshot(
+                nextNowPlaying,
+                diagnostics: nowPlayingResult.diagnostics
+            )
             nextNowPlaying.artworkIdentifier = try? await syncArtworkIdentifier(for: nextNowPlaying)
             nextNowPlaying.transportActions = await refreshedTransportActions ?? nowPlaying.transportActions
 
@@ -145,7 +148,8 @@ extension SonoicModel {
     }
 
     private func fetchManualTransportActions() async -> SonosTransportActions? {
-        try? await avTransportClient.fetchCurrentTransportActions(host: manualSonosHost)
+        let host = await manualSonosCoordinatorHost() ?? manualSonosHost
+        return try? await avTransportClient.fetchCurrentTransportActions(host: host)
     }
 
     private func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {

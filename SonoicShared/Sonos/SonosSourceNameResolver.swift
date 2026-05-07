@@ -67,6 +67,7 @@ struct SonosSourceNameResolver {
         if uri.hasPrefix("x-sonos-http:")
             || uri.hasPrefix("x-sonosapi-radio:")
             || uri.hasPrefix("x-sonosapi-stream:")
+            || uri.hasPrefix("x-sonosapi-hls-static:")
             || uri.hasPrefix("x-sonosapi-hls:")
             || uri.hasPrefix("x-sonosapi-http:")
             || uri.hasPrefix("x-sonosapi-static:")
