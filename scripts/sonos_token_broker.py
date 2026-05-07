@@ -142,6 +142,7 @@ class SonosTokenBrokerHandler(BaseHTTPRequestHandler):
             self.write_json(error.status, {"error": error.message})
         except urllib.error.HTTPError as error:
             body = error.read().decode("utf-8", errors="replace")
+            self.log_broker_event(f"sonos token error {error.code}: {body}")
             self.write_json(error.code, {"error": "sonos_error", "detail": body})
         except Exception as error:  # noqa: BLE001 - dev server should return diagnostics.
             self.write_json(500, {"error": "broker_error", "detail": str(error)})
@@ -172,12 +173,14 @@ class SonosTokenBrokerHandler(BaseHTTPRequestHandler):
         body = self.read_json()
         broker_code = required_body_string(body, "code")
         state = required_body_string(body, "state")
+        redirect_uri = required_body_string(body, "redirect_uri")
+        self.validate_redirect_uri(redirect_uri)
         pending = self.store.redeem(broker_code, expected_state=state)
         response = self.request_sonos_token(
             {
                 "grant_type": "authorization_code",
                 "code": pending.sonos_code,
-                "redirect_uri": self.config.redirect_uri,
+                "redirect_uri": redirect_uri,
             }
         )
         self.write_json(200, response)
@@ -208,6 +211,12 @@ class SonosTokenBrokerHandler(BaseHTTPRequestHandler):
         )
         with urllib.request.urlopen(request, timeout=15) as response:
             return json.loads(response.read().decode("utf-8"))
+
+    def validate_redirect_uri(self, redirect_uri: str) -> None:
+        expected = urllib.parse.urlparse(self.config.redirect_uri)
+        candidate = urllib.parse.urlparse(redirect_uri)
+        if candidate.scheme != "https" or candidate.netloc != expected.netloc:
+            raise BrokerHTTPError(400, "Redirect URI does not match the configured broker host.")
 
     def redirect_to_app(self, query: dict[str, str]) -> None:
         separator = "&" if "?" in self.config.app_redirect_uri else "?"
