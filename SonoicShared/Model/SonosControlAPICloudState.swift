@@ -80,6 +80,15 @@ nonisolated struct SonosControlAPICloudSnapshot: Equatable {
             return selectedTarget
         }
 
+        if let preferredGroupID,
+           let selectedTarget = commandTarget(
+               matching: { group in group.id == preferredGroupID },
+               updatedAt: updatedAt
+           )
+        {
+            return selectedTarget
+        }
+
         return commandTarget(matching: { _, _ in true }, updatedAt: updatedAt)
     }
 

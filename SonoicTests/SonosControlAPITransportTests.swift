@@ -386,6 +386,51 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
+    func preferredCommandTargetUsesConfiguredGroupWithoutHousehold() {
+        let snapshot = SonosControlAPICloudSnapshot(
+            households: [
+                SonosControlAPIHousehold(id: "household-1"),
+                SonosControlAPIHousehold(id: "household-2")
+            ],
+            groupsByHouseholdID: [
+                "household-1": SonosControlAPIGroupSnapshot(
+                    groups: [
+                        SonosControlAPIGroup(
+                            id: "group-1",
+                            name: "Kitchen",
+                            coordinatorId: "player-1",
+                            playerIds: ["player-1"]
+                        )
+                    ],
+                    players: []
+                ),
+                "household-2": SonosControlAPIGroupSnapshot(
+                    groups: [
+                        SonosControlAPIGroup(
+                            id: "group-2",
+                            name: "Stue",
+                            coordinatorId: "player-2",
+                            playerIds: ["player-2"]
+                        )
+                    ],
+                    players: []
+                )
+            ]
+        )
+        let settings = SonosControlAPISettings(
+            mode: .fallback,
+            selectedHouseholdID: nil,
+            selectedGroupID: "group-2"
+        )
+
+        let target = snapshot.preferredCommandTarget(settings: settings)
+
+        #expect(target?.householdID == "household-2")
+        #expect(target?.groupID == "group-2")
+        #expect(target?.coordinatorPlayerID == "player-2")
+    }
+
+    @Test
     func preferredCommandTargetFallsBackToFirstReachableGroup() {
         let snapshot = SonosControlAPICloudSnapshot(
             households: [
