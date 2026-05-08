@@ -45,7 +45,7 @@ extension SonoicModel {
 
     func updateSourceSearchQuery(_ query: String, for source: SonoicSource) {
         let currentState = sourceSearchState(for: source)
-        let shouldPreserveResults = currentState.query.sonoicNonEmptyTrimmed == query.sonoicNonEmptyTrimmed
+        let shouldPreserveResults = currentState.query.sonoicSearchCacheKey == query.sonoicSearchCacheKey
         sourceSearchStates[source.service.id] = SonoicSourceSearchState(
             query: query,
             service: source.service,
@@ -246,5 +246,11 @@ extension SonoicModel {
 
         recentSourceSearches = nextSearches
         settingsStore.saveRecentSourceSearches(nextSearches)
+    }
+}
+
+private extension String {
+    var sonoicSearchCacheKey: String? {
+        sonoicNonEmptyTrimmed?.lowercased()
     }
 }

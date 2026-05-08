@@ -5,10 +5,6 @@ extension SonoicModel {
     private static let manualSeekSyncDelay: Duration = .milliseconds(700)
 
     func toggleManualSonosPlayback() async {
-        guard hasManualSonosHost else {
-            return
-        }
-
         switch nowPlaying.playbackState {
         case .playing:
             _ = await pauseManualSonosPlayback()
@@ -18,6 +14,10 @@ extension SonoicModel {
     }
 
     func playManualSonosPlayback() async -> Bool {
+        if await playSonosControlAPIPlaybackIfAvailable() {
+            return true
+        }
+
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
         return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
@@ -26,6 +26,10 @@ extension SonoicModel {
     }
 
     func pauseManualSonosPlayback() async -> Bool {
+        if await pauseSonosControlAPIPlaybackIfAvailable() {
+            return true
+        }
+
         manualPlayTransitionGraceDeadline = nil
         setManualPlayTransitionAwaitingConfirmation(false)
         freezeLocalPlaybackTimeIfNeeded()
@@ -36,6 +40,10 @@ extension SonoicModel {
     }
 
     func skipToNextManualSonosTrack() async -> Bool {
+        if await skipToNextSonosControlAPITrackIfAvailable() {
+            return true
+        }
+
         manualPlaybackContextPayload = nil
         if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
             beginManualPlayTransitionGrace()
@@ -51,6 +59,10 @@ extension SonoicModel {
     }
 
     func skipToPreviousManualSonosTrack() async -> Bool {
+        if await skipToPreviousSonosControlAPITrackIfAvailable() {
+            return true
+        }
+
         manualPlaybackContextPayload = nil
         if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
             beginManualPlayTransitionGrace()
@@ -66,6 +78,10 @@ extension SonoicModel {
     }
 
     func seekManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
+        if await seekSonosControlAPIPlaybackIfAvailable(to: timeInterval) {
+            return true
+        }
+
         let previousNowPlaying = nowPlaying
         let previousObservedAt = nowPlayingObservedAt
         let boundedElapsedTime = markLocalSeek(to: timeInterval)

@@ -1,7 +1,7 @@
 import Foundation
 
-struct SonosControlAPICloudState: Equatable {
-    enum Status: Equatable {
+nonisolated struct SonosControlAPICloudState: Equatable {
+    nonisolated enum Status: Equatable {
         case idle
         case loading
         case verified(SonosControlAPICloudSnapshot)
@@ -26,7 +26,7 @@ struct SonosControlAPICloudState: Equatable {
     }
 }
 
-struct SonosControlAPICloudSnapshot: Equatable {
+nonisolated struct SonosControlAPICloudSnapshot: Equatable {
     var households: [SonosControlAPIHousehold]
     var groupsByHouseholdID: [String: SonosControlAPIGroupSnapshot]
 
@@ -44,6 +44,35 @@ struct SonosControlAPICloudSnapshot: Equatable {
             "\(groupCount) \(groupCount == 1 ? "group" : "groups")",
             "\(playerCount) \(playerCount == 1 ? "player" : "players")"
         ].joined(separator: " · ")
+    }
+
+    func preferredCommandTarget(
+        settings: SonosControlAPISettings,
+        updatedAt: Date = .now
+    ) -> SonosControlAPITargetIdentity? {
+        let preferredHouseholdID = settings.selectedHouseholdID?.sonoicNonEmptyTrimmed
+        let household = households.first { $0.id == preferredHouseholdID } ?? households.first
+
+        guard let household,
+              let groupSnapshot = groupsByHouseholdID[household.id],
+              !groupSnapshot.groups.isEmpty
+        else {
+            return nil
+        }
+
+        let preferredGroupID = settings.selectedGroupID?.sonoicNonEmptyTrimmed
+        let group = groupSnapshot.groups.first { $0.id == preferredGroupID } ?? groupSnapshot.groups.first
+        guard let group else {
+            return nil
+        }
+
+        return SonosControlAPITargetIdentity(
+            householdID: household.id,
+            groupID: group.id,
+            playerID: group.playerIds.first,
+            coordinatorPlayerID: group.coordinatorId,
+            updatedAt: updatedAt
+        )
     }
 }
 

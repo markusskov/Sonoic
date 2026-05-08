@@ -35,7 +35,7 @@ struct SonoicOnboardingView: View {
         VStack(spacing: 14) {
             Button(action: advance) {
                 HStack(spacing: 10) {
-                    if isWorking {
+                    if shouldShowButtonSpinner {
                         ProgressView()
                             .tint(.black)
                     }
@@ -161,6 +161,15 @@ struct SonoicOnboardingView: View {
             !hasAllowedDiscoveryContinue && !model.hasDiscoveredPlayers
         case .splash:
             false
+        }
+    }
+
+    private var shouldShowButtonSpinner: Bool {
+        switch step {
+        case .locatingSpeakers:
+            isWorking && !model.hasDiscoveredPlayers
+        case .sonosAccount, .splash:
+            isWorking
         }
     }
 
