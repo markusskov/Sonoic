@@ -42,11 +42,6 @@ extension SonoicModel {
         var settings = sonosControlAPIState.settings
         var didChangeSettings = false
 
-        if settings.mode == .off {
-            settings.mode = .fallback
-            didChangeSettings = true
-        }
-
         if let target = snapshot.preferredCommandTarget(
             settings: settings,
             activeTargetID: activeTarget.id

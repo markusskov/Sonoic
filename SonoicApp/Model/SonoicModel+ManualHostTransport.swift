@@ -18,6 +18,10 @@ extension SonoicModel {
             return true
         }
 
+        guard hasManualSonosHost else {
+            return false
+        }
+
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
         return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
@@ -28,6 +32,10 @@ extension SonoicModel {
     func pauseManualSonosPlayback() async -> Bool {
         if await pauseSonosControlAPIPlaybackIfAvailable() {
             return true
+        }
+
+        guard hasManualSonosHost else {
+            return false
         }
 
         manualPlayTransitionGraceDeadline = nil
@@ -42,6 +50,10 @@ extension SonoicModel {
     func skipToNextManualSonosTrack() async -> Bool {
         if await skipToNextSonosControlAPITrackIfAvailable() {
             return true
+        }
+
+        guard hasManualSonosHost else {
+            return false
         }
 
         manualPlaybackContextPayload = nil
@@ -63,6 +75,10 @@ extension SonoicModel {
             return true
         }
 
+        guard hasManualSonosHost else {
+            return false
+        }
+
         manualPlaybackContextPayload = nil
         if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
             beginManualPlayTransitionGrace()
@@ -80,6 +96,10 @@ extension SonoicModel {
     func seekManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
         if await seekSonosControlAPIPlaybackIfAvailable(to: timeInterval) {
             return true
+        }
+
+        guard hasManualSonosHost else {
+            return false
         }
 
         let previousNowPlaying = nowPlaying

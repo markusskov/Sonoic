@@ -62,6 +62,11 @@ extension SonoicModel {
             try keychainStore.saveSonosTokenSet(tokenSet)
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .connected(expiresAt: tokenSet.expiresAt))
             markSonosControlAPIAuthorizationReady()
+            if sonosControlAPIState.settings.mode == .off {
+                var settings = sonosControlAPIState.settings
+                settings.mode = .fallback
+                updateSonosControlAPISettings(settings)
+            }
             await refreshSonosControlAPICloudSnapshot()
         } catch {
             refreshSonosControlAPIAuthorizationState()
