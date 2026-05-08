@@ -47,6 +47,21 @@ extension SonoicModel {
             didChangeSettings = true
         }
 
+        if let target = snapshot.preferredCommandTarget(
+            settings: settings,
+            activeTargetID: activeTarget.id
+        ) {
+            if settings.selectedHouseholdID != target.householdID {
+                settings.selectedHouseholdID = target.householdID
+                didChangeSettings = true
+            }
+
+            if settings.selectedGroupID != target.groupID {
+                settings.selectedGroupID = target.groupID
+                didChangeSettings = true
+            }
+        }
+
         if didChangeSettings {
             updateSonosControlAPISettings(settings)
         }
@@ -166,6 +181,10 @@ extension SonoicModel {
             return false
         }
 
+        guard !isManualTransportCommandInFlight else {
+            return false
+        }
+
         let previousNowPlaying = nowPlaying
         let previousObservedAt = nowPlayingObservedAt
         let boundedElapsedTime = markLocalSeek(to: timeInterval)
@@ -178,7 +197,12 @@ extension SonoicModel {
             errorDetail: nil
         )
 
-        do {
+        var observedElapsedTime: TimeInterval?
+        let didSeek = await performSonosControlAPITransportCommand(
+            description: "Cloud seek",
+            refreshQueueAfterSuccess: false,
+            syncDelay: .milliseconds(100)
+        ) {
             let status = try await sonosControlAPIClient.playbackStatus(
                 groupID: context.groupID,
                 accessToken: context.accessToken
@@ -189,43 +213,35 @@ extension SonoicModel {
                 itemID: status.itemId,
                 accessToken: context.accessToken
             )
-            recordSonosControlAPICommand("Cloud seek")
             try await Task.sleep(for: Self.sonosControlAPISeekSyncDelay)
-            let observed = try? await sonosControlAPIClient.playbackStatus(
+            observedElapsedTime = try? await sonosControlAPIClient.playbackStatus(
                 groupID: context.groupID,
                 accessToken: context.accessToken
             ).positionMillis.map { TimeInterval($0) / 1_000 }
+        }
+
+        if didSeek {
             recordSeekDiagnostics(
                 status: .succeeded,
                 host: "Sonos Control API",
                 target: boundedElapsedTime,
-                observed: observed,
+                observed: observedElapsedTime,
                 errorDetail: nil
             )
-            scheduleManualStateSync(
-                after: .milliseconds(100),
-                restartRefreshLoop: true,
-                refreshQueueAfterSync: false
-            )
             return true
-        } catch {
-            recordSonosControlAPIError(error)
-            recordSeekDiagnostics(
-                status: .failed,
-                host: "Sonos Control API",
-                target: boundedElapsedTime,
-                observed: nil,
-                errorDetail: error.localizedDescription
-            )
-            clearManualSeekConfirmation()
-            nowPlaying = previousNowPlaying
-            nowPlayingObservedAt = previousObservedAt
-            if isSonosControlAPIAuthorizationFailure(error) {
-                sonosControlAPIState.authorizationStatus = .expired
-                sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
-            }
-            return false
         }
+
+        recordSeekDiagnostics(
+            status: .failed,
+            host: "Sonos Control API",
+            target: boundedElapsedTime,
+            observed: nil,
+            errorDetail: sonosControlAPIState.lastErrorDetail
+        )
+        clearManualSeekConfirmation()
+        nowPlaying = previousNowPlaying
+        nowPlayingObservedAt = previousObservedAt
+        return false
     }
 
     private func sonosControlAPICommandContext() -> SonosControlAPICommandContext? {
@@ -271,6 +287,7 @@ extension SonoicModel {
     private func performSonosControlAPITransportCommand(
         description: String,
         refreshQueueAfterSuccess: Bool,
+        syncDelay: Duration? = nil,
         _ action: () async throws -> Void
     ) async -> Bool {
         guard !isManualTransportCommandInFlight else {
@@ -293,7 +310,7 @@ extension SonoicModel {
             try await action()
             recordSonosControlAPICommand(description)
             scheduleManualStateSync(
-                after: Self.sonosControlAPITransportSyncDelay,
+                after: syncDelay ?? Self.sonosControlAPITransportSyncDelay,
                 restartRefreshLoop: true,
                 refreshQueueAfterSync: refreshQueueAfterSuccess
             )
