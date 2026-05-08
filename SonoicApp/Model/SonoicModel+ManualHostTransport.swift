@@ -198,6 +198,10 @@ extension SonoicModel {
     }
 
     func playManualSonosFavorite(_ favorite: SonosFavoriteItem) async -> Bool {
+        if await playSonosControlAPIFavoriteIfAvailable(favorite) {
+            return true
+        }
+
         guard let payload = favorite.playablePayload else {
             return false
         }

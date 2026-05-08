@@ -29,6 +29,20 @@ nonisolated struct SonosControlAPICloudState: Equatable {
 nonisolated struct SonosControlAPICloudSnapshot: Equatable {
     var households: [SonosControlAPIHousehold]
     var groupsByHouseholdID: [String: SonosControlAPIGroupSnapshot]
+    var favoritesByHouseholdID: [String: [SonosControlAPIFavorite]]
+    var playlistsByHouseholdID: [String: [SonosControlAPIPlaylist]]
+
+    init(
+        households: [SonosControlAPIHousehold],
+        groupsByHouseholdID: [String: SonosControlAPIGroupSnapshot],
+        favoritesByHouseholdID: [String: [SonosControlAPIFavorite]] = [:],
+        playlistsByHouseholdID: [String: [SonosControlAPIPlaylist]] = [:]
+    ) {
+        self.households = households
+        self.groupsByHouseholdID = groupsByHouseholdID
+        self.favoritesByHouseholdID = favoritesByHouseholdID
+        self.playlistsByHouseholdID = playlistsByHouseholdID
+    }
 
     var groupCount: Int {
         groupsByHouseholdID.values.reduce(0) { $0 + $1.groups.count }
@@ -36,6 +50,14 @@ nonisolated struct SonosControlAPICloudSnapshot: Equatable {
 
     var playerCount: Int {
         groupsByHouseholdID.values.reduce(0) { $0 + $1.players.count }
+    }
+
+    var favoriteCount: Int {
+        favoritesByHouseholdID.values.reduce(0) { $0 + $1.count }
+    }
+
+    var playlistCount: Int {
+        playlistsByHouseholdID.values.reduce(0) { $0 + $1.count }
     }
 
     var summary: String {
@@ -92,6 +114,47 @@ nonisolated struct SonosControlAPICloudSnapshot: Equatable {
         return commandTarget(matching: { _, _ in true }, updatedAt: updatedAt)
     }
 
+    func uniqueFavorite(
+        matchingTitle title: String,
+        householdID: String,
+        serviceName: String? = nil
+    ) -> SonosControlAPIFavorite? {
+        let normalizedTitle = title.sonoicControlAPIMatchKey
+        guard !normalizedTitle.isEmpty else {
+            return nil
+        }
+
+        let normalizedServiceName = serviceName?.sonoicControlAPIMatchKey
+        let matches = (favoritesByHouseholdID[householdID] ?? []).filter { favorite in
+            guard favorite.name.sonoicControlAPIMatchKey == normalizedTitle else {
+                return false
+            }
+
+            guard let normalizedServiceName else {
+                return true
+            }
+
+            return favorite.service?.name?.sonoicControlAPIMatchKey == normalizedServiceName
+        }
+
+        guard matches.count == 1 else {
+            return nil
+        }
+
+        return matches[0]
+    }
+
+    func uniquePlaylist(
+        matchingTitle title: String,
+        householdID: String
+    ) -> SonosControlAPIPlaylist? {
+        uniqueItem(
+            matchingTitle: title,
+            in: playlistsByHouseholdID[householdID] ?? [],
+            title: \.name
+        )
+    }
+
     private func commandTarget(
         matching predicate: (SonosControlAPIGroup) -> Bool,
         updatedAt: Date
@@ -123,6 +186,33 @@ nonisolated struct SonosControlAPICloudSnapshot: Equatable {
 
         return nil
     }
+
+    private func uniqueItem<Item>(
+        matchingTitle title: String,
+        in items: [Item],
+        title titleKeyPath: KeyPath<Item, String>
+    ) -> Item? {
+        let normalizedTitle = title.sonoicControlAPIMatchKey
+        guard !normalizedTitle.isEmpty else {
+            return nil
+        }
+
+        let matches = items.filter { $0[keyPath: titleKeyPath].sonoicControlAPIMatchKey == normalizedTitle }
+        guard matches.count == 1 else {
+            return nil
+        }
+
+        return matches[0]
+    }
 }
 
 typealias SonosControlAPIGroupSnapshot = SonosControlAPIGroupsResponse
+
+private extension String {
+    nonisolated var sonoicControlAPIMatchKey: String {
+        folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+}

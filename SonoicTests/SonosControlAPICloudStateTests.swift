@@ -33,4 +33,71 @@ struct SonosControlAPICloudStateTests {
         #expect(snapshot.summary == "1 household · 1 group · 1 player")
         #expect(SonosControlAPICloudState(status: .verified(snapshot)).detail == snapshot.summary)
     }
+
+    @Test
+    func matchesCloudFavoritesAndPlaylistsByUniqueTitle() {
+        let snapshot = SonosControlAPICloudSnapshot(
+            households: [
+                SonosControlAPIHousehold(id: "household-1")
+            ],
+            groupsByHouseholdID: [:],
+            favoritesByHouseholdID: [
+                "household-1": [
+                    SonosControlAPIFavorite(
+                        id: "favorite-1",
+                        name: "Easy Mode",
+                        description: nil,
+                        imageUrl: nil,
+                        service: SonosControlAPIService(
+                            id: "204",
+                            name: "Apple Music",
+                            imageUrl: nil
+                        )
+                    ),
+                    SonosControlAPIFavorite(
+                        id: "favorite-2",
+                        name: "Duplicate",
+                        description: nil,
+                        imageUrl: nil,
+                        service: nil
+                    ),
+                    SonosControlAPIFavorite(
+                        id: "favorite-3",
+                        name: "Duplicate",
+                        description: nil,
+                        imageUrl: nil,
+                        service: nil
+                    )
+                ]
+            ],
+            playlistsByHouseholdID: [
+                "household-1": [
+                    SonosControlAPIPlaylist(
+                        id: "playlist-1",
+                        name: "Følelsen #",
+                        type: nil,
+                        trackCount: 40
+                    )
+                ]
+            ]
+        )
+
+        #expect(snapshot.uniqueFavorite(matchingTitle: "easy   mode", householdID: "household-1")?.id == "favorite-1")
+        #expect(
+            snapshot.uniqueFavorite(
+                matchingTitle: "easy   mode",
+                householdID: "household-1",
+                serviceName: "Apple Music"
+            )?.id == "favorite-1"
+        )
+        #expect(
+            snapshot.uniqueFavorite(
+                matchingTitle: "easy   mode",
+                householdID: "household-1",
+                serviceName: "Spotify"
+            ) == nil
+        )
+        #expect(snapshot.uniqueFavorite(matchingTitle: "duplicate", householdID: "household-1") == nil)
+        #expect(snapshot.uniquePlaylist(matchingTitle: "Folelsen #", householdID: "household-1")?.id == "playlist-1")
+    }
 }
