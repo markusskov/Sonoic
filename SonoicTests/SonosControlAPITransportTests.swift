@@ -345,6 +345,47 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
+    func preferredCommandTargetUsesActiveTargetBeforeConfiguredGroup() {
+        let snapshot = SonosControlAPICloudSnapshot(
+            households: [
+                SonosControlAPIHousehold(id: "household-1")
+            ],
+            groupsByHouseholdID: [
+                "household-1": SonosControlAPIGroupSnapshot(
+                    groups: [
+                        SonosControlAPIGroup(
+                            id: "group-1",
+                            name: "Kitchen",
+                            coordinatorId: "player-1",
+                            playerIds: ["player-1"]
+                        ),
+                        SonosControlAPIGroup(
+                            id: "group-2",
+                            name: "Stue",
+                            coordinatorId: "player-2",
+                            playerIds: ["player-2", "player-3"]
+                        )
+                    ],
+                    players: []
+                )
+            ]
+        )
+        let settings = SonosControlAPISettings(
+            mode: .fallback,
+            selectedHouseholdID: "household-1",
+            selectedGroupID: "group-1"
+        )
+
+        let target = snapshot.preferredCommandTarget(
+            settings: settings,
+            activeTargetID: "player-2"
+        )
+
+        #expect(target?.groupID == "group-2")
+        #expect(target?.coordinatorPlayerID == "player-2")
+    }
+
+    @Test
     func preferredCommandTargetFallsBackToFirstReachableGroup() {
         let snapshot = SonosControlAPICloudSnapshot(
             households: [
@@ -375,6 +416,38 @@ struct SonosControlAPITransportTests {
         #expect(target?.householdID == "household-1")
         #expect(target?.groupID == "group-1")
         #expect(target?.playerID == "player-1")
+    }
+
+    @Test
+    func preferredCommandTargetSkipsEmptyHouseholds() {
+        let snapshot = SonosControlAPICloudSnapshot(
+            households: [
+                SonosControlAPIHousehold(id: "household-1"),
+                SonosControlAPIHousehold(id: "household-2")
+            ],
+            groupsByHouseholdID: [
+                "household-1": SonosControlAPIGroupSnapshot(
+                    groups: [],
+                    players: []
+                ),
+                "household-2": SonosControlAPIGroupSnapshot(
+                    groups: [
+                        SonosControlAPIGroup(
+                            id: "group-2",
+                            name: "Stue",
+                            coordinatorId: "player-2",
+                            playerIds: ["player-2"]
+                        )
+                    ],
+                    players: []
+                )
+            ]
+        )
+
+        let target = snapshot.preferredCommandTarget(settings: .disabled)
+
+        #expect(target?.householdID == "household-2")
+        #expect(target?.groupID == "group-2")
     }
 
     @Test

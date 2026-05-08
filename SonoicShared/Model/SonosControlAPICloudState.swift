@@ -48,31 +48,71 @@ nonisolated struct SonosControlAPICloudSnapshot: Equatable {
 
     func preferredCommandTarget(
         settings: SonosControlAPISettings,
+        activeTargetID: String? = nil,
         updatedAt: Date = .now
     ) -> SonosControlAPITargetIdentity? {
         let preferredHouseholdID = settings.selectedHouseholdID?.sonoicNonEmptyTrimmed
-        let household = households.first { $0.id == preferredHouseholdID } ?? households.first
-
-        guard let household,
-              let groupSnapshot = groupsByHouseholdID[household.id],
-              !groupSnapshot.groups.isEmpty
-        else {
-            return nil
-        }
-
         let preferredGroupID = settings.selectedGroupID?.sonoicNonEmptyTrimmed
-        let group = groupSnapshot.groups.first { $0.id == preferredGroupID } ?? groupSnapshot.groups.first
-        guard let group else {
-            return nil
+        let activeTargetID = activeTargetID?.sonoicNonEmptyTrimmed
+
+        if let activeTargetID,
+           let activeTarget = commandTarget(
+               matching: { group in
+                   group.id == activeTargetID
+                       || group.coordinatorId == activeTargetID
+                       || group.playerIds.contains(activeTargetID)
+               },
+               updatedAt: updatedAt
+           )
+        {
+            return activeTarget
         }
 
-        return SonosControlAPITargetIdentity(
-            householdID: household.id,
-            groupID: group.id,
-            playerID: group.playerIds.first,
-            coordinatorPlayerID: group.coordinatorId,
-            updatedAt: updatedAt
-        )
+        if let preferredHouseholdID,
+           let preferredGroupID,
+           let selectedTarget = commandTarget(
+               matching: { household, group in
+                   household.id == preferredHouseholdID && group.id == preferredGroupID
+               },
+               updatedAt: updatedAt
+           )
+        {
+            return selectedTarget
+        }
+
+        return commandTarget(matching: { _, _ in true }, updatedAt: updatedAt)
+    }
+
+    private func commandTarget(
+        matching predicate: (SonosControlAPIGroup) -> Bool,
+        updatedAt: Date
+    ) -> SonosControlAPITargetIdentity? {
+        commandTarget(matching: { _, group in predicate(group) }, updatedAt: updatedAt)
+    }
+
+    private func commandTarget(
+        matching predicate: (SonosControlAPIHousehold, SonosControlAPIGroup) -> Bool,
+        updatedAt: Date
+    ) -> SonosControlAPITargetIdentity? {
+        for household in households {
+            guard let groupSnapshot = groupsByHouseholdID[household.id] else {
+                continue
+            }
+
+            guard let group = groupSnapshot.groups.first(where: { predicate(household, $0) }) else {
+                continue
+            }
+
+            return SonosControlAPITargetIdentity(
+                householdID: household.id,
+                groupID: group.id,
+                playerID: group.playerIds.first,
+                coordinatorPlayerID: group.coordinatorId,
+                updatedAt: updatedAt
+            )
+        }
+
+        return nil
     }
 }
 

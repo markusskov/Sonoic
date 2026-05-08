@@ -32,31 +32,18 @@ extension SonoicModel {
             return nil
         }
 
-        return sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed
+        return activeSonosControlAPICommandTarget()?.groupID
+            ?? sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed
     }
 
     func applyVerifiedSonosControlAPICloudSnapshot(_ snapshot: SonosControlAPICloudSnapshot) {
         markSonosControlAPIAuthorizationReady()
-
-        guard let target = snapshot.preferredCommandTarget(settings: sonosControlAPIState.settings) else {
-            return
-        }
 
         var settings = sonosControlAPIState.settings
         var didChangeSettings = false
 
         if settings.mode == .off {
             settings.mode = .fallback
-            didChangeSettings = true
-        }
-
-        if settings.selectedHouseholdID != target.householdID {
-            settings.selectedHouseholdID = target.householdID
-            didChangeSettings = true
-        }
-
-        if settings.selectedGroupID != target.groupID {
-            settings.selectedGroupID = target.groupID
             didChangeSettings = true
         }
 
@@ -268,6 +255,17 @@ extension SonoicModel {
             recordSonosControlAPIError(error)
             return nil
         }
+    }
+
+    private func activeSonosControlAPICommandTarget() -> SonosControlAPITargetIdentity? {
+        guard case let .verified(snapshot) = sonosControlAPICloudState.status else {
+            return nil
+        }
+
+        return snapshot.preferredCommandTarget(
+            settings: sonosControlAPIState.settings,
+            activeTargetID: activeTarget.id
+        )
     }
 
     private func performSonosControlAPITransportCommand(
