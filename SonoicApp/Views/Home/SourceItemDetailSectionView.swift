@@ -79,10 +79,17 @@ struct SourceItemDetailSectionView: View {
     }
 
     private func playPlaylistTrack(at index: Int) async {
-        await model.playSourcePlaylistQueue(
+        let itemTitle = section.items.indices.contains(index) ? section.items[index].title : "unknown"
+        sonoicPlaybackDebugLog(
+            "rowTap parent='\(parentItem.title)' parentKind=\(parentItem.kind.rawValue) section=\(section.id) index=\(index) item='\(itemTitle)' sectionItems=\(section.items.count)"
+        )
+        let didStart = await model.playSourcePlaylistQueue(
             parentItem: parentItem,
             trackItems: section.items,
             startingAtIndex: index
+        )
+        sonoicPlaybackDebugLog(
+            "rowTap result=\(didStart) parent='\(parentItem.title)' index=\(index) item='\(itemTitle)'"
         )
     }
 }

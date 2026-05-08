@@ -99,5 +99,35 @@ struct SonosControlAPICloudStateTests {
         )
         #expect(snapshot.uniqueFavorite(matchingTitle: "duplicate", householdID: "household-1") == nil)
         #expect(snapshot.uniquePlaylist(matchingTitle: "Folelsen #", householdID: "household-1")?.id == "playlist-1")
+        #expect(snapshot.hasLoadedFavorites(for: "household-1"))
+        #expect(snapshot.hasLoadedPlaylists(for: "household-1"))
+        #expect(!snapshot.hasLoadedFavorites(for: "missing-household"))
+        #expect(!snapshot.hasLoadedPlaylists(for: "missing-household"))
+    }
+
+    @Test
+    func resolvesCommandTargetOnlyWhenActiveTargetMatchesCloudGroup() {
+        let snapshot = SonosControlAPICloudSnapshot(
+            households: [
+                SonosControlAPIHousehold(id: "household-1")
+            ],
+            groupsByHouseholdID: [
+                "household-1": SonosControlAPIGroupSnapshot(
+                    groups: [
+                        SonosControlAPIGroup(
+                            id: "group-1",
+                            name: "Stue",
+                            coordinatorId: "player-1",
+                            playerIds: ["player-1", "player-2"]
+                        )
+                    ],
+                    players: []
+                )
+            ]
+        )
+
+        #expect(snapshot.commandTarget(activeTargetID: "group-1")?.groupID == "group-1")
+        #expect(snapshot.commandTarget(activeTargetID: "player-1")?.groupID == "group-1")
+        #expect(snapshot.commandTarget(activeTargetID: "manual-host:192.0.2.1") == nil)
     }
 }

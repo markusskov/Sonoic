@@ -241,18 +241,119 @@ extension SonoicModel {
     }
 
     func playSonosControlAPIFavoriteIfAvailable(_ favorite: SonosFavoriteItem) async -> Bool {
-        guard let context = sonosControlAPICommandContext(),
-              let householdID = context.householdID,
-              case let .verified(snapshot) = sonosControlAPICloudState.status
-        else {
+        sonoicPlaybackDebugLog(
+            "cloudFavorite start title='\(favorite.title)' canSend=\(sonosControlAPIState.canSendCommands) auth=\(String(describing: sonosControlAPIState.authorizationStatus)) target=\(activeTarget.id)"
+        )
+        guard sonosControlAPIState.canSendCommands else {
+            sonoicPlaybackDebugLog("cloudFavorite unavailable canSend=false title='\(favorite.title)'")
             return false
         }
 
+        guard hasValidSonosControlAPITokenForPlayback() else {
+            sonoicPlaybackDebugLog("cloudFavorite unavailable tokenInvalid title='\(favorite.title)'")
+            return false
+        }
+
+        let snapshot: SonosControlAPICloudSnapshot
+        if case let .verified(verifiedSnapshot) = sonosControlAPICloudState.status {
+            snapshot = verifiedSnapshot
+        } else {
+            sonoicPlaybackDebugLog(
+                "cloudFavorite refreshCloudSnapshot state=\(sonoicPlaybackDebugCloudStatus(sonosControlAPICloudState.status)) title='\(favorite.title)'"
+            )
+            refreshSonosControlAPIAuthorizationState()
+            await refreshSonosControlAPICloudSnapshot()
+
+            guard case let .verified(refreshedSnapshot) = sonosControlAPICloudState.status else {
+                sonoicPlaybackDebugLog(
+                    "cloudFavorite unavailable cloudState=\(sonoicPlaybackDebugCloudStatus(sonosControlAPICloudState.status)) title='\(favorite.title)'"
+                )
+                return false
+            }
+
+            sonoicPlaybackDebugLog(
+                "cloudFavorite refreshedCloudSnapshot \(sonoicPlaybackDebugCloudStatus(sonosControlAPICloudState.status)) title='\(favorite.title)'"
+            )
+            snapshot = refreshedSnapshot
+        }
+
+        if let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true),
+           let householdID = context.householdID
+        {
+            sonoicPlaybackDebugLog(
+                "cloudFavorite strictContext household=\(sonoicPlaybackDebugID(householdID)) group=\(sonoicPlaybackDebugID(context.groupID)) title='\(favorite.title)'"
+            )
+            return await loadMatchedSonosControlAPICloudContent(
+                favorite,
+                snapshot: snapshot,
+                householdID: householdID,
+                context: context
+            ) ?? false
+        }
+
+        guard favorite.isPlaylistLike,
+              let fallbackHouseholdID = sonosControlAPICloudContentFallbackHouseholdID(snapshot: snapshot),
+              hasMatchedSonosControlAPICloudContent(
+                  favorite,
+                  snapshot: snapshot,
+                  householdID: fallbackHouseholdID
+              )
+        else {
+            sonoicPlaybackDebugLog(
+                "cloudFavorite noStrictContextNoFallback title='\(favorite.title)' isPlaylistLike=\(favorite.isPlaylistLike)"
+            )
+            return false
+        }
+
+        sonoicPlaybackDebugLog(
+            "cloudFavorite refreshingManualIdentity fallbackHousehold=\(sonoicPlaybackDebugID(fallbackHouseholdID)) title='\(favorite.title)'"
+        )
+        await refreshManualHostIdentityBeforeCloudContentPlaybackIfNeeded()
+
+        guard let refreshedContext = sonosControlAPICommandContext(requiresActiveTargetMatch: true),
+              case let .verified(refreshedSnapshot) = sonosControlAPICloudState.status,
+              let refreshedHouseholdID = refreshedContext.householdID
+        else {
+            sonoicPlaybackDebugLog("cloudFavorite noRefreshedContext title='\(favorite.title)'")
+            return false
+        }
+
+        sonoicPlaybackDebugLog(
+            "cloudFavorite refreshedContext household=\(sonoicPlaybackDebugID(refreshedHouseholdID)) group=\(sonoicPlaybackDebugID(refreshedContext.groupID)) title='\(favorite.title)'"
+        )
+        return await loadMatchedSonosControlAPICloudContent(
+            favorite,
+            snapshot: refreshedSnapshot,
+            householdID: refreshedHouseholdID,
+            context: refreshedContext
+        ) ?? false
+    }
+
+    private func refreshManualHostIdentityBeforeCloudContentPlaybackIfNeeded() async {
+        guard activeTarget.id.hasPrefix("manual-host:") else {
+            return
+        }
+
+        await refreshManualHostIdentityIfNeeded()
+    }
+
+    private func loadMatchedSonosControlAPICloudContent(
+        _ favorite: SonosFavoriteItem,
+        snapshot: SonosControlAPICloudSnapshot,
+        householdID: String,
+        context: SonosControlAPICommandContext
+    ) async -> Bool? {
+        sonoicPlaybackDebugLog(
+            "cloudFavorite matchContent start title='\(favorite.title)' household=\(sonoicPlaybackDebugID(householdID)) favorites=\(snapshot.favoritesByHouseholdID[householdID]?.count ?? 0) playlists=\(snapshot.playlistsByHouseholdID[householdID]?.count ?? 0)"
+        )
         if let cloudFavorite = snapshot.uniqueFavorite(
             matchingTitle: favorite.title,
             householdID: householdID,
             serviceName: favorite.service?.name
         ) {
+            sonoicPlaybackDebugLog(
+                "cloudFavorite matchedCloudFavorite title='\(favorite.title)' cloudID=\(sonoicPlaybackDebugID(cloudFavorite.id))"
+            )
             return await loadSonosControlAPICloudFavorite(
                 cloudFavorite,
                 localFavorite: favorite,
@@ -260,12 +361,15 @@ extension SonoicModel {
             )
         }
 
-        if favorite.isCollectionLike,
+        if favorite.isPlaylistLike,
            let cloudPlaylist = snapshot.uniquePlaylist(
                matchingTitle: favorite.title,
                householdID: householdID
            )
         {
+            sonoicPlaybackDebugLog(
+                "cloudFavorite matchedCloudPlaylist title='\(favorite.title)' playlistID=\(sonoicPlaybackDebugID(cloudPlaylist.id))"
+            )
             return await loadSonosControlAPICloudPlaylist(
                 cloudPlaylist,
                 localFavorite: favorite,
@@ -273,15 +377,74 @@ extension SonoicModel {
             )
         }
 
-        return false
+        sonoicPlaybackDebugLog("cloudFavorite noCloudMatch title='\(favorite.title)'")
+        return nil
     }
 
-    private func sonosControlAPICommandContext() -> SonosControlAPICommandContext? {
+    private func hasMatchedSonosControlAPICloudContent(
+        _ favorite: SonosFavoriteItem,
+        snapshot: SonosControlAPICloudSnapshot,
+        householdID: String
+    ) -> Bool {
+        if snapshot.uniqueFavorite(
+            matchingTitle: favorite.title,
+            householdID: householdID,
+            serviceName: favorite.service?.name
+        ) != nil {
+            return true
+        }
+
+        return favorite.isPlaylistLike
+            && snapshot.uniquePlaylist(matchingTitle: favorite.title, householdID: householdID) != nil
+    }
+
+    private func sonosControlAPICloudContentFallbackHouseholdID(
+        snapshot: SonosControlAPICloudSnapshot
+    ) -> String? {
+        if let selectedHouseholdID = sonosControlAPIState.settings.selectedHouseholdID?.sonoicNonEmptyTrimmed {
+            return selectedHouseholdID
+        }
+
+        guard snapshot.households.count == 1 else {
+            return nil
+        }
+
+        return snapshot.households[0].id.sonoicNonEmptyTrimmed
+    }
+
+    private func hasValidSonosControlAPITokenForPlayback() -> Bool {
+        do {
+            guard let tokenSet = try keychainStore.loadSonosTokenSet() else {
+                sonosControlAPIAuthorizationState = .disconnected
+                markSonosControlAPIAuthorizationUnavailable()
+                return false
+            }
+
+            guard !tokenSet.isExpired() else {
+                sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
+                sonosControlAPIState.authorizationStatus = .expired
+                return false
+            }
+
+            return true
+        } catch {
+            recordSonosControlAPIError(error)
+            return false
+        }
+    }
+
+    private func sonosControlAPICommandContext(
+        requiresActiveTargetMatch: Bool = false
+    ) -> SonosControlAPICommandContext? {
         guard sonosControlAPIState.canSendCommands else {
             return nil
         }
 
-        let commandTarget = activeSonosControlAPICommandTarget()
+        let commandTarget = activeSonosControlAPICommandTarget(requiresActiveTargetMatch: requiresActiveTargetMatch)
+        if requiresActiveTargetMatch && commandTarget == nil {
+            return nil
+        }
+
         let groupID = commandTarget?.groupID
             ?? sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed
         let householdID = commandTarget?.householdID
@@ -316,15 +479,26 @@ extension SonoicModel {
         }
     }
 
-    private func activeSonosControlAPICommandTarget() -> SonosControlAPITargetIdentity? {
+    private func activeSonosControlAPICommandTarget(
+        requiresActiveTargetMatch: Bool = false
+    ) -> SonosControlAPITargetIdentity? {
         guard case let .verified(snapshot) = sonosControlAPICloudState.status else {
             return nil
         }
 
-        return snapshot.preferredCommandTarget(
-            settings: sonosControlAPIState.settings,
-            activeTargetID: activeTarget.id
-        )
+        if let activeTarget = snapshot.commandTarget(activeTargetID: activeTarget.id) {
+            return activeTarget
+        }
+
+        guard !requiresActiveTargetMatch else {
+            return nil
+        }
+
+        guard activeTarget.kind == .group else {
+            return nil
+        }
+
+        return snapshot.selectedCommandTarget(settings: sonosControlAPIState.settings)
     }
 
     private func loadSonosControlAPICloudFavorite(
@@ -368,9 +542,13 @@ extension SonoicModel {
         description: String,
         action: () async throws -> Void
     ) async -> Bool {
-        guard let payload = localFavorite.playablePayload else {
-            return false
-        }
+        sonoicPlaybackDebugLog("cloudFavorite loadStart description='\(description)' title='\(localFavorite.title)'")
+        let previousQueueState = queueState
+        let previousNowPlaying = nowPlaying
+        let previousNowPlayingObservedAt = nowPlayingObservedAt
+        let previousPlaybackContextPayload = manualPlaybackContextPayload
+        let previousQueueContextPayloads = manualQueueContextPayloads
+        let previousRecentPlaybackContextPayload = manualRecentPlaybackContextPayload
 
         if let snapshot = queueState.snapshot {
             queueState = .loaded(SonosQueueSnapshot(
@@ -383,8 +561,13 @@ extension SonoicModel {
         beginManualPlayTransitionGrace()
         manualQueueContextPayloads = nil
         manualRecentPlaybackContextPayload = nil
-        manualPlaybackContextPayload = payload
-        markLocalNowPlaying(from: payload)
+        if let payload = localFavorite.playablePayload {
+            manualPlaybackContextPayload = payload
+            markLocalNowPlaying(from: payload)
+        } else {
+            manualPlaybackContextPayload = nil
+            markLocalCloudFavoriteNowPlaying(from: localFavorite)
+        }
 
         let didLoad = await performSonosControlAPITransportCommand(
             description: description,
@@ -396,10 +579,38 @@ extension SonoicModel {
         if didLoad {
             recordRecentFavoritePlayback(localFavorite)
         } else {
-            manualPlaybackContextPayload = nil
+            queueState = previousQueueState
+            nowPlaying = previousNowPlaying
+            nowPlayingObservedAt = previousNowPlayingObservedAt
+            manualPlaybackContextPayload = previousPlaybackContextPayload
+            manualQueueContextPayloads = previousQueueContextPayloads
+            manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
         }
 
+        sonoicPlaybackDebugLog(
+            "cloudFavorite loadResult=\(didLoad) description='\(description)' title='\(localFavorite.title)'"
+        )
         return didLoad
+    }
+
+    private func markLocalCloudFavoriteNowPlaying(from favorite: SonosFavoriteItem) {
+        let subtitleParts = favorite.subtitle?
+            .components(separatedBy: " • ")
+            .map(\.sonoicTrimmed)
+            .filter { !$0.isEmpty } ?? []
+
+        nowPlaying = SonosNowPlayingSnapshot(
+            title: favorite.title,
+            artistName: subtitleParts.first,
+            albumTitle: subtitleParts.dropFirst().first,
+            sourceName: favorite.service?.name ?? nowPlaying.sourceName,
+            playbackState: .playing,
+            artworkURL: favorite.artworkURL,
+            artworkIdentifier: nil,
+            elapsedTime: 0,
+            duration: nil,
+            transportActions: nowPlaying.transportActions
+        )
     }
 
     private func performSonosControlAPITransportCommand(

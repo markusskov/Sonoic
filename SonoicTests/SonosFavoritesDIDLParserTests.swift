@@ -82,6 +82,49 @@ struct SonosFavoritesDIDLParserTests {
 
         #expect(favorite.kind == .collection)
         #expect(favorite.isCollectionLike)
+        #expect(favorite.isPlaylistLike)
         #expect(favorite.service == .spotify)
+    }
+
+    @Test
+    @MainActor
+    func separatesPlaylistFavoritesFromOtherCollections() {
+        let playlist = SonosFavoriteItem(
+            id: "playlist",
+            title: "Road Trip",
+            subtitle: nil,
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-rincon-cpcontainer:1006206cplaylist%3a123?sid=204",
+            playbackMetadataXML: "<upnp:class>object.container.playlistContainer</upnp:class>",
+            kind: .collection
+        )
+        let album = SonosFavoriteItem(
+            id: "album",
+            title: "Road Trip",
+            subtitle: nil,
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-rincon-cpcontainer:1006206calbum%3a123?sid=204",
+            playbackMetadataXML: "<upnp:class>object.container.album.musicAlbum</upnp:class>",
+            kind: .collection
+        )
+        let station = SonosFavoriteItem(
+            id: "station",
+            title: "Road Trip",
+            subtitle: nil,
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonosapi-radio:station%3a123?sid=204",
+            playbackMetadataXML: "<upnp:class>object.item.audioItem.audioBroadcast</upnp:class>",
+            kind: .collection
+        )
+
+        #expect(playlist.isCollectionLike)
+        #expect(playlist.isPlaylistLike)
+        #expect(album.isCollectionLike)
+        #expect(!album.isPlaylistLike)
+        #expect(station.isCollectionLike)
+        #expect(!station.isPlaylistLike)
     }
 }

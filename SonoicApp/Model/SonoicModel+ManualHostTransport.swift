@@ -180,33 +180,44 @@ extension SonoicModel {
 
     func playManualSonosQueueItem(at position: Int) async -> Bool {
         guard position > 0 else {
+            sonoicPlaybackDebugLog("queueSeek invalidPosition=\(position)")
             return false
         }
 
+        sonoicPlaybackDebugLog("queueSeek start position=\(position) host=\(manualSonosHost)")
         manualPlaybackContextPayload = nil
         manualQueueContextPayloads = nil
         manualRecentPlaybackContextPayload = nil
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
-        return await performManualTransportCommand(
+        let didSeek = await performManualTransportCommand(
             syncDelay: Self.manualTransportSyncDelay,
             refreshQueueAfterSuccess: true
         ) {
             try await avTransportClient.seekToTrack(host: manualSonosHost, trackNumber: position)
             try await avTransportClient.play(host: manualSonosHost)
         }
+        sonoicPlaybackDebugLog("queueSeek result=\(didSeek) position=\(position)")
+        return didSeek
     }
 
     func playManualSonosFavorite(_ favorite: SonosFavoriteItem) async -> Bool {
+        sonoicPlaybackDebugLog(
+            "manualFavorite start title='\(favorite.title)' kind=\(favorite.kind.rawValue) isPlaylistLike=\(favorite.isPlaylistLike)"
+        )
         if await playSonosControlAPIFavoriteIfAvailable(favorite) {
+            sonoicPlaybackDebugLog("manualFavorite cloudSuccess title='\(favorite.title)'")
             return true
         }
 
         guard let payload = favorite.playablePayload else {
+            sonoicPlaybackDebugLog("manualFavorite noLANPayload title='\(favorite.title)'")
             return false
         }
 
-        return await playManualSonosPayload(payload)
+        let didStart = await playManualSonosPayload(payload)
+        sonoicPlaybackDebugLog("manualFavorite lanFallbackResult=\(didStart) title='\(favorite.title)'")
+        return didStart
     }
 
     func playManualSonosPayload(

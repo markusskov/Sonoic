@@ -1,5 +1,32 @@
 import Foundation
 
+func sonoicPlaybackDebugLog(_ message: @autoclosure () -> String) {
+#if DEBUG
+    print("[SonoicPlaylistPlayback] \(message())")
+#endif
+}
+
+func sonoicPlaybackDebugID(_ value: String?) -> String {
+    guard let value = value?.sonoicNonEmptyTrimmed else {
+        return "nil"
+    }
+
+    return value.count > 8 ? String(value.suffix(8)) : value
+}
+
+func sonoicPlaybackDebugCloudStatus(_ status: SonosControlAPICloudState.Status) -> String {
+    switch status {
+    case .idle:
+        "idle"
+    case .loading:
+        "loading"
+    case let .verified(snapshot):
+        "verified households=\(snapshot.households.count) groups=\(snapshot.groupCount) players=\(snapshot.playerCount) favorites=\(snapshot.favoriteCount) playlists=\(snapshot.playlistCount)"
+    case .failed:
+        "failed"
+    }
+}
+
 enum SonoicSourceActionError: LocalizedError {
     case playbackPayloadUnavailable
 
@@ -24,7 +51,8 @@ extension SonoicModel {
         parentItem: SonoicSourceItem,
         trackItems: [SonoicSourceItem]
     ) -> Bool {
-        sourcePlaylistPlaybackPlan(parentItem: parentItem, trackItems: trackItems) != nil
+        sonosFavoriteBackedPlaylist(for: parentItem) != nil
+            || sourcePlaylistPlaybackPlan(parentItem: parentItem, trackItems: trackItems) != nil
     }
 
     @discardableResult
@@ -43,18 +71,95 @@ extension SonoicModel {
         startingAtIndex startIndex: Int? = nil,
         shuffled: Bool = false
     ) async -> Bool {
+        sonoicPlaybackDebugLog(
+            "playlistQueue start parent='\(parentItem.title)' kind=\(parentItem.kind.rawValue) origin=\(parentItem.origin.rawValue) service=\(parentItem.service.name) trackCount=\(trackItems.count) startIndex=\(String(describing: startIndex)) shuffled=\(shuffled)"
+        )
+
+        if !shuffled,
+           let favorite = sonosFavoriteBackedPlaylist(for: parentItem, log: true)
+        {
+            let sourceIndex = startIndex ?? 0
+            guard sourceIndex >= 0,
+                  startIndex == nil || sourceIndex < trackItems.count
+            else {
+                sonoicPlaybackDebugLog(
+                    "playlistQueue favoritePath invalidIndex parent='\(parentItem.title)' sourceIndex=\(sourceIndex) trackCount=\(trackItems.count)"
+                )
+                return false
+            }
+
+            sonoicPlaybackDebugLog(
+                "playlistQueue favoritePath loading favorite='\(favorite.title)' favoriteID=\(sonoicPlaybackDebugID(favorite.id)) sourceIndex=\(sourceIndex)"
+            )
+            guard await playManualSonosFavorite(favorite) else {
+                sonoicPlaybackDebugLog(
+                    "playlistQueue favoritePath favoriteLoadFailed favorite='\(favorite.title)' fallingBackToGeneratedPlan=true"
+                )
+                return await playGeneratedSourcePlaylistQueue(
+                    parentItem: parentItem,
+                    trackItems: trackItems,
+                    startingAtIndex: startIndex,
+                    shuffled: shuffled
+                )
+            }
+
+            let startingTrackNumber = sourceIndex + 1
+            if startingTrackNumber > 1 {
+                sonoicPlaybackDebugLog(
+                    "playlistQueue favoritePath seekingToTrack=\(startingTrackNumber)"
+                )
+                guard await playManualSonosQueueItem(at: startingTrackNumber) else {
+                    sonoicPlaybackDebugLog(
+                        "playlistQueue favoritePath seekFailed track=\(startingTrackNumber) fallingBackToGeneratedPlan=true"
+                    )
+                    return await playGeneratedSourcePlaylistQueue(
+                        parentItem: parentItem,
+                        trackItems: trackItems,
+                        startingAtIndex: startIndex,
+                        shuffled: shuffled
+                    )
+                }
+            }
+            recordRecentSourceItem(parentItem, replayPayload: sourcePlaylistFallbackPayload(for: parentItem))
+            sonoicPlaybackDebugLog(
+                "playlistQueue favoritePath success parent='\(parentItem.title)' track=\(startingTrackNumber)"
+            )
+            return true
+        }
+
+        return await playGeneratedSourcePlaylistQueue(
+            parentItem: parentItem,
+            trackItems: trackItems,
+            startingAtIndex: startIndex,
+            shuffled: shuffled
+        )
+    }
+
+    private func playGeneratedSourcePlaylistQueue(
+        parentItem: SonoicSourceItem,
+        trackItems: [SonoicSourceItem],
+        startingAtIndex startIndex: Int?,
+        shuffled: Bool
+    ) async -> Bool {
         guard let plan = sourcePlaylistPlaybackPlan(
             parentItem: parentItem,
             trackItems: trackItems,
             startingAtIndex: startIndex,
             shuffled: shuffled
         ) else {
+            sonoicPlaybackDebugLog(
+                "playlistQueue generatedPlanUnavailable parent='\(parentItem.title)' trackCount=\(trackItems.count) startIndex=\(String(describing: startIndex))"
+            )
             return false
         }
 
+        let startingTrackNumber = plan.startingTrackNumber
+        sonoicPlaybackDebugLog(
+            "playlistQueue generatedPlan start payloadCount=\(plan.payloads.count) startingTrack=\(startingTrackNumber)"
+        )
         let didStartPlayback = await playManualSonosQueuePayloads(
             plan.payloads,
-            startingTrackNumber: plan.startingTrackNumber,
+            startingTrackNumber: startingTrackNumber,
             localNowPlayingPayload: plan.localNowPlayingPayload,
             recentPlaybackPayload: plan.recentPlaybackPayload
         )
@@ -63,6 +168,9 @@ extension SonoicModel {
             recordRecentSourceItem(parentItem, replayPayload: plan.recentPlaybackPayload)
         }
 
+        sonoicPlaybackDebugLog(
+            "playlistQueue generatedPlan result=\(didStartPlayback) parent='\(parentItem.title)'"
+        )
         return didStartPlayback
     }
 
@@ -100,5 +208,102 @@ extension SonoicModel {
         }
 
         return try await playSourcePlaylistFallback(parentItem)
+    }
+
+    private func sonosFavoriteBackedPlaylist(for item: SonoicSourceItem, log: Bool = false) -> SonosFavoriteItem? {
+        guard item.kind == .playlist,
+              item.service.kind == .appleMusic
+        else {
+            if log {
+                sonoicPlaybackDebugLog(
+                    "favoriteMatch skipped item='\(item.title)' kind=\(item.kind.rawValue) service=\(item.service.name)"
+                )
+            }
+            return nil
+        }
+
+        let itemCatalogID = item.sourceReference?.catalogID?.sonoicNonEmptyTrimmed
+        let itemLibraryID = item.sourceReference?.libraryID?.sonoicNonEmptyTrimmed
+        let itemServiceID = item.serviceItemID?.sonoicNonEmptyTrimmed
+        let sourceIDs = [itemCatalogID, itemLibraryID, itemServiceID].compactMap(\.self)
+        let favorites = homeFavoritesState.snapshot?.items ?? []
+
+        if log {
+            sonoicPlaybackDebugLog(
+                "favoriteMatch start item='\(item.title)' sourceIDs=\(sourceIDs.map(sonoicPlaybackDebugID).joined(separator: ",")) favoriteCount=\(favorites.count)"
+            )
+        }
+
+        for favorite in favorites {
+            guard favorite.service?.kind == .appleMusic,
+                  favorite.isPlaylistLike,
+                  sourceActionMatchText(favorite.title) == sourceActionMatchText(item.title)
+            else {
+                continue
+            }
+
+            guard !sourceIDs.isEmpty else {
+                if log {
+                    sonoicPlaybackDebugLog(
+                        "favoriteMatch matchedByTitle favorite='\(favorite.title)' favoriteID=\(sonoicPlaybackDebugID(favorite.id))"
+                    )
+                }
+                return favorite
+            }
+
+            let normalizedFavoritePayload = sourceActionPayloadSearchText(for: favorite)
+
+            let hasSourceIDMatch = sourceIDs.contains { sourceID in
+                normalizedFavoritePayload.contains(sourceActionPayloadID(sourceID))
+            }
+
+            if hasSourceIDMatch {
+                if log {
+                    sonoicPlaybackDebugLog(
+                        "favoriteMatch matchedByPayload favorite='\(favorite.title)' favoriteID=\(sonoicPlaybackDebugID(favorite.id))"
+                    )
+                }
+                return favorite
+            }
+        }
+
+        if log {
+            sonoicPlaybackDebugLog(
+                "favoriteMatch noMatch item='\(item.title)' sourceIDs=\(sourceIDs.map(sonoicPlaybackDebugID).joined(separator: ","))"
+            )
+        }
+
+        return nil
+    }
+
+    private func sourceActionPayloadSearchText(for favorite: SonosFavoriteItem) -> String {
+        [
+            favorite.playbackURI,
+            favorite.playbackURI.removingPercentEncoding,
+            favorite.playbackMetadataXML,
+            favorite.playbackMetadataXML?.removingPercentEncoding
+        ]
+        .compactMap(\.self)
+        .map(sourceActionPayloadID)
+        .joined(separator: " ")
+    }
+
+    private func sourceActionPayloadID(_ value: String) -> String {
+        value
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined()
+    }
+
+    private func sourceActionMatchText(_ value: String) -> String {
+        value
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .lowercased()
+            .replacingOccurrences(of: "&", with: "and")
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 }

@@ -114,6 +114,48 @@ nonisolated struct SonosControlAPICloudSnapshot: Equatable {
         return commandTarget(matching: { _, _ in true }, updatedAt: updatedAt)
     }
 
+    func commandTarget(
+        activeTargetID: String?,
+        updatedAt: Date = .now
+    ) -> SonosControlAPITargetIdentity? {
+        let activeTargetID = activeTargetID?.sonoicNonEmptyTrimmed
+        guard let activeTargetID else {
+            return nil
+        }
+
+        return commandTarget(
+            matching: { group in
+                group.id == activeTargetID
+                    || group.coordinatorId == activeTargetID
+                    || group.playerIds.contains(activeTargetID)
+            },
+            updatedAt: updatedAt
+        )
+    }
+
+    func selectedCommandTarget(
+        settings: SonosControlAPISettings,
+        updatedAt: Date = .now
+    ) -> SonosControlAPITargetIdentity? {
+        guard let selectedGroupID = settings.selectedGroupID?.sonoicNonEmptyTrimmed else {
+            return nil
+        }
+
+        if let selectedHouseholdID = settings.selectedHouseholdID?.sonoicNonEmptyTrimmed {
+            return commandTarget(
+                matching: { household, group in
+                    household.id == selectedHouseholdID && group.id == selectedGroupID
+                },
+                updatedAt: updatedAt
+            )
+        }
+
+        return commandTarget(
+            matching: { group in group.id == selectedGroupID },
+            updatedAt: updatedAt
+        )
+    }
+
     func uniqueFavorite(
         matchingTitle title: String,
         householdID: String,
@@ -142,6 +184,14 @@ nonisolated struct SonosControlAPICloudSnapshot: Equatable {
         }
 
         return matches[0]
+    }
+
+    func hasLoadedFavorites(for householdID: String) -> Bool {
+        favoritesByHouseholdID[householdID] != nil
+    }
+
+    func hasLoadedPlaylists(for householdID: String) -> Bool {
+        playlistsByHouseholdID[householdID] != nil
     }
 
     func uniquePlaylist(
@@ -210,7 +260,7 @@ typealias SonosControlAPIGroupSnapshot = SonosControlAPIGroupsResponse
 
 private extension String {
     nonisolated var sonoicControlAPIMatchKey: String {
-        folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+        folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
