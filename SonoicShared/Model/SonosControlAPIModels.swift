@@ -1,6 +1,6 @@
 import Foundation
 
-enum SonosControlAPIMode: String, Codable, CaseIterable, Equatable {
+nonisolated enum SonosControlAPIMode: String, Codable, CaseIterable, Equatable {
     case off
     case diagnosticsOnly
     case fallback
@@ -11,7 +11,7 @@ enum SonosControlAPIMode: String, Codable, CaseIterable, Equatable {
     }
 }
 
-struct SonosControlAPISettings: Codable, Equatable {
+nonisolated struct SonosControlAPISettings: Codable, Equatable {
     var mode: SonosControlAPIMode
     var selectedHouseholdID: String?
     var selectedGroupID: String?
@@ -23,7 +23,7 @@ struct SonosControlAPISettings: Codable, Equatable {
     )
 }
 
-struct SonosControlAPIState: Equatable {
+nonisolated struct SonosControlAPIState: Equatable {
     enum AuthorizationStatus: Equatable {
         case notConfigured
         case ready
@@ -49,7 +49,7 @@ struct SonosControlAPIState: Equatable {
     }
 }
 
-struct SonosControlAPITargetIdentity: Codable, Equatable {
+nonisolated struct SonosControlAPITargetIdentity: Codable, Equatable {
     var householdID: String
     var groupID: String
     var playerID: String?
@@ -57,39 +57,39 @@ struct SonosControlAPITargetIdentity: Codable, Equatable {
     var updatedAt: Date
 }
 
-struct SonosControlAPIHouseholdsResponse: Codable, Equatable {
+nonisolated struct SonosControlAPIHouseholdsResponse: Codable, Equatable {
     var households: [SonosControlAPIHousehold]
 }
 
-struct SonosControlAPIHousehold: Codable, Equatable, Identifiable {
+nonisolated struct SonosControlAPIHousehold: Codable, Equatable, Identifiable {
     var id: String
 }
 
-struct SonosControlAPIGroupsResponse: Codable, Equatable {
+nonisolated struct SonosControlAPIGroupsResponse: Codable, Equatable {
     var groups: [SonosControlAPIGroup]
     var players: [SonosControlAPIPlayer]
 }
 
-struct SonosControlAPIGroup: Codable, Equatable, Identifiable {
+nonisolated struct SonosControlAPIGroup: Codable, Equatable, Identifiable {
     var id: String
     var name: String?
     var coordinatorId: String?
     var playerIds: [String]
 }
 
-struct SonosControlAPIPlayer: Codable, Equatable, Identifiable {
+nonisolated struct SonosControlAPIPlayer: Codable, Equatable, Identifiable {
     var id: String
     var name: String?
     var roomName: String?
     var deviceIds: [String]?
 }
 
-struct SonosControlAPIFavoritesResponse: Codable, Equatable {
+nonisolated struct SonosControlAPIFavoritesResponse: Codable, Equatable {
     var version: String?
     var favorites: [SonosControlAPIFavorite]
 }
 
-struct SonosControlAPIFavorite: Codable, Equatable, Identifiable {
+nonisolated struct SonosControlAPIFavorite: Codable, Equatable, Identifiable {
     var id: String
     var name: String
     var description: String?
@@ -97,32 +97,32 @@ struct SonosControlAPIFavorite: Codable, Equatable, Identifiable {
     var service: SonosControlAPIService?
 }
 
-struct SonosControlAPIPlaylistsResponse: Codable, Equatable {
+nonisolated struct SonosControlAPIPlaylistsResponse: Codable, Equatable {
     var version: String?
     var playlists: [SonosControlAPIPlaylist]
 }
 
-struct SonosControlAPIPlaylist: Codable, Equatable, Identifiable {
+nonisolated struct SonosControlAPIPlaylist: Codable, Equatable, Identifiable {
     var id: String
     var name: String
     var type: String?
     var trackCount: Int?
 }
 
-struct SonosControlAPIService: Codable, Equatable {
+nonisolated struct SonosControlAPIService: Codable, Equatable {
     var id: String?
     var name: String?
     var imageUrl: String?
 }
 
-enum SonosControlAPIPlaybackState: String, Codable, Equatable {
+nonisolated enum SonosControlAPIPlaybackState: String, Codable, Equatable {
     case idle = "PLAYBACK_STATE_IDLE"
     case buffering = "PLAYBACK_STATE_BUFFERING"
     case paused = "PLAYBACK_STATE_PAUSED"
     case playing = "PLAYBACK_STATE_PLAYING"
 }
 
-struct SonosControlAPIPlaybackStatus: Codable, Equatable {
+nonisolated struct SonosControlAPIPlaybackStatus: Codable, Equatable {
     var playbackState: SonosControlAPIPlaybackState
     var isDucking: Bool?
     var queueVersion: String?
@@ -134,7 +134,7 @@ struct SonosControlAPIPlaybackStatus: Codable, Equatable {
     var availablePlaybackActions: SonosControlAPIPlaybackActions?
 }
 
-struct SonosControlAPIPlayModes: Codable, Equatable {
+nonisolated struct SonosControlAPIPlayModes: Codable, Equatable {
     var repeatEnabled: Bool?
     var repeatOne: Bool?
     var shuffle: Bool?
@@ -148,7 +148,7 @@ struct SonosControlAPIPlayModes: Codable, Equatable {
     }
 }
 
-struct SonosControlAPIPlaybackActions: Codable, Equatable {
+nonisolated struct SonosControlAPIPlaybackActions: Codable, Equatable {
     var canSkip: Bool?
     var canSkipBack: Bool?
     var canSeek: Bool?
@@ -160,21 +160,21 @@ struct SonosControlAPIPlaybackActions: Codable, Equatable {
     var canShuffle: Bool?
 }
 
-struct SonosControlAPIMetadataStatus: Codable, Equatable {
+nonisolated struct SonosControlAPIMetadataStatus: Codable, Equatable {
     var container: SonosControlAPIContainer?
     var currentItem: SonosControlAPIQueueItem?
     var nextItem: SonosControlAPIQueueItem?
     var streamInfo: String?
 }
 
-struct SonosControlAPIQueueItem: Codable, Equatable, Identifiable {
+nonisolated struct SonosControlAPIQueueItem: Codable, Equatable, Identifiable {
     var id: String?
     var track: SonosControlAPITrack?
     var deleted: Bool?
     var policies: SonosControlAPIPlaybackPolicy?
 }
 
-struct SonosControlAPITrack: Codable, Equatable {
+nonisolated struct SonosControlAPITrack: Codable, Equatable {
     var type: String?
     var name: String?
     var mediaUrl: String?
@@ -189,18 +189,18 @@ struct SonosControlAPITrack: Codable, Equatable {
     var quality: SonosControlAPITrackQuality?
 }
 
-struct SonosControlAPIAlbum: Codable, Equatable {
+nonisolated struct SonosControlAPIAlbum: Codable, Equatable {
     var name: String
     var artist: SonosControlAPIArtist?
     var id: SonosControlAPIUniversalMusicObjectID?
 }
 
-struct SonosControlAPIArtist: Codable, Equatable {
+nonisolated struct SonosControlAPIArtist: Codable, Equatable {
     var name: String
     var id: SonosControlAPIUniversalMusicObjectID?
 }
 
-struct SonosControlAPIContainer: Codable, Equatable {
+nonisolated struct SonosControlAPIContainer: Codable, Equatable {
     var name: String?
     var type: String?
     var id: SonosControlAPIUniversalMusicObjectID?
@@ -208,13 +208,13 @@ struct SonosControlAPIContainer: Codable, Equatable {
     var imageUrl: String?
 }
 
-struct SonosControlAPIUniversalMusicObjectID: Codable, Equatable {
+nonisolated struct SonosControlAPIUniversalMusicObjectID: Codable, Equatable {
     var serviceId: String?
     var objectId: String
     var accountId: String?
 }
 
-struct SonosControlAPITrackQuality: Codable, Equatable {
+nonisolated struct SonosControlAPITrackQuality: Codable, Equatable {
     var bitDepth: Int?
     var sampleRate: Int?
     var codec: String?
@@ -222,7 +222,7 @@ struct SonosControlAPITrackQuality: Codable, Equatable {
     var immersive: Bool?
 }
 
-struct SonosControlAPIPlaybackPolicy: Codable, Equatable {
+nonisolated struct SonosControlAPIPlaybackPolicy: Codable, Equatable {
     var canSkip: Bool?
     var canSkipBack: Bool?
     var limitedSkips: Bool?
@@ -242,43 +242,43 @@ struct SonosControlAPIPlaybackPolicy: Codable, Equatable {
     var pauseTtlSec: Int?
 }
 
-enum SonosControlAPISessionState: String, Codable, Equatable {
+nonisolated enum SonosControlAPISessionState: String, Codable, Equatable {
     case connected = "SESSION_STATE_CONNECTED"
 }
 
-struct SonosControlAPISessionStatus: Codable, Equatable {
+nonisolated struct SonosControlAPISessionStatus: Codable, Equatable {
     var sessionId: String?
     var sessionState: SonosControlAPISessionState?
     var sessionCreated: Bool?
     var customData: String?
 }
 
-struct SonosControlAPILoadFavoriteRequest: Codable, Equatable {
+nonisolated struct SonosControlAPILoadFavoriteRequest: Codable, Equatable {
     var favoriteId: String
 }
 
-struct SonosControlAPILoadPlaylistRequest: Codable, Equatable {
+nonisolated struct SonosControlAPILoadPlaylistRequest: Codable, Equatable {
     var playlistId: String
 }
 
-struct SonosControlAPISeekRequest: Codable, Equatable {
+nonisolated struct SonosControlAPISeekRequest: Codable, Equatable {
     var positionMillis: Int
     var itemId: String?
 }
 
-struct SonosControlAPISeekRelativeRequest: Codable, Equatable {
+nonisolated struct SonosControlAPISeekRelativeRequest: Codable, Equatable {
     var deltaMillis: Int
     var itemId: String?
 }
 
-struct SonosControlAPICreateSessionRequest: Codable, Equatable {
+nonisolated struct SonosControlAPICreateSessionRequest: Codable, Equatable {
     var appId: String
     var appContext: String
     var accountId: String?
     var customData: String?
 }
 
-struct SonosControlAPILoadCloudQueueRequest: Codable, Equatable {
+nonisolated struct SonosControlAPILoadCloudQueueRequest: Codable, Equatable {
     var queueBaseUrl: String
     var httpAuthorization: String?
     var useHttpAuthorizationForMedia: Bool?
@@ -289,7 +289,7 @@ struct SonosControlAPILoadCloudQueueRequest: Codable, Equatable {
     var trackMetadata: SonosControlAPITrack?
 }
 
-struct SonosControlAPISkipToItemRequest: Codable, Equatable {
+nonisolated struct SonosControlAPISkipToItemRequest: Codable, Equatable {
     var itemId: String
     var queueVersion: String?
     var positionMillis: Int?
@@ -297,7 +297,7 @@ struct SonosControlAPISkipToItemRequest: Codable, Equatable {
     var trackMetadata: SonosControlAPITrack?
 }
 
-struct SonosControlAPIErrorResponse: Codable, Equatable {
+nonisolated struct SonosControlAPIErrorResponse: Codable, Equatable {
     var errorCode: String?
     var reason: String?
     var message: String?

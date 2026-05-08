@@ -36,13 +36,15 @@ nonisolated struct SonosOAuthClient: Sendable {
             throw OAuthError.invalidAuthorizationURL
         }
 
-        components.queryItems = [
-            URLQueryItem(name: "client_id", value: configuration.clientID),
-            URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "state", value: state),
-            URLQueryItem(name: "scope", value: configuration.scopeValue),
-            URLQueryItem(name: "redirect_uri", value: configuration.redirectURI)
+        components.percentEncodedQuery = [
+            ("client_id", configuration.clientID),
+            ("response_type", "code"),
+            ("state", state),
+            ("scope", configuration.scopeValue),
+            ("redirect_uri", configuration.redirectURI),
         ]
+        .map { name, value in "\(name)=\(Self.percentEncodedQueryValue(value))" }
+        .joined(separator: "&")
 
         guard let url = components.url else {
             throw OAuthError.invalidAuthorizationURL
@@ -85,5 +87,11 @@ nonisolated struct SonosOAuthClient: Sendable {
 
     func makeState() -> String {
         UUID().uuidString.replacingOccurrences(of: "-", with: "")
+    }
+
+    private static func percentEncodedQueryValue(_ value: String) -> String {
+        var allowedCharacters = CharacterSet.urlQueryAllowed
+        allowedCharacters.remove(charactersIn: ":#[]@!$&'()*+,;=/?")
+        return value.addingPercentEncoding(withAllowedCharacters: allowedCharacters) ?? value
     }
 }
