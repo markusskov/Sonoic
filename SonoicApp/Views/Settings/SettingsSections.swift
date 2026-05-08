@@ -246,6 +246,68 @@ struct SettingsMusicServicesSection: View {
 
 }
 
+struct SettingsSonosAccountSection: View {
+    let model: SonoicModel
+
+    var body: some View {
+        Section {
+            SettingsStatusRow(
+                title: "Sonos Account",
+                statusTitle: model.sonosControlAPIAuthorizationState.title,
+                detail: detail,
+                systemImage: model.sonosControlAPIAuthorizationState.systemImage,
+                tint: tint
+            )
+
+            if model.sonosControlAPIAuthorizationState.isConnected {
+                Button(role: .destructive, action: disconnect) {
+                    Label("Disconnect", systemImage: "person.crop.circle.badge.xmark")
+                }
+            } else {
+                Button(action: connect) {
+                    if model.sonosControlAPIAuthorizationState.isConnecting {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Connecting")
+                        }
+                    } else {
+                        Label("Connect Sonos", systemImage: "person.crop.circle.badge.checkmark")
+                    }
+                }
+                .disabled(!model.sonosControlAPIAuthorizationState.canConnect)
+            }
+        } header: {
+            Text("Sonos")
+        }
+    }
+
+    private var tint: Color {
+        switch model.sonosControlAPIAuthorizationState.status {
+        case .connected:
+            .green
+        case .connecting, .disconnected, .notConfigured, .expired:
+            .orange
+        case .failed:
+            .red
+        }
+    }
+
+    private var detail: String? {
+        model.sonosControlAPICloudState.detail
+            ?? model.sonosControlAPIAuthorizationState.detail
+    }
+
+    private func connect() {
+        Task {
+            await model.connectSonosAccount()
+        }
+    }
+
+    private func disconnect() {
+        model.disconnectSonosAccount()
+    }
+}
+
 struct SettingsAdvancedNavigationSection: View {
     let model: SonoicModel
     let playerRefreshDetail: String?

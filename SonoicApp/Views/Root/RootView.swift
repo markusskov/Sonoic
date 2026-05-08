@@ -10,51 +10,57 @@ struct RootView: View {
     var body: some View {
         @Bindable var model = model
 
-        TabView(selection: $model.selectedTab) {
-            Tab(value: RootTab.home) {
-                rootNavigationView(tab: .home) {
-                    HomeView()
-                }
-            } label: {
-                Label(RootTab.home.title, systemImage: RootTab.home.systemImage)
-            }
+        Group {
+            if model.hasCompletedOnboarding {
+                TabView(selection: $model.selectedTab) {
+                    Tab(value: RootTab.home) {
+                        rootNavigationView(tab: .home) {
+                            HomeView()
+                        }
+                    } label: {
+                        Label(RootTab.home.title, systemImage: RootTab.home.systemImage)
+                    }
 
-            Tab(value: RootTab.rooms) {
-                rootNavigationView(tab: .rooms) {
-                    RoomsView()
-                }
-            } label: {
-                Label(RootTab.rooms.title, systemImage: RootTab.rooms.systemImage)
-            }
+                    Tab(value: RootTab.rooms) {
+                        rootNavigationView(tab: .rooms) {
+                            RoomsView()
+                        }
+                    } label: {
+                        Label(RootTab.rooms.title, systemImage: RootTab.rooms.systemImage)
+                    }
 
-            Tab(value: RootTab.queue) {
-                rootNavigationView(tab: .queue) {
-                    QueueView()
-                }
-            } label: {
-                Label(RootTab.queue.title, systemImage: RootTab.queue.systemImage)
-            }
+                    Tab(value: RootTab.queue) {
+                        rootNavigationView(tab: .queue) {
+                            QueueView()
+                        }
+                    } label: {
+                        Label(RootTab.queue.title, systemImage: RootTab.queue.systemImage)
+                    }
 
-            Tab(value: RootTab.settings) {
-                rootNavigationView(tab: .settings) {
-                    SettingsView()
-                }
-            } label: {
-                Label(RootTab.settings.title, systemImage: RootTab.settings.systemImage)
-            }
+                    Tab(value: RootTab.settings) {
+                        rootNavigationView(tab: .settings) {
+                            SettingsView()
+                        }
+                    } label: {
+                        Label(RootTab.settings.title, systemImage: RootTab.settings.systemImage)
+                    }
 
-            Tab(value: RootTab.search, role: .search) {
-                rootNavigationView(tab: .search) {
-                    SearchView()
+                    Tab(value: RootTab.search, role: .search) {
+                        rootNavigationView(tab: .search) {
+                            SearchView()
+                        }
+                    } label: {
+                        Label(RootTab.search.title, systemImage: RootTab.search.systemImage)
+                    }
                 }
-            } label: {
-                Label(RootTab.search.title, systemImage: RootTab.search.systemImage)
+                .tabViewStyle(.sidebarAdaptable)
+            } else {
+                SonoicOnboardingView()
             }
         }
-        .tabViewStyle(.sidebarAdaptable)
         .tint(SonoicTheme.Colors.tabAccent)
         .overlay(alignment: .bottom) {
-            if model.hasManualSonosHost {
+            if model.hasCompletedOnboarding, model.hasManualSonosHost {
                 PlayerMiniBar(
                     nowPlaying: model.nowPlaying,
                     openPlayer: {

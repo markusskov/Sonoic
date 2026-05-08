@@ -4,6 +4,7 @@ struct SonoicSettingsStore {
     static let manualSonosHostKey = "manualSonosHost"
     static let recentPlaysKey = "recentPlays"
     static let recentSourceSearchesKey = "recentSourceSearches"
+    static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     static let sonosControlAPISettingsKey = "sonosControlAPISettings"
 
     private let userDefaults: UserDefaults
@@ -54,6 +55,14 @@ struct SonoicSettingsStore {
         }
 
         userDefaults.set(data, forKey: Self.recentSourceSearchesKey)
+    }
+
+    func loadHasCompletedOnboarding() -> Bool {
+        userDefaults.bool(forKey: Self.hasCompletedOnboardingKey)
+    }
+
+    func saveHasCompletedOnboarding(_ hasCompletedOnboarding: Bool) {
+        userDefaults.set(hasCompletedOnboarding, forKey: Self.hasCompletedOnboardingKey)
     }
 
     func loadSonosControlAPISettings() -> SonosControlAPISettings {

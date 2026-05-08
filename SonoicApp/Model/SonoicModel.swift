@@ -68,11 +68,17 @@ final class SonoicModel {
     @ObservationIgnored let contentDirectoryProbeClient: SonosContentDirectoryProbeClient
     @ObservationIgnored let sonosControlAPIClient: SonosControlAPIClient
     @ObservationIgnored let appleMusicCatalogSearchClient: SonoicAppleMusicCatalogSearchClient
+    @ObservationIgnored let sonosOAuthConfiguration: SonosOAuthConfiguration
+    @ObservationIgnored let sonosOAuthClient: SonosOAuthClient
+    @ObservationIgnored let sonosTokenBrokerClient: SonosTokenBrokerClient
+    @ObservationIgnored let keychainStore: SonoicKeychainStore
+    @ObservationIgnored let sonosOAuthWebAuthenticator: SonosOAuthWebAuthenticator
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
     @ObservationIgnored let plusController: SonoicPlusController
 
     var selectedTab: RootTab = .home
     var pendingSourceItemDetailRoute: SonoicSourceItem?
+    var hasCompletedOnboarding = false
     var manualSonosHost: String {
         didSet {
             settingsStore.saveManualSonosHost(manualSonosHost)
@@ -128,6 +134,8 @@ final class SonoicModel {
     var appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
     var plusState = SonoicPlusState.notConfigured
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
+    var sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState.notConfigured
+    var sonosControlAPICloudState = SonosControlAPICloudState.idle
     var appleMusicServiceDetails = SonoicAppleMusicServiceDetails.idle
     var appleMusicRequestReadiness = SonoicAppleMusicRequestReadiness.idle
     var musicKitDiagnostics = SonoicMusicKitDiagnostics.current
@@ -264,11 +272,23 @@ final class SonoicModel {
         contentDirectoryProbeClient = SonosContentDirectoryProbeClient(transport: sonosControlTransport)
         sonosControlAPIClient = SonosControlAPIClient()
         appleMusicCatalogSearchClient = SonoicAppleMusicCatalogSearchClient()
+        sonosOAuthConfiguration = SonosOAuthConfiguration.load()
+        sonosOAuthClient = SonosOAuthClient()
+        sonosTokenBrokerClient = SonosTokenBrokerClient()
+        keychainStore = SonoicKeychainStore()
+        sonosOAuthWebAuthenticator = SonosOAuthWebAuthenticator()
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         plusController = SonoicPlusController()
-        manualSonosHost = settingsStore.loadManualSonosHost()
+        let savedManualSonosHost = settingsStore.loadManualSonosHost()
+        manualSonosHost = savedManualSonosHost
         recentPlays = settingsStore.loadRecentPlays()
         recentSourceSearches = settingsStore.loadRecentSourceSearches()
+        let savedHasCompletedOnboarding = settingsStore.loadHasCompletedOnboarding()
+        let migratedHasCompletedOnboarding = savedHasCompletedOnboarding || !savedManualSonosHost.isEmpty
+        hasCompletedOnboarding = migratedHasCompletedOnboarding
+        if migratedHasCompletedOnboarding && !savedHasCompletedOnboarding {
+            settingsStore.saveHasCompletedOnboarding(true)
+        }
         sonosControlAPIState = SonosControlAPIState(
             settings: settingsStore.loadSonosControlAPISettings(),
             authorizationStatus: .notConfigured,
@@ -289,5 +309,6 @@ final class SonoicModel {
         persistSharedExternalControlState()
         configureNowPlayableSessionController()
         configureSonosDiscoveryBrowser()
+        refreshSonosControlAPIAuthorizationState()
     }
 }

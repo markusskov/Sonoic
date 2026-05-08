@@ -157,7 +157,7 @@ def check_markdown_links() -> list[str]:
 
 
 def markdown_files() -> list[Path]:
-    ignored_parts = {".git", ".build", "DerivedData", "build"}
+    ignored_parts = {".git", ".build", "DerivedData", "build", "node_modules"}
     return sorted(
         path
         for path in ROOT.rglob("*.md")

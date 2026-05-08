@@ -11,6 +11,27 @@ struct SonosControlAPIClient {
         "/playbackSessions/\(sessionID)/playbackSession/\(command)"
     }
 
+    func fetchCloudSnapshot(tokenSet: SonosOAuthTokenSet) async throws -> SonosControlAPICloudSnapshot {
+        let householdsResponse = try await households(accessToken: tokenSet.accessToken)
+        var groupsByHouseholdID: [String: SonosControlAPIGroupSnapshot] = [:]
+
+        for household in householdsResponse.households {
+            let groupsResponse = try await groups(
+                householdID: household.id,
+                accessToken: tokenSet.accessToken
+            )
+            groupsByHouseholdID[household.id] = SonosControlAPIGroupSnapshot(
+                groups: groupsResponse.groups,
+                players: groupsResponse.players
+            )
+        }
+
+        return SonosControlAPICloudSnapshot(
+            households: householdsResponse.households,
+            groupsByHouseholdID: groupsByHouseholdID
+        )
+    }
+
     func households(accessToken: String) async throws -> SonosControlAPIHouseholdsResponse {
         try await transport.get(
             "/households",

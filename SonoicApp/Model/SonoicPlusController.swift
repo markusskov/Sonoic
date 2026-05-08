@@ -39,7 +39,7 @@ final class SonoicPlusController {
             return notConfiguredState
         }
 
-        configureIfPossible()
+        _ = configureIfPossible()
 
         do {
             let customerInfo = try await customerInfo()
@@ -54,7 +54,7 @@ final class SonoicPlusController {
             return notConfiguredState
         }
 
-        configureIfPossible()
+        _ = configureIfPossible()
 
         do {
             let customerInfo = try await restoreCustomerInfo()
