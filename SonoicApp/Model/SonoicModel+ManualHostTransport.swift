@@ -347,9 +347,7 @@ extension SonoicModel {
                 metadataXML: nil
             )
 
-            if startingTrackNumber > 1 {
-                try await avTransportClient.seekToTrack(host: playbackHost, trackNumber: startingTrackNumber)
-            }
+            try await avTransportClient.seekToTrack(host: playbackHost, trackNumber: startingTrackNumber)
 
             try await avTransportClient.play(host: playbackHost)
         }

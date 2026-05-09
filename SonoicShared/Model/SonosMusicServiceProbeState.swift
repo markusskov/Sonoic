@@ -320,7 +320,7 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
         }
 
         guard let sid = pairs["sid"],
-              let serialNumber = pairs["sn"]?.sonoicNonEmptyTrimmed,
+              let serialNumber = pairs["sn"].flatMap(cleanedSerialNumber)?.sonoicNonEmptyTrimmed,
               let serviceID = Int(sid)
         else {
             return nil
@@ -336,6 +336,14 @@ struct SonosMusicServiceAccountSummary: Identifiable, Equatable {
             source: .observedPlayback,
             observedOrigins: [observedValue.origin]
         )
+    }
+
+    private static func cleanedSerialNumber(_ value: String) -> String? {
+        let decodedValue = value.removingPercentEncoding ?? value
+        return decodedValue
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .first?
+            .sonoicNonEmptyTrimmed
     }
 }
 
