@@ -57,6 +57,8 @@ extension SonoicModel {
 
     @discardableResult
     func playSourceItem(_ item: SonoicSourceItem) async throws -> Bool {
+        await refreshSourcePlaybackContextIfNeeded(for: item.service)
+
         guard let payload = try sourcePlayablePayload(for: item, purpose: .directPlay) else {
             throw SonoicSourceActionError.playbackPayloadUnavailable
         }
@@ -141,6 +143,8 @@ extension SonoicModel {
         startingAtIndex startIndex: Int?,
         shuffled: Bool
     ) async -> Bool {
+        await refreshSourcePlaybackContextIfNeeded(for: parentItem.service)
+
         guard let plan = sourcePlaylistPlaybackPlan(
             parentItem: parentItem,
             trackItems: trackItems,
@@ -172,6 +176,20 @@ extension SonoicModel {
             "playlistQueue generatedPlan result=\(didStartPlayback) parent='\(parentItem.title)'"
         )
         return didStartPlayback
+    }
+
+    private func refreshSourcePlaybackContextIfNeeded(for service: SonosServiceDescriptor) async {
+        guard service.kind == .appleMusic else {
+            return
+        }
+
+        await refreshSonosMusicServiceProbeIfNeeded()
+
+        let appleMusicRow = sonosMusicServiceProbeState.snapshot?.knownServiceRows.first { $0.service == .appleMusic }
+        let hint = appleMusicRow?.playbackHint
+        sonoicPlaybackDebugLog(
+            "sourcePlaybackContext service='\(service.name)' probeStatus=\(sonosMusicServiceProbeState.status.sonoicDebugTitle) launchSerials=\(hint?.launchSerials.joined(separator: ",") ?? "none") trackSerials=\(hint?.trackSerials.joined(separator: ",") ?? "none")"
+        )
     }
 
     @discardableResult
@@ -305,5 +323,20 @@ extension SonoicModel {
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+    }
+}
+
+private extension SonosMusicServiceProbeState.Status {
+    var sonoicDebugTitle: String {
+        switch self {
+        case .idle:
+            "idle"
+        case .loading:
+            "loading"
+        case .loaded:
+            "loaded"
+        case .failed:
+            "failed"
+        }
     }
 }
