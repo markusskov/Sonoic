@@ -14,6 +14,8 @@ struct SonosControlAPIClient {
     func fetchCloudSnapshot(tokenSet: SonosOAuthTokenSet) async throws -> SonosControlAPICloudSnapshot {
         let householdsResponse = try await households(accessToken: tokenSet.accessToken)
         var groupsByHouseholdID: [String: SonosControlAPIGroupSnapshot] = [:]
+        var favoritesByHouseholdID: [String: [SonosControlAPIFavorite]] = [:]
+        var playlistsByHouseholdID: [String: [SonosControlAPIPlaylist]] = [:]
 
         for household in householdsResponse.households {
             let groupsResponse = try await groups(
@@ -24,11 +26,22 @@ struct SonosControlAPIClient {
                 groups: groupsResponse.groups,
                 players: groupsResponse.players
             )
+
+            favoritesByHouseholdID[household.id] = try? await favorites(
+                householdID: household.id,
+                accessToken: tokenSet.accessToken
+            ).favorites
+            playlistsByHouseholdID[household.id] = try? await playlists(
+                householdID: household.id,
+                accessToken: tokenSet.accessToken
+            ).playlists
         }
 
         return SonosControlAPICloudSnapshot(
             households: householdsResponse.households,
-            groupsByHouseholdID: groupsByHouseholdID
+            groupsByHouseholdID: groupsByHouseholdID,
+            favoritesByHouseholdID: favoritesByHouseholdID,
+            playlistsByHouseholdID: playlistsByHouseholdID
         )
     }
 

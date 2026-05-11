@@ -28,6 +28,15 @@ struct SonosFavoriteItem: Identifiable, Equatable {
             || normalizedURI.contains("album")
     }
 
+    var isPlaylistLike: Bool {
+        let normalizedURI = playbackURI.lowercased()
+        let normalizedMetadata = playbackMetadataXML?.lowercased() ?? ""
+
+        return normalizedURI.contains("playlist")
+            || normalizedMetadata.contains("object.container.playlist")
+            || normalizedMetadata.contains("playlist:")
+    }
+
     var playablePayload: SonosPlayablePayload? {
         SonosPlayablePayload(favorite: self)
     }
