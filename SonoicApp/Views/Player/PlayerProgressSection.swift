@@ -71,6 +71,8 @@ struct PlayerProgressSection: View {
                 return
             }
 
+            refreshPendingSeekPlaybackState(at: .now)
+
             if shouldKeepPendingSeek(at: .now) {
                 return
             }
@@ -142,6 +144,20 @@ struct PlayerProgressSection: View {
         }
 
         return true
+    }
+
+    private func refreshPendingSeekPlaybackState(at date: Date) {
+        guard let pendingSeekTarget,
+              pendingSeekTarget.playbackState != nowPlaying.playbackState
+        else {
+            return
+        }
+
+        self.pendingSeekTarget = PendingSeekTarget(
+            elapsedSeconds: pendingSeekTarget.displayedElapsedSeconds(at: date, duration: durationSeconds),
+            requestedAt: date,
+            playbackState: nowPlaying.playbackState
+        )
     }
 
     private func displayedElapsedSeconds(at date: Date) -> Double {
