@@ -285,6 +285,7 @@ extension SonoicModel {
         }
 
         let boundedLevel = min(max(level, 0), 100)
+        let preflightVolume = externalVolume
         externalVolume.level = boundedLevel
         pendingSonosControlAPIVolumeLevel = boundedLevel
 
@@ -298,10 +299,11 @@ extension SonoicModel {
         }
 
         var latestRequestSucceeded = true
+        var confirmedVolume = preflightVolume
 
         while let nextLevel = pendingSonosControlAPIVolumeLevel {
             pendingSonosControlAPIVolumeLevel = nil
-            let previousVolume = externalVolume
+            let previousVolume = confirmedVolume
             externalVolume.level = nextLevel
 
             guard let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true) else {
@@ -335,6 +337,7 @@ extension SonoicModel {
             }
 
             if didSetVolume {
+                confirmedVolume.level = nextLevel
                 latestRequestSucceeded = true
             } else {
                 latestRequestSucceeded = false
