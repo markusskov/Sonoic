@@ -6,7 +6,8 @@ struct RoomVolumeControlsSection: View {
     let roomVolumeState: SonosRoomVolumeState
     let mutatingRoomVolumeIDs: Set<SonosRoomVolumeItem.ID>
     let operationErrorDetail: String?
-    let isEnabled: Bool
+    let isTargetEnabled: Bool
+    let isRoomEnabled: Bool
     let refreshAction: () async -> Void
     let setTargetVolume: (Int) async -> Bool
     let toggleTargetMute: () async -> Void
@@ -32,7 +33,7 @@ struct RoomVolumeControlsSection: View {
                     subtitle: activeTarget.name,
                     systemImage: activeTarget.kind.systemImage,
                     volume: targetVolume,
-                    isEnabled: isEnabled,
+                    isEnabled: isTargetEnabled,
                     setVolume: setTargetVolume,
                     toggleMute: toggleTargetMute
                 )
@@ -92,7 +93,7 @@ struct RoomVolumeControlsSection: View {
                         subtitle: item.isCoordinator ? "Coordinator" : "Grouped room",
                         systemImage: item.isCoordinator ? "speaker.wave.3.fill" : "speaker.wave.2.fill",
                         volume: item.volume,
-                        isEnabled: isEnabled && !mutatingRoomVolumeIDs.contains(item.id),
+                        isEnabled: isRoomEnabled && !mutatingRoomVolumeIDs.contains(item.id),
                         setVolume: { level in
                             await setRoomVolume(item, level)
                         },

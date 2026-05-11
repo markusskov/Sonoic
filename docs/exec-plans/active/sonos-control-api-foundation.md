@@ -1,5 +1,7 @@
 # Sonos Control API Foundation
 
+> Status: Superseded by the Cloud Control Spine plan. This file is retained as historical context for the first Control API research slice; LAN-default statements below describe the pre-spine state, not the current product direction.
+
 ## Current Behavior
 Sonoic controls Sonos over the local SOAP APIs. This works well for room discovery, volume, queue inspection, queue editing, now-playing reads, and saved Sonos favorite playback. Apple Music catalog playback currently relies on locally generated Sonos URI/DIDL payloads, which is fragile: the player can accept playback while refusing reliable seek behavior, or reject a guessed URI shape entirely.
 

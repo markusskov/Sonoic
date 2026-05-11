@@ -8,7 +8,7 @@ Last reviewed: 2026-04-27
 
 | Area | Grade | Notes |
 | --- | --- | --- |
-| Product direction | B | Focused local-first Sonos direction is clear in `README.md` and `plan.md`. |
+| Product direction | B | Focused Cloud-first Sonos direction is clear in `README.md` and `plan.md`, with local tools kept as an explicit same-network island. |
 | App shell | B | Core tabs, mini-player, player sheet, settings, rooms, and queue surfaces exist. |
 | Sonos control | B | Real discovery, room/group selection, queue control, home theater controls, and playback commands exist. More multi-household validation is still needed. |
 | Native now-playing path | C+ | Lock Screen metadata, artwork, controls, progress, and scrubbing exist, but ownership is still sensitive because Sonos remains the audio owner. |

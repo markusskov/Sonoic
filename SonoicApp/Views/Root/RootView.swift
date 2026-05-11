@@ -68,7 +68,7 @@ struct RootView: View {
                     },
                     togglePlayback: {
                         Task {
-                            await model.toggleManualSonosPlayback()
+                            await model.toggleSonosPlayback()
                         }
                     }
                 )

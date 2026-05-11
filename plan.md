@@ -6,7 +6,7 @@ It describes what is already real in the app, the architectural guardrails we wa
 
 ## Current State
 
-Sonoic already has a real app shell and a full first-pass local Sonos control path.
+Sonoic already has a real app shell and a first-pass Sonos control path. The current architectural migration is to make Sonos Cloud the normal control plane while keeping LAN/SOAP as an explicit local-tools layer.
 
 Implemented so far:
 
@@ -15,17 +15,17 @@ Implemented so far:
 - typed Sonos domain models for active target, room list, queue, and now playing
 - favorites-first `Home` surface with real Sonos favorites, collections, recently played items, source summaries, and now-playing context
 - real mini-player and draggable player sheet
-- real local Sonos `play/pause`, `next`, `previous`, `mute`, volume, and seek
+- real Sonos playback controls, with the active migration moving normal transport, seek, volume, and mute to Cloud-owned commands
 - real now-playing title, artist, album, source, artwork, duration, and progress reads
 - Advanced now-playing inspection for raw Sonos metadata, transport URI, duration, and elapsed-time behavior
-- manual playback transition smoothing so local progress does not run ahead before Sonos confirms `PLAYING`
+- playback transition smoothing so local progress does not run ahead before Sonos confirms `PLAYING`
 - discovery-backed Sonos room selection through Bonjour and household topology
 - real group awareness for current Sonos groups and group coordinator selection
 - real room naming and bonded home theater member details
 - Sonos queue inspection with current-item highlighting, tap-to-play, clear, remove, and reorder
 - shared external-control snapshot for widgets
 - App Group-backed artwork cache and shared state store
-- manual host fallback through `Settings`
+- Sonos Cloud account connection through onboarding/Settings, plus manual host/local tools behind Advanced
 - `Rooms` surface for the selected room or group, discovered groups, discovered room list, bonded setup, discovery refresh state, and home theater entry point
 - `Settings` focused on quiet everyday configuration, with manual setup and diagnostics behind Advanced
 - lightweight foreground polling for playback, metadata, volume, and mute
@@ -50,6 +50,7 @@ Principles:
 - add new folders only when a feature becomes real
 - avoid “foundation” rewrites that are not tied to user-visible progress
 - keep the main UI quiet: short labels, obvious actions, and no diagnostic explanations outside Advanced
+- keep Cloud as the main control plane; LAN should not become an invisible fallback for normal playback commands
 
 In practice:
 
@@ -81,14 +82,18 @@ SonoicApp/
 
 ## Near-Term Priorities
 
-### 1. Harden the current Sonos path on real hardware
+### 1. Finish the Cloud control spine
 
-The project now has enough real behavior that the highest-value work is making it boring on actual Sonos households.
+The project now has enough real behavior that the highest-value work is making the control plane boring on actual Sonos households.
 
 The next work here should be careful:
 
+- make Cloud household/group/player identity the first-class target model
+- route normal play, pause, next, previous, seek, favorite, playlist, volume, and mute through Cloud when supported
+- remove hidden LAN fallback from normal playback paths
+- move manual host and SOAP controls into explicit local tools
 - verify discovery against multiple households and room names
-- verify queue editing during transitions and grouped playback
+- verify queue editing during transitions and grouped playback while it remains an explicit local queue tool
 - verify lock-screen scrubbing and progress across services
 - verify home theater controls across products with and without Sub, surrounds, speech enhancement, and night sound
 - keep diagnostics behind Advanced so the main UI stays quiet
@@ -161,6 +166,8 @@ These are real project decisions, but they do not all need to be answered right 
 
 - How far should the project go with background refresh before the complexity stops being worth it?
 - How much of the Apple native now-playing experience can be supported reliably for a remote-control app?
+- Which Control API metadata/events are reliable enough to replace local now-playing polling completely?
+- Which home-theater controls are covered by Cloud today, and which should remain local tools?
 - How far should Sonoic go into service-native browsing before it starts duplicating the Sonos app?
 - Which Apple Music API lanes are worth making first: recently added, charts, editorial playlists, recommendations, or category browsing?
 - What is the smallest reliable Sonos-native payload path for an Apple Music catalog/library item?

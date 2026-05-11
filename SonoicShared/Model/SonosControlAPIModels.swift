@@ -115,6 +115,20 @@ nonisolated struct SonosControlAPIService: Codable, Equatable {
     var imageUrl: String?
 }
 
+nonisolated struct SonosControlAPIVolume: Codable, Equatable {
+    var volume: Int
+    var muted: Bool
+    var fixed: Bool?
+}
+
+nonisolated struct SonosControlAPISetVolumeRequest: Codable, Equatable {
+    var volume: Int
+}
+
+nonisolated struct SonosControlAPISetMuteRequest: Codable, Equatable {
+    var muted: Bool
+}
+
 nonisolated enum SonosControlAPIPlaybackState: String, Codable, Equatable {
     case idle = "PLAYBACK_STATE_IDLE"
     case buffering = "PLAYBACK_STATE_BUFFERING"

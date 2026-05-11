@@ -35,7 +35,8 @@ struct RoomDetailView: View {
                         roomVolumeState: model.roomVolumeState,
                         mutatingRoomVolumeIDs: model.mutatingRoomVolumeIDs,
                         operationErrorDetail: model.roomVolumeOperationErrorDetail,
-                        isEnabled: model.hasManualSonosHost,
+                        isTargetEnabled: model.canControlSonosPlayback,
+                        isRoomEnabled: model.hasManualSonosHost,
                         refreshAction: refreshRoomVolumes,
                         setTargetVolume: setTargetVolume,
                         toggleTargetMute: toggleTargetMute,
@@ -119,11 +120,11 @@ struct RoomDetailView: View {
     }
 
     private func setTargetVolume(_ level: Int) async -> Bool {
-        await model.setManualSonosVolume(to: level)
+        await model.setSonosVolume(to: level)
     }
 
     private func toggleTargetMute() async {
-        await model.toggleManualSonosMute()
+        await model.toggleSonosMute()
         await model.refreshRoomVolumes(showLoading: false)
     }
 

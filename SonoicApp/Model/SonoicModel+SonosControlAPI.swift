@@ -7,6 +7,8 @@ extension SonoicModel {
     private struct SonosControlAPICommandContext {
         var householdID: String?
         var groupID: String
+        var playerID: String?
+        var coordinatorPlayerID: String?
         var accessToken: String
     }
 
@@ -33,8 +35,7 @@ extension SonoicModel {
             return nil
         }
 
-        return activeSonosControlAPICommandTarget()?.groupID
-            ?? sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed
+        return activeSonosControlAPICommandTarget(requiresActiveTargetMatch: true)?.groupID
     }
 
     func applyVerifiedSonosControlAPICloudSnapshot(_ snapshot: SonosControlAPICloudSnapshot) {
@@ -75,7 +76,7 @@ extension SonoicModel {
     }
 
     func playSonosControlAPIPlaybackIfAvailable() async -> Bool {
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true) else {
             return false
         }
 
@@ -101,7 +102,7 @@ extension SonoicModel {
     }
 
     func pauseSonosControlAPIPlaybackIfAvailable() async -> Bool {
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true) else {
             return false
         }
 
@@ -129,7 +130,7 @@ extension SonoicModel {
     }
 
     func skipToNextSonosControlAPITrackIfAvailable() async -> Bool {
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true) else {
             return false
         }
 
@@ -151,7 +152,7 @@ extension SonoicModel {
     }
 
     func skipToPreviousSonosControlAPITrackIfAvailable() async -> Bool {
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true) else {
             return false
         }
 
@@ -173,7 +174,7 @@ extension SonoicModel {
     }
 
     func seekSonosControlAPIPlaybackIfAvailable(to timeInterval: TimeInterval) async -> Bool {
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true) else {
             return false
         }
 
@@ -238,6 +239,115 @@ extension SonoicModel {
         nowPlaying = previousNowPlaying
         nowPlayingObservedAt = previousObservedAt
         return false
+    }
+
+    func toggleSonosControlAPIMuteIfAvailable() async -> Bool {
+        guard let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true) else {
+            return false
+        }
+
+        let desiredMute = !externalVolume.isMuted
+        let previousVolume = externalVolume
+        let targetKind = activeTarget.kind
+        let playerID = activeSonosControlAPIPlayerID(context: context)
+        externalVolume.isMuted = desiredMute
+
+        let didMute = await performSonosControlAPIVolumeCommand(
+            description: desiredMute ? "Cloud mute" : "Cloud unmute"
+        ) {
+            if targetKind == .group {
+                try await sonosControlAPIClient.setGroupMute(
+                    groupID: context.groupID,
+                    muted: desiredMute,
+                    accessToken: context.accessToken
+                )
+            } else if let playerID {
+                try await sonosControlAPIClient.setPlayerMute(
+                    playerID: playerID,
+                    muted: desiredMute,
+                    accessToken: context.accessToken
+                )
+            } else {
+                throw SonosControlAPITransport.TransportError.invalidResponse
+            }
+        }
+
+        if !didMute {
+            externalVolume = previousVolume
+        }
+
+        return didMute
+    }
+
+    func setSonosControlAPIVolumeIfAvailable(to level: Int) async -> Bool {
+        guard sonosControlAPICommandContext(requiresActiveTargetMatch: true) != nil else {
+            return false
+        }
+
+        let boundedLevel = min(max(level, 0), 100)
+        let preflightVolume = externalVolume
+        externalVolume.level = boundedLevel
+        pendingSonosControlAPIVolumeLevel = boundedLevel
+
+        guard !isSonosControlAPIVolumeCommandInFlight else {
+            return true
+        }
+
+        isSonosControlAPIVolumeCommandInFlight = true
+        defer {
+            isSonosControlAPIVolumeCommandInFlight = false
+        }
+
+        var latestRequestSucceeded = true
+        var confirmedVolume = preflightVolume
+
+        while let nextLevel = pendingSonosControlAPIVolumeLevel {
+            pendingSonosControlAPIVolumeLevel = nil
+            let previousVolume = confirmedVolume
+            externalVolume.level = nextLevel
+
+            guard let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true) else {
+                latestRequestSucceeded = false
+                if pendingSonosControlAPIVolumeLevel == nil {
+                    externalVolume = previousVolume
+                }
+                continue
+            }
+
+            let targetKind = activeTarget.kind
+            let playerID = activeSonosControlAPIPlayerID(context: context)
+            let didSetVolume = await performSonosControlAPIVolumeCommand(
+                description: "Cloud volume"
+            ) {
+                if targetKind == .group {
+                    try await sonosControlAPIClient.setGroupVolume(
+                        groupID: context.groupID,
+                        volume: nextLevel,
+                        accessToken: context.accessToken
+                    )
+                } else if let playerID {
+                    try await sonosControlAPIClient.setPlayerVolume(
+                        playerID: playerID,
+                        volume: nextLevel,
+                        accessToken: context.accessToken
+                    )
+                } else {
+                    throw SonosControlAPITransport.TransportError.invalidResponse
+                }
+            }
+
+            if didSetVolume {
+                confirmedVolume.level = nextLevel
+                latestRequestSucceeded = true
+            } else {
+                latestRequestSucceeded = false
+                if pendingSonosControlAPIVolumeLevel == nil {
+                    externalVolume = previousVolume
+                }
+            }
+        }
+
+        return latestRequestSucceeded
     }
 
     func playSonosControlAPIFavoriteIfAvailable(_ favorite: SonosFavoriteItem) async -> Bool {
@@ -381,6 +491,16 @@ extension SonoicModel {
         return nil
     }
 
+    private func activeSonosControlAPIPlayerID(context: SonosControlAPICommandContext) -> String? {
+        if activeTarget.kind != .group,
+           activeTarget.id.hasPrefix("RINCON_")
+        {
+            return activeTarget.id
+        }
+
+        return context.playerID ?? context.coordinatorPlayerID
+    }
+
     private func hasMatchedSonosControlAPICloudContent(
         _ favorite: SonosFavoriteItem,
         snapshot: SonosControlAPICloudSnapshot,
@@ -471,6 +591,8 @@ extension SonoicModel {
             return SonosControlAPICommandContext(
                 householdID: householdID,
                 groupID: groupID,
+                playerID: commandTarget?.playerID,
+                coordinatorPlayerID: commandTarget?.coordinatorPlayerID,
                 accessToken: tokenSet.accessToken
             )
         } catch {
@@ -655,6 +777,24 @@ extension SonoicModel {
             }
             manualHostRefreshStatus = .failed(error.localizedDescription)
             startManualHostRefreshLoopIfPossible()
+            return false
+        }
+    }
+
+    private func performSonosControlAPIVolumeCommand(
+        description: String,
+        _ action: () async throws -> Void
+    ) async -> Bool {
+        do {
+            try await action()
+            recordSonosControlAPICommand(description)
+            return true
+        } catch {
+            recordSonosControlAPIError(error)
+            if isSonosControlAPIAuthorizationFailure(error) {
+                sonosControlAPIState.authorizationStatus = .expired
+                sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
+            }
             return false
         }
     }

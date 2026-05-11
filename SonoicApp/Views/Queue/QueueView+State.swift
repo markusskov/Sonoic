@@ -42,7 +42,7 @@ extension QueueView {
             return
         }
 
-        guard await model.playManualSonosQueueItem(at: position) else {
+        guard await model.playLocalSonosQueueItem(at: position) else {
             return
         }
 

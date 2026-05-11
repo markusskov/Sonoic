@@ -63,6 +63,8 @@ extension SonoicModel {
             throw SonoicSourceActionError.playbackPayloadUnavailable
         }
 
+        // Direct source payload starts still use the local Sonos content bridge
+        // until Sonoic owns a Cloud Queue API for arbitrary service items.
         return await playManualSonosPayload(payload)
     }
 
@@ -77,10 +79,11 @@ extension SonoicModel {
             "playlistQueue start parent='\(parentItem.title)' kind=\(parentItem.kind.rawValue) origin=\(parentItem.origin.rawValue) service=\(parentItem.service.name) trackCount=\(trackItems.count) startIndex=\(String(describing: startIndex)) shuffled=\(shuffled)"
         )
 
+        let sourceIndex = startIndex ?? 0
         if !shuffled,
+           sourceIndex == 0,
            let favorite = sonosFavoriteBackedPlaylist(for: parentItem, log: true)
         {
-            let sourceIndex = startIndex ?? 0
             guard sourceIndex >= 0,
                   startIndex == nil || sourceIndex < trackItems.count
             else {
@@ -93,40 +96,26 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "playlistQueue favoritePath loading favorite='\(favorite.title)' favoriteID=\(sonoicPlaybackDebugID(favorite.id)) sourceIndex=\(sourceIndex)"
             )
-            guard await playManualSonosFavorite(favorite) else {
+            if await playSonosFavorite(favorite) {
+                recordRecentSourceItem(parentItem, replayPayload: sourcePlaylistFallbackPayload(for: parentItem))
+                sonoicPlaybackDebugLog(
+                    "playlistQueue favoritePath success parent='\(parentItem.title)'"
+                )
+                return true
+            } else {
                 sonoicPlaybackDebugLog(
                     "playlistQueue favoritePath favoriteLoadFailed favorite='\(favorite.title)' fallingBackToGeneratedPlan=true"
                 )
-                return await playGeneratedSourcePlaylistQueue(
-                    parentItem: parentItem,
-                    trackItems: trackItems,
-                    startingAtIndex: startIndex,
-                    shuffled: shuffled
-                )
             }
+        }
 
-            let startingTrackNumber = sourceIndex + 1
-            if startingTrackNumber > 1 {
-                sonoicPlaybackDebugLog(
-                    "playlistQueue favoritePath seekingToTrack=\(startingTrackNumber)"
-                )
-                guard await playManualSonosQueueItem(at: startingTrackNumber) else {
-                    sonoicPlaybackDebugLog(
-                        "playlistQueue favoritePath seekFailed track=\(startingTrackNumber) fallingBackToGeneratedPlan=true"
-                    )
-                    return await playGeneratedSourcePlaylistQueue(
-                        parentItem: parentItem,
-                        trackItems: trackItems,
-                        startingAtIndex: startIndex,
-                        shuffled: shuffled
-                    )
-                }
-            }
-            recordRecentSourceItem(parentItem, replayPayload: sourcePlaylistFallbackPayload(for: parentItem))
+        if !shuffled,
+           sourceIndex > 0,
+           sonosFavoriteBackedPlaylist(for: parentItem) != nil
+        {
             sonoicPlaybackDebugLog(
-                "playlistQueue favoritePath success parent='\(parentItem.title)' track=\(startingTrackNumber)"
+                "playlistQueue favoritePath specificTrackUsesGeneratedQueueUntilCloudQueueAPI parent='\(parentItem.title)' sourceIndex=\(sourceIndex)"
             )
-            return true
         }
 
         return await playGeneratedSourcePlaylistQueue(
@@ -161,6 +150,9 @@ extension SonoicModel {
         sonoicPlaybackDebugLog(
             "playlistQueue generatedPlan start payloadCount=\(plan.payloads.count) startingTrack=\(startingTrackNumber)"
         )
+        // Generated source queues are an explicit local bridge for now. They
+        // should move to Cloud Queue API once the worker hosts the required
+        // context/itemWindow/version endpoints.
         let didStartPlayback = await playManualSonosQueuePayloads(
             plan.payloads,
             startingTrackNumber: startingTrackNumber,
