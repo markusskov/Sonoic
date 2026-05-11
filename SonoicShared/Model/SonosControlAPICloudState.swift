@@ -260,9 +260,21 @@ typealias SonosControlAPIGroupSnapshot = SonosControlAPIGroupsResponse
 
 private extension String {
     nonisolated var sonoicControlAPIMatchKey: String {
-        folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+        sonoicLatinSearchFolded
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+    }
+
+    nonisolated var sonoicLatinSearchFolded: String {
+        let directFolded = replacingOccurrences(of: "Æ", with: "AE")
+            .replacingOccurrences(of: "Ø", with: "O")
+            .replacingOccurrences(of: "Å", with: "A")
+            .replacingOccurrences(of: "æ", with: "ae")
+            .replacingOccurrences(of: "ø", with: "o")
+            .replacingOccurrences(of: "å", with: "a")
+
+        return directFolded.applyingTransform(.toLatin, reverse: false) ?? directFolded
     }
 }

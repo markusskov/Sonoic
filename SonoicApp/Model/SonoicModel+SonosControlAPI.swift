@@ -2,7 +2,8 @@ import Foundation
 
 extension SonoicModel {
     private static let sonosControlAPITransportSyncDelay: Duration = .milliseconds(350)
-    private static let sonosControlAPISeekSyncDelay: Duration = .milliseconds(750)
+    private static let sonosControlAPISeekPollDelay: Duration = .milliseconds(350)
+    private static let sonosControlAPISeekPollAttempts = 5
 
     private struct SonosControlAPICommandContext {
         var householdID: String?
@@ -181,10 +182,7 @@ extension SonoicModel {
             return false
         }
 
-        let previousNowPlaying = nowPlaying
-        let previousObservedAt = nowPlayingObservedAt
-        let boundedElapsedTime = markLocalSeek(to: timeInterval)
-        beginManualSeekConfirmation(to: boundedElapsedTime)
+        let boundedElapsedTime = max(timeInterval, 0)
         recordSeekDiagnostics(
             status: .pending,
             host: "Sonos Control API",
@@ -194,6 +192,10 @@ extension SonoicModel {
         )
 
         var observedElapsedTime: TimeInterval?
+        var observedPlaybackState: SonosControlAPIPlaybackState?
+        var didConfirmSeek = false
+        var pollingErrorDetail: String?
+        let requestedAt = Date()
         let didSeek = await performSonosControlAPITransportCommand(
             description: "Cloud seek",
             refreshQueueAfterSuccess: false,
@@ -203,26 +205,51 @@ extension SonoicModel {
                 groupID: context.groupID,
                 accessToken: context.accessToken
             )
+            if status.availablePlaybackActions?.canSeek == false {
+                throw SonosControlAPISeekFailure.unsupported
+            }
             try await sonosControlAPIClient.seek(
                 groupID: context.groupID,
                 positionMillis: Int((boundedElapsedTime * 1_000).rounded()),
                 itemID: status.itemId,
                 accessToken: context.accessToken
             )
-            try await Task.sleep(for: Self.sonosControlAPISeekSyncDelay)
-            observedElapsedTime = try? await sonosControlAPIClient.playbackStatus(
-                groupID: context.groupID,
-                accessToken: context.accessToken
-            ).positionMillis.map { TimeInterval($0) / 1_000 }
+            for _ in 0 ..< Self.sonosControlAPISeekPollAttempts {
+                try await Task.sleep(for: Self.sonosControlAPISeekPollDelay)
+                let observedStatus: SonosControlAPIPlaybackStatus
+                do {
+                    observedStatus = try await sonosControlAPIClient.playbackStatus(
+                        groupID: context.groupID,
+                        accessToken: context.accessToken
+                    )
+                } catch {
+                    pollingErrorDetail = error.localizedDescription
+                    return
+                }
+                observedPlaybackState = observedStatus.playbackState
+                observedElapsedTime = observedStatus.positionMillis.map { TimeInterval($0) / 1_000 }
+                if SonosSeekConfirmation.isConfirmed(
+                    targetElapsedTime: boundedElapsedTime,
+                    observedElapsedTime: observedElapsedTime,
+                    requestedAt: requestedAt,
+                    observedAt: .now,
+                    playbackState: observedPlaybackState
+                ) {
+                    didConfirmSeek = true
+                    return
+                }
+            }
         }
 
         if didSeek {
             recordSeekDiagnostics(
-                status: .succeeded,
+                status: didConfirmSeek ? .succeeded : .pending,
                 host: "Sonos Control API",
                 target: boundedElapsedTime,
                 observed: observedElapsedTime,
-                errorDetail: nil
+                errorDetail: didConfirmSeek ? nil : pollingErrorDetail.map {
+                    "Cloud accepted; status polling failed: \($0)"
+                } ?? "Cloud accepted; awaiting Sonos position update."
             )
             return true
         }
@@ -231,12 +258,9 @@ extension SonoicModel {
             status: .failed,
             host: "Sonos Control API",
             target: boundedElapsedTime,
-            observed: nil,
+            observed: observedElapsedTime,
             errorDetail: sonosControlAPIState.lastErrorDetail
         )
-        clearManualSeekConfirmation()
-        nowPlaying = previousNowPlaying
-        nowPlayingObservedAt = previousObservedAt
         return false
     }
 
@@ -665,5 +689,16 @@ extension SonoicModel {
         }
 
         return transportError.isAuthorizationFailure
+    }
+}
+
+private enum SonosControlAPISeekFailure: LocalizedError {
+    case unsupported
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupported:
+            "Sonos reported that the current item cannot seek."
+        }
     }
 }

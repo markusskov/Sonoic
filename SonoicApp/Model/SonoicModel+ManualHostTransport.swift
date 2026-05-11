@@ -94,11 +94,7 @@ extension SonoicModel {
     }
 
     func seekManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
-        if await seekSonosControlAPIPlaybackIfAvailable(to: timeInterval) {
-            return true
-        }
-
-        guard hasManualSonosHost else {
+        guard !isManualTransportCommandInFlight else {
             return false
         }
 
@@ -106,7 +102,20 @@ extension SonoicModel {
         let previousObservedAt = nowPlayingObservedAt
         let boundedElapsedTime = markLocalSeek(to: timeInterval)
         beginManualSeekConfirmation(to: boundedElapsedTime)
+
+        if await seekSonosControlAPIPlaybackIfAvailable(to: boundedElapsedTime) {
+            return true
+        }
+
+        guard hasManualSonosHost else {
+            clearManualSeekConfirmation()
+            nowPlaying = previousNowPlaying
+            nowPlayingObservedAt = previousObservedAt
+            return false
+        }
+
         let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+        beginManualSeekConfirmation(to: boundedElapsedTime)
         recordSeekDiagnostics(
             status: .pending,
             host: playbackHost,
@@ -117,7 +126,7 @@ extension SonoicModel {
 
         let didSeek = await performManualTransportCommand(syncDelay: Self.manualSeekSyncDelay) {
             do {
-                try await avTransportClient.seek(host: playbackHost, timeInterval: timeInterval)
+                try await avTransportClient.seek(host: playbackHost, timeInterval: boundedElapsedTime)
                 let observed = try? await avTransportClient.fetchSeekPosition(host: playbackHost)?.relativeTime
                 await MainActor.run {
                     self.recordSeekDiagnostics(

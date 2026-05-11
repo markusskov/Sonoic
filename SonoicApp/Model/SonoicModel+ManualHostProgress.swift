@@ -2,7 +2,7 @@ import Foundation
 
 extension SonoicModel {
     private static let manualPlayConfirmationRetryDelay: Duration = .milliseconds(300)
-    private static let manualSeekConfirmationGraceInterval: TimeInterval = 3
+    private static let manualSeekConfirmationGraceInterval: TimeInterval = 6
 
     func markLocalPlaybackState(_ playbackState: SonosNowPlayingSnapshot.PlaybackState) {
         guard nowPlaying.playbackState != playbackState else {
