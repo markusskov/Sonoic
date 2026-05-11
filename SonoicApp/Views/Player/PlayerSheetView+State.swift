@@ -55,7 +55,7 @@ extension PlayerSheetView {
 
     func seek(to timeInterval: TimeInterval) {
         Task {
-            _ = await model.seekManualSonosPlayback(to: timeInterval)
+            _ = await model.seekSonosPlayback(to: timeInterval)
         }
     }
 
@@ -83,7 +83,7 @@ extension PlayerSheetView {
             }
 
             Task { @MainActor in
-                _ = await model.setManualSonosVolume(to: targetLevel)
+                _ = await model.setSonosVolume(to: targetLevel)
             }
         }
     }
@@ -94,25 +94,25 @@ extension PlayerSheetView {
 
         let targetLevel = Int(volumeLevel.rounded())
         Task { @MainActor in
-            _ = await model.setManualSonosVolume(to: targetLevel)
+            _ = await model.setSonosVolume(to: targetLevel)
         }
     }
 
     func skipToPreviousTrack() async {
-        _ = await model.skipToPreviousManualSonosTrack()
+        _ = await model.skipToPreviousSonosTrack()
     }
 
     func togglePlayback() async {
-        await model.toggleManualSonosPlayback()
+        await model.toggleSonosPlayback()
     }
 
     func skipToNextTrack() async {
-        _ = await model.skipToNextManualSonosTrack()
+        _ = await model.skipToNextSonosTrack()
     }
 
     func toggleMute() {
         Task {
-            await model.toggleManualSonosMute()
+            await model.toggleSonosMute()
         }
     }
 

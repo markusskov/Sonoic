@@ -126,6 +126,74 @@ struct SonosControlAPIClient {
         )
     }
 
+    func groupVolume(
+        groupID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIVolume {
+        try await transport.get(
+            "/groups/\(groupID)/groupVolume",
+            accessToken: accessToken
+        )
+    }
+
+    func setGroupVolume(
+        groupID: String,
+        volume: Int,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/groupVolume",
+            accessToken: accessToken,
+            body: SonosControlAPISetVolumeRequest(volume: min(max(volume, 0), 100))
+        )
+    }
+
+    func setGroupMute(
+        groupID: String,
+        muted: Bool,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/groupVolume/mute",
+            accessToken: accessToken,
+            body: SonosControlAPISetMuteRequest(muted: muted)
+        )
+    }
+
+    func playerVolume(
+        playerID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIVolume {
+        try await transport.get(
+            "/players/\(playerID)/playerVolume",
+            accessToken: accessToken
+        )
+    }
+
+    func setPlayerVolume(
+        playerID: String,
+        volume: Int,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/players/\(playerID)/playerVolume",
+            accessToken: accessToken,
+            body: SonosControlAPISetVolumeRequest(volume: min(max(volume, 0), 100))
+        )
+    }
+
+    func setPlayerMute(
+        playerID: String,
+        muted: Bool,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/players/\(playerID)/playerVolume/mute",
+            accessToken: accessToken,
+            body: SonosControlAPISetMuteRequest(muted: muted)
+        )
+    }
+
     func play(groupID: String, accessToken: String) async throws {
         try await transport.post(
             "/groups/\(groupID)/playback/play",

@@ -40,7 +40,7 @@ struct PlayerSheetView: View {
                         PlayerProgressSection(
                             nowPlaying: model.nowPlaying,
                             observedAt: model.nowPlayingObservedAt,
-                            isEnabled: model.hasManualSonosHost && model.nowPlaying.canSeek,
+                            isEnabled: model.canControlSonosPlayback && model.nowPlaying.canSeek,
                             showsTimeLabels: true,
                             showsThumb: false,
                             seek: { timeInterval in
@@ -57,14 +57,15 @@ struct PlayerSheetView: View {
 
                         PlayerFullscreenVolumeBar(
                             volume: volumeBinding,
-                            isEnabled: model.hasManualSonosHost,
+                            isEnabled: model.canControlSonosPlayback,
                             volumeEditingChanged: handleVolumeEditingChanged
                         )
 
                         PlayerFullscreenSonosActions(
                             activeTargetSystemImage: model.activeTarget.kind.systemImage,
                             muteButtonSystemImage: muteButtonSystemImage,
-                            isEnabled: model.hasManualSonosHost,
+                            isRoomsEnabled: model.hasManualSonosHost,
+                            isMuteEnabled: model.canControlSonosPlayback,
                             openRooms: openRooms,
                             toggleMute: toggleMute,
                             openQueue: openQueue

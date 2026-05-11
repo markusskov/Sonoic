@@ -74,7 +74,7 @@ extension SonoicModel {
             nowPlaying: nowPlaying,
             observedAt: nowPlayingObservedAt,
             activeTargetName: activeTarget.name,
-            canControlPlayback: hasManualSonosHost,
+            canControlPlayback: canControlSonosPlayback,
             canAdvanceProgress: canAdvanceProgress
         )
     }
@@ -206,35 +206,35 @@ extension SonoicModel {
                     return false
                 }
 
-                return await self.playManualSonosPlayback()
+                return await self.playSonosPlayback()
             },
             pause: { [weak self] in
                 guard let self else {
                     return false
                 }
 
-                return await self.pauseManualSonosPlayback()
+                return await self.pauseSonosPlayback()
             },
             next: { [weak self] in
                 guard let self else {
                     return false
                 }
 
-                return await self.skipToNextManualSonosTrack()
+                return await self.skipToNextSonosTrack()
             },
             previous: { [weak self] in
                 guard let self else {
                     return false
                 }
 
-                return await self.skipToPreviousManualSonosTrack()
+                return await self.skipToPreviousSonosTrack()
             },
             seek: { [weak self] timeInterval in
                 guard let self else {
                     return false
                 }
 
-                return await self.seekManualSonosPlayback(to: timeInterval)
+                return await self.seekSonosPlayback(to: timeInterval)
             }
         )
     }

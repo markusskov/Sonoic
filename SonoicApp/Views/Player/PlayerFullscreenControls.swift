@@ -70,7 +70,8 @@ struct PlayerFullscreenVolumeBar: View {
 struct PlayerFullscreenSonosActions: View {
     let activeTargetSystemImage: String
     let muteButtonSystemImage: String
-    let isEnabled: Bool
+    let isRoomsEnabled: Bool
+    let isMuteEnabled: Bool
     let openRooms: () -> Void
     let toggleMute: () -> Void
     let openQueue: () -> Void
@@ -80,7 +81,7 @@ struct PlayerFullscreenSonosActions: View {
             PlayerFullscreenIconButton(
                 title: "Rooms",
                 systemImage: activeTargetSystemImage,
-                isEnabled: isEnabled,
+                isEnabled: isRoomsEnabled,
                 action: openRooms
             )
 
@@ -89,7 +90,7 @@ struct PlayerFullscreenSonosActions: View {
             PlayerFullscreenIconButton(
                 title: "Mute",
                 systemImage: muteButtonSystemImage,
-                isEnabled: isEnabled,
+                isEnabled: isMuteEnabled,
                 action: toggleMute
             )
 

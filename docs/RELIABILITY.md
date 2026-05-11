@@ -1,14 +1,18 @@
 # Reliability
 
-Sonoic controls real local Sonos devices, so reliability means the app tells the truth about what it knows.
+Sonoic controls real Sonos devices, so reliability means the app tells the truth about what it knows and which control plane owns the command.
 
 ## Core Reliability Rules
 
 - Failed refreshes must not look successful.
 - Stale now-playing, queue, room, or topology state must remain distinguishable from fresh state.
-- Discovery should remain the primary setup path, with manual host entry kept as an honest fallback.
+- Sonos Cloud should own normal playback/control state when connected.
+- Discovery and manual host entry should remain honest local tools, not hidden normal playback fallbacks.
 - Widget and outside-app state should prefer honest unavailable state over optimistic old data.
+- Failed Cloud commands must not silently become LAN commands unless the user is in an explicit local/manual mode.
 - Debug logs are useful locally but should not become noisy permanent output.
+
+See [sonos-control-boundary.md](sonos-control-boundary.md) for the current Cloud-owned and Local Tools-owned surfaces.
 
 ## Manual Verification
 

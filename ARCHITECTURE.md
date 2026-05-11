@@ -39,6 +39,20 @@ Source browsing stays inside `SonoicApp` because it combines app navigation, Mus
 - Artists, albums, and playlists route to one shared source detail screen regardless of whether the entry point is Search, Home, Recently Played, Favorites, a row menu, or the player.
 - Songs do not have a detail route. Song rows play only when the adapter can provide a trustworthy Sonos-owned payload.
 
+## Sonos Control Plane
+
+Sonoic's normal control model is Cloud-first:
+
+- Sonos Cloud owns account, household, group, player, and normal playback identity.
+- Normal play, pause, next, previous, seek, favorites, playlists, volume, mute, now-playing, Lock Screen, and Control Center paths should route through Cloud whenever the capability exists.
+- LAN/SOAP is an explicit local tools layer, not a silent fallback for normal playback.
+- Local tools own same-network tuning and inspection: EQ-like controls, Sub level, dialog/speech enhancement, night sound, TV diagnostics, bonded accessory topology, local host troubleshooting, and emergency/manual local mode if we keep one.
+- UI should show Cloud unavailable when Cloud-owned commands cannot run. It should not quietly change transports in a way the user cannot understand.
+
+Cloud identity should flow through `householdId`, `groupId`, and `playerId`. Local host/RINCON mapping is an accessory for discovery and local tools, not the primary app target identity.
+
+The working boundary between Cloud and Local Tools lives in [docs/sonos-control-boundary.md](docs/sonos-control-boundary.md).
+
 ## Sonoic Plus
 
 Sonoic Plus is an app-only purchase and personalization layer. It must not gate core Sonos control: discovery, playback, queue, rooms, Lock Screen, Control Center, and the default Home experience stay free.

@@ -87,11 +87,11 @@ struct HomeView: View {
     }
 
     private func playFavorite(_ favorite: SonosFavoriteItem) async {
-        _ = await model.playManualSonosFavorite(favorite)
+        _ = await model.playSonosFavorite(favorite)
     }
 
     private func togglePlayback() async {
-        await model.toggleManualSonosPlayback()
+        await model.toggleSonosPlayback()
     }
 
     private func openRooms() {

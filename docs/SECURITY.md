@@ -1,11 +1,12 @@
 # Security And Privacy
 
-Sonoic is local-first, but it still handles network access, shared app state, artwork, and Apple platform identifiers. Keep those boundaries explicit.
+Sonoic is Cloud-first for normal Sonos control, with a narrow same-network local-tools layer for tuning, diagnostics, and capabilities that Cloud does not cover yet. It still handles network access, shared app state, artwork, and Apple platform identifiers, so keep those boundaries explicit.
 
 ## Current Boundaries
 
-- Sonos control currently happens over the local network.
-- Manual host configuration identifies a player on the user's LAN.
+- Normal Sonos playback/control should use the Sonos Control API when the user is connected.
+- Same-network LAN access is reserved for local tools such as discovery, tuning, diagnostics, and explicit manual troubleshooting.
+- Manual host configuration identifies a player on the user's LAN and must not become a hidden playback fallback.
 - Shared state and artwork are stored through the App Group path used by the app and widget.
 - Bundle identifiers, App Group identifiers, signing, and entitlements are developer-account-specific.
 

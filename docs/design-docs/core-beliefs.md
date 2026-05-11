@@ -4,7 +4,8 @@ Sonoic should make everyday Sonos control feel fast, legible, and dependable.
 
 ## Product Beliefs
 
-- Local-first Sonos control is the center of the product.
+- Cloud-owned Sonos control is the center of the product.
+- Same-network local access is an explicit tools layer, not a hidden fallback.
 - The active room or group matters more than broad browsing.
 - A small honest control surface is better than a wide unreliable one.
 - Stale or unavailable state should be visible instead of disguised as fresh state.

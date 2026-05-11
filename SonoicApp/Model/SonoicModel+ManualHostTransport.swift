@@ -14,10 +14,6 @@ extension SonoicModel {
     }
 
     func playManualSonosPlayback() async -> Bool {
-        if await playSonosControlAPIPlaybackIfAvailable() {
-            return true
-        }
-
         guard hasManualSonosHost else {
             return false
         }
@@ -30,10 +26,6 @@ extension SonoicModel {
     }
 
     func pauseManualSonosPlayback() async -> Bool {
-        if await pauseSonosControlAPIPlaybackIfAvailable() {
-            return true
-        }
-
         guard hasManualSonosHost else {
             return false
         }
@@ -48,10 +40,6 @@ extension SonoicModel {
     }
 
     func skipToNextManualSonosTrack() async -> Bool {
-        if await skipToNextSonosControlAPITrackIfAvailable() {
-            return true
-        }
-
         guard hasManualSonosHost else {
             return false
         }
@@ -71,10 +59,6 @@ extension SonoicModel {
     }
 
     func skipToPreviousManualSonosTrack() async -> Bool {
-        if await skipToPreviousSonosControlAPITrackIfAvailable() {
-            return true
-        }
-
         guard hasManualSonosHost else {
             return false
         }
@@ -94,10 +78,6 @@ extension SonoicModel {
     }
 
     func seekManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
-        if await seekSonosControlAPIPlaybackIfAvailable(to: timeInterval) {
-            return true
-        }
-
         guard hasManualSonosHost else {
             return false
         }
@@ -205,18 +185,13 @@ extension SonoicModel {
         sonoicPlaybackDebugLog(
             "manualFavorite start title='\(favorite.title)' kind=\(favorite.kind.rawValue) isPlaylistLike=\(favorite.isPlaylistLike)"
         )
-        if await playSonosControlAPIFavoriteIfAvailable(favorite) {
-            sonoicPlaybackDebugLog("manualFavorite cloudSuccess title='\(favorite.title)'")
-            return true
-        }
-
         guard let payload = favorite.playablePayload else {
             sonoicPlaybackDebugLog("manualFavorite noLANPayload title='\(favorite.title)'")
             return false
         }
 
         let didStart = await playManualSonosPayload(payload)
-        sonoicPlaybackDebugLog("manualFavorite lanFallbackResult=\(didStart) title='\(favorite.title)'")
+        sonoicPlaybackDebugLog("manualFavorite localResult=\(didStart) title='\(favorite.title)'")
         return didStart
     }
 

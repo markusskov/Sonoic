@@ -181,7 +181,7 @@ extension SonoicModel {
             return false
         }
 
-        return await playManualSonosFavorite(favorite)
+        return await playSonosFavorite(favorite)
     }
 
     private func upsertRecentPlay(_ recentPlay: SonoicRecentPlayItem) {

@@ -39,6 +39,8 @@ final class SonoicModel {
     @ObservationIgnored var isManualTransportCommandInFlight = false
     @ObservationIgnored var isManualVolumeCommandInFlight = false
     @ObservationIgnored var pendingManualVolumeLevel: Int?
+    @ObservationIgnored var isSonosControlAPIVolumeCommandInFlight = false
+    @ObservationIgnored var pendingSonosControlAPIVolumeLevel: Int?
     @ObservationIgnored var pendingRoomVolumeLevels: [String: Int] = [:]
     @ObservationIgnored var isRoomVolumeRefreshInFlight = false
     @ObservationIgnored var isHomeFavoritesRefreshing = false

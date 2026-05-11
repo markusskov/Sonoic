@@ -1,5 +1,7 @@
 # Sonos Control API OAuth Foundation
 
+> Status: Superseded by the Cloud Control Spine plan. This file is retained as historical context for the OAuth foundation slice; "LAN untouched" statements below describe the narrow PR boundary at the time, not the current control-plane decision.
+
 ## Goal
 Prepare Sonoic for the official Sonos Control API without moving playback away from the current LAN path in this pass.
 
