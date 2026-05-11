@@ -40,11 +40,12 @@ struct PlayerSheetView: View {
                         PlayerProgressSection(
                             nowPlaying: model.nowPlaying,
                             observedAt: model.nowPlayingObservedAt,
+                            contentIdentity: progressContentIdentity,
                             isEnabled: model.hasManualSonosHost && model.nowPlaying.canSeek,
                             showsTimeLabels: true,
                             showsThumb: false,
                             seek: { timeInterval in
-                                seek(to: timeInterval)
+                                await seek(to: timeInterval)
                             }
                         )
 

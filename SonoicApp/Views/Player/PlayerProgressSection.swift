@@ -3,14 +3,16 @@ import SwiftUI
 struct PlayerProgressSection: View {
     let nowPlaying: SonosNowPlayingSnapshot
     let observedAt: Date
+    let contentIdentity: String
     let isEnabled: Bool
     var showsTimeLabels = true
     var showsThumb = true
-    let seek: (TimeInterval) -> Void
+    let seek: (TimeInterval) async -> Bool
 
     @State private var isScrubbing = false
     @State private var scrubElapsedSeconds = 0.0
     @State private var pendingSeekTarget: PendingSeekTarget?
+    @State private var pendingSeekTask: Task<Void, Never>?
     @State private var pendingSeekTimeoutTask: Task<Void, Never>?
 
     var body: some View {
@@ -63,7 +65,11 @@ struct PlayerProgressSection: View {
 
             resetScrubbingState()
         }
-        .onChange(of: nowPlaying.title, initial: false) { _, _ in
+        .onChange(of: contentIdentity, initial: false) { _, _ in
+            guard !isScrubbing else {
+                return
+            }
+
             resetScrubbingState()
         }
         .onChange(of: nowPlaying.playbackState, initial: false) { _, _ in
@@ -118,15 +124,21 @@ struct PlayerProgressSection: View {
         pendingSeekTarget = PendingSeekTarget(
             elapsedSeconds: targetElapsedSeconds,
             requestedAt: .now,
-            playbackState: nowPlaying.playbackState
+            playbackState: nowPlaying.playbackState,
+            contentIdentity: contentIdentity
         )
         schedulePendingSeekTimeout()
         isScrubbing = false
-        seek(targetElapsedSeconds)
+        scheduleSeek(targetElapsedSeconds, pendingTarget: pendingSeekTarget)
     }
 
     private func shouldKeepPendingSeek(at date: Date) -> Bool {
         guard let pendingSeekTarget else {
+            return false
+        }
+
+        if pendingSeekTarget.contentIdentity != contentIdentity {
+            self.pendingSeekTarget = nil
             return false
         }
 
@@ -154,9 +166,11 @@ struct PlayerProgressSection: View {
         }
 
         self.pendingSeekTarget = PendingSeekTarget(
+            id: pendingSeekTarget.id,
             elapsedSeconds: pendingSeekTarget.displayedElapsedSeconds(at: date, duration: durationSeconds),
-            requestedAt: date,
-            playbackState: nowPlaying.playbackState
+            requestedAt: pendingSeekTarget.requestedAt,
+            playbackState: nowPlaying.playbackState,
+            contentIdentity: pendingSeekTarget.contentIdentity
         )
     }
 
@@ -176,6 +190,8 @@ struct PlayerProgressSection: View {
     }
 
     private func resetScrubbingState() {
+        pendingSeekTask?.cancel()
+        pendingSeekTask = nil
         pendingSeekTimeoutTask?.cancel()
         pendingSeekTimeoutTask = nil
         isScrubbing = false
@@ -202,6 +218,26 @@ struct PlayerProgressSection: View {
         }
     }
 
+    private func scheduleSeek(_ elapsedSeconds: TimeInterval, pendingTarget: PendingSeekTarget?) {
+        let pendingTargetID = pendingTarget?.id
+        pendingSeekTask?.cancel()
+        pendingSeekTask = Task { @MainActor in
+            let didSeek = await seek(elapsedSeconds)
+
+            guard !Task.isCancelled,
+                  pendingSeekTarget?.id == pendingTargetID
+            else {
+                return
+            }
+
+            pendingSeekTask = nil
+
+            if !didSeek {
+                resetScrubbingState()
+            }
+        }
+    }
+
     private func formatTime(_ timeInterval: TimeInterval) -> String {
         let totalSeconds = max(0, Int(timeInterval.rounded()))
         let hours = totalSeconds / 3600
@@ -217,9 +253,11 @@ struct PlayerProgressSection: View {
 }
 
 private struct PendingSeekTarget: Equatable {
+    var id = UUID()
     var elapsedSeconds: TimeInterval
     var requestedAt: Date
     var playbackState: SonosNowPlayingSnapshot.PlaybackState
+    var contentIdentity: String
 
     func displayedElapsedSeconds(at date: Date, duration: TimeInterval?) -> TimeInterval {
         var elapsedSeconds = elapsedSeconds
@@ -248,8 +286,9 @@ private struct PendingSeekTarget: Equatable {
             duration: 201
         ),
         observedAt: .now,
+        contentIdentity: "preview",
         isEnabled: true,
-        seek: { _ in }
+        seek: { _ in true }
     )
     .padding()
 }
