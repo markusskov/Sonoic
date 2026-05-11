@@ -96,18 +96,17 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "playlistQueue favoritePath loading favorite='\(favorite.title)' favoriteID=\(sonoicPlaybackDebugID(favorite.id)) sourceIndex=\(sourceIndex)"
             )
-            guard await playSonosFavorite(favorite) else {
+            if await playSonosFavorite(favorite) {
+                recordRecentSourceItem(parentItem, replayPayload: sourcePlaylistFallbackPayload(for: parentItem))
                 sonoicPlaybackDebugLog(
-                    "playlistQueue favoritePath favoriteLoadFailed favorite='\(favorite.title)'"
+                    "playlistQueue favoritePath success parent='\(parentItem.title)'"
                 )
-                return false
+                return true
+            } else {
+                sonoicPlaybackDebugLog(
+                    "playlistQueue favoritePath favoriteLoadFailed favorite='\(favorite.title)' fallingBackToGeneratedPlan=true"
+                )
             }
-
-            recordRecentSourceItem(parentItem, replayPayload: sourcePlaylistFallbackPayload(for: parentItem))
-            sonoicPlaybackDebugLog(
-                "playlistQueue favoritePath success parent='\(parentItem.title)'"
-            )
-            return true
         }
 
         if !shuffled,
