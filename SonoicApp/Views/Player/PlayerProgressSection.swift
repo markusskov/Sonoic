@@ -66,10 +66,6 @@ struct PlayerProgressSection: View {
             resetScrubbingState()
         }
         .onChange(of: contentIdentity, initial: false) { _, _ in
-            guard !isScrubbing else {
-                return
-            }
-
             resetScrubbingState()
         }
         .onChange(of: nowPlaying.playbackState, initial: false) { _, _ in
