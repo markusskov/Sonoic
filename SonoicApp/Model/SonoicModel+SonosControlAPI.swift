@@ -223,7 +223,7 @@ extension SonoicModel {
                 itemID: status.itemId,
                 accessToken: context.accessToken
             )
-            for _ in 0 ..< Self.sonosControlAPISeekPollAttempts {
+            for attempt in 1 ... Self.sonosControlAPISeekPollAttempts {
                 try await Task.sleep(for: Self.sonosControlAPISeekPollDelay)
                 let observedStatus: SonosControlAPIPlaybackStatus
                 do {
@@ -233,10 +233,16 @@ extension SonoicModel {
                     )
                 } catch {
                     pollingErrorDetail = error.localizedDescription
+                    sonoicPlaybackDebugLog(
+                        "cloudSeek pollFailed attempt=\(attempt) target=\(boundedElapsedTime) error='\(error.localizedDescription)'"
+                    )
                     return
                 }
                 observedPlaybackState = observedStatus.playbackState
                 observedElapsedTime = observedStatus.positionMillis.map { TimeInterval($0) / 1_000 }
+                sonoicPlaybackDebugLog(
+                    "cloudSeek poll attempt=\(attempt) target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState)) itemID=\(sonoicPlaybackDebugID(observedStatus.itemId))"
+                )
                 if SonosSeekConfirmation.isConfirmed(
                     targetElapsedTime: boundedElapsedTime,
                     observedElapsedTime: observedElapsedTime,
@@ -253,20 +259,31 @@ extension SonoicModel {
         if didSeek {
             if didConfirmSeek {
                 clearManualSeekConfirmation()
+                sonoicPlaybackDebugLog(
+                    "cloudSeek result=true confirmed=true target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
+                )
+                recordSeekDiagnostics(
+                    status: .succeeded,
+                    host: "Sonos Control API",
+                    target: boundedElapsedTime,
+                    observed: observedElapsedTime,
+                    errorDetail: nil
+                )
+                return true
             }
             sonoicPlaybackDebugLog(
-                "cloudSeek result=true confirmed=\(didConfirmSeek) target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
+                "cloudSeek result=false confirmed=false fallingBackToLocal target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
             )
             recordSeekDiagnostics(
-                status: didConfirmSeek ? .succeeded : .pending,
+                status: .failed,
                 host: "Sonos Control API",
                 target: boundedElapsedTime,
                 observed: observedElapsedTime,
-                errorDetail: didConfirmSeek ? nil : pollingErrorDetail.map {
+                errorDetail: pollingErrorDetail.map {
                     "Cloud accepted; status polling failed: \($0)"
-                } ?? "Cloud accepted; awaiting Sonos position update."
+                } ?? "Cloud accepted; Sonos did not report the requested position."
             )
-            return true
+            return false
         }
 
         clearManualSeekConfirmation()

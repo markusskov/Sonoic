@@ -100,10 +100,8 @@ extension SonoicModel {
 
         let previousNowPlaying = nowPlaying
         let previousObservedAt = nowPlayingObservedAt
-        let boundedElapsedTime = markLocalSeek(to: timeInterval)
-        beginManualSeekConfirmation(to: boundedElapsedTime)
 
-        if await seekSonosControlAPIPlaybackIfAvailable(to: boundedElapsedTime) {
+        if await seekSonosControlAPIPlaybackIfAvailable(to: timeInterval) {
             return true
         }
 
@@ -114,6 +112,7 @@ extension SonoicModel {
             return false
         }
 
+        let boundedElapsedTime = markLocalSeek(to: timeInterval)
         let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
         beginManualSeekConfirmation(to: boundedElapsedTime)
         recordSeekDiagnostics(
