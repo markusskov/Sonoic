@@ -220,7 +220,7 @@ extension SonoicModel {
             try await sonosControlAPIClient.seek(
                 groupID: context.groupID,
                 positionMillis: Int((boundedElapsedTime * 1_000).rounded()),
-                itemID: nil,
+                itemID: status.itemId,
                 accessToken: context.accessToken
             )
             for _ in 0 ..< Self.sonosControlAPISeekPollAttempts {
