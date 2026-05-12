@@ -3,13 +3,17 @@ import SwiftUI
 struct PlayerProgressSection: View {
     let nowPlaying: SonosNowPlayingSnapshot
     let observedAt: Date
+    let contentIdentity: String
     let isEnabled: Bool
     var showsTimeLabels = true
     var showsThumb = true
-    let seek: (TimeInterval) -> Void
+    let seek: (TimeInterval) async -> Bool
 
     @State private var isScrubbing = false
     @State private var scrubElapsedSeconds = 0.0
+    @State private var pendingSeekTarget: PendingSeekTarget?
+    @State private var pendingSeekTask: Task<Void, Never>?
+    @State private var pendingSeekTimeoutTask: Task<Void, Never>?
 
     var body: some View {
         TimelineView(.periodic(from: observedAt, by: 1)) { context in
@@ -18,7 +22,13 @@ struct PlayerProgressSection: View {
                     PlayerScrubber(
                         value: Binding(
                             get: {
-                                isScrubbing ? scrubElapsedSeconds : displayedElapsedSeconds(at: context.date)
+                                if isScrubbing {
+                                    scrubElapsedSeconds
+                                } else if let pendingSeekTarget {
+                                    pendingSeekTarget.displayedElapsedSeconds(at: context.date, duration: durationSeconds)
+                                } else {
+                                    displayedElapsedSeconds(at: context.date)
+                                }
                             },
                             set: { newValue in
                                 scrubElapsedSeconds = newValue
@@ -49,13 +59,23 @@ struct PlayerProgressSection: View {
                 return
             }
 
+            if shouldKeepPendingSeek(at: .now) {
+                return
+            }
+
             resetScrubbingState()
         }
-        .onChange(of: nowPlaying.title, initial: false) { _, _ in
+        .onChange(of: contentIdentity, initial: false) { _, _ in
             resetScrubbingState()
         }
         .onChange(of: nowPlaying.playbackState, initial: false) { _, _ in
             guard !isScrubbing else {
+                return
+            }
+
+            refreshPendingSeekPlaybackState(at: .now)
+
+            if shouldKeepPendingSeek(at: .now) {
                 return
             }
 
@@ -79,7 +99,13 @@ struct PlayerProgressSection: View {
     }
 
     private func elapsedLabelText(at date: Date) -> String {
-        formatTime(isScrubbing ? scrubElapsedSeconds : displayedElapsedSeconds(at: date))
+        if isScrubbing {
+            formatTime(scrubElapsedSeconds)
+        } else if let pendingSeekTarget {
+            formatTime(pendingSeekTarget.displayedElapsedSeconds(at: date, duration: durationSeconds))
+        } else {
+            formatTime(displayedElapsedSeconds(at: date))
+        }
     }
 
     private func handleEditingChanged(_ isEditing: Bool) {
@@ -91,8 +117,57 @@ struct PlayerProgressSection: View {
 
         let targetElapsedSeconds = scrubElapsedSeconds
         scrubElapsedSeconds = targetElapsedSeconds
+        pendingSeekTarget = PendingSeekTarget(
+            elapsedSeconds: targetElapsedSeconds,
+            requestedAt: .now,
+            playbackState: nowPlaying.playbackState,
+            contentIdentity: contentIdentity
+        )
+        schedulePendingSeekTimeout()
         isScrubbing = false
-        seek(targetElapsedSeconds)
+        scheduleSeek(targetElapsedSeconds, pendingTarget: pendingSeekTarget)
+    }
+
+    private func shouldKeepPendingSeek(at date: Date) -> Bool {
+        guard let pendingSeekTarget else {
+            return false
+        }
+
+        if pendingSeekTarget.contentIdentity != contentIdentity {
+            self.pendingSeekTarget = nil
+            return false
+        }
+
+        let modelElapsedSeconds = displayedElapsedSeconds(at: date)
+        let targetElapsedSeconds = pendingSeekTarget.displayedElapsedSeconds(at: date, duration: durationSeconds)
+
+        if abs(modelElapsedSeconds - targetElapsedSeconds) <= SonosSeekConfirmation.elapsedTolerance {
+            self.pendingSeekTarget = nil
+            return false
+        }
+
+        if date.timeIntervalSince(pendingSeekTarget.requestedAt) > SonosSeekConfirmation.pendingUITimeout {
+            self.pendingSeekTarget = nil
+            return false
+        }
+
+        return true
+    }
+
+    private func refreshPendingSeekPlaybackState(at date: Date) {
+        guard let pendingSeekTarget,
+              pendingSeekTarget.playbackState != nowPlaying.playbackState
+        else {
+            return
+        }
+
+        self.pendingSeekTarget = PendingSeekTarget(
+            id: pendingSeekTarget.id,
+            elapsedSeconds: pendingSeekTarget.displayedElapsedSeconds(at: date, duration: durationSeconds),
+            requestedAt: pendingSeekTarget.requestedAt,
+            playbackState: nowPlaying.playbackState,
+            contentIdentity: pendingSeekTarget.contentIdentity
+        )
     }
 
     private func displayedElapsedSeconds(at date: Date) -> Double {
@@ -111,8 +186,52 @@ struct PlayerProgressSection: View {
     }
 
     private func resetScrubbingState() {
+        pendingSeekTask?.cancel()
+        pendingSeekTask = nil
+        pendingSeekTimeoutTask?.cancel()
+        pendingSeekTimeoutTask = nil
         isScrubbing = false
+        pendingSeekTarget = nil
         scrubElapsedSeconds = baseElapsedSeconds
+    }
+
+    private func schedulePendingSeekTimeout() {
+        pendingSeekTimeoutTask?.cancel()
+        pendingSeekTimeoutTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .seconds(SonosSeekConfirmation.pendingUITimeout))
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            if shouldKeepPendingSeek(at: .now) {
+                resetScrubbingState()
+            }
+        }
+    }
+
+    private func scheduleSeek(_ elapsedSeconds: TimeInterval, pendingTarget: PendingSeekTarget?) {
+        let pendingTargetID = pendingTarget?.id
+        pendingSeekTask?.cancel()
+        pendingSeekTask = Task { @MainActor in
+            let didSeek = await seek(elapsedSeconds)
+
+            guard !Task.isCancelled,
+                  pendingSeekTarget?.id == pendingTargetID
+            else {
+                return
+            }
+
+            pendingSeekTask = nil
+
+            if !didSeek {
+                resetScrubbingState()
+            }
+        }
     }
 
     private func formatTime(_ timeInterval: TimeInterval) -> String {
@@ -129,6 +248,28 @@ struct PlayerProgressSection: View {
     }
 }
 
+private struct PendingSeekTarget: Equatable {
+    var id = UUID()
+    var elapsedSeconds: TimeInterval
+    var requestedAt: Date
+    var playbackState: SonosNowPlayingSnapshot.PlaybackState
+    var contentIdentity: String
+
+    func displayedElapsedSeconds(at date: Date, duration: TimeInterval?) -> TimeInterval {
+        var elapsedSeconds = elapsedSeconds
+
+        if playbackState == .playing {
+            elapsedSeconds += max(date.timeIntervalSince(requestedAt), 0)
+        }
+
+        if let duration {
+            return min(max(elapsedSeconds, 0), duration)
+        }
+
+        return max(elapsedSeconds, 0)
+    }
+}
+
 #Preview {
     PlayerProgressSection(
         nowPlaying: SonosNowPlayingSnapshot(
@@ -141,8 +282,9 @@ struct PlayerProgressSection: View {
             duration: 201
         ),
         observedAt: .now,
+        contentIdentity: "preview",
         isEnabled: true,
-        seek: { _ in }
+        seek: { _ in true }
     )
     .padding()
 }

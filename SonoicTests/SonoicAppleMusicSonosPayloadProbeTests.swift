@@ -91,7 +91,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
     }
 
     @Test
-    func queueCandidateFallsBackToCatalogSongWhenLibraryTrackIsUnavailable() throws {
+    func queueCandidateFallsBackToCatalogHLSWhenLibraryTrackIsUnavailable() throws {
         let item = appleMusicSong(catalogID: "1440857781", libraryID: nil)
 
         let candidate = try #require(probe.queueCandidate(

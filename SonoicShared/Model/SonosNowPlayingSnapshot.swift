@@ -117,11 +117,11 @@ struct SonosNowPlayingSnapshot: Equatable {
             return false
         }
 
-        return true
+        return transportActions?.canSeek ?? true
     }
 }
 
-struct SonosTransportActions: Equatable, Hashable {
+nonisolated struct SonosTransportActions: Equatable, Hashable {
     private var normalizedActions: Set<String>
 
     init(rawActions: Set<String>) {

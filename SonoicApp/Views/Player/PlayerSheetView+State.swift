@@ -53,10 +53,39 @@ extension PlayerSheetView {
         .joined(separator: "|")
     }
 
-    func seek(to timeInterval: TimeInterval) {
-        Task {
-            _ = await model.seekManualSonosPlayback(to: timeInterval)
+    var progressContentIdentity: String {
+        if let queueSnapshot = model.queueState.snapshot,
+           let currentItem = queueSnapshot.currentItem
+        {
+            let values: [String?] = [
+                "queue",
+                queueSnapshot.sourceURI,
+                queueSnapshot.currentItemIndex.map { String($0) },
+                currentItem.id,
+                currentItem.title,
+                currentItem.artistName,
+                currentItem.albumTitle,
+            ]
+
+            return values
+                .compactMap { $0?.sonoicNonEmptyTrimmed }
+                .joined(separator: "|")
         }
+
+        let values: [String?] = [
+            model.nowPlaying.title,
+            model.nowPlaying.artistName,
+            model.nowPlaying.albumTitle,
+            model.nowPlaying.sourceName,
+        ]
+
+        return values
+            .compactMap { $0?.sonoicNonEmptyTrimmed }
+            .joined(separator: "|")
+    }
+
+    func seek(to timeInterval: TimeInterval) async -> Bool {
+        await model.seekManualSonosPlayback(to: timeInterval)
     }
 
     func handleVolumeEditingChanged(_ isEditing: Bool) {
