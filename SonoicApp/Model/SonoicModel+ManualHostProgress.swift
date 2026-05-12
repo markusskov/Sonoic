@@ -3,6 +3,8 @@ import Foundation
 extension SonoicModel {
     private static let manualPlayConfirmationRetryDelay: Duration = .milliseconds(300)
     private static let manualSeekConfirmationGraceInterval: TimeInterval = 6
+    private static let manualSeekStrongContentKeyPrefix = "uri:"
+    private static let manualSeekVisibleContentKeyPrefix = "visible:"
 
     func markLocalPlaybackState(_ playbackState: SonosNowPlayingSnapshot.PlaybackState) {
         guard nowPlaying.playbackState != playbackState else {
@@ -212,7 +214,10 @@ extension SonoicModel {
         }
 
         let incomingContentKey = manualSeekContentKey(for: snapshot, diagnostics: diagnostics)
-        guard manualSeekContentKey == incomingContentKey || manualSeekVisibleContentMatches(snapshot) else {
+        guard manualSeekContentKey == incomingContentKey || manualSeekCanUseVisibleContentFallback(
+            incomingContentKey: incomingContentKey,
+            snapshot: snapshot
+        ) else {
             clearManualSeekConfirmation()
             return nil
         }
@@ -240,6 +245,19 @@ extension SonoicModel {
         snapshot.title.sonoicTrimmed == nowPlaying.title.sonoicTrimmed
             && (snapshot.artistName?.sonoicTrimmed ?? "") == (nowPlaying.artistName?.sonoicTrimmed ?? "")
             && (snapshot.albumTitle?.sonoicTrimmed ?? "") == (nowPlaying.albumTitle?.sonoicTrimmed ?? "")
+    }
+
+    private func manualSeekCanUseVisibleContentFallback(
+        incomingContentKey: String,
+        snapshot: SonosNowPlayingSnapshot
+    ) -> Bool {
+        guard manualSeekContentKey?.hasPrefix(Self.manualSeekVisibleContentKeyPrefix) == true,
+              incomingContentKey.hasPrefix(Self.manualSeekVisibleContentKeyPrefix)
+        else {
+            return false
+        }
+
+        return manualSeekVisibleContentMatches(snapshot)
     }
 
     func snapshotPreservingManualPlaybackContext(
@@ -482,15 +500,27 @@ extension SonoicModel {
         for snapshot: SonosNowPlayingSnapshot,
         diagnostics: SonosNowPlayingDiagnostics
     ) -> String {
-        [
+        let uriParts = [
             normalizedManualPlaybackURI(diagnostics.trackURI) ?? "",
             normalizedManualPlaybackURI(diagnostics.currentURI) ?? "",
+        ]
+        .filter { !$0.isEmpty }
+
+        let visibleParts = [
             snapshot.title.sonoicTrimmed,
             snapshot.artistName?.sonoicTrimmed ?? "",
             snapshot.albumTitle?.sonoicTrimmed ?? "",
             snapshot.sourceName.sonoicTrimmed,
         ]
-        .joined(separator: "\t")
-        .lowercased()
+
+        if !uriParts.isEmpty {
+            return ([Self.manualSeekStrongContentKeyPrefix] + uriParts + visibleParts)
+                .joined(separator: "\t")
+                .lowercased()
+        }
+
+        return ([Self.manualSeekVisibleContentKeyPrefix] + visibleParts)
+            .joined(separator: "\t")
+            .lowercased()
     }
 }
