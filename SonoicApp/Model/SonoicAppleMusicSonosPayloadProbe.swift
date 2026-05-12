@@ -159,6 +159,7 @@ struct SonoicAppleMusicSonosPayloadProbe {
     ) -> SonoicAppleMusicGeneratedPayloadCandidate? {
         let candidates = candidates(for: item, playbackHint: playbackHint)
         return candidates.first { $0.strategy == .libraryTrack }
+            ?? candidates.first { $0.strategy == .catalogStaticHLS }
             ?? candidates.first { $0.strategy == .catalogHLS }
     }
 

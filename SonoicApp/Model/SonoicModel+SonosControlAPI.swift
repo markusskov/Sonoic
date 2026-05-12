@@ -182,7 +182,13 @@ extension SonoicModel {
             return false
         }
 
-        let boundedElapsedTime = max(timeInterval, 0)
+        let previousNowPlaying = nowPlaying
+        let previousObservedAt = nowPlayingObservedAt
+        let boundedElapsedTime = markLocalSeek(to: timeInterval)
+        beginManualSeekConfirmation(to: boundedElapsedTime)
+        sonoicPlaybackDebugLog(
+            "cloudSeek start target=\(boundedElapsedTime) group=\(sonoicPlaybackDebugID(context.groupID))"
+        )
         recordSeekDiagnostics(
             status: .pending,
             host: "Sonos Control API",
@@ -208,10 +214,13 @@ extension SonoicModel {
             if status.availablePlaybackActions?.canSeek == false {
                 throw SonosControlAPISeekFailure.unsupported
             }
+            sonoicPlaybackDebugLog(
+                "cloudSeek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) positionMillis=\(String(describing: status.positionMillis))"
+            )
             try await sonosControlAPIClient.seek(
                 groupID: context.groupID,
                 positionMillis: Int((boundedElapsedTime * 1_000).rounded()),
-                itemID: status.itemId,
+                itemID: nil,
                 accessToken: context.accessToken
             )
             for _ in 0 ..< Self.sonosControlAPISeekPollAttempts {
@@ -242,6 +251,12 @@ extension SonoicModel {
         }
 
         if didSeek {
+            if didConfirmSeek {
+                clearManualSeekConfirmation()
+            }
+            sonoicPlaybackDebugLog(
+                "cloudSeek result=true confirmed=\(didConfirmSeek) target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
+            )
             recordSeekDiagnostics(
                 status: didConfirmSeek ? .succeeded : .pending,
                 host: "Sonos Control API",
@@ -254,6 +269,13 @@ extension SonoicModel {
             return true
         }
 
+        clearManualSeekConfirmation()
+        nowPlaying = previousNowPlaying
+        nowPlayingObservedAt = previousObservedAt
+        persistSharedExternalControlState()
+        sonoicPlaybackDebugLog(
+            "cloudSeek result=false target=\(boundedElapsedTime) error='\(sonosControlAPIState.lastErrorDetail ?? "")'"
+        )
         recordSeekDiagnostics(
             status: .failed,
             host: "Sonos Control API",

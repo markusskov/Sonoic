@@ -205,9 +205,14 @@ extension SonoicModel {
     ) -> SonosNowPlayingSnapshot? {
         guard let manualSeekConfirmationDeadline,
               manualSeekConfirmationDeadline > .now,
-              let manualSeekTargetElapsedTime,
-              manualSeekContentKey == manualSeekContentKey(for: snapshot, diagnostics: diagnostics)
+              let manualSeekTargetElapsedTime
         else {
+            clearManualSeekConfirmation()
+            return nil
+        }
+
+        let incomingContentKey = manualSeekContentKey(for: snapshot, diagnostics: diagnostics)
+        guard manualSeekContentKey == incomingContentKey || manualSeekVisibleContentMatches(snapshot) else {
             clearManualSeekConfirmation()
             return nil
         }
@@ -229,6 +234,12 @@ extension SonoicModel {
         }
 
         return preservedSnapshot
+    }
+
+    private func manualSeekVisibleContentMatches(_ snapshot: SonosNowPlayingSnapshot) -> Bool {
+        snapshot.title.sonoicTrimmed == nowPlaying.title.sonoicTrimmed
+            && (snapshot.artistName?.sonoicTrimmed ?? "") == (nowPlaying.artistName?.sonoicTrimmed ?? "")
+            && (snapshot.albumTitle?.sonoicTrimmed ?? "") == (nowPlaying.albumTitle?.sonoicTrimmed ?? "")
     }
 
     func snapshotPreservingManualPlaybackContext(

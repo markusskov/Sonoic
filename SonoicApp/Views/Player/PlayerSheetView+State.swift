@@ -73,8 +73,6 @@ extension PlayerSheetView {
         }
 
         let values: [String?] = [
-            model.nowPlayingDiagnostics.trackURI,
-            model.nowPlayingDiagnostics.currentURI,
             model.nowPlaying.title,
             model.nowPlaying.artistName,
             model.nowPlaying.albumTitle,
