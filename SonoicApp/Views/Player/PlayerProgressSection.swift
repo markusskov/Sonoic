@@ -112,14 +112,23 @@ struct PlayerProgressSection: View {
         guard !isEditing else {
             scrubElapsedSeconds = displayedElapsedSeconds(at: .now)
             isScrubbing = true
+            sonoicPlaybackDebugLog(
+                "progressSeek editing=true enabled=\(isEnabled) duration=\(String(describing: durationSeconds)) base=\(baseElapsedSeconds)"
+            )
             return
         }
 
         guard isScrubbing else {
+            sonoicPlaybackDebugLog(
+                "progressSeek ignored editing=false withoutActiveDrag enabled=\(isEnabled)"
+            )
             return
         }
 
         let targetElapsedSeconds = scrubElapsedSeconds
+        sonoicPlaybackDebugLog(
+            "progressSeek commit target=\(targetElapsedSeconds) enabled=\(isEnabled) duration=\(String(describing: durationSeconds)) content='\(contentIdentity)'"
+        )
         scrubElapsedSeconds = targetElapsedSeconds
         pendingSeekTarget = PendingSeekTarget(
             elapsedSeconds: targetElapsedSeconds,
@@ -224,7 +233,9 @@ struct PlayerProgressSection: View {
         let pendingTargetID = pendingTarget?.id
         pendingSeekTask?.cancel()
         pendingSeekTask = Task { @MainActor in
+            sonoicPlaybackDebugLog("progressSeek taskStart target=\(elapsedSeconds)")
             let didSeek = await seek(elapsedSeconds)
+            sonoicPlaybackDebugLog("progressSeek taskResult=\(didSeek) target=\(elapsedSeconds)")
 
             guard !Task.isCancelled,
                   pendingSeekTarget?.id == pendingTargetID

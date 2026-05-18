@@ -89,7 +89,10 @@ extension PlayerSheetView {
     }
 
     func seek(to timeInterval: TimeInterval) async -> Bool {
-        await model.seekManualSonosPlayback(to: timeInterval)
+        sonoicPlaybackDebugLog("playerSeek request target=\(timeInterval)")
+        let didSeek = await model.seekManualSonosPlayback(to: timeInterval)
+        sonoicPlaybackDebugLog("playerSeek result=\(didSeek) target=\(timeInterval)")
+        return didSeek
     }
 
     func handleVolumeEditingChanged(_ isEditing: Bool) {

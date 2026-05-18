@@ -174,22 +174,23 @@ extension SonoicModel {
     }
 
     func seekSonosControlAPIPlaybackIfAvailable(to timeInterval: TimeInterval) async -> Bool {
+        sonoicPlaybackDebugLog("cloudseek entry target=\(timeInterval)")
         guard sonosControlAPIState.canSendCommands else {
             sonoicPlaybackDebugLog(
-                "cloudSeek unavailable canSend=false auth=\(String(describing: sonosControlAPIState.authorizationStatus)) mode=\(sonosControlAPIState.settings.mode.rawValue) target=\(timeInterval)"
+                "cloudseek unavailable canSend=false auth=\(String(describing: sonosControlAPIState.authorizationStatus)) mode=\(sonosControlAPIState.settings.mode.rawValue) target=\(timeInterval)"
             )
             return false
         }
 
         guard let context = sonosControlAPICommandContext() else {
             sonoicPlaybackDebugLog(
-                "cloudSeek unavailable contextMissing auth=\(String(describing: sonosControlAPIState.authorizationStatus)) mode=\(sonosControlAPIState.settings.mode.rawValue) selectedGroup=\(sonoicPlaybackDebugID(sonosControlAPIState.settings.selectedGroupID)) cloudState=\(sonoicPlaybackDebugCloudStatus(sonosControlAPICloudState.status)) target=\(timeInterval)"
+                "cloudseek unavailable contextMissing auth=\(String(describing: sonosControlAPIState.authorizationStatus)) mode=\(sonosControlAPIState.settings.mode.rawValue) selectedGroup=\(sonoicPlaybackDebugID(sonosControlAPIState.settings.selectedGroupID)) cloudState=\(sonoicPlaybackDebugCloudStatus(sonosControlAPICloudState.status)) target=\(timeInterval)"
             )
             return false
         }
 
         guard !isManualTransportCommandInFlight else {
-            sonoicPlaybackDebugLog("cloudSeek blocked transportInFlight=true target=\(timeInterval)")
+            sonoicPlaybackDebugLog("cloudseek blocked transportInFlight=true target=\(timeInterval)")
             return false
         }
 
@@ -198,7 +199,7 @@ extension SonoicModel {
         let boundedElapsedTime = markLocalSeek(to: timeInterval)
         beginManualSeekConfirmation(to: boundedElapsedTime)
         sonoicPlaybackDebugLog(
-            "cloudSeek start target=\(boundedElapsedTime) group=\(sonoicPlaybackDebugID(context.groupID))"
+            "cloudseek start target=\(boundedElapsedTime) group=\(sonoicPlaybackDebugID(context.groupID))"
         )
         recordSeekDiagnostics(
             status: .pending,
@@ -226,13 +227,13 @@ extension SonoicModel {
                 throw SonosControlAPISeekFailure.unsupported
             }
             sonoicPlaybackDebugLog(
-                "cloudSeek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) positionMillis=\(String(describing: status.positionMillis))"
+                "cloudseek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) positionMillis=\(String(describing: status.positionMillis))"
             )
             requestedAt = Date()
             try await sonosControlAPIClient.seek(
                 groupID: context.groupID,
                 positionMillis: Int((boundedElapsedTime * 1_000).rounded()),
-                itemID: status.itemId,
+                itemID: nil,
                 accessToken: context.accessToken
             )
             for attempt in 1 ... Self.sonosControlAPISeekPollAttempts {
@@ -246,14 +247,14 @@ extension SonoicModel {
                 } catch {
                     pollingErrorDetail = error.localizedDescription
                     sonoicPlaybackDebugLog(
-                        "cloudSeek pollFailed attempt=\(attempt) target=\(boundedElapsedTime) error='\(error.localizedDescription)'"
+                        "cloudseek pollFailed attempt=\(attempt) target=\(boundedElapsedTime) error='\(error.localizedDescription)'"
                     )
                     return
                 }
                 observedPlaybackState = observedStatus.playbackState
                 observedElapsedTime = observedStatus.positionMillis.map { TimeInterval($0) / 1_000 }
                 sonoicPlaybackDebugLog(
-                    "cloudSeek poll attempt=\(attempt) target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState)) itemID=\(sonoicPlaybackDebugID(observedStatus.itemId))"
+                    "cloudseek poll attempt=\(attempt) target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState)) itemID=\(sonoicPlaybackDebugID(observedStatus.itemId))"
                 )
                 if SonosSeekConfirmation.isConfirmed(
                     targetElapsedTime: boundedElapsedTime,
@@ -272,7 +273,7 @@ extension SonoicModel {
             if didConfirmSeek {
                 clearManualSeekConfirmation()
                 sonoicPlaybackDebugLog(
-                    "cloudSeek result=true confirmed=true target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
+                    "cloudseek result=true confirmed=true target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
                 )
                 recordSeekDiagnostics(
                     status: .succeeded,
@@ -284,7 +285,7 @@ extension SonoicModel {
                 return true
             }
             sonoicPlaybackDebugLog(
-                "cloudSeek result=true accepted=true confirmed=false target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
+                "cloudseek result=true accepted=true confirmed=false target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
             )
             recordSeekDiagnostics(
                 status: .succeeded,
@@ -303,7 +304,7 @@ extension SonoicModel {
         nowPlayingObservedAt = previousObservedAt
         persistSharedExternalControlState()
         sonoicPlaybackDebugLog(
-            "cloudSeek result=false target=\(boundedElapsedTime) error='\(sonosControlAPIState.lastErrorDetail ?? "")'"
+            "cloudseek result=false target=\(boundedElapsedTime) error='\(sonosControlAPIState.lastErrorDetail ?? "")'"
         )
         recordSeekDiagnostics(
             status: .failed,
