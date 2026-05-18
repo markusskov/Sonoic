@@ -13,6 +13,7 @@ struct PlayerProgressSection: View {
     @State private var scrubElapsedSeconds = 0.0
     @State private var pendingSeekTarget: PendingSeekTarget?
     @State private var pendingSeekTask: Task<Void, Never>?
+    @State private var pendingSeekTaskID: UUID?
     @State private var pendingSeekTimeoutTask: Task<Void, Never>?
 
     var body: some View {
@@ -202,6 +203,7 @@ struct PlayerProgressSection: View {
         if cancelSeekTask {
             pendingSeekTask?.cancel()
             pendingSeekTask = nil
+            pendingSeekTaskID = nil
         }
         pendingSeekTimeoutTask?.cancel()
         pendingSeekTimeoutTask = nil
@@ -231,7 +233,8 @@ struct PlayerProgressSection: View {
 
     private func scheduleSeek(_ elapsedSeconds: TimeInterval, pendingTarget: PendingSeekTarget?) {
         let pendingTargetID = pendingTarget?.id
-        pendingSeekTask?.cancel()
+        let taskID = UUID()
+        pendingSeekTaskID = taskID
         pendingSeekTask = Task { @MainActor in
             sonoicPlaybackDebugLog("progressSeek taskStart target=\(elapsedSeconds)")
             let didSeek = await seek(elapsedSeconds)
@@ -243,7 +246,10 @@ struct PlayerProgressSection: View {
                 return
             }
 
-            pendingSeekTask = nil
+            if pendingSeekTaskID == taskID {
+                pendingSeekTask = nil
+                pendingSeekTaskID = nil
+            }
 
             if !didSeek {
                 resetScrubbingState(cancelSeekTask: false)
