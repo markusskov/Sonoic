@@ -115,6 +115,10 @@ struct PlayerProgressSection: View {
             return
         }
 
+        guard isScrubbing else {
+            return
+        }
+
         let targetElapsedSeconds = scrubElapsedSeconds
         scrubElapsedSeconds = targetElapsedSeconds
         pendingSeekTarget = PendingSeekTarget(
@@ -164,7 +168,7 @@ struct PlayerProgressSection: View {
         self.pendingSeekTarget = PendingSeekTarget(
             id: pendingSeekTarget.id,
             elapsedSeconds: pendingSeekTarget.displayedElapsedSeconds(at: date, duration: durationSeconds),
-            requestedAt: pendingSeekTarget.requestedAt,
+            requestedAt: date,
             playbackState: nowPlaying.playbackState,
             contentIdentity: pendingSeekTarget.contentIdentity
         )
@@ -185,9 +189,11 @@ struct PlayerProgressSection: View {
         return nextElapsed
     }
 
-    private func resetScrubbingState() {
-        pendingSeekTask?.cancel()
-        pendingSeekTask = nil
+    private func resetScrubbingState(cancelSeekTask: Bool = false) {
+        if cancelSeekTask {
+            pendingSeekTask?.cancel()
+            pendingSeekTask = nil
+        }
         pendingSeekTimeoutTask?.cancel()
         pendingSeekTimeoutTask = nil
         isScrubbing = false
@@ -209,7 +215,7 @@ struct PlayerProgressSection: View {
             }
 
             if shouldKeepPendingSeek(at: .now) {
-                resetScrubbingState()
+                resetScrubbingState(cancelSeekTask: false)
             }
         }
     }
@@ -229,7 +235,7 @@ struct PlayerProgressSection: View {
             pendingSeekTask = nil
 
             if !didSeek {
-                resetScrubbingState()
+                resetScrubbingState(cancelSeekTask: false)
             }
         }
     }

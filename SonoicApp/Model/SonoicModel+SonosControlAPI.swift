@@ -212,7 +212,7 @@ extension SonoicModel {
         var observedPlaybackState: SonosControlAPIPlaybackState?
         var didConfirmSeek = false
         var pollingErrorDetail: String?
-        let requestedAt = Date()
+        var requestedAt = Date()
         let didSeek = await performSonosControlAPITransportCommand(
             description: "Cloud seek",
             refreshQueueAfterSuccess: false,
@@ -228,6 +228,7 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "cloudSeek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) positionMillis=\(String(describing: status.positionMillis))"
             )
+            requestedAt = Date()
             try await sonosControlAPIClient.seek(
                 groupID: context.groupID,
                 positionMillis: Int((boundedElapsedTime * 1_000).rounded()),
@@ -283,18 +284,18 @@ extension SonoicModel {
                 return true
             }
             sonoicPlaybackDebugLog(
-                "cloudSeek result=false confirmed=false fallingBackToLocal target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
+                "cloudSeek result=true accepted=true confirmed=false target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState))"
             )
             recordSeekDiagnostics(
-                status: .failed,
+                status: .succeeded,
                 host: "Sonos Control API",
                 target: boundedElapsedTime,
                 observed: observedElapsedTime,
                 errorDetail: pollingErrorDetail.map {
-                    "Cloud accepted; status polling failed: \($0)"
-                } ?? "Cloud accepted; Sonos did not report the requested position."
+                    "Cloud accepted; status polling lagged: \($0)"
+                } ?? "Cloud accepted; waiting for Sonos to report the requested position."
             )
-            return false
+            return true
         }
 
         clearManualSeekConfirmation()
