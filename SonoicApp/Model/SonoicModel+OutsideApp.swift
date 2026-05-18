@@ -74,7 +74,7 @@ extension SonoicModel {
             nowPlaying: nowPlaying,
             observedAt: nowPlayingObservedAt,
             activeTargetName: activeTarget.name,
-            canControlPlayback: hasManualSonosHost,
+            canControlPlayback: hasManualSonosHost || sonosControlAPIState.canSendCommands,
             canAdvanceProgress: canAdvanceProgress
         )
     }

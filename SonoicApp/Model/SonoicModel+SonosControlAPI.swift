@@ -174,11 +174,22 @@ extension SonoicModel {
     }
 
     func seekSonosControlAPIPlaybackIfAvailable(to timeInterval: TimeInterval) async -> Bool {
+        guard sonosControlAPIState.canSendCommands else {
+            sonoicPlaybackDebugLog(
+                "cloudSeek unavailable canSend=false auth=\(String(describing: sonosControlAPIState.authorizationStatus)) mode=\(sonosControlAPIState.settings.mode.rawValue) target=\(timeInterval)"
+            )
+            return false
+        }
+
         guard let context = sonosControlAPICommandContext() else {
+            sonoicPlaybackDebugLog(
+                "cloudSeek unavailable contextMissing auth=\(String(describing: sonosControlAPIState.authorizationStatus)) mode=\(sonosControlAPIState.settings.mode.rawValue) selectedGroup=\(sonoicPlaybackDebugID(sonosControlAPIState.settings.selectedGroupID)) cloudState=\(sonoicPlaybackDebugCloudStatus(sonosControlAPICloudState.status)) target=\(timeInterval)"
+            )
             return false
         }
 
         guard !isManualTransportCommandInFlight else {
+            sonoicPlaybackDebugLog("cloudSeek blocked transportInFlight=true target=\(timeInterval)")
             return false
         }
 

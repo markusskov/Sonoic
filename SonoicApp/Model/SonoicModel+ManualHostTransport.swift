@@ -94,7 +94,11 @@ extension SonoicModel {
     }
 
     func seekManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
+        sonoicPlaybackDebugLog(
+            "manualSeek start target=\(timeInterval) canSeek=\(nowPlaying.canSeek) hasHost=\(hasManualSonosHost) cloudCanSend=\(sonosControlAPIState.canSendCommands) cloudAuth=\(String(describing: sonosControlAPIState.authorizationStatus)) cloudMode=\(sonosControlAPIState.settings.mode.rawValue)"
+        )
         guard !isManualTransportCommandInFlight else {
+            sonoicPlaybackDebugLog("manualSeek blocked transportInFlight=true target=\(timeInterval)")
             return false
         }
 
@@ -102,6 +106,7 @@ extension SonoicModel {
         let previousObservedAt = nowPlayingObservedAt
 
         if await seekSonosControlAPIPlaybackIfAvailable(to: timeInterval) {
+            sonoicPlaybackDebugLog("manualSeek cloudConfirmed target=\(timeInterval)")
             return true
         }
 
@@ -109,11 +114,15 @@ extension SonoicModel {
             clearManualSeekConfirmation()
             nowPlaying = previousNowPlaying
             nowPlayingObservedAt = previousObservedAt
+            sonoicPlaybackDebugLog("manualSeek failed noLocalHost target=\(timeInterval)")
             return false
         }
 
         let boundedElapsedTime = markLocalSeek(to: timeInterval)
         let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+        sonoicPlaybackDebugLog(
+            "manualSeek localFallback start target=\(boundedElapsedTime) host=\(playbackHost)"
+        )
         beginManualSeekConfirmation(to: boundedElapsedTime)
         recordSeekDiagnostics(
             status: .pending,
@@ -128,6 +137,9 @@ extension SonoicModel {
                 try await avTransportClient.seek(host: playbackHost, timeInterval: boundedElapsedTime)
                 let observed = try? await avTransportClient.fetchSeekPosition(host: playbackHost)?.relativeTime
                 await MainActor.run {
+                    sonoicPlaybackDebugLog(
+                        "manualSeek localFallback commandSucceeded target=\(boundedElapsedTime) observed=\(String(describing: observed))"
+                    )
                     self.recordSeekDiagnostics(
                         status: .succeeded,
                         host: playbackHost,
@@ -155,6 +167,7 @@ extension SonoicModel {
             clearManualSeekConfirmation()
             nowPlaying = previousNowPlaying
             nowPlayingObservedAt = previousObservedAt
+            sonoicPlaybackDebugLog("manualSeek localFallback result=false target=\(boundedElapsedTime)")
             if seekDiagnostics.status == .pending {
                 recordSeekDiagnostics(
                     status: .failed,
@@ -166,6 +179,7 @@ extension SonoicModel {
             }
         }
 
+        sonoicPlaybackDebugLog("manualSeek result=\(didSeek) target=\(boundedElapsedTime)")
         return didSeek
     }
 
