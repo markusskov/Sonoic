@@ -65,6 +65,10 @@ extension PlayerSheetView {
                 currentItem.title,
                 currentItem.artistName,
                 currentItem.albumTitle,
+                model.nowPlaying.title,
+                model.nowPlaying.artistName,
+                model.nowPlaying.albumTitle,
+                model.nowPlaying.sourceName,
             ]
 
             return values
