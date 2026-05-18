@@ -4,6 +4,8 @@ extension SonoicModel {
     private static let sonosControlAPITransportSyncDelay: Duration = .milliseconds(350)
     private static let sonosControlAPISeekPollDelay: Duration = .milliseconds(350)
     private static let sonosControlAPISeekPollAttempts = 5
+    private static let sonosControlAPISeekSlotWaitDelay: Duration = .milliseconds(80)
+    private static let sonosControlAPISeekSlotWaitAttempts = 8
 
     private struct SonosControlAPICommandContext {
         var householdID: String?
@@ -189,8 +191,7 @@ extension SonoicModel {
             return false
         }
 
-        guard !isManualTransportCommandInFlight else {
-            sonoicPlaybackDebugLog("cloudseek blocked transportInFlight=true target=\(timeInterval)")
+        guard await waitForSonosControlAPISeekTransportSlot(target: timeInterval) else {
             return false
         }
 
@@ -313,6 +314,24 @@ extension SonoicModel {
             observed: observedElapsedTime,
             errorDetail: sonosControlAPIState.lastErrorDetail
         )
+        return false
+    }
+
+    private func waitForSonosControlAPISeekTransportSlot(target: TimeInterval) async -> Bool {
+        guard isManualTransportCommandInFlight else {
+            return true
+        }
+
+        sonoicPlaybackDebugLog("cloudseek waiting transportInFlight=true target=\(target)")
+        for attempt in 1 ... Self.sonosControlAPISeekSlotWaitAttempts {
+            try? await Task.sleep(for: Self.sonosControlAPISeekSlotWaitDelay)
+            if !isManualTransportCommandInFlight {
+                sonoicPlaybackDebugLog("cloudseek waitComplete attempt=\(attempt) target=\(target)")
+                return true
+            }
+        }
+
+        sonoicPlaybackDebugLog("cloudseek blocked transportInFlight=true target=\(target)")
         return false
     }
 

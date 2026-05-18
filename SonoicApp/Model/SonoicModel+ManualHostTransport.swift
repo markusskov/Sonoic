@@ -97,17 +97,17 @@ extension SonoicModel {
         sonoicPlaybackDebugLog(
             "manualSeek start target=\(timeInterval) canSeek=\(nowPlaying.canSeek) hasHost=\(hasManualSonosHost) cloudCanSend=\(sonosControlAPIState.canSendCommands) cloudAuth=\(String(describing: sonosControlAPIState.authorizationStatus)) cloudMode=\(sonosControlAPIState.settings.mode.rawValue)"
         )
-        guard !isManualTransportCommandInFlight else {
-            sonoicPlaybackDebugLog("manualSeek blocked transportInFlight=true target=\(timeInterval)")
-            return false
-        }
-
         let previousNowPlaying = nowPlaying
         let previousObservedAt = nowPlayingObservedAt
 
         if await seekSonosControlAPIPlaybackIfAvailable(to: timeInterval) {
             sonoicPlaybackDebugLog("manualSeek cloudConfirmed target=\(timeInterval)")
             return true
+        }
+
+        guard !isManualTransportCommandInFlight else {
+            sonoicPlaybackDebugLog("manualSeek blocked transportInFlight=true target=\(timeInterval)")
+            return false
         }
 
         guard hasManualSonosHost else {
