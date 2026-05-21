@@ -230,11 +230,15 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "cloudseek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) positionMillis=\(String(describing: status.positionMillis))"
             )
+            let itemID = sonosControlAPISeekItemID(from: status)
+            sonoicPlaybackDebugLog(
+                "cloudseek seekPayload itemID=\(itemID.map(sonoicPlaybackDebugID) ?? "omitted") rawItemID=\(sonoicPlaybackDebugID(status.itemId))"
+            )
             requestedAt = Date()
             try await sonosControlAPIClient.seek(
                 groupID: context.groupID,
                 positionMillis: Int((boundedElapsedTime * 1_000).rounded()),
-                itemID: status.itemId,
+                itemID: itemID,
                 accessToken: context.accessToken
             )
             for attempt in 1 ... Self.sonosControlAPISeekPollAttempts {
@@ -333,6 +337,20 @@ extension SonoicModel {
 
         sonoicPlaybackDebugLog("cloudseek blocked transportInFlight=true target=\(target)")
         return false
+    }
+
+    private func sonosControlAPISeekItemID(from status: SonosControlAPIPlaybackStatus) -> String? {
+        guard let itemID = status.itemId?.sonoicNonEmptyTrimmed else {
+            return nil
+        }
+
+        // Queue playback can report a numeric itemId that behaves like a queue index,
+        // not a seekable cloud object id. Passing it makes Sonos reject the seek.
+        guard !itemID.allSatisfy(\.isNumber) else {
+            return nil
+        }
+
+        return itemID
     }
 
     func playSonosControlAPIFavoriteIfAvailable(_ favorite: SonosFavoriteItem) async -> Bool {
