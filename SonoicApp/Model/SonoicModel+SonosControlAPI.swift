@@ -412,8 +412,28 @@ extension SonoicModel {
             candidates.append(SonosControlAPISeekItemIDCandidate(label: "queue", itemID: queueItemID))
         }
 
+        if let statusItemID,
+           statusItemID.allSatisfy(\.isNumber),
+           isSonosControlAPIQueuePlaybackActive
+        {
+            let derivedQueueItemID = "Q:0/\(statusItemID)"
+            if !candidates.contains(where: { $0.itemID == derivedQueueItemID }) {
+                candidates.append(SonosControlAPISeekItemIDCandidate(label: "queueDerived", itemID: derivedQueueItemID))
+            }
+        }
+
         candidates.append(SonosControlAPISeekItemIDCandidate(label: "omitted", itemID: nil))
         return candidates
+    }
+
+    private var isSonosControlAPIQueuePlaybackActive: Bool {
+        [
+            queueState.snapshot?.sourceURI,
+            nowPlayingDiagnostics.currentURI,
+        ]
+        .contains { uri in
+            uri?.sonoicNonEmptyTrimmed?.hasPrefix("x-rincon-queue:") == true
+        }
     }
 
     private func sonosControlAPIError(
