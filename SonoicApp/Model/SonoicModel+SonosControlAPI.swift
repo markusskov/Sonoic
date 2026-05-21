@@ -32,7 +32,7 @@ extension SonoicModel {
     }
 
     func activeSonosControlAPIGroupID() -> String? {
-        guard sonosControlAPIState.canSendCommands else {
+        guard sonosControlAPIState.settings.mode.canSendCommands else {
             return nil
         }
 
@@ -78,7 +78,7 @@ extension SonoicModel {
     }
 
     func playSonosControlAPIPlaybackIfAvailable() async -> Bool {
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = await sonosControlAPICommandContext(logPrefix: "cloudPlay") else {
             return false
         }
 
@@ -104,7 +104,7 @@ extension SonoicModel {
     }
 
     func pauseSonosControlAPIPlaybackIfAvailable() async -> Bool {
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = await sonosControlAPICommandContext(logPrefix: "cloudPause") else {
             return false
         }
 
@@ -132,7 +132,7 @@ extension SonoicModel {
     }
 
     func skipToNextSonosControlAPITrackIfAvailable() async -> Bool {
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = await sonosControlAPICommandContext(logPrefix: "cloudNext") else {
             return false
         }
 
@@ -154,7 +154,7 @@ extension SonoicModel {
     }
 
     func skipToPreviousSonosControlAPITrackIfAvailable() async -> Bool {
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = await sonosControlAPICommandContext(logPrefix: "cloudPrevious") else {
             return false
         }
 
@@ -177,14 +177,14 @@ extension SonoicModel {
 
     func seekSonosControlAPIPlaybackIfAvailable(to timeInterval: TimeInterval) async -> Bool {
         sonoicPlaybackDebugLog("cloudseek entry target=\(timeInterval)")
-        guard sonosControlAPIState.canSendCommands else {
+        guard sonosControlAPIState.settings.mode.canSendCommands else {
             sonoicPlaybackDebugLog(
                 "cloudseek unavailable canSend=false auth=\(String(describing: sonosControlAPIState.authorizationStatus)) mode=\(sonosControlAPIState.settings.mode.rawValue) target=\(timeInterval)"
             )
             return false
         }
 
-        guard let context = sonosControlAPICommandContext() else {
+        guard let context = await sonosControlAPICommandContext(logPrefix: "cloudseek") else {
             sonoicPlaybackDebugLog(
                 "cloudseek unavailable contextMissing auth=\(String(describing: sonosControlAPIState.authorizationStatus)) mode=\(sonosControlAPIState.settings.mode.rawValue) selectedGroup=\(sonoicPlaybackDebugID(sonosControlAPIState.settings.selectedGroupID)) cloudState=\(sonoicPlaybackDebugCloudStatus(sonosControlAPICloudState.status)) target=\(timeInterval)"
             )
@@ -339,12 +339,12 @@ extension SonoicModel {
         sonoicPlaybackDebugLog(
             "cloudFavorite start title='\(favorite.title)' canSend=\(sonosControlAPIState.canSendCommands) auth=\(String(describing: sonosControlAPIState.authorizationStatus)) target=\(activeTarget.id)"
         )
-        guard sonosControlAPIState.canSendCommands else {
+        guard sonosControlAPIState.settings.mode.canSendCommands else {
             sonoicPlaybackDebugLog("cloudFavorite unavailable canSend=false title='\(favorite.title)'")
             return false
         }
 
-        guard hasValidSonosControlAPITokenForPlayback() else {
+        guard await hasValidSonosControlAPITokenForPlayback(logPrefix: "cloudFavorite") else {
             sonoicPlaybackDebugLog("cloudFavorite unavailable tokenInvalid title='\(favorite.title)'")
             return false
         }
@@ -372,7 +372,10 @@ extension SonoicModel {
             snapshot = refreshedSnapshot
         }
 
-        if let context = sonosControlAPICommandContext(requiresActiveTargetMatch: true),
+        if let context = await sonosControlAPICommandContext(
+            requiresActiveTargetMatch: true,
+            logPrefix: "cloudFavorite"
+        ),
            let householdID = context.householdID
         {
             sonoicPlaybackDebugLog(
@@ -405,7 +408,10 @@ extension SonoicModel {
         )
         await refreshManualHostIdentityBeforeCloudContentPlaybackIfNeeded()
 
-        guard let refreshedContext = sonosControlAPICommandContext(requiresActiveTargetMatch: true),
+        guard let refreshedContext = await sonosControlAPICommandContext(
+            requiresActiveTargetMatch: true,
+            logPrefix: "cloudFavorite"
+        ),
               case let .verified(refreshedSnapshot) = sonosControlAPICloudState.status,
               let refreshedHouseholdID = refreshedContext.householdID
         else {
@@ -507,31 +513,15 @@ extension SonoicModel {
         return snapshot.households[0].id.sonoicNonEmptyTrimmed
     }
 
-    private func hasValidSonosControlAPITokenForPlayback() -> Bool {
-        do {
-            guard let tokenSet = try keychainStore.loadSonosTokenSet() else {
-                sonosControlAPIAuthorizationState = .disconnected
-                markSonosControlAPIAuthorizationUnavailable()
-                return false
-            }
-
-            guard !tokenSet.isExpired() else {
-                sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
-                sonosControlAPIState.authorizationStatus = .expired
-                return false
-            }
-
-            return true
-        } catch {
-            recordSonosControlAPIError(error)
-            return false
-        }
+    private func hasValidSonosControlAPITokenForPlayback(logPrefix: String? = nil) async -> Bool {
+        await validSonosControlAPITokenSetForCommands(logPrefix: logPrefix) != nil
     }
 
     private func sonosControlAPICommandContext(
-        requiresActiveTargetMatch: Bool = false
-    ) -> SonosControlAPICommandContext? {
-        guard sonosControlAPIState.canSendCommands else {
+        requiresActiveTargetMatch: Bool = false,
+        logPrefix: String? = nil
+    ) async -> SonosControlAPICommandContext? {
+        guard sonosControlAPIState.settings.mode.canSendCommands else {
             return nil
         }
 
@@ -549,29 +539,15 @@ extension SonoicModel {
             return nil
         }
 
-        do {
-            guard let tokenSet = try keychainStore.loadSonosTokenSet() else {
-                sonosControlAPIAuthorizationState = .disconnected
-                markSonosControlAPIAuthorizationUnavailable()
-                return nil
-            }
-
-            guard !tokenSet.isExpired() else {
-                sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
-                sonosControlAPIState.authorizationStatus = .expired
-                return nil
-            }
-
-            markSonosControlAPIAuthorizationReady()
-            return SonosControlAPICommandContext(
-                householdID: householdID,
-                groupID: groupID,
-                accessToken: tokenSet.accessToken
-            )
-        } catch {
-            recordSonosControlAPIError(error)
+        guard let tokenSet = await validSonosControlAPITokenSetForCommands(logPrefix: logPrefix) else {
             return nil
         }
+
+        return SonosControlAPICommandContext(
+            householdID: householdID,
+            groupID: groupID,
+            accessToken: tokenSet.accessToken
+        )
     }
 
     private func activeSonosControlAPICommandTarget(
