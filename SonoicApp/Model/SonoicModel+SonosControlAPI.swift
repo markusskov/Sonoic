@@ -235,12 +235,33 @@ extension SonoicModel {
                 "cloudseek seekPayload itemID=\(itemID.map(sonoicPlaybackDebugID) ?? "omitted") rawItemID=\(sonoicPlaybackDebugID(status.itemId))"
             )
             requestedAt = Date()
-            try await sonosControlAPIClient.seek(
-                groupID: context.groupID,
-                positionMillis: Int((boundedElapsedTime * 1_000).rounded()),
-                itemID: itemID,
-                accessToken: context.accessToken
-            )
+            let targetMillis = Int((boundedElapsedTime * 1_000).rounded())
+            do {
+                try await sonosControlAPIClient.seek(
+                    groupID: context.groupID,
+                    positionMillis: targetMillis,
+                    itemID: itemID,
+                    accessToken: context.accessToken
+                )
+            } catch {
+                guard
+                    sonosControlAPIError(error, matchesStatus: 499, detailContains: "ERROR_DISALLOWED_BY_POLICY"),
+                    let positionMillis = status.positionMillis
+                else {
+                    throw error
+                }
+
+                let deltaMillis = targetMillis - positionMillis
+                sonoicPlaybackDebugLog(
+                    "cloudseek absoluteDisallowed retryRelative deltaMillis=\(deltaMillis) currentMillis=\(positionMillis) targetMillis=\(targetMillis) itemID=\(itemID.map(sonoicPlaybackDebugID) ?? "omitted")"
+                )
+                try await sonosControlAPIClient.seekRelative(
+                    groupID: context.groupID,
+                    deltaMillis: deltaMillis,
+                    itemID: itemID,
+                    accessToken: context.accessToken
+                )
+            }
             for attempt in 1 ... Self.sonosControlAPISeekPollAttempts {
                 try await Task.sleep(for: Self.sonosControlAPISeekPollDelay)
                 let observedStatus: SonosControlAPIPlaybackStatus
@@ -351,6 +372,22 @@ extension SonoicModel {
         }
 
         return itemID
+    }
+
+    private func sonosControlAPIError(
+        _ error: Error,
+        matchesStatus statusCode: Int,
+        detailContains detailNeedle: String
+    ) -> Bool {
+        guard case let SonosControlAPITransport.TransportError.httpStatus(status, detail) = error else {
+            return false
+        }
+
+        guard status == statusCode else {
+            return false
+        }
+
+        return detail?.localizedCaseInsensitiveContains(detailNeedle) == true
     }
 
     func playSonosControlAPIFavoriteIfAvailable(_ favorite: SonosFavoriteItem) async -> Bool {
