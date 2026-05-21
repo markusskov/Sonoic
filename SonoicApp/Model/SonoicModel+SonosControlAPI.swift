@@ -13,6 +13,11 @@ extension SonoicModel {
         var accessToken: String
     }
 
+    private struct SonosControlAPISeekItemIDCandidate {
+        var label: String
+        var itemID: String?
+    }
+
     func updateSonosControlAPISettings(_ settings: SonosControlAPISettings) {
         settingsStore.saveSonosControlAPISettings(settings)
         sonosControlAPIState.settings = settings
@@ -230,37 +235,65 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "cloudseek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) positionMillis=\(String(describing: status.positionMillis))"
             )
-            let itemID = sonosControlAPISeekItemID(from: status)
+            let itemIDCandidates = sonosControlAPISeekItemIDCandidates(from: status)
             sonoicPlaybackDebugLog(
-                "cloudseek seekPayload itemID=\(itemID.map(sonoicPlaybackDebugID) ?? "omitted") rawItemID=\(sonoicPlaybackDebugID(status.itemId))"
+                "cloudseek seekPayload candidates=\(itemIDCandidates.map { "\($0.label):\($0.itemID.map(sonoicPlaybackDebugID) ?? "omitted")" }.joined(separator: ",")) rawItemID=\(sonoicPlaybackDebugID(status.itemId))"
             )
             requestedAt = Date()
             let targetMillis = Int((boundedElapsedTime * 1_000).rounded())
-            do {
-                try await sonosControlAPIClient.seek(
-                    groupID: context.groupID,
-                    positionMillis: targetMillis,
-                    itemID: itemID,
-                    accessToken: context.accessToken
+            var lastSeekError: Error?
+            for candidate in itemIDCandidates {
+                sonoicPlaybackDebugLog(
+                    "cloudseek attemptAbsolute candidate=\(candidate.label) itemID=\(candidate.itemID.map(sonoicPlaybackDebugID) ?? "omitted")"
                 )
-            } catch {
-                guard
-                    sonosControlAPIError(error, matchesStatus: 499, detailContains: "ERROR_DISALLOWED_BY_POLICY"),
-                    let positionMillis = status.positionMillis
-                else {
+                do {
+                    try await sonosControlAPIClient.seek(
+                        groupID: context.groupID,
+                        positionMillis: targetMillis,
+                        itemID: candidate.itemID,
+                        accessToken: context.accessToken
+                    )
+                    lastSeekError = nil
+                    break
+                } catch {
+                    lastSeekError = error
+                    if sonosControlAPIError(error, matchesStatus: 499, detailContains: "ERROR_DISALLOWED_BY_POLICY"),
+                       let positionMillis = status.positionMillis
+                    {
+                        let deltaMillis = targetMillis - positionMillis
+                        sonoicPlaybackDebugLog(
+                            "cloudseek absoluteDisallowed retryRelative deltaMillis=\(deltaMillis) currentMillis=\(positionMillis) targetMillis=\(targetMillis) candidate=\(candidate.label) itemID=\(candidate.itemID.map(sonoicPlaybackDebugID) ?? "omitted")"
+                        )
+                        do {
+                            try await sonosControlAPIClient.seekRelative(
+                                groupID: context.groupID,
+                                deltaMillis: deltaMillis,
+                                itemID: candidate.itemID,
+                                accessToken: context.accessToken
+                            )
+                            lastSeekError = nil
+                            break
+                        } catch {
+                            lastSeekError = error
+                            sonoicPlaybackDebugLog(
+                                "cloudseek relativeFailed candidate=\(candidate.label) itemID=\(candidate.itemID.map(sonoicPlaybackDebugID) ?? "omitted") error='\(error.localizedDescription)'"
+                            )
+                            continue
+                        }
+                    }
+
+                    if sonosControlAPIError(error, matchesStatus: 400, detailContains: "ERROR_INVALID_OBJECT_ID") {
+                        sonoicPlaybackDebugLog(
+                            "cloudseek invalidObject candidate=\(candidate.label) itemID=\(candidate.itemID.map(sonoicPlaybackDebugID) ?? "omitted")"
+                        )
+                        continue
+                    }
+
                     throw error
                 }
-
-                let deltaMillis = targetMillis - positionMillis
-                sonoicPlaybackDebugLog(
-                    "cloudseek absoluteDisallowed retryRelative deltaMillis=\(deltaMillis) currentMillis=\(positionMillis) targetMillis=\(targetMillis) itemID=\(itemID.map(sonoicPlaybackDebugID) ?? "omitted")"
-                )
-                try await sonosControlAPIClient.seekRelative(
-                    groupID: context.groupID,
-                    deltaMillis: deltaMillis,
-                    itemID: itemID,
-                    accessToken: context.accessToken
-                )
+            }
+            if let lastSeekError {
+                throw lastSeekError
             }
             for attempt in 1 ... Self.sonosControlAPISeekPollAttempts {
                 try await Task.sleep(for: Self.sonosControlAPISeekPollDelay)
@@ -360,18 +393,27 @@ extension SonoicModel {
         return false
     }
 
-    private func sonosControlAPISeekItemID(from status: SonosControlAPIPlaybackStatus) -> String? {
-        guard let itemID = status.itemId?.sonoicNonEmptyTrimmed else {
-            return nil
+    private func sonosControlAPISeekItemIDCandidates(
+        from status: SonosControlAPIPlaybackStatus
+    ) -> [SonosControlAPISeekItemIDCandidate] {
+        var candidates: [SonosControlAPISeekItemIDCandidate] = []
+        let statusItemID = status.itemId?.sonoicNonEmptyTrimmed
+
+        if let statusItemID,
+           !statusItemID.allSatisfy(\.isNumber)
+        {
+            candidates.append(SonosControlAPISeekItemIDCandidate(label: "status", itemID: statusItemID))
         }
 
-        // Queue playback can report a numeric itemId that behaves like a queue index,
-        // not a seekable cloud object id. Passing it makes Sonos reject the seek.
-        guard !itemID.allSatisfy(\.isNumber) else {
-            return nil
+        if let queueItemID = queueState.snapshot?.currentItem?.id.sonoicNonEmptyTrimmed,
+           queueItemID != statusItemID,
+           queueItemID.hasPrefix("Q:")
+        {
+            candidates.append(SonosControlAPISeekItemIDCandidate(label: "queue", itemID: queueItemID))
         }
 
-        return itemID
+        candidates.append(SonosControlAPISeekItemIDCandidate(label: "omitted", itemID: nil))
+        return candidates
     }
 
     private func sonosControlAPIError(
