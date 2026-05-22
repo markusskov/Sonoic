@@ -209,14 +209,9 @@ extension SonoicModel {
 
             let playbackStatus = try await playbackStatusTask
             let metadataStatus = try? await metadataStatusTask
-            guard let queueVersion = playbackStatus.queueVersion?.sonoicNonEmptyTrimmed else {
-                clearSonosControlAPICloudQueueContext()
-                return false
-            }
-
             guard restoreSonosControlAPICloudQueueContextIfNeeded(
                 groupID: context.groupID,
-                queueVersion: queueVersion
+                queueVersion: playbackStatus.queueVersion
             ) else {
                 return false
             }
@@ -491,8 +486,15 @@ extension SonoicModel {
             let inMemoryGroupID = sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed
             let inMemoryQueueVersion = sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed
             let groupMatches = normalizedGroupID.map { inMemoryGroupID == $0 } ?? true
-            let queueVersionMatches = normalizedQueueVersion.map { inMemoryQueueVersion == $0 } ?? true
-            if groupMatches && queueVersionMatches {
+            if groupMatches {
+                if let normalizedQueueVersion,
+                   let inMemoryQueueVersion,
+                   inMemoryQueueVersion != normalizedQueueVersion
+                {
+                    sonoicPlaybackDebugLog(
+                        "cloudQueue restoreContext keepingMemory versionChanged stored=\(sonoicPlaybackDebugID(inMemoryQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+                    )
+                }
                 return true
             }
 
@@ -525,10 +527,8 @@ extension SonoicModel {
            storedQueueVersion != normalizedQueueVersion
         {
             sonoicPlaybackDebugLog(
-                "cloudQueue restoreContext skipped queueVersionMismatch stored=\(sonoicPlaybackDebugID(storedQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+                "cloudQueue restoreContext keepingStored versionChanged stored=\(sonoicPlaybackDebugID(storedQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
             )
-            clearSonosControlAPICloudQueueContext()
-            return false
         }
 
         sonosControlAPICloudQueueSessionID = context.sessionID
