@@ -410,7 +410,7 @@ extension SonoicModel {
     }
 
     func toggleManualSonosMute() async {
-        guard hasManualSonosHost else {
+        guard hasActiveSonosControlTarget else {
             return
         }
 
@@ -428,7 +428,7 @@ extension SonoicModel {
     }
 
     func setManualSonosVolume(to level: Int) async -> Bool {
-        guard hasManualSonosHost else {
+        guard hasActiveSonosControlTarget else {
             return false
         }
 

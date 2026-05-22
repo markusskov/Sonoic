@@ -6,7 +6,7 @@ extension SonoicModel {
     private static let sharedStoreKeepAliveInterval: TimeInterval = 45
 
     var externalControlState: SonoicExternalControlState {
-        guard hasManualSonosHost else {
+        guard hasActiveSonosControlTarget else {
             return .unconfigured
         }
 
@@ -50,8 +50,12 @@ extension SonoicModel {
     }
 
     private var externalAvailability: SonoicExternalControlState.Availability {
-        guard hasManualSonosHost else {
+        guard hasActiveSonosControlTarget else {
             return .unavailable
+        }
+
+        guard hasManualSonosHost else {
+            return sonosControlAPIState.canSendCommands ? .ready : .unavailable
         }
 
         switch manualHostRefreshStatus {

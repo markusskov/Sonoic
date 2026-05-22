@@ -10,7 +10,7 @@ private struct MiniPlayerContentInsetModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content.safeAreaInset(edge: .bottom, spacing: 0) {
-            if model.hasManualSonosHost {
+            if model.hasActiveSonosControlTarget {
                 Color.clear
                     .frame(height: MiniPlayerLayout.contentInset)
             }

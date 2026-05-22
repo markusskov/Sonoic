@@ -58,14 +58,14 @@ struct PlayerSheetView: View {
 
                         PlayerFullscreenVolumeBar(
                             volume: volumeBinding,
-                            isEnabled: model.hasManualSonosHost,
+                            isEnabled: model.hasActiveSonosControlTarget,
                             volumeEditingChanged: handleVolumeEditingChanged
                         )
 
                         PlayerFullscreenSonosActions(
                             activeTargetSystemImage: model.activeTarget.kind.systemImage,
                             muteButtonSystemImage: muteButtonSystemImage,
-                            isEnabled: model.hasManualSonosHost,
+                            isEnabled: model.hasActiveSonosControlTarget,
                             openRooms: openRooms,
                             toggleMute: toggleMute,
                             openQueue: openQueue

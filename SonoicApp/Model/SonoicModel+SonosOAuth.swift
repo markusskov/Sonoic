@@ -191,7 +191,7 @@ extension SonoicModel {
             markSonosControlAPIAuthorizationReady()
             if sonosControlAPIState.settings.mode == .off {
                 var settings = sonosControlAPIState.settings
-                settings.mode = .fallback
+                settings.mode = .preferred
                 updateSonosControlAPISettings(settings)
             }
             await refreshSonosControlAPICloudSnapshot()

@@ -48,7 +48,7 @@ extension SonoicModel {
     }
 
     private var allowsLocalSourcePlaybackFallback: Bool {
-        sonosControlAPIState.settings.mode != .preferred
+        !sonosControlAPIState.settings.mode.canSendCommands
     }
 
     func canPlaySourcePlaylistQueue(

@@ -514,7 +514,7 @@ extension SonoicModel {
             throw SonosControlAPICommandUnavailableError()
         }
 
-        if activeTarget.kind == .group {
+        if activeTarget.kind == .group || !hasManualSonosHost {
             let volume = try await sonosControlAPIClient.groupVolume(
                 groupID: context.groupID,
                 accessToken: context.accessToken
@@ -535,7 +535,7 @@ extension SonoicModel {
             throw SonosControlAPICommandUnavailableError()
         }
 
-        if activeTarget.kind == .group {
+        if activeTarget.kind == .group || !hasManualSonosHost {
             try await sonosControlAPIClient.setGroupVolume(
                 groupID: context.groupID,
                 level: level,
@@ -556,7 +556,7 @@ extension SonoicModel {
             throw SonosControlAPICommandUnavailableError()
         }
 
-        if activeTarget.kind == .group {
+        if activeTarget.kind == .group || !hasManualSonosHost {
             try await sonosControlAPIClient.setGroupMute(
                 groupID: context.groupID,
                 isMuted: isMuted,

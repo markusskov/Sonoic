@@ -7,8 +7,27 @@ extension SonoicModel {
         manualSonosHost.sonoicNonEmptyTrimmed != nil
     }
 
+    var hasActiveSonosControlTarget: Bool {
+        hasManualSonosHost || hasSonosControlAPICommandTarget
+    }
+
+    var activeSonosControlTargetRefreshKey: String {
+        [
+            manualSonosHost.sonoicNonEmptyTrimmed ?? "",
+            sonosControlAPIState.settings.mode.rawValue,
+            sonosControlAPIState.settings.selectedHouseholdID?.sonoicNonEmptyTrimmed ?? "",
+            sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed ?? "",
+            String(describing: sonosControlAPIState.authorizationStatus)
+        ].joined(separator: "|")
+    }
+
+    private var hasSonosControlAPICommandTarget: Bool {
+        sonosControlAPIState.settings.mode.canSendCommands
+            && sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed != nil
+    }
+
     func refreshManualSonosPlayerState(forceRoomRefresh: Bool = true) async {
-        guard hasManualSonosHost else {
+        guard hasActiveSonosControlTarget else {
             manualHostRefreshStatus = .idle
             stopManualHostRefreshLoop()
             return
@@ -65,7 +84,7 @@ extension SonoicModel {
     }
 
     private var shouldRunManualHostRefreshLoop: Bool {
-        guard hasManualSonosHost else {
+        guard hasActiveSonosControlTarget else {
             return false
         }
 
