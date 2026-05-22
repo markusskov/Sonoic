@@ -15,7 +15,7 @@ struct SourceItemNavigationRow: View {
     @State private var actionFailure: SourceActionFailure?
 
     private var canPlay: Bool {
-        playOverride != nil || model.canPlaySourceItem(item)
+        playOverride != nil || (item.kind == .song && model.canPlaySourceItem(item))
     }
 
     private var shouldPlayOnRowTap: Bool {

@@ -151,7 +151,11 @@ private struct AppleMusicLibraryGridCard: View {
     let item: SonoicSourceItem
 
     private var exactPlaybackCandidate: SonoicSonosPlaybackCandidate? {
-        model.appleMusicExactPlaybackCandidate(for: item)
+        guard item.kind == .song else {
+            return nil
+        }
+
+        return model.appleMusicExactPlaybackCandidate(for: item)
     }
 
     var body: some View {
