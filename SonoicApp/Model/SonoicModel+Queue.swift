@@ -21,7 +21,7 @@ extension SonoicModel {
     }
 
     func refreshQueue(showLoading: Bool = true) async {
-        if sonosControlAPIState.settings.mode.canSendCommands,
+        if sonosControlAPIState.canSendCommands,
            let snapshot = sonosControlAPICloudQueueSnapshot(
                currentItemIndex: queueState.snapshot?.currentItemIndex,
                sourceURI: queueState.snapshot?.sourceURI
@@ -143,7 +143,7 @@ extension SonoicModel {
     }
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
-        if sonosControlAPIState.settings.mode.canSendCommands,
+        if sonosControlAPIState.canSendCommands,
            let snapshot = sonosControlAPICloudQueueSnapshot(
                currentItemIndex: queueState.snapshot?.currentItemIndex,
                sourceURI: queueState.snapshot?.sourceURI

@@ -78,9 +78,11 @@ extension SonoicModel {
                 sonoicPlaybackDebugLog("\(logPrefix) refreshToken start")
             }
 
+            let refreshGeneration = sonosControlAPITokenRefreshGeneration
             let refreshTask = Task { @MainActor in
                 await refreshSonosControlAPITokenSet(
                     refreshToken: refreshToken,
+                    generation: refreshGeneration,
                     logPrefix: logPrefix
                 )
             }
@@ -104,6 +106,7 @@ extension SonoicModel {
 
     private func refreshSonosControlAPITokenSet(
         refreshToken: String,
+        generation: Int,
         logPrefix: String?
     ) async -> SonosOAuthTokenSet? {
         do {
@@ -115,9 +118,9 @@ extension SonoicModel {
                 refreshedTokenSet.refreshToken = refreshToken
             }
 
-            guard !Task.isCancelled else {
+            guard canCommitSonosControlAPITokenRefresh(generation: generation) else {
                 if let logPrefix {
-                    sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false cancelled=true")
+                    sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false cancelled=true generation=\(generation)")
                 }
                 return nil
             }
@@ -164,6 +167,9 @@ extension SonoicModel {
             return
         }
 
+        sonosControlAPITokenRefreshGeneration += 1
+        sonosControlAPITokenRefreshTask?.cancel()
+        sonosControlAPITokenRefreshTask = nil
         sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .connecting)
 
         do {
@@ -199,6 +205,7 @@ extension SonoicModel {
 
     func disconnectSonosAccount() {
         do {
+            sonosControlAPITokenRefreshGeneration += 1
             sonosControlAPITokenRefreshTask?.cancel()
             sonosControlAPITokenRefreshTask = nil
             try keychainStore.deleteSonosTokenSet()
@@ -209,6 +216,10 @@ extension SonoicModel {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .failed(error.localizedDescription))
             markSonosControlAPIAuthorizationUnavailable(error.localizedDescription)
         }
+    }
+
+    private func canCommitSonosControlAPITokenRefresh(generation: Int) -> Bool {
+        !Task.isCancelled && sonosControlAPITokenRefreshGeneration == generation
     }
 
     func refreshSonosControlAPICloudSnapshotIfConnected() {
