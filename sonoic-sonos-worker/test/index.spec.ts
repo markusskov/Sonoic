@@ -217,6 +217,7 @@ describe('Sonoic Cloud Queue worker', () => {
 		expect(response.status).toBe(201);
 		const body = (await response.json()) as Record<string, unknown>;
 		expect(body.queueId).toEqual(expect.any(String));
+		expect(body.queueBaseUrl).toContain('https://sonos.ryvus.app');
 		expect(body.queueBaseUrl).toContain(`/cloud-queues/${body.queueId}/v2.3`);
 		expect(body.startItemId).toBe('sonoic-track-2');
 		expect(body.trackMetadata).toMatchObject({ name: 'Track 2' });

@@ -7,6 +7,7 @@ const CLOUD_QUEUE_API_VERSION = 'v2.3';
 const CLOUD_QUEUE_STORAGE_PREFIX = 'cloud-queue:';
 const CLOUD_QUEUE_TTL_SECONDS = 24 * 60 * 60;
 const CLOUD_QUEUE_MAX_WINDOW_ITEMS = 20;
+const EXTERNAL_ORIGIN_HEADER = 'X-Sonoic-External-Origin';
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -204,7 +205,7 @@ export class SonoicCloudQueues {
 		};
 
 		await this.state.storage.put(`${CLOUD_QUEUE_STORAGE_PREFIX}${queueId}`, record);
-		const queueBaseUrl = `${new URL(request.url).origin}/cloud-queues/${queueId}/${CLOUD_QUEUE_API_VERSION}`;
+		const queueBaseUrl = `${externalOrigin(request)}/cloud-queues/${queueId}/${CLOUD_QUEUE_API_VERSION}`;
 		const startItem = items.find((item) => item.id === startItemId) ?? items[0];
 		const responseBody: JsonObject = {
 			queueId,
@@ -549,7 +550,26 @@ async function callSonoicCloudQueues(env: WorkerEnv, path: string, request: Requ
 
 	const id = namespace.idFromName('global');
 	const stub = namespace.get(id);
-	return await stub.fetch(new Request(new URL(path, 'https://sonoic-cloud-queues'), request));
+	const headers = new Headers(request.headers);
+	headers.set(EXTERNAL_ORIGIN_HEADER, new URL(request.url).origin);
+	return await stub.fetch(new Request(new URL(path, 'https://sonoic-cloud-queues'), {
+		method: request.method,
+		headers,
+		body: request.body,
+	}));
+}
+
+function externalOrigin(request: Request): string {
+	const value = request.headers.get(EXTERNAL_ORIGIN_HEADER);
+	if (!value) {
+		return new URL(request.url).origin;
+	}
+
+	try {
+		return new URL(value).origin;
+	} catch {
+		return new URL(request.url).origin;
+	}
 }
 
 function validateRedirectURI(env: WorkerEnv, redirectURI: string): void {
