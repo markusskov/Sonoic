@@ -662,6 +662,10 @@ extension SonoicModel {
 
             let playbackStatus = try await refreshedPlaybackStatus
             let metadataStatus = try await refreshedMetadataStatus
+            restoreSonosControlAPICloudQueueContextIfNeeded(
+                groupID: context.groupID,
+                queueVersion: nil
+            )
             updateSonosControlAPICloudQueueCurrentItem(itemID: playbackStatus.itemId)
             var nextNowPlaying = sonosControlAPINowPlayingSnapshot(
                 playbackStatus: playbackStatus,

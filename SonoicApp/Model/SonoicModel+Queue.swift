@@ -21,6 +21,11 @@ extension SonoicModel {
     }
 
     func refreshQueue(showLoading: Bool = true) async {
+        restoreSonosControlAPICloudQueueContextIfNeeded(
+            groupID: sonosControlAPICloudQueueGroupID ?? sonosControlAPIState.settings.selectedGroupID,
+            queueVersion: nil
+        )
+
         if sonosControlAPIState.canSendCommands,
            let snapshot = sonosControlAPICloudQueueSnapshot(
                currentItemIndex: queueState.snapshot?.currentItemIndex,
@@ -143,6 +148,11 @@ extension SonoicModel {
     }
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
+        restoreSonosControlAPICloudQueueContextIfNeeded(
+            groupID: sonosControlAPICloudQueueGroupID ?? sonosControlAPIState.settings.selectedGroupID,
+            queueVersion: nil
+        )
+
         if sonosControlAPIState.canSendCommands,
            let snapshot = sonosControlAPICloudQueueSnapshot(
                currentItemIndex: queueState.snapshot?.currentItemIndex,
@@ -476,28 +486,30 @@ extension SonoicModel {
         currentItemIndex: Int? = nil,
         sourceURI: String? = nil
     ) -> SonosQueueSnapshot? {
-        guard let payloads = manualQueueContextPayloads,
-              !payloads.isEmpty
-        else {
+        let payloads = manualQueueContextPayloads ?? []
+        let tracks = sonosControlAPICloudQueueTracks ?? []
+        let itemIDs = sonosControlAPICloudQueueItemIDs
+        let itemCount = max(payloads.count, tracks.count, itemIDs?.count ?? 0)
+
+        guard itemCount > 0 else {
             return nil
         }
 
-        let tracks = sonosControlAPICloudQueueTracks
-        let itemIDs = sonosControlAPICloudQueueItemIDs
-        let items = payloads.enumerated().map { index, payload in
-            let subtitleParts = payload.subtitle?
+        let items = (0..<itemCount).map { index in
+            let payload = payloads.indices.contains(index) ? payloads[index] : nil
+            let track = tracks.indices.contains(index) ? tracks[index] : nil
+            let subtitleParts = payload?.subtitle?
                 .components(separatedBy: "•")
                 .map(\.sonoicTrimmed)
                 .filter { !$0.isEmpty } ?? []
-            let track = tracks.flatMap { $0.indices.contains(index) ? $0[index] : nil }
             let itemID = itemIDs.flatMap { $0.indices.contains(index) ? $0[index] : nil }
             return SonosQueueItem(
-                id: itemID ?? payload.id,
-                title: track?.name?.sonoicNonEmptyTrimmed ?? payload.title,
+                id: itemID ?? payload?.id ?? "sonoic-cloud-queue-\(index + 1)",
+                title: track?.name?.sonoicNonEmptyTrimmed ?? payload?.title ?? "Unknown Track",
                 artistName: track?.artist?.name.sonoicNonEmptyTrimmed ?? subtitleParts.first,
                 albumTitle: track?.album?.name.sonoicNonEmptyTrimmed ?? subtitleParts.dropFirst().first,
-                artworkURL: track?.imageUrl?.sonoicNonEmptyTrimmed ?? payload.artworkURL,
-                duration: track?.durationMillis.map { TimeInterval($0) / 1_000 } ?? payload.duration
+                artworkURL: track?.imageUrl?.sonoicNonEmptyTrimmed ?? payload?.artworkURL,
+                duration: track?.durationMillis.map { TimeInterval($0) / 1_000 } ?? payload?.duration
             )
         }
 
