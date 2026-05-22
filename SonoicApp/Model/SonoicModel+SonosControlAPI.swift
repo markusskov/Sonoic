@@ -40,6 +40,7 @@ extension SonoicModel {
         sonosControlAPIState.authorizationStatus = .notConfigured
         sonosControlAPIState.lastErrorDetail = detail
         sonosControlAPIState.lastUpdatedAt = .now
+        clearSonosControlAPICloudQueueContext()
     }
 
     func activeSonosControlAPIGroupID() -> String? {
