@@ -520,17 +520,22 @@ extension SonoicModel {
         )
     }
 
-    func updateSonosControlAPICloudQueueCurrentItem(itemID: String?) {
-        guard let itemID = itemID?.sonoicNonEmptyTrimmed,
-              let itemIDs = sonosControlAPICloudQueueItemIDs,
-              let currentIndex = itemIDs.firstIndex(of: itemID)
-                ?? Int(itemID).flatMap({ itemIDs.indices.contains($0 - 1) ? $0 - 1 : nil }),
+    @discardableResult
+    func updateSonosControlAPICloudQueueCurrentItem(itemID: String?) -> Bool {
+        updateSonosControlAPICloudQueueCurrentItem(itemIDCandidates: [itemID])
+    }
+
+    @discardableResult
+    func updateSonosControlAPICloudQueueCurrentItem(itemIDCandidates: [String?]) -> Bool {
+        guard let currentIndex = sonosControlAPICloudQueueCurrentIndex(
+            from: itemIDCandidates
+        ),
               let snapshot = sonosControlAPICloudQueueSnapshot(
                 currentItemIndex: currentIndex,
                 sourceURI: queueState.snapshot?.sourceURI
               )
         else {
-            return
+            return false
         }
 
         queueState = .loaded(snapshot)
@@ -540,6 +545,18 @@ extension SonoicModel {
             itemCount: snapshot.items.count,
             lastRefreshErrorDetail: queueDiagnostics.lastRefreshErrorDetail,
             lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+        )
+        return true
+    }
+
+    private func sonosControlAPICloudQueueCurrentIndex(from itemIDCandidates: [String?]) -> Int? {
+        guard let itemIDs = sonosControlAPICloudQueueItemIDs else {
+            return nil
+        }
+
+        return SonoicSonosControlAPIQueueCurrentIndexResolver.currentIndex(
+            itemIDs: itemIDs,
+            candidates: itemIDCandidates
         )
     }
 }

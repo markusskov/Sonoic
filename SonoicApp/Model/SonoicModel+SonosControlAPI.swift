@@ -4,8 +4,8 @@ extension SonoicModel {
     private static let sonosControlAPITransportSyncDelay: Duration = .milliseconds(350)
     private static let sonosControlAPISeekPollDelay: Duration = .milliseconds(350)
     private static let sonosControlAPISeekPollAttempts = 5
-    private static let sonosControlAPISeekSlotWaitDelay: Duration = .milliseconds(80)
-    private static let sonosControlAPISeekSlotWaitAttempts = 8
+    private static let sonosControlAPISeekSlotWaitDelay: Duration = .milliseconds(100)
+    private static let sonosControlAPISeekSlotWaitAttempts = 36
 
     private struct SonosControlAPICommandContext {
         var householdID: String?
@@ -236,15 +236,22 @@ extension SonoicModel {
                 groupID: context.groupID,
                 accessToken: context.accessToken
             )
+            let metadataStatus = try? await sonosControlAPIClient.playbackMetadata(
+                groupID: context.groupID,
+                accessToken: context.accessToken
+            )
             if status.availablePlaybackActions?.canSeek == false {
                 throw SonosControlAPISeekFailure.unsupported
             }
+            if metadataStatus?.currentItem?.policies?.canSeek == false {
+                throw SonosControlAPISeekFailure.unsupported
+            }
             sonoicPlaybackDebugLog(
-                "cloudseek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) positionMillis=\(String(describing: status.positionMillis))"
+                "cloudseek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) metadataItemID=\(sonoicPlaybackDebugID(metadataStatus?.currentItem?.id)) positionMillis=\(String(describing: status.positionMillis))"
             )
             let didRestoreCloudQueueContext = restoreSonosControlAPICloudQueueContextIfNeeded(
                 groupID: context.groupID,
-                queueVersion: nil
+                queueVersion: status.queueVersion
             )
             sonoicPlaybackDebugLog(
                 "cloudseek cloudQueueContext restored=\(didRestoreCloudQueueContext) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0) rawItemID=\(sonoicPlaybackDebugID(status.itemId)) queueVersion=\(sonoicPlaybackDebugID(status.queueVersion))"
@@ -255,38 +262,19 @@ extension SonoicModel {
             )
             requestedAt = Date()
             let targetMillis = Int((boundedElapsedTime * 1_000).rounded())
-            if let sessionSeekTarget = sonosControlAPICloudQueueSeekTarget(from: status) {
+            if let sessionSeekTarget = sonosControlAPICloudQueueSeekTarget(
+                from: status,
+                metadataStatus: metadataStatus
+            ) {
                 sonoicPlaybackDebugLog(
                     "cloudseek sessionSeek itemID=\(sonoicPlaybackDebugID(sessionSeekTarget.itemID)) session=\(sonoicPlaybackDebugID(sessionSeekTarget.sessionID)) targetMillis=\(targetMillis)"
                 )
-                do {
-                    try await sonosControlAPIClient.seekPlaybackSession(
-                        sessionID: sessionSeekTarget.sessionID,
-                        itemID: sessionSeekTarget.itemID,
-                        positionMillis: targetMillis,
-                        accessToken: context.accessToken
-                    )
-                } catch {
-                    if sonosControlAPIError(error, matchesStatus: 499, detailContains: "ERROR_DISALLOWED_BY_POLICY") {
-                        sonoicPlaybackDebugLog(
-                            "cloudseek sessionSeekDisallowed retrySkipToItem itemID=\(sonoicPlaybackDebugID(sessionSeekTarget.itemID)) error='\(error.localizedDescription)'"
-                        )
-                    } else {
-                        sonoicPlaybackDebugLog(
-                            "cloudseek sessionSeekFailed retrySkipToItem itemID=\(sonoicPlaybackDebugID(sessionSeekTarget.itemID)) error='\(error.localizedDescription)'"
-                        )
-                    }
-
-                    try await sonosControlAPIClient.skipToItem(
-                        sessionID: sessionSeekTarget.sessionID,
-                        itemID: sessionSeekTarget.itemID,
-                        queueVersion: sonosControlAPICloudQueueVersion,
-                        positionMillis: targetMillis,
-                        playOnCompletion: nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering,
-                        trackMetadata: sessionSeekTarget.track,
-                        accessToken: context.accessToken
-                    )
-                }
+                try await sonosControlAPIClient.seekPlaybackSession(
+                    sessionID: sessionSeekTarget.sessionID,
+                    itemID: sessionSeekTarget.itemID,
+                    positionMillis: targetMillis,
+                    accessToken: context.accessToken
+                )
                 try await confirmSonosControlAPISeek(
                     groupID: context.groupID,
                     accessToken: context.accessToken,
@@ -302,9 +290,9 @@ extension SonoicModel {
 
             if sonosControlAPIHasCloudQueueContext {
                 sonoicPlaybackDebugLog(
-                    "cloudseek sessionContextUnmapped noGroupFallback=true rawItemID=\(sonoicPlaybackDebugID(status.itemId)) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0)"
+                    "cloudseek sessionContextUnmapped clearingContextForGroupSeek rawItemID=\(sonoicPlaybackDebugID(status.itemId)) metadataItemID=\(sonoicPlaybackDebugID(metadataStatus?.currentItem?.id)) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0)"
                 )
-                throw SonosControlAPISeekFailure.sessionItemUnavailable
+                clearSonosControlAPICloudQueueContext()
             }
 
             var lastSeekError: Error?
@@ -470,11 +458,19 @@ extension SonoicModel {
             return [SonosControlAPISeekItemIDCandidate(label: "omitted", itemID: nil)]
         }
 
-        return [SonosControlAPISeekItemIDCandidate(label: "status", itemID: statusItemID)]
+        guard Int(statusItemID) == nil else {
+            return [SonosControlAPISeekItemIDCandidate(label: "omitted", itemID: nil)]
+        }
+
+        return [
+            SonosControlAPISeekItemIDCandidate(label: "status", itemID: statusItemID),
+            SonosControlAPISeekItemIDCandidate(label: "omitted", itemID: nil)
+        ]
     }
 
     private func sonosControlAPICloudQueueSeekTarget(
-        from status: SonosControlAPIPlaybackStatus
+        from status: SonosControlAPIPlaybackStatus,
+        metadataStatus: SonosControlAPIMetadataStatus?
     ) -> (sessionID: String, itemID: String, track: SonosControlAPITrack?)? {
         guard let sessionID = sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed,
               let itemIDs = sonosControlAPICloudQueueItemIDs,
@@ -483,7 +479,11 @@ extension SonoicModel {
             return nil
         }
 
-        if let index = sonosControlAPICloudQueueCurrentIndex(from: status, itemIDs: itemIDs),
+        if let index = sonosControlAPICloudQueueCurrentIndex(
+            from: status,
+            metadataStatus: metadataStatus,
+            itemIDs: itemIDs
+        ),
            itemIDs.indices.contains(index),
            let itemID = itemIDs[index].sonoicNonEmptyTrimmed
         {
@@ -508,40 +508,22 @@ extension SonoicModel {
 
     private func sonosControlAPICloudQueueCurrentIndex(
         from status: SonosControlAPIPlaybackStatus,
+        metadataStatus: SonosControlAPIMetadataStatus?,
         itemIDs: [String]
     ) -> Int? {
-        if let statusItemID = status.itemId?.sonoicNonEmptyTrimmed {
-            if let exactIndex = itemIDs.firstIndex(of: statusItemID) {
-                return exactIndex
-            }
-
-            if let oneBasedIndex = Int(statusItemID),
-               itemIDs.indices.contains(oneBasedIndex - 1)
-            {
-                return oneBasedIndex - 1
-            }
-
-            sonoicPlaybackDebugLog(
-                "cloudseek sessionItemUnmapped rawItemID=\(sonoicPlaybackDebugID(statusItemID)) cloudQueueItems=\(itemIDs.count)"
-            )
-            return nil
-        }
-
-        if let currentIndex = queueState.snapshot?.currentItemIndex,
-           itemIDs.indices.contains(currentIndex)
-        {
-            return currentIndex
-        }
-
-        if let payloadID = manualPlaybackContextPayload?.id,
-           let payloads = manualQueueContextPayloads,
-           let payloadIndex = payloads.firstIndex(where: { $0.id == payloadID }),
-           itemIDs.indices.contains(payloadIndex)
-        {
-            return payloadIndex
-        }
-
-        return nil
+        SonoicSonosControlAPIQueueCurrentIndexResolver.currentIndex(
+            itemIDs: itemIDs,
+            candidates: [
+                status.itemId,
+                metadataStatus?.currentItem?.id,
+                queueState.snapshot?.currentItemIndex.map { String($0 + 1) },
+                manualPlaybackContextPayload.flatMap { payload in
+                    manualQueueContextPayloads?.firstIndex { $0.id == payload.id }.map {
+                        String($0 + 1)
+                    }
+                }
+            ]
+        )
     }
 
     func fetchSonosControlAPIActiveTargetVolume() async throws -> SonoicExternalControlState.Volume {
@@ -699,9 +681,14 @@ extension SonoicModel {
             let metadataStatus = try await refreshedMetadataStatus
             restoreSonosControlAPICloudQueueContextIfNeeded(
                 groupID: context.groupID,
-                queueVersion: nil
+                queueVersion: playbackStatus.queueVersion
             )
-            updateSonosControlAPICloudQueueCurrentItem(itemID: playbackStatus.itemId)
+            updateSonosControlAPICloudQueueCurrentItem(
+                itemIDCandidates: [
+                    playbackStatus.itemId,
+                    metadataStatus.currentItem?.id
+                ]
+            )
             var nextNowPlaying = sonosControlAPINowPlayingSnapshot(
                 playbackStatus: playbackStatus,
                 metadataStatus: metadataStatus,
