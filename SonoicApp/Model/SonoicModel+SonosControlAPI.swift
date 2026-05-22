@@ -287,6 +287,16 @@ extension SonoicModel {
                         accessToken: context.accessToken
                     )
                 }
+                try await confirmSonosControlAPISeek(
+                    groupID: context.groupID,
+                    accessToken: context.accessToken,
+                    targetElapsedTime: boundedElapsedTime,
+                    requestedAt: requestedAt,
+                    observedElapsedTime: &observedElapsedTime,
+                    observedPlaybackState: &observedPlaybackState,
+                    didConfirmSeek: &didConfirmSeek,
+                    pollingErrorDetail: &pollingErrorDetail
+                )
                 return
             }
 
@@ -333,37 +343,16 @@ extension SonoicModel {
             if let lastSeekError {
                 throw lastSeekError
             }
-            for attempt in 1 ... Self.sonosControlAPISeekPollAttempts {
-                try await Task.sleep(for: Self.sonosControlAPISeekPollDelay)
-                let observedStatus: SonosControlAPIPlaybackStatus
-                do {
-                    observedStatus = try await sonosControlAPIClient.playbackStatus(
-                        groupID: context.groupID,
-                        accessToken: context.accessToken
-                    )
-                } catch {
-                    pollingErrorDetail = error.localizedDescription
-                    sonoicPlaybackDebugLog(
-                        "cloudseek pollFailed attempt=\(attempt) target=\(boundedElapsedTime) error='\(error.localizedDescription)'"
-                    )
-                    return
-                }
-                observedPlaybackState = observedStatus.playbackState
-                observedElapsedTime = observedStatus.positionMillis.map { TimeInterval($0) / 1_000 }
-                sonoicPlaybackDebugLog(
-                    "cloudseek poll attempt=\(attempt) target=\(boundedElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState)) itemID=\(sonoicPlaybackDebugID(observedStatus.itemId))"
-                )
-                if SonosSeekConfirmation.isConfirmed(
-                    targetElapsedTime: boundedElapsedTime,
-                    observedElapsedTime: observedElapsedTime,
-                    requestedAt: requestedAt,
-                    observedAt: .now,
-                    playbackState: observedPlaybackState
-                ) {
-                    didConfirmSeek = true
-                    return
-                }
-            }
+            try await confirmSonosControlAPISeek(
+                groupID: context.groupID,
+                accessToken: context.accessToken,
+                targetElapsedTime: boundedElapsedTime,
+                requestedAt: requestedAt,
+                observedElapsedTime: &observedElapsedTime,
+                observedPlaybackState: &observedPlaybackState,
+                didConfirmSeek: &didConfirmSeek,
+                pollingErrorDetail: &pollingErrorDetail
+            )
         }
 
         if didSeek {
@@ -411,6 +400,49 @@ extension SonoicModel {
             errorDetail: sonosControlAPIState.lastErrorDetail
         )
         return false
+    }
+
+    private func confirmSonosControlAPISeek(
+        groupID: String,
+        accessToken: String,
+        targetElapsedTime: TimeInterval,
+        requestedAt: Date,
+        observedElapsedTime: inout TimeInterval?,
+        observedPlaybackState: inout SonosControlAPIPlaybackState?,
+        didConfirmSeek: inout Bool,
+        pollingErrorDetail: inout String?
+    ) async throws {
+        for attempt in 1 ... Self.sonosControlAPISeekPollAttempts {
+            try await Task.sleep(for: Self.sonosControlAPISeekPollDelay)
+            let observedStatus: SonosControlAPIPlaybackStatus
+            do {
+                observedStatus = try await sonosControlAPIClient.playbackStatus(
+                    groupID: groupID,
+                    accessToken: accessToken
+                )
+            } catch {
+                pollingErrorDetail = error.localizedDescription
+                sonoicPlaybackDebugLog(
+                    "cloudseek pollFailed attempt=\(attempt) target=\(targetElapsedTime) error='\(error.localizedDescription)'"
+                )
+                return
+            }
+            observedPlaybackState = observedStatus.playbackState
+            observedElapsedTime = observedStatus.positionMillis.map { TimeInterval($0) / 1_000 }
+            sonoicPlaybackDebugLog(
+                "cloudseek poll attempt=\(attempt) target=\(targetElapsedTime) observed=\(String(describing: observedElapsedTime)) state=\(String(describing: observedPlaybackState)) itemID=\(sonoicPlaybackDebugID(observedStatus.itemId))"
+            )
+            if SonosSeekConfirmation.isConfirmed(
+                targetElapsedTime: targetElapsedTime,
+                observedElapsedTime: observedElapsedTime,
+                requestedAt: requestedAt,
+                observedAt: .now,
+                playbackState: observedPlaybackState
+            ) {
+                didConfirmSeek = true
+                return
+            }
+        }
     }
 
     private func waitForSonosControlAPISeekTransportSlot(target: TimeInterval) async -> Bool {
@@ -1319,15 +1351,12 @@ extension SonoicModel {
                 return nil
             }
 
-            let baseQueueItemID = sonosControlAPICloudQueueItemID(index: index, objectID: objectID, item: pair.0)
-            var queueItemID = baseQueueItemID
-            if seenItemIDs.contains(queueItemID) {
-                var suffix = index + 1
-                repeat {
-                    queueItemID = sonosControlAPICloudQueueItemID(baseQueueItemID, suffix: suffix)
-                    suffix += 1
-                } while seenItemIDs.contains(queueItemID)
-            }
+            let queueItemID = SonoicSonosControlAPIQueueItemIDBuilder.uniqueID(
+                index: index,
+                objectID: objectID,
+                itemID: pair.0.id,
+                usedIDs: seenItemIDs
+            )
             seenItemIDs.insert(queueItemID)
 
             queueItems.append(SonosControlAPIQueueItem(
@@ -1541,28 +1570,6 @@ extension SonoicModel {
         }
 
         return nil
-    }
-
-    private func sonosControlAPICloudQueueItemID(
-        index: Int,
-        objectID: String,
-        item: SonoicSourceItem
-    ) -> String {
-        let rawValue = "sonoic-\(index + 1)-\(objectID)-\(item.id)"
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_.~"))
-        let sanitizedScalars = rawValue.unicodeScalars.map { scalar in
-            allowed.contains(scalar) ? Character(scalar) : "-"
-        }
-        let sanitized = String(sanitizedScalars)
-            .replacingOccurrences(of: "--+", with: "-", options: .regularExpression)
-            .sonoicTrimmed
-        return String(sanitized.prefix(128))
-    }
-
-    private func sonosControlAPICloudQueueItemID(_ id: String, suffix: Int) -> String {
-        let suffixValue = "-\(suffix)"
-        let maxBaseLength = max(0, 128 - suffixValue.count)
-        return "\(String(id.prefix(maxBaseLength)))\(suffixValue)"
     }
 
     private func sonosControlAPISubtitleParts(from subtitle: String?) -> [String] {
