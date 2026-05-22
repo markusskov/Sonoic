@@ -232,6 +232,10 @@ struct PlayerProgressSection: View {
     }
 
     private func scheduleSeek(_ elapsedSeconds: TimeInterval, pendingTarget: PendingSeekTarget?) {
+        pendingSeekTask?.cancel()
+        pendingSeekTask = nil
+        pendingSeekTaskID = nil
+
         let pendingTargetID = pendingTarget?.id
         let taskID = UUID()
         pendingSeekTaskID = taskID
