@@ -464,12 +464,6 @@ extension SonoicModel {
         from status: SonosControlAPIPlaybackStatus,
         itemIDs: [String]
     ) -> Int? {
-        if let currentIndex = queueState.snapshot?.currentItemIndex,
-           itemIDs.indices.contains(currentIndex)
-        {
-            return currentIndex
-        }
-
         if let statusItemID = status.itemId?.sonoicNonEmptyTrimmed {
             if let exactIndex = itemIDs.firstIndex(of: statusItemID) {
                 return exactIndex
@@ -480,6 +474,12 @@ extension SonoicModel {
             {
                 return oneBasedIndex - 1
             }
+        }
+
+        if let currentIndex = queueState.snapshot?.currentItemIndex,
+           itemIDs.indices.contains(currentIndex)
+        {
+            return currentIndex
         }
 
         if let payloadID = manualPlaybackContextPayload?.id,
