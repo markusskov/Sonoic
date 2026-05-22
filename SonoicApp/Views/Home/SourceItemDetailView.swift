@@ -26,7 +26,7 @@ struct SourceItemDetailView: View {
         model.sourceFavoriteObjectID(for: item)
     }
 
-    private var canPlayPlaylistFallback: Bool {
+    private var canPlayContainerFallback: Bool {
         model.sourcePlaylistFallbackPayload(for: item) != nil
     }
 
@@ -47,17 +47,17 @@ struct SourceItemDetailView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         SourceItemDetailHeader(item: item)
 
-                        if item.kind == .playlist {
-                            if canPlayPlaylistQueue || canPlayPlaylistFallback {
+                        if item.kind.isPlayableContainer {
+                            if canPlayContainerQueue || canPlayContainerFallback {
                                 SourcePlaylistActionRow(
                                     isFavorite: isPlaylistFavorited,
-                                    canShuffle: canPlayPlaylistQueue,
+                                    canShuffle: canPlayContainerQueue,
                                     canFavorite: canFavoriteItem,
                                     shuffle: {
-                                        await playPlaylistQueue(shuffled: true)
+                                        await playContainerQueue(shuffled: true)
                                     },
                                     play: {
-                                        await playPlaylist()
+                                        await playContainer()
                                     },
                                     favorite: {
                                         await togglePlaylistFavorite()
@@ -171,28 +171,28 @@ struct SourceItemDetailView: View {
         }
     }
 
-    private var playlistTrackItems: [SonoicSourceItem] {
-        guard item.kind == .playlist else {
+    private var containerTrackItems: [SonoicSourceItem] {
+        guard item.kind.isPlayableContainer else {
             return []
         }
 
         return state.sections.flatMap(\.items).filter { $0.kind == .song }
     }
 
-    private var canPlayPlaylistQueue: Bool {
-        model.canPlaySourcePlaylistQueue(parentItem: item, trackItems: playlistTrackItems)
+    private var canPlayContainerQueue: Bool {
+        model.canPlaySourcePlaylistQueue(parentItem: item, trackItems: containerTrackItems)
     }
 
-    private func playPlaylistQueue(shuffled: Bool) async {
+    private func playContainerQueue(shuffled: Bool) async {
         await model.playSourcePlaylistQueue(
             parentItem: item,
-            trackItems: playlistTrackItems,
+            trackItems: containerTrackItems,
             shuffled: shuffled
         )
     }
 
-    private func playPlaylist() async {
-        _ = try? await model.playSourcePlaylist(parentItem: item, trackItems: playlistTrackItems)
+    private func playContainer() async {
+        _ = try? await model.playSourcePlaylist(parentItem: item, trackItems: containerTrackItems)
     }
 
     private func togglePlaylistFavorite() async {
@@ -218,6 +218,12 @@ struct SourceItemDetailView: View {
         }
 
         await model.refreshSonosMusicServiceProbeIfNeeded()
+    }
+}
+
+private extension SonoicSourceItem.Kind {
+    var isPlayableContainer: Bool {
+        self == .playlist || self == .album
     }
 }
 
