@@ -272,7 +272,7 @@ extension SonoicModel {
                         itemID: sessionSeekTarget.itemID,
                         queueVersion: sonosControlAPICloudQueueVersion,
                         positionMillis: targetMillis,
-                        playOnCompletion: true,
+                        playOnCompletion: nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering,
                         trackMetadata: sessionSeekTarget.track,
                         accessToken: context.accessToken
                     )

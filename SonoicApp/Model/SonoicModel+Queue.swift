@@ -420,9 +420,9 @@ extension SonoicModel {
         {
             let inMemoryGroupID = sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed
             let inMemoryQueueVersion = sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed
-            if inMemoryGroupID == normalizedGroupID,
-               inMemoryQueueVersion == normalizedQueueVersion
-            {
+            let groupMatches = normalizedGroupID.map { inMemoryGroupID == $0 } ?? true
+            let queueVersionMatches = normalizedQueueVersion.map { inMemoryQueueVersion == $0 } ?? true
+            if groupMatches && queueVersionMatches {
                 return true
             }
 
