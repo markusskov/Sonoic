@@ -33,6 +33,7 @@ enum SonoicSourceAdapterError: LocalizedError {
 
 struct SonoicSourcePlaylistPlaybackPlan {
     var payloads: [SonosPlayablePayload]
+    var items: [SonoicSourceItem]
     var startingTrackNumber: Int
     var localNowPlayingPayload: SonosPlayablePayload?
     var recentPlaybackPayload: SonosPlayablePayload?
@@ -161,6 +162,7 @@ extension SonoicModel {
 
             return SonoicSourcePlaylistPlaybackPlan(
                 payloads: plan.payloads,
+                items: plan.items,
                 startingTrackNumber: plan.startingTrackNumber,
                 localNowPlayingPayload: plan.localNowPlayingPayload,
                 recentPlaybackPayload: plan.recentPlaybackPayload

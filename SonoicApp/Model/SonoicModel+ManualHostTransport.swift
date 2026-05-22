@@ -2,7 +2,6 @@ import Foundation
 
 extension SonoicModel {
     private static let manualTransportSyncDelay: Duration = .milliseconds(300)
-    private static let manualSeekSyncDelay: Duration = .milliseconds(700)
 
     func toggleManualSonosPlayback() async {
         switch nowPlaying.playbackState {
@@ -18,15 +17,8 @@ extension SonoicModel {
             return true
         }
 
-        guard hasManualSonosHost else {
-            return false
-        }
-
-        beginManualPlayTransitionGrace()
-        markLocalPlaybackState(.playing)
-        return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
-            try await avTransportClient.play(host: manualSonosHost)
-        }
+        sonoicPlaybackDebugLog("manualPlay cloudUnavailable noLocalTransportFallback=true")
+        return false
     }
 
     func pauseManualSonosPlayback() async -> Bool {
@@ -34,17 +26,8 @@ extension SonoicModel {
             return true
         }
 
-        guard hasManualSonosHost else {
-            return false
-        }
-
-        manualPlayTransitionGraceDeadline = nil
-        setManualPlayTransitionAwaitingConfirmation(false)
-        freezeLocalPlaybackTimeIfNeeded()
-        markLocalPlaybackState(.paused)
-        return await performManualTransportCommand(syncDelay: Self.manualTransportSyncDelay) {
-            try await avTransportClient.pause(host: manualSonosHost)
-        }
+        sonoicPlaybackDebugLog("manualPause cloudUnavailable noLocalTransportFallback=true")
+        return false
     }
 
     func skipToNextManualSonosTrack() async -> Bool {
@@ -52,22 +35,8 @@ extension SonoicModel {
             return true
         }
 
-        guard hasManualSonosHost else {
-            return false
-        }
-
-        manualPlaybackContextPayload = nil
-        if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
-            beginManualPlayTransitionGrace()
-            markLocalPlaybackState(.playing)
-        }
-
-        return await performManualTransportCommand(
-            syncDelay: Self.manualTransportSyncDelay,
-            refreshQueueAfterSuccess: true
-        ) {
-            try await avTransportClient.next(host: manualSonosHost)
-        }
+        sonoicPlaybackDebugLog("manualNext cloudUnavailable noLocalTransportFallback=true")
+        return false
     }
 
     func skipToPreviousManualSonosTrack() async -> Bool {
@@ -75,22 +44,8 @@ extension SonoicModel {
             return true
         }
 
-        guard hasManualSonosHost else {
-            return false
-        }
-
-        manualPlaybackContextPayload = nil
-        if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
-            beginManualPlayTransitionGrace()
-            markLocalPlaybackState(.playing)
-        }
-
-        return await performManualTransportCommand(
-            syncDelay: Self.manualTransportSyncDelay,
-            refreshQueueAfterSuccess: true
-        ) {
-            try await avTransportClient.previous(host: manualSonosHost)
-        }
+        sonoicPlaybackDebugLog("manualPrevious cloudUnavailable noLocalTransportFallback=true")
+        return false
     }
 
     func seekManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
@@ -105,82 +60,11 @@ extension SonoicModel {
             return true
         }
 
-        guard !isManualTransportCommandInFlight else {
-            sonoicPlaybackDebugLog("manualSeek blocked transportInFlight=true target=\(timeInterval)")
-            return false
-        }
-
-        guard hasManualSonosHost else {
-            clearManualSeekConfirmation()
-            nowPlaying = previousNowPlaying
-            nowPlayingObservedAt = previousObservedAt
-            sonoicPlaybackDebugLog("manualSeek failed noLocalHost target=\(timeInterval)")
-            return false
-        }
-
-        let boundedElapsedTime = markLocalSeek(to: timeInterval)
-        let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
-        sonoicPlaybackDebugLog(
-            "manualSeek localFallback start target=\(boundedElapsedTime) host=\(playbackHost)"
-        )
-        beginManualSeekConfirmation(to: boundedElapsedTime)
-        recordSeekDiagnostics(
-            status: .pending,
-            host: playbackHost,
-            target: boundedElapsedTime,
-            observed: nil,
-            errorDetail: nil
-        )
-
-        let didSeek = await performManualTransportCommand(syncDelay: Self.manualSeekSyncDelay) {
-            do {
-                try await avTransportClient.seek(host: playbackHost, timeInterval: boundedElapsedTime)
-                let observed = try? await avTransportClient.fetchSeekPosition(host: playbackHost)?.relativeTime
-                await MainActor.run {
-                    sonoicPlaybackDebugLog(
-                        "manualSeek localFallback commandSucceeded target=\(boundedElapsedTime) observed=\(String(describing: observed))"
-                    )
-                    self.recordSeekDiagnostics(
-                        status: .succeeded,
-                        host: playbackHost,
-                        target: boundedElapsedTime,
-                        observed: observed,
-                        errorDetail: nil
-                    )
-                }
-            } catch {
-                let observed = try? await avTransportClient.fetchSeekPosition(host: playbackHost)?.relativeTime
-                await MainActor.run {
-                    self.recordSeekDiagnostics(
-                        status: .failed,
-                        host: playbackHost,
-                        target: boundedElapsedTime,
-                        observed: observed,
-                        errorDetail: error.localizedDescription
-                    )
-                }
-                throw error
-            }
-        }
-
-        if !didSeek {
-            clearManualSeekConfirmation()
-            nowPlaying = previousNowPlaying
-            nowPlayingObservedAt = previousObservedAt
-            sonoicPlaybackDebugLog("manualSeek localFallback result=false target=\(boundedElapsedTime)")
-            if seekDiagnostics.status == .pending {
-                recordSeekDiagnostics(
-                    status: .failed,
-                    host: playbackHost,
-                    target: boundedElapsedTime,
-                    observed: nil,
-                    errorDetail: "The seek command did not run."
-                )
-            }
-        }
-
-        sonoicPlaybackDebugLog("manualSeek result=\(didSeek) target=\(boundedElapsedTime)")
-        return didSeek
+        clearManualSeekConfirmation()
+        nowPlaying = previousNowPlaying
+        nowPlayingObservedAt = previousObservedAt
+        sonoicPlaybackDebugLog("manualSeek cloudFailed noLocalTransportFallback=true target=\(timeInterval)")
+        return false
     }
 
     func recordSeekDiagnostics(
@@ -206,9 +90,14 @@ extension SonoicModel {
             return false
         }
 
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return await skipSonosControlAPICloudQueueItemIfAvailable(at: position)
+        }
+
         sonoicPlaybackDebugLog("queueSeek start position=\(position) host=\(manualSonosHost)")
         manualPlaybackContextPayload = nil
         manualQueueContextPayloads = nil
+        clearSonosControlAPICloudQueueContext()
         manualRecentPlaybackContextPayload = nil
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
@@ -230,6 +119,29 @@ extension SonoicModel {
         if await playSonosControlAPIFavoriteIfAvailable(favorite) {
             sonoicPlaybackDebugLog("manualFavorite cloudSuccess title='\(favorite.title)'")
             return true
+        }
+
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            if !favorite.isCollectionLike,
+               let payload = favorite.playablePayload
+            {
+                let sourceItem = SonoicSourceItem(favorite: favorite)
+                let plan = SonoicSourcePlaylistPlaybackPlan(
+                    payloads: [payload],
+                    items: [sourceItem],
+                    startingTrackNumber: 1,
+                    localNowPlayingPayload: payload,
+                    recentPlaybackPayload: payload
+                )
+                if await playSonosControlAPICloudQueueIfAvailable(parentItem: sourceItem, plan: plan) {
+                    recordRecentFavoritePlayback(favorite)
+                    sonoicPlaybackDebugLog("manualFavorite cloudQueueSuccess title='\(favorite.title)'")
+                    return true
+                }
+            }
+
+            sonoicPlaybackDebugLog("manualFavorite cloudFailed noLocalPlaybackFallback=true title='\(favorite.title)'")
+            return false
         }
 
         guard let payload = favorite.playablePayload else {
@@ -269,6 +181,7 @@ extension SonoicModel {
 
         beginManualPlayTransitionGrace()
         manualQueueContextPayloads = nil
+        clearSonosControlAPICloudQueueContext()
         manualRecentPlaybackContextPayload = nil
         manualPlaybackContextPayload = displayPayload
         markLocalNowPlaying(from: displayPayload)
@@ -339,6 +252,7 @@ extension SonoicModel {
 
         beginManualPlayTransitionGrace()
         manualQueueContextPayloads = preparedPayloads
+        clearSonosControlAPICloudQueueContext()
         manualRecentPlaybackContextPayload = preparedRecentPayload
         manualPlaybackContextPayload = confirmationPayload
         markLocalNowPlaying(from: displayPayload)

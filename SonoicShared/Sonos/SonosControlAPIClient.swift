@@ -193,6 +193,74 @@ struct SonosControlAPIClient {
         )
     }
 
+    func groupVolume(
+        groupID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIVolumeState {
+        try await transport.get(
+            "/groups/\(groupID)/groupVolume",
+            accessToken: accessToken
+        )
+    }
+
+    func setGroupVolume(
+        groupID: String,
+        level: Int,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/groupVolume",
+            accessToken: accessToken,
+            body: SonosControlAPISetVolumeRequest(volume: min(max(level, 0), 100))
+        )
+    }
+
+    func setGroupMute(
+        groupID: String,
+        isMuted: Bool,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/groups/\(groupID)/groupVolume/mute",
+            accessToken: accessToken,
+            body: SonosControlAPISetMuteRequest(muted: isMuted)
+        )
+    }
+
+    func playerVolume(
+        playerID: String,
+        accessToken: String
+    ) async throws -> SonosControlAPIVolumeState {
+        try await transport.get(
+            "/players/\(playerID)/playerVolume",
+            accessToken: accessToken
+        )
+    }
+
+    func setPlayerVolume(
+        playerID: String,
+        level: Int,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/players/\(playerID)/playerVolume",
+            accessToken: accessToken,
+            body: SonosControlAPISetVolumeRequest(volume: min(max(level, 0), 100))
+        )
+    }
+
+    func setPlayerMute(
+        playerID: String,
+        isMuted: Bool,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            "/players/\(playerID)/playerVolume/mute",
+            accessToken: accessToken,
+            body: SonosControlAPISetMuteRequest(muted: isMuted)
+        )
+    }
+
     func createPlaybackSession(
         groupID: String,
         appID: String,
@@ -243,6 +311,22 @@ struct SonosControlAPIClient {
                 positionMillis: positionMillis.map { max(0, $0) },
                 playOnCompletion: playOnCompletion,
                 trackMetadata: trackMetadata
+            )
+        )
+    }
+
+    func seekPlaybackSession(
+        sessionID: String,
+        itemID: String,
+        positionMillis: Int,
+        accessToken: String
+    ) async throws {
+        try await transport.post(
+            Self.playbackSessionCommandPath(sessionID: sessionID, command: "seek"),
+            accessToken: accessToken,
+            body: SonosControlAPISeekRequest(
+                positionMillis: max(0, positionMillis),
+                itemId: itemID.sonoicNonEmptyTrimmed
             )
         )
     }

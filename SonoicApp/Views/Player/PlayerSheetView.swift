@@ -41,7 +41,7 @@ struct PlayerSheetView: View {
                             nowPlaying: model.nowPlaying,
                             observedAt: model.nowPlayingObservedAt,
                             contentIdentity: progressContentIdentity,
-                            isEnabled: (model.hasManualSonosHost || model.sonosControlAPIState.canSendCommands) && model.nowPlaying.canSeek,
+                            isEnabled: model.sonosControlAPIState.canSendCommands && model.nowPlaying.canSeek,
                             showsTimeLabels: true,
                             showsThumb: false,
                             seek: { timeInterval in

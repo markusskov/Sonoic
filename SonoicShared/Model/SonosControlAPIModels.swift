@@ -271,6 +271,20 @@ nonisolated struct SonosControlAPISeekRelativeRequest: Codable, Equatable {
     var itemId: String?
 }
 
+nonisolated struct SonosControlAPIVolumeState: Codable, Equatable {
+    var volume: Int
+    var muted: Bool
+    var fixed: Bool?
+}
+
+nonisolated struct SonosControlAPISetVolumeRequest: Codable, Equatable {
+    var volume: Int
+}
+
+nonisolated struct SonosControlAPISetMuteRequest: Codable, Equatable {
+    var muted: Bool
+}
+
 nonisolated struct SonosControlAPICreateSessionRequest: Codable, Equatable {
     var appId: String
     var appContext: String

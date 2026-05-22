@@ -50,6 +50,10 @@ final class SonoicModel {
     @ObservationIgnored var manualPlaybackContextPayload: SonosPlayablePayload?
     @ObservationIgnored var manualQueueContextPayloads: [SonosPlayablePayload]?
     @ObservationIgnored var manualRecentPlaybackContextPayload: SonosPlayablePayload?
+    @ObservationIgnored var sonosControlAPICloudQueueSessionID: String?
+    @ObservationIgnored var sonosControlAPICloudQueueVersion: String?
+    @ObservationIgnored var sonosControlAPICloudQueueItemIDs: [String]?
+    @ObservationIgnored var sonosControlAPICloudQueueTracks: [SonosControlAPITrack]?
     @ObservationIgnored var backgroundExecutionIdentifier: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored let sonosDiscoveryBrowser: SonosBonjourBrowser
     @ObservationIgnored var discoverySnapshotTask: Task<Void, Never>?
@@ -71,6 +75,7 @@ final class SonoicModel {
     @ObservationIgnored let sonosOAuthConfiguration: SonosOAuthConfiguration
     @ObservationIgnored let sonosOAuthClient: SonosOAuthClient
     @ObservationIgnored let sonosTokenBrokerClient: SonosTokenBrokerClient
+    @ObservationIgnored let sonoicCloudQueueClient: SonoicCloudQueueClient
     @ObservationIgnored let keychainStore: SonoicKeychainStore
     @ObservationIgnored let sonosOAuthWebAuthenticator: SonosOAuthWebAuthenticator
     @ObservationIgnored let nowPlayableSessionController: SonoicNowPlayableSessionController
@@ -107,6 +112,7 @@ final class SonoicModel {
             manualPlaybackContextPayload = nil
             manualQueueContextPayloads = nil
             manualRecentPlaybackContextPayload = nil
+            clearSonosControlAPICloudQueueContext()
             sonosMusicServiceProbeState = .idle
             sonosContentDirectoryProbeState = .idle
             resetManualHostIdentity()
@@ -275,6 +281,7 @@ final class SonoicModel {
         sonosOAuthConfiguration = SonosOAuthConfiguration.load()
         sonosOAuthClient = SonosOAuthClient()
         sonosTokenBrokerClient = SonosTokenBrokerClient()
+        sonoicCloudQueueClient = SonoicCloudQueueClient()
         keychainStore = SonoicKeychainStore()
         sonosOAuthWebAuthenticator = SonosOAuthWebAuthenticator()
         nowPlayableSessionController = SonoicNowPlayableSessionController()

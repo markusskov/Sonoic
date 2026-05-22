@@ -6,3 +6,4 @@ SONOS_OAUTH_CLIENT_ID = <Sonos Key>
 SONOS_OAUTH_REDIRECT_URI = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/oauth/sonos/callback
 SONOS_OAUTH_TOKEN_EXCHANGE_URL = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/api/sonos/token
 SONOS_OAUTH_TOKEN_REFRESH_URL = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/api/sonos/token/refresh
+SONOS_CLOUD_QUEUE_CREATE_URL = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/api/sonos/cloud-queues

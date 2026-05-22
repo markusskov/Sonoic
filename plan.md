@@ -6,16 +6,19 @@ It describes what is already real in the app, the architectural guardrails we wa
 
 ## Current State
 
-Sonoic already has a real app shell and a full first-pass local Sonos control path.
+Sonoic already has a real app shell and a first-pass Sonos Cloud control path, with LAN kept for discovery, diagnostics, and local-only tuning.
 
 Implemented so far:
 
 - feature-shaped iPhone app shell with `Home`, `Rooms`, `Queue`, and `Settings`
 - one shared app model, `SonoicModel`
 - typed Sonos domain models for active target, room list, queue, and now playing
+- Sonos OAuth connection with verified household, group, and player reads
+- Sonos Control API as the normal transport path for play, pause, next, previous, seek, group/player volume, and mute
+- worker-backed Sonos Cloud Queue playback for source playlists so queue context is preserved instead of faking single-track playback
 - favorites-first `Home` surface with real Sonos favorites, collections, recently played items, source summaries, and now-playing context
 - real mini-player and draggable player sheet
-- real local Sonos `play/pause`, `next`, `previous`, `mute`, volume, and seek
+- real Sonos `play/pause`, `next`, `previous`, `mute`, volume, and seek through the active Cloud control plane
 - real now-playing title, artist, album, source, artwork, duration, and progress reads
 - Advanced now-playing inspection for raw Sonos metadata, transport URI, duration, and elapsed-time behavior
 - manual playback transition smoothing so local progress does not run ahead before Sonos confirms `PLAYING`
@@ -25,7 +28,7 @@ Implemented so far:
 - Sonos queue inspection with current-item highlighting, tap-to-play, clear, remove, and reorder
 - shared external-control snapshot for widgets
 - App Group-backed artwork cache and shared state store
-- manual host fallback through `Settings`
+- manual local mode through `Settings` for Advanced diagnostics and LAN-only tuning
 - `Rooms` surface for the selected room or group, discovered groups, discovered room list, bonded setup, discovery refresh state, and home theater entry point
 - `Settings` focused on quiet everyday configuration, with manual setup and diagnostics behind Advanced
 - lightweight foreground polling for playback, metadata, volume, and mute
@@ -81,15 +84,17 @@ SonoicApp/
 
 ## Near-Term Priorities
 
-### 1. Harden the current Sonos path on real hardware
+### 1. Harden the Cloud control path on real hardware
 
 The project now has enough real behavior that the highest-value work is making it boring on actual Sonos households.
 
 The next work here should be careful:
 
+- verify Cloud Queue seek and Lock Screen scrubbing across Apple Music favorites, saved playlists, catalog playlists, albums, and outside-app starts
+- verify Control API token refresh during long playback sessions and app relaunches
+- verify Cloud group/player volume and mute against grouped rooms and fixed-volume products
 - verify discovery against multiple households and room names
 - verify queue editing during transitions and grouped playback
-- verify lock-screen scrubbing and progress across services
 - verify home theater controls across products with and without Sub, surrounds, speech enhancement, and night sound
 - keep diagnostics behind Advanced so the main UI stays quiet
 
@@ -129,6 +134,14 @@ The useful path is:
 - add App Intents for common actions
 - consider Control Center controls and widgets for rooms, volume, and favorites
 - preserve clear stale-state behavior whenever Sonos cannot be confirmed
+
+### Cloud and LAN boundary
+
+Sonoic should not treat Cloud and LAN as equal fallback paths for the same everyday command.
+
+- Cloud owns normal playback, seek, now-playing, queue starts, volume, mute, household, group, and player identity.
+- LAN owns local discovery/bootstrap, Advanced diagnostics, manual local mode, and tuning controls that Cloud does not expose reliably yet.
+- Hidden fallback is avoided in normal transport paths. When Cloud is unavailable, the app should show that state rather than silently issuing a LAN command.
 
 ### 5. Polish the home theater path
 

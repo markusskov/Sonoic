@@ -76,6 +76,13 @@ extension SonoicModel {
     }
 
     func syncManualSonosState(showProgress: Bool, forceRoomRefresh: Bool = false) async -> Bool {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return await syncSonosControlAPIPlaybackStateIfAvailable(
+                showProgress: showProgress,
+                forceRoomRefresh: forceRoomRefresh
+            )
+        }
+
         if showProgress {
             manualHostRefreshStatus = .refreshing
         }
@@ -152,7 +159,7 @@ extension SonoicModel {
         return try? await avTransportClient.fetchCurrentTransportActions(host: host)
     }
 
-    private func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {
+    func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {
         let normalizedIncomingArtworkURL = snapshot.artworkURL.sonoicNonEmptyTrimmed
         let normalizedCurrentArtworkURL = nowPlaying.artworkURL.sonoicNonEmptyTrimmed
 

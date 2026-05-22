@@ -192,6 +192,33 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
+    func decodesAndEncodesVolumeRequests() throws {
+        let data = """
+        {
+          "volume": 42,
+          "muted": false,
+          "fixed": false
+        }
+        """.data(using: .utf8)!
+        let volume = try JSONDecoder().decode(SonosControlAPIVolumeState.self, from: data)
+        let setVolume = SonosControlAPISetVolumeRequest(volume: 65)
+        let setMute = SonosControlAPISetMuteRequest(muted: true)
+
+        let volumeObject = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(setVolume)
+        ) as? [String: Any]
+        let muteObject = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(setMute)
+        ) as? [String: Any]
+
+        #expect(volume.volume == 42)
+        #expect(volume.muted == false)
+        #expect(volume.fixed == false)
+        #expect(volumeObject?["volume"] as? Int == 65)
+        #expect(muteObject?["muted"] as? Bool == true)
+    }
+
+    @Test
     func encodesPlaybackSessionRequests() throws {
         let session = SonosControlAPICreateSessionRequest(
             appId: "com.markusskov.Sonoic",
@@ -285,6 +312,12 @@ struct SonosControlAPITransportTests {
                 sessionID: "session-1",
                 command: "skipToItem"
             ) == "/playbackSessions/session-1/playbackSession/skipToItem"
+        )
+        #expect(
+            SonosControlAPIClient.playbackSessionCommandPath(
+                sessionID: "session-1",
+                command: "seek"
+            ) == "/playbackSessions/session-1/playbackSession/seek"
         )
         #expect(
             SonosControlAPIClient.playbackSessionCommandPath(

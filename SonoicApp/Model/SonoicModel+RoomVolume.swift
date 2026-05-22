@@ -2,6 +2,17 @@ import Foundation
 
 extension SonoicModel {
     func refreshRoomVolumes(showLoading: Bool = true) async {
+        if sonosControlAPIState.settings.mode.canSendCommands,
+           await refreshCloudRoomVolumes(showLoading: showLoading)
+        {
+            return
+        }
+
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            roomVolumeState = .unavailable("Sonos Cloud volume is unavailable.")
+            return
+        }
+
         guard hasManualSonosHost else {
             roomVolumeState = .idle
             return
@@ -78,7 +89,11 @@ extension SonoicModel {
             }
 
             do {
-                try await renderingControlClient.setVolume(host: item.host, level: nextLevel)
+                if sonosControlAPIState.settings.mode.canSendCommands {
+                    try await setSonosControlAPIPlayerVolume(playerID: item.id, to: nextLevel)
+                } else {
+                    try await renderingControlClient.setVolume(host: item.host, level: nextLevel)
+                }
                 if normalizedManualSonosHost(item.host) == normalizedManualSonosHost(manualSonosHost) {
                     externalVolume.level = nextLevel
                 }
@@ -115,7 +130,11 @@ extension SonoicModel {
         }
 
         do {
-            try await renderingControlClient.setMute(host: item.host, isMuted: desiredMute)
+            if sonosControlAPIState.settings.mode.canSendCommands {
+                try await setSonosControlAPIPlayerMute(playerID: item.id, isMuted: desiredMute)
+            } else {
+                try await renderingControlClient.setMute(host: item.host, isMuted: desiredMute)
+            }
             if normalizedManualSonosHost(item.host) == normalizedManualSonosHost(manualSonosHost) {
                 externalVolume.isMuted = desiredMute
             }
@@ -123,6 +142,58 @@ extension SonoicModel {
             roomVolumeOperationErrorDetail = error.localizedDescription
             await refreshRoomVolumes(showLoading: false)
         }
+    }
+
+    private func refreshCloudRoomVolumes(showLoading: Bool) async -> Bool {
+        guard case let .verified(snapshot) = sonosControlAPICloudState.status else {
+            return false
+        }
+
+        guard !isRoomVolumeRefreshInFlight else {
+            return true
+        }
+
+        let target = snapshot.commandTarget(activeTargetID: activeTarget.id)
+            ?? snapshot.selectedCommandTarget(settings: sonosControlAPIState.settings)
+        guard let target,
+              let groupSnapshot = snapshot.groupsByHouseholdID[target.householdID],
+              let group = groupSnapshot.groups.first(where: { $0.id == target.groupID })
+        else {
+            return false
+        }
+
+        isRoomVolumeRefreshInFlight = true
+        if showLoading {
+            roomVolumeState = .loading
+        }
+
+        defer {
+            isRoomVolumeRefreshInFlight = false
+        }
+
+        let players = group.playerIds.compactMap { playerID in
+            groupSnapshot.players.first { $0.id == playerID }
+        }
+        let items = await cloudVolumeItems(
+            for: players,
+            coordinatorID: group.coordinatorId ?? target.coordinatorPlayerID
+        )
+
+        guard !items.isEmpty else {
+            roomVolumeState = .unavailable("Sonoic couldn't read volume from any room in this target.")
+            return true
+        }
+
+        roomVolumeState = .loaded(
+            SonosRoomVolumeSnapshot(
+                targetID: activeTarget.id,
+                targetName: activeTarget.name,
+                targetKind: activeTarget.kind,
+                items: items,
+                refreshedAt: .now
+            )
+        )
+        return true
     }
 
     private func volumeItems(
@@ -164,6 +235,41 @@ extension SonoicModel {
 
                 return first.name.localizedStandardCompare(second.name) == .orderedAscending
             }
+        }
+    }
+
+    private func cloudVolumeItems(
+        for players: [SonosControlAPIPlayer],
+        coordinatorID: String?
+    ) async -> [SonosRoomVolumeItem] {
+        var items: [SonosRoomVolumeItem] = []
+
+        for player in players {
+            guard let volume = try? await fetchSonosControlAPIPlayerVolume(playerID: player.id) else {
+                continue
+            }
+
+            let discoveredPlayer = discoveredPlayers.first { $0.id == player.id }
+            let name = player.roomName?.sonoicNonEmptyTrimmed
+                ?? player.name?.sonoicNonEmptyTrimmed
+                ?? discoveredPlayer?.name
+                ?? "Room"
+
+            items.append(SonosRoomVolumeItem(
+                id: player.id,
+                name: name,
+                host: discoveredPlayer?.host ?? "",
+                isCoordinator: player.id == coordinatorID,
+                volume: volume
+            ))
+        }
+
+        return items.sorted { first, second in
+            if first.isCoordinator != second.isCoordinator {
+                return first.isCoordinator
+            }
+
+            return first.name.localizedStandardCompare(second.name) == .orderedAscending
         }
     }
 

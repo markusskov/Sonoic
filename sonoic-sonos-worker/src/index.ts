@@ -3,12 +3,17 @@ const OAUTH_CALLBACK_PATHS = new Set(['/oauth/sonos/callback', '/oauth']);
 const BROKER_CODE_TTL_SECONDS = 5 * 60;
 const BROKER_CODE_STORAGE_PREFIX = 'broker-code:';
 const BROKER_CODE_PRUNE_GRACE_SECONDS = 60;
+const CLOUD_QUEUE_API_VERSION = 'v2.3';
+const CLOUD_QUEUE_STORAGE_PREFIX = 'cloud-queue:';
+const CLOUD_QUEUE_TTL_SECONDS = 24 * 60 * 60;
+const CLOUD_QUEUE_MAX_WINDOW_ITEMS = 20;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
 type WorkerEnv = Env & {
 	SONOS_CLIENT_SECRET?: string;
 	SONOS_BROKER_CODE_REDEMPTIONS?: DurableObjectNamespace;
+	SONOIC_CLOUD_QUEUES?: DurableObjectNamespace;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -21,6 +26,17 @@ type BrokerCodePayload = {
 
 type BrokerCodeRedemptionRecord = {
 	status: 'pending' | 'redeemed';
+	expiresAt: number;
+};
+
+type CloudQueueRecord = {
+	queueId: string;
+	contextVersion: string;
+	queueVersion: string;
+	container: JsonObject;
+	items: JsonObject[];
+	startItemId: string;
+	createdAt: number;
 	expiresAt: number;
 };
 
@@ -130,6 +146,176 @@ export class BrokerCodeRedemptions {
 	}
 }
 
+export class SonoicCloudQueues {
+	constructor(private readonly state: DurableObjectState) {}
+
+	async fetch(request: Request): Promise<Response> {
+		const url = new URL(request.url);
+		try {
+			await this.pruneExpiredQueues();
+
+			if (request.method === 'POST' && url.pathname === '/create') {
+				return await this.createQueue(request);
+			}
+
+			if (request.method === 'GET') {
+				return await this.handleQueueRead(url);
+			}
+
+			return jsonResponse(405, { error: 'method_not_allowed' });
+		} catch (error) {
+			if (error instanceof HTTPError) {
+				return jsonResponse(error.status, error.body ?? { error: error.message });
+			}
+
+			return jsonResponse(500, { error: 'cloud_queue_error' });
+		}
+	}
+
+	private async createQueue(request: Request): Promise<Response> {
+		const body = await readJson(request);
+		const container = requiredObject(body, 'container');
+		const items = requiredObjectArray(body, 'items');
+		if (items.length === 0) {
+			throw new HTTPError(400, 'cloud_queue_requires_items');
+		}
+
+		const itemIDs = items.map((item, index) => validateCloudQueueItem(item, index));
+		const uniqueItemIDs = new Set(itemIDs);
+		if (uniqueItemIDs.size !== itemIDs.length) {
+			throw new HTTPError(400, 'cloud_queue_item_ids_must_be_unique');
+		}
+
+		const requestedStartItemID = optionalString(body, 'startItemId');
+		const startItemId = requestedStartItemID && uniqueItemIDs.has(requestedStartItemID)
+			? requestedStartItemID
+			: itemIDs[0];
+		const queueId = crypto.randomUUID();
+		const now = currentEpochSeconds();
+		const record: CloudQueueRecord = {
+			queueId,
+			contextVersion: `CV:${now}:${queueId}`,
+			queueVersion: `QV:${now}:${queueId}`,
+			container,
+			items,
+			startItemId,
+			createdAt: now,
+			expiresAt: now + CLOUD_QUEUE_TTL_SECONDS,
+		};
+
+		await this.state.storage.put(`${CLOUD_QUEUE_STORAGE_PREFIX}${queueId}`, record);
+		const queueBaseUrl = `${new URL(request.url).origin}/cloud-queues/${queueId}/${CLOUD_QUEUE_API_VERSION}`;
+		const startItem = items.find((item) => item.id === startItemId) ?? items[0];
+		const responseBody: JsonObject = {
+			queueId,
+			queueBaseUrl,
+			contextVersion: record.contextVersion,
+			queueVersion: record.queueVersion,
+			startItemId,
+		};
+		if (isJsonObject(startItem.track)) {
+			responseBody.trackMetadata = startItem.track;
+		}
+
+		return jsonResponse(201, responseBody);
+	}
+
+	private async handleQueueRead(url: URL): Promise<Response> {
+		const match = /^\/cloud-queues\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(url.pathname);
+		if (!match) {
+			return jsonResponse(404, { error: 'not_found' });
+		}
+
+		const [, queueId, apiVersion, operation] = match;
+		if (apiVersion !== CLOUD_QUEUE_API_VERSION) {
+			throw new HTTPError(404, 'unsupported_cloud_queue_version');
+		}
+
+		const record = await this.readQueueRecord(queueId);
+		switch (operation) {
+			case 'context':
+				return jsonResponse(200, this.contextResponse(record));
+			case 'version':
+				return jsonResponse(200, {
+					contextVersion: record.contextVersion,
+					queueVersion: record.queueVersion,
+				});
+			case 'itemWindow':
+				return jsonResponse(200, this.itemWindowResponse(record, url.searchParams));
+			default:
+				return jsonResponse(404, { error: 'not_found' });
+		}
+	}
+
+	private async readQueueRecord(queueId: string): Promise<CloudQueueRecord> {
+		const record = await this.state.storage.get<CloudQueueRecord>(`${CLOUD_QUEUE_STORAGE_PREFIX}${queueId}`);
+		if (!record || record.expiresAt <= currentEpochSeconds()) {
+			throw new HTTPError(404, 'cloud_queue_not_found');
+		}
+
+		return record;
+	}
+
+	private contextResponse(record: CloudQueueRecord): JsonObject {
+		return {
+			contextVersion: record.contextVersion,
+			queueVersion: record.queueVersion,
+			container: record.container,
+			playbackPolicies: {
+				canSkip: true,
+				canSkipBack: true,
+				canSeek: true,
+				canSkipToItem: true,
+				canShuffle: true,
+			},
+		};
+	}
+
+	private itemWindowResponse(record: CloudQueueRecord, searchParams: URLSearchParams): JsonObject {
+		const requestedItemID = searchParams.get('itemId') || optionalString(record.items[0] ?? {}, 'id') || record.startItemId;
+		const targetIndex = record.items.findIndex((item) => item.id === requestedItemID);
+		if (targetIndex < 0) {
+			throw new HTTPError(404, 'cloud_queue_item_not_found');
+		}
+
+		const previousWindowSize = clampedWindowSize(searchParams.get('previousWindowSize'), 0);
+		const upcomingWindowSize = clampedWindowSize(searchParams.get('upcomingWindowSize'), CLOUD_QUEUE_MAX_WINDOW_ITEMS - 1);
+		let startIndex = Math.max(0, targetIndex - previousWindowSize);
+		let endIndex = Math.min(record.items.length, targetIndex + upcomingWindowSize + 1);
+
+		if (endIndex - startIndex > CLOUD_QUEUE_MAX_WINDOW_ITEMS) {
+			const overflow = endIndex - startIndex - CLOUD_QUEUE_MAX_WINDOW_ITEMS;
+			if (targetIndex - startIndex >= endIndex - targetIndex - 1) {
+				startIndex += overflow;
+			} else {
+				endIndex -= overflow;
+			}
+		}
+
+		return {
+			contextVersion: record.contextVersion,
+			queueVersion: record.queueVersion,
+			includesBeginningOfQueue: startIndex === 0,
+			includesEndOfQueue: endIndex >= record.items.length,
+			items: record.items.slice(startIndex, endIndex),
+			windowPlayhead: {
+				itemId: requestedItemID,
+				positionMillis: 0,
+			},
+		};
+	}
+
+	private async pruneExpiredQueues(): Promise<void> {
+		const now = currentEpochSeconds();
+		const entries = await this.state.storage.list<CloudQueueRecord>({ prefix: CLOUD_QUEUE_STORAGE_PREFIX });
+		const expiredKeys = [...entries]
+			.filter(([, record]) => record.expiresAt <= now)
+			.map(([key]) => key);
+
+		await Promise.all(expiredKeys.map((key) => this.state.storage.delete(key)));
+	}
+}
+
 export default {
 	async fetch(request, env): Promise<Response> {
 		try {
@@ -154,6 +340,14 @@ export default {
 				return jsonResponse(202, { success: true });
 			}
 
+			if (request.method === 'POST' && url.pathname === '/api/sonos/cloud-queues') {
+				return await handleCreateCloudQueue(request, env as WorkerEnv);
+			}
+
+			if (request.method === 'GET' && url.pathname.startsWith('/cloud-queues/')) {
+				return await handleCloudQueueRead(request, env as WorkerEnv);
+			}
+
 			return jsonResponse(404, { error: 'not_found' });
 		} catch (error) {
 			if (error instanceof HTTPError) {
@@ -164,6 +358,15 @@ export default {
 		}
 	},
 } satisfies ExportedHandler<Env>;
+
+async function handleCreateCloudQueue(request: Request, env: WorkerEnv): Promise<Response> {
+	return await callSonoicCloudQueues(env, '/create', request);
+}
+
+async function handleCloudQueueRead(request: Request, env: WorkerEnv): Promise<Response> {
+	const url = new URL(request.url);
+	return await callSonoicCloudQueues(env, `${url.pathname}${url.search}`, request);
+}
 
 async function handleOAuthCallback(url: URL, env: WorkerEnv): Promise<Response> {
 	const state = url.searchParams.get('state') ?? '';
@@ -306,6 +509,29 @@ function requiredNumber(body: JsonObject, key: string): number {
 	return value;
 }
 
+function requiredObject(body: JsonObject, key: string): JsonObject {
+	const value = body[key];
+	if (!isJsonObject(value)) {
+		throw new HTTPError(400, `missing_required_field:${key}`);
+	}
+
+	return value;
+}
+
+function requiredObjectArray(body: JsonObject, key: string): JsonObject[] {
+	const value = body[key];
+	if (!Array.isArray(value) || !value.every(isJsonObject)) {
+		throw new HTTPError(400, `missing_required_field:${key}`);
+	}
+
+	return value;
+}
+
+function optionalString(body: JsonObject, key: string): string | undefined {
+	const value = body[key];
+	return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 function requiredEnv(env: WorkerEnv, key: keyof WorkerEnv & string): string {
 	const value = env[key];
 	if (typeof value !== 'string' || value.length === 0) {
@@ -313,6 +539,17 @@ function requiredEnv(env: WorkerEnv, key: keyof WorkerEnv & string): string {
 	}
 
 	return value;
+}
+
+async function callSonoicCloudQueues(env: WorkerEnv, path: string, request: Request): Promise<Response> {
+	const namespace = env.SONOIC_CLOUD_QUEUES;
+	if (!namespace) {
+		throw new HTTPError(500, 'missing_required_env:SONOIC_CLOUD_QUEUES');
+	}
+
+	const id = namespace.idFromName('global');
+	const stub = namespace.get(id);
+	return await stub.fetch(new Request(new URL(path, 'https://sonoic-cloud-queues'), request));
 }
 
 function validateRedirectURI(env: WorkerEnv, redirectURI: string): void {
@@ -472,6 +709,46 @@ function constantTimeEqual(left: string, right: string): boolean {
 
 function currentEpochSeconds(): number {
 	return Math.floor(Date.now() / 1_000);
+}
+
+function validateCloudQueueItem(item: JsonObject, index: number): string {
+	const id = optionalString(item, 'id');
+	if (!id) {
+		throw new HTTPError(400, `cloud_queue_item_missing_id:${index}`);
+	}
+
+	if (id.length > 128) {
+		throw new HTTPError(400, `cloud_queue_item_id_too_long:${index}`);
+	}
+
+	const track = item.track;
+	if (!isJsonObject(track)) {
+		throw new HTTPError(400, `cloud_queue_item_missing_track:${index}`);
+	}
+
+	const trackName = optionalString(track, 'name');
+	const contentType = optionalString(track, 'contentType');
+	const mediaUrl = optionalString(track, 'mediaUrl');
+	const trackID = track.id;
+	const hasTrackID = isJsonObject(trackID) && optionalString(trackID, 'objectId') !== undefined;
+	if (!trackName || !contentType || (!mediaUrl && !hasTrackID)) {
+		throw new HTTPError(400, `cloud_queue_item_invalid_track:${index}`);
+	}
+
+	return id;
+}
+
+function clampedWindowSize(rawValue: string | null, defaultValue: number): number {
+	const parsed = rawValue === null ? defaultValue : Number.parseInt(rawValue, 10);
+	if (!Number.isFinite(parsed) || parsed < 0) {
+		return defaultValue;
+	}
+
+	return Math.min(parsed, CLOUD_QUEUE_MAX_WINDOW_ITEMS - 1);
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+	return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function jsonResponse(status: number, body: JsonObject): Response {
