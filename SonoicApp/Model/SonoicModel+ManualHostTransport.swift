@@ -142,8 +142,10 @@ extension SonoicModel {
 
     private func skipToNextLocalManualSonosTrack() async -> Bool {
         manualPlaybackContextPayload = nil
-        beginManualPlayTransitionGrace()
-        markLocalPlaybackState(.playing)
+        if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
+            beginManualPlayTransitionGrace()
+            markLocalPlaybackState(.playing)
+        }
         let didSkip = await performManualTransportCommand(
             syncDelay: Self.manualTransportSyncDelay,
             refreshQueueAfterSuccess: true
@@ -157,8 +159,10 @@ extension SonoicModel {
 
     private func skipToPreviousLocalManualSonosTrack() async -> Bool {
         manualPlaybackContextPayload = nil
-        beginManualPlayTransitionGrace()
-        markLocalPlaybackState(.playing)
+        if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
+            beginManualPlayTransitionGrace()
+            markLocalPlaybackState(.playing)
+        }
         let didSkip = await performManualTransportCommand(
             syncDelay: Self.manualTransportSyncDelay,
             refreshQueueAfterSuccess: true
