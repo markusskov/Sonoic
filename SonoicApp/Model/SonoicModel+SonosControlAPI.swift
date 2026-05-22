@@ -474,6 +474,11 @@ extension SonoicModel {
             {
                 return oneBasedIndex - 1
             }
+
+            sonoicPlaybackDebugLog(
+                "cloudseek sessionItemUnmapped rawItemID=\(sonoicPlaybackDebugID(statusItemID)) cloudQueueItems=\(itemIDs.count)"
+            )
+            return nil
         }
 
         if let currentIndex = queueState.snapshot?.currentItemIndex,
