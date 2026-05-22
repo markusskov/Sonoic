@@ -1316,9 +1316,14 @@ extension SonoicModel {
                 return nil
             }
 
-            var queueItemID = sonosControlAPICloudQueueItemID(index: index, objectID: objectID, item: pair.0)
+            let baseQueueItemID = sonosControlAPICloudQueueItemID(index: index, objectID: objectID, item: pair.0)
+            var queueItemID = baseQueueItemID
             if seenItemIDs.contains(queueItemID) {
-                queueItemID = sonosControlAPICloudQueueItemID(queueItemID, suffix: index + 1)
+                var suffix = index + 1
+                repeat {
+                    queueItemID = sonosControlAPICloudQueueItemID(baseQueueItemID, suffix: suffix)
+                    suffix += 1
+                } while seenItemIDs.contains(queueItemID)
             }
             seenItemIDs.insert(queueItemID)
 
