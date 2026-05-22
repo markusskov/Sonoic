@@ -416,11 +416,20 @@ extension SonoicModel {
         let normalizedQueueVersion = queueVersion?.sonoicNonEmptyTrimmed
 
         if sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed != nil,
-           sonosControlAPICloudQueueItemIDs?.isEmpty == false,
-           sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed == normalizedGroupID,
-           sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed == normalizedQueueVersion
+           sonosControlAPICloudQueueItemIDs?.isEmpty == false
         {
-            return true
+            let inMemoryGroupID = sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed
+            let inMemoryQueueVersion = sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed
+            if inMemoryGroupID == normalizedGroupID,
+               inMemoryQueueVersion == normalizedQueueVersion
+            {
+                return true
+            }
+
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext clearing staleMemory group=\(sonoicPlaybackDebugID(inMemoryGroupID)) currentGroup=\(sonoicPlaybackDebugID(normalizedGroupID)) version=\(sonoicPlaybackDebugID(inMemoryQueueVersion)) currentVersion=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+            )
+            clearSonosControlAPICloudQueueContext()
         }
 
         guard let context = sharedStore?.loadCloudQueueSessionContext(),
@@ -437,6 +446,7 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "cloudQueue restoreContext skipped groupMismatch stored=\(sonoicPlaybackDebugID(storedGroupID)) current=\(sonoicPlaybackDebugID(normalizedGroupID))"
             )
+            clearSonosControlAPICloudQueueContext()
             return false
         }
 
@@ -447,6 +457,7 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "cloudQueue restoreContext skipped queueVersionMismatch stored=\(sonoicPlaybackDebugID(storedQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
             )
+            clearSonosControlAPICloudQueueContext()
             return false
         }
 
