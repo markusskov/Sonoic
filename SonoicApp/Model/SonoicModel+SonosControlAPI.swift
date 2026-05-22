@@ -242,9 +242,12 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "cloudseek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) positionMillis=\(String(describing: status.positionMillis))"
             )
-            restoreSonosControlAPICloudQueueContextIfNeeded(
+            let didRestoreCloudQueueContext = restoreSonosControlAPICloudQueueContextIfNeeded(
                 groupID: context.groupID,
-                queueVersion: status.queueVersion
+                queueVersion: nil
+            )
+            sonoicPlaybackDebugLog(
+                "cloudseek cloudQueueContext restored=\(didRestoreCloudQueueContext) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0) rawItemID=\(sonoicPlaybackDebugID(status.itemId)) queueVersion=\(sonoicPlaybackDebugID(status.queueVersion))"
             )
             let itemIDCandidates = sonosControlAPISeekItemIDCandidates(from: status)
             sonoicPlaybackDebugLog(
@@ -266,14 +269,14 @@ extension SonoicModel {
                 } catch {
                     if sonosControlAPIError(error, matchesStatus: 499, detailContains: "ERROR_DISALLOWED_BY_POLICY") {
                         sonoicPlaybackDebugLog(
-                            "cloudseek sessionSeekDisallowed itemID=\(sonoicPlaybackDebugID(sessionSeekTarget.itemID)) error='\(error.localizedDescription)'"
+                            "cloudseek sessionSeekDisallowed retrySkipToItem itemID=\(sonoicPlaybackDebugID(sessionSeekTarget.itemID)) error='\(error.localizedDescription)'"
                         )
-                        throw error
+                    } else {
+                        sonoicPlaybackDebugLog(
+                            "cloudseek sessionSeekFailed retrySkipToItem itemID=\(sonoicPlaybackDebugID(sessionSeekTarget.itemID)) error='\(error.localizedDescription)'"
+                        )
                     }
 
-                    sonoicPlaybackDebugLog(
-                        "cloudseek sessionSeekFailed retrySkipToItem itemID=\(sonoicPlaybackDebugID(sessionSeekTarget.itemID)) error='\(error.localizedDescription)'"
-                    )
                     try await sonosControlAPIClient.skipToItem(
                         sessionID: sessionSeekTarget.sessionID,
                         itemID: sessionSeekTarget.itemID,
@@ -289,7 +292,7 @@ extension SonoicModel {
 
             if sonosControlAPIHasCloudQueueContext {
                 sonoicPlaybackDebugLog(
-                    "cloudseek sessionContextUnmapped noGroupFallback=true rawItemID=\(sonoicPlaybackDebugID(status.itemId))"
+                    "cloudseek sessionContextUnmapped noGroupFallback=true rawItemID=\(sonoicPlaybackDebugID(status.itemId)) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0)"
                 )
                 throw SonosControlAPISeekFailure.sessionItemUnavailable
             }
