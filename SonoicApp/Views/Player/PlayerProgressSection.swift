@@ -67,7 +67,7 @@ struct PlayerProgressSection: View {
             resetScrubbingState()
         }
         .onChange(of: contentIdentity, initial: false) { _, _ in
-            resetScrubbingState()
+            resetScrubbingState(cancelSeekTask: true)
         }
         .onChange(of: nowPlaying.playbackState, initial: false) { _, _ in
             guard !isScrubbing else {
@@ -148,7 +148,7 @@ struct PlayerProgressSection: View {
         }
 
         if pendingSeekTarget.contentIdentity != contentIdentity {
-            self.pendingSeekTarget = nil
+            resetScrubbingState(cancelSeekTask: true)
             return false
         }
 
