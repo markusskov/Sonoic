@@ -1,4 +1,5 @@
 const SONOS_TOKEN_URL = 'https://api.sonos.com/login/v3/oauth/access';
+const SONOS_CONTROL_API_BASE_URL = 'https://api.ws.sonos.com/control/api/v1';
 const OAUTH_CALLBACK_PATHS = new Set(['/oauth/sonos/callback', '/oauth']);
 const BROKER_CODE_TTL_SECONDS = 5 * 60;
 const BROKER_CODE_STORAGE_PREFIX = 'broker-code:';
@@ -361,6 +362,8 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 async function handleCreateCloudQueue(request: Request, env: WorkerEnv): Promise<Response> {
+	const accessToken = requireBearerAccessToken(request);
+	await validateSonosAccessToken(accessToken);
 	return await callSonoicCloudQueues(env, '/create', request);
 }
 
@@ -459,6 +462,37 @@ async function requestSonosToken(env: WorkerEnv, form: Record<string, string>): 
 	} catch {
 		throw new HTTPError(502, 'invalid_sonos_response');
 	}
+}
+
+function requireBearerAccessToken(request: Request): string {
+	const authorization = request.headers.get('Authorization') ?? '';
+	const match = /^Bearer\s+(.+)$/i.exec(authorization);
+	if (!match?.[1]) {
+		throw new HTTPError(401, 'missing_authorization');
+	}
+
+	return match[1];
+}
+
+async function validateSonosAccessToken(accessToken: string): Promise<void> {
+	const response = await fetch(`${SONOS_CONTROL_API_BASE_URL}/households`, {
+		method: 'GET',
+		headers: {
+			Authorization: `Bearer ${accessToken}`,
+			Accept: 'application/json',
+			'User-Agent': 'Sonoic Cloud Queue Worker',
+		},
+	});
+
+	if (response.ok) {
+		return;
+	}
+
+	if (response.status === 401 || response.status === 403) {
+		throw new HTTPError(401, 'invalid_authorization');
+	}
+
+	throw new HTTPError(502, 'sonos_authorization_check_failed');
 }
 
 function redirectToApp(env: WorkerEnv, query: Record<string, string>): Response {

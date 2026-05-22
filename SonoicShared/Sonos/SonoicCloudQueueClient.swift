@@ -33,7 +33,8 @@ struct SonoicCloudQueueClient {
 
     func createQueue(
         _ requestBody: SonoicCloudQueueCreateRequest,
-        configuration: SonosOAuthConfiguration
+        configuration: SonosOAuthConfiguration,
+        accessToken: String
     ) async throws -> SonoicCloudQueueCreateResponse {
         guard let createURL = configuration.cloudQueueCreateURL else {
             throw ClientError.missingCreateURL
@@ -48,6 +49,7 @@ struct SonoicCloudQueueClient {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = try encoder.encode(requestBody)
 
         let (data, response) = try await session.data(for: request)

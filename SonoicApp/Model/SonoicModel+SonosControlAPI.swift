@@ -1204,7 +1204,8 @@ extension SonoicModel {
         ) {
             let cloudQueue = try await sonoicCloudQueueClient.createQueue(
                 request,
-                configuration: sonosOAuthConfiguration
+                configuration: sonosOAuthConfiguration,
+                accessToken: context.accessToken
             )
             let sessionStatus = try await sonosControlAPIClient.createPlaybackSession(
                 groupID: context.groupID,
