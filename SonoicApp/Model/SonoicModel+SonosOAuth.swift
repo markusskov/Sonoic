@@ -115,6 +115,13 @@ extension SonoicModel {
                 refreshedTokenSet.refreshToken = refreshToken
             }
 
+            guard !Task.isCancelled else {
+                if let logPrefix {
+                    sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false cancelled=true")
+                }
+                return nil
+            }
+
             try keychainStore.saveSonosTokenSet(refreshedTokenSet)
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(
                 status: .connected(expiresAt: refreshedTokenSet.expiresAt)
@@ -127,6 +134,13 @@ extension SonoicModel {
 
             return refreshedTokenSet
         } catch {
+            if Task.isCancelled {
+                if let logPrefix {
+                    sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false cancelled=true")
+                }
+                return nil
+            }
+
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
             sonosControlAPIState.authorizationStatus = .expired
             sonosControlAPICloudState = .idle
@@ -185,10 +199,11 @@ extension SonoicModel {
 
     func disconnectSonosAccount() {
         do {
+            sonosControlAPITokenRefreshTask?.cancel()
+            sonosControlAPITokenRefreshTask = nil
             try keychainStore.deleteSonosTokenSet()
             sonosControlAPIAuthorizationState = sonosOAuthConfiguration.isConfigured ? .disconnected : .notConfigured
             sonosControlAPICloudState = .idle
-            sonosControlAPITokenRefreshTask = nil
             markSonosControlAPIAuthorizationUnavailable()
         } catch {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .failed(error.localizedDescription))

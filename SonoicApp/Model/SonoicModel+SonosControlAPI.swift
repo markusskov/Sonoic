@@ -693,6 +693,7 @@ extension SonoicModel {
             if isSonosControlAPIAuthorizationFailure(error) {
                 sonosControlAPIState.authorizationStatus = .expired
                 sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
+                clearSonosControlAPICloudQueueContext()
             }
             manualHostRefreshStatus = .failed(error.localizedDescription)
             return false
