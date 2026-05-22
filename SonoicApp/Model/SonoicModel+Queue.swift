@@ -22,7 +22,7 @@ extension SonoicModel {
 
     func refreshQueue(showLoading: Bool = true) async {
         restoreSonosControlAPICloudQueueContextIfNeeded(
-            groupID: sonosControlAPICloudQueueGroupID ?? sonosControlAPIState.settings.selectedGroupID,
+            groupID: activeSonosControlAPIGroupID(),
             queueVersion: nil
         )
 
@@ -149,7 +149,7 @@ extension SonoicModel {
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
         restoreSonosControlAPICloudQueueContextIfNeeded(
-            groupID: sonosControlAPICloudQueueGroupID ?? sonosControlAPIState.settings.selectedGroupID,
+            groupID: activeSonosControlAPIGroupID(),
             queueVersion: nil
         )
 

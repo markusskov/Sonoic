@@ -22,7 +22,7 @@ extension SonoicModel {
     }
 
     private var hasSonosControlAPICommandTarget: Bool {
-        sonosControlAPIState.settings.mode.canSendCommands
+        sonosControlAPIState.canSendCommands
             && sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed != nil
     }
 
