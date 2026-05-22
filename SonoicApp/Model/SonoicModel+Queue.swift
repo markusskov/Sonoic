@@ -22,6 +22,15 @@ extension SonoicModel {
 
     func refreshQueue(showLoading: Bool = true) async {
         if sonosControlAPIState.settings.mode.canSendCommands {
+            guard !isQueueRefreshing else {
+                return
+            }
+
+            isQueueRefreshing = true
+            defer {
+                isQueueRefreshing = false
+            }
+
             guard sonosControlAPIState.canSendCommands else {
                 queueDiagnostics = SonosQueueDiagnostics(
                     observedAt: Date(),
@@ -31,12 +40,10 @@ extension SonoicModel {
                     lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
                 )
                 queueState = .unavailable(sonosControlAPIQueueUnavailableDetail)
-                isQueueRefreshing = false
                 return
             }
 
             if await refreshSonosControlAPICloudQueueSnapshot() {
-                isQueueRefreshing = false
                 return
             }
 
@@ -48,7 +55,6 @@ extension SonoicModel {
                 lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
             )
             queueState = .unavailable("Queue is unavailable for this Cloud playback source.")
-            isQueueRefreshing = false
             return
         }
 
@@ -155,7 +161,7 @@ extension SonoicModel {
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
         if sonosControlAPIState.canSendCommands {
-            _ = await refreshSonosControlAPICloudQueueSnapshot()
+            await refreshQueue(showLoading: false)
             return
         }
 
@@ -597,7 +603,7 @@ extension SonoicModel {
             observedAt: Date(),
             currentURI: snapshot.sourceURI ?? nowPlayingDiagnostics.currentURI,
             itemCount: snapshot.items.count,
-            lastRefreshErrorDetail: queueDiagnostics.lastRefreshErrorDetail,
+            lastRefreshErrorDetail: nil,
             lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
         )
         return true
