@@ -13,45 +13,65 @@ extension SonoicModel {
     }
 
     func playManualSonosPlayback() async -> Bool {
-        if await playSonosControlAPIPlaybackIfAvailable() {
-            return true
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            if await playSonosControlAPIPlaybackIfAvailable() {
+                return true
+            }
+
+            sonoicPlaybackDebugLog("manualPlay cloudUnavailable noLocalTransportFallback=true")
+            return false
         }
 
-        sonoicPlaybackDebugLog("manualPlay cloudUnavailable noLocalTransportFallback=true")
-        return false
+        return await playLocalManualSonosPlayback()
     }
 
     func pauseManualSonosPlayback() async -> Bool {
-        if await pauseSonosControlAPIPlaybackIfAvailable() {
-            return true
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            if await pauseSonosControlAPIPlaybackIfAvailable() {
+                return true
+            }
+
+            sonoicPlaybackDebugLog("manualPause cloudUnavailable noLocalTransportFallback=true")
+            return false
         }
 
-        sonoicPlaybackDebugLog("manualPause cloudUnavailable noLocalTransportFallback=true")
-        return false
+        return await pauseLocalManualSonosPlayback()
     }
 
     func skipToNextManualSonosTrack() async -> Bool {
-        if await skipToNextSonosControlAPITrackIfAvailable() {
-            return true
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            if await skipToNextSonosControlAPITrackIfAvailable() {
+                return true
+            }
+
+            sonoicPlaybackDebugLog("manualNext cloudUnavailable noLocalTransportFallback=true")
+            return false
         }
 
-        sonoicPlaybackDebugLog("manualNext cloudUnavailable noLocalTransportFallback=true")
-        return false
+        return await skipToNextLocalManualSonosTrack()
     }
 
     func skipToPreviousManualSonosTrack() async -> Bool {
-        if await skipToPreviousSonosControlAPITrackIfAvailable() {
-            return true
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            if await skipToPreviousSonosControlAPITrackIfAvailable() {
+                return true
+            }
+
+            sonoicPlaybackDebugLog("manualPrevious cloudUnavailable noLocalTransportFallback=true")
+            return false
         }
 
-        sonoicPlaybackDebugLog("manualPrevious cloudUnavailable noLocalTransportFallback=true")
-        return false
+        return await skipToPreviousLocalManualSonosTrack()
     }
 
     func seekManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
         sonoicPlaybackDebugLog(
             "manualSeek start target=\(timeInterval) canSeek=\(nowPlaying.canSeek) hasHost=\(hasManualSonosHost) cloudCanSend=\(sonosControlAPIState.canSendCommands) cloudAuth=\(String(describing: sonosControlAPIState.authorizationStatus)) cloudMode=\(sonosControlAPIState.settings.mode.rawValue)"
         )
+        if !sonosControlAPIState.settings.mode.canSendCommands {
+            return await seekLocalManualSonosPlayback(to: timeInterval)
+        }
+
         let previousNowPlaying = nowPlaying
         let previousObservedAt = nowPlayingObservedAt
 
@@ -82,6 +102,86 @@ extension SonoicModel {
             observed: observed,
             errorDetail: errorDetail
         )
+    }
+
+    private func playLocalManualSonosPlayback() async -> Bool {
+        beginManualPlayTransitionGrace()
+        markLocalPlaybackState(.playing)
+        let didPlay = await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay
+        ) {
+            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+            try await avTransportClient.play(host: playbackHost)
+        }
+        sonoicPlaybackDebugLog("manualPlay localMode result=\(didPlay)")
+        return didPlay
+    }
+
+    private func pauseLocalManualSonosPlayback() async -> Bool {
+        manualPlayTransitionGraceDeadline = nil
+        setManualPlayTransitionAwaitingConfirmation(false)
+        freezeLocalPlaybackTimeIfNeeded()
+        markLocalPlaybackState(.paused)
+        let didPause = await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay
+        ) {
+            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+            try await avTransportClient.pause(host: playbackHost)
+        }
+        sonoicPlaybackDebugLog("manualPause localMode result=\(didPause)")
+        return didPause
+    }
+
+    private func skipToNextLocalManualSonosTrack() async -> Bool {
+        manualPlaybackContextPayload = nil
+        beginManualPlayTransitionGrace()
+        markLocalPlaybackState(.playing)
+        let didSkip = await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay,
+            refreshQueueAfterSuccess: true
+        ) {
+            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+            try await avTransportClient.next(host: playbackHost)
+        }
+        sonoicPlaybackDebugLog("manualNext localMode result=\(didSkip)")
+        return didSkip
+    }
+
+    private func skipToPreviousLocalManualSonosTrack() async -> Bool {
+        manualPlaybackContextPayload = nil
+        beginManualPlayTransitionGrace()
+        markLocalPlaybackState(.playing)
+        let didSkip = await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay,
+            refreshQueueAfterSuccess: true
+        ) {
+            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+            try await avTransportClient.previous(host: playbackHost)
+        }
+        sonoicPlaybackDebugLog("manualPrevious localMode result=\(didSkip)")
+        return didSkip
+    }
+
+    private func seekLocalManualSonosPlayback(to timeInterval: TimeInterval) async -> Bool {
+        let previousNowPlaying = nowPlaying
+        let previousObservedAt = nowPlayingObservedAt
+        let boundedElapsedTime = markLocalSeek(to: timeInterval)
+        beginManualSeekConfirmation(to: boundedElapsedTime)
+        let didSeek = await performManualTransportCommand(
+            syncDelay: Self.manualTransportSyncDelay
+        ) {
+            let playbackHost = await manualSonosCoordinatorHost() ?? manualSonosHost
+            try await avTransportClient.seek(host: playbackHost, timeInterval: boundedElapsedTime)
+        }
+
+        if !didSeek {
+            clearManualSeekConfirmation()
+            nowPlaying = previousNowPlaying
+            nowPlayingObservedAt = previousObservedAt
+        }
+
+        sonoicPlaybackDebugLog("manualSeek localMode result=\(didSeek) target=\(boundedElapsedTime)")
+        return didSeek
     }
 
     func playManualSonosQueueItem(at position: Int) async -> Bool {
