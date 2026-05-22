@@ -1318,7 +1318,7 @@ extension SonoicModel {
 
             var queueItemID = sonosControlAPICloudQueueItemID(index: index, objectID: objectID, item: pair.0)
             if seenItemIDs.contains(queueItemID) {
-                queueItemID = "\(queueItemID)-\(index + 1)"
+                queueItemID = sonosControlAPICloudQueueItemID(queueItemID, suffix: index + 1)
             }
             seenItemIDs.insert(queueItemID)
 
@@ -1549,6 +1549,12 @@ extension SonoicModel {
             .replacingOccurrences(of: "--+", with: "-", options: .regularExpression)
             .sonoicTrimmed
         return String(sanitized.prefix(128))
+    }
+
+    private func sonosControlAPICloudQueueItemID(_ id: String, suffix: Int) -> String {
+        let suffixValue = "-\(suffix)"
+        let maxBaseLength = max(0, 128 - suffixValue.count)
+        return "\(String(id.prefix(maxBaseLength)))\(suffixValue)"
     }
 
     private func sonosControlAPISubtitleParts(from subtitle: String?) -> [String] {
