@@ -264,6 +264,13 @@ extension SonoicModel {
                         accessToken: context.accessToken
                     )
                 } catch {
+                    if sonosControlAPIError(error, matchesStatus: 499, detailContains: "ERROR_DISALLOWED_BY_POLICY") {
+                        sonoicPlaybackDebugLog(
+                            "cloudseek sessionSeekDisallowed itemID=\(sonoicPlaybackDebugID(sessionSeekTarget.itemID)) error='\(error.localizedDescription)'"
+                        )
+                        throw error
+                    }
+
                     sonoicPlaybackDebugLog(
                         "cloudseek sessionSeekFailed retrySkipToItem itemID=\(sonoicPlaybackDebugID(sessionSeekTarget.itemID)) error='\(error.localizedDescription)'"
                     )
@@ -278,6 +285,13 @@ extension SonoicModel {
                     )
                 }
                 return
+            }
+
+            if sonosControlAPIHasCloudQueueContext {
+                sonoicPlaybackDebugLog(
+                    "cloudseek sessionContextUnmapped noGroupFallback=true rawItemID=\(sonoicPlaybackDebugID(status.itemId))"
+                )
+                throw SonosControlAPISeekFailure.sessionItemUnavailable
             }
 
             var lastSeekError: Error?
@@ -445,6 +459,16 @@ extension SonoicModel {
         }
 
         return nil
+    }
+
+    private var sonosControlAPIHasCloudQueueContext: Bool {
+        guard sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed != nil,
+              sonosControlAPICloudQueueItemIDs?.isEmpty == false
+        else {
+            return false
+        }
+
+        return true
     }
 
     private func sonosControlAPICloudQueueCurrentIndex(
@@ -1685,11 +1709,14 @@ extension SonoicModel {
 
 private enum SonosControlAPISeekFailure: LocalizedError {
     case unsupported
+    case sessionItemUnavailable
 
     var errorDescription: String? {
         switch self {
         case .unsupported:
             "Sonos reported that the current item cannot seek."
+        case .sessionItemUnavailable:
+            "Sonoic could not match the current Cloud Queue item for seeking."
         }
     }
 }
