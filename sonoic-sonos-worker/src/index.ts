@@ -279,7 +279,7 @@ export class SonoicCloudQueues {
 	}
 
 	private itemWindowResponse(record: CloudQueueRecord, searchParams: URLSearchParams): JsonObject {
-		const requestedItemID = searchParams.get('itemId') || optionalString(record.items[0] ?? {}, 'id') || record.startItemId;
+		const requestedItemID = searchParams.get('itemId') || record.startItemId || optionalString(record.items[0] ?? {}, 'id');
 		const targetIndex = record.items.findIndex((item) => item.id === requestedItemID);
 		if (targetIndex < 0) {
 			throw new HTTPError(404, 'cloud_queue_item_not_found');

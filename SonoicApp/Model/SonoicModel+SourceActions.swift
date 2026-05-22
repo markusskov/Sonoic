@@ -47,6 +47,10 @@ extension SonoicModel {
         try? sourcePlayablePayload(for: item, purpose: .metadata)
     }
 
+    private var allowsLocalSourcePlaybackFallback: Bool {
+        sonosControlAPIState.settings.mode != .preferred
+    }
+
     func canPlaySourcePlaylistQueue(
         parentItem: SonoicSourceItem,
         trackItems: [SonoicSourceItem]
@@ -70,7 +74,7 @@ extension SonoicModel {
             return true
         }
 
-        guard !sonosControlAPIState.settings.mode.canSendCommands else {
+        guard allowsLocalSourcePlaybackFallback else {
             return false
         }
 
@@ -106,7 +110,7 @@ extension SonoicModel {
             return true
         }
 
-        guard !sonosControlAPIState.settings.mode.canSendCommands else {
+        guard allowsLocalSourcePlaybackFallback else {
             sonoicPlaybackDebugLog(
                 "playlistQueue cloudQueue result=false noLocalPlaybackFallback=true parent='\(parentItem.title)'"
             )
@@ -179,7 +183,7 @@ extension SonoicModel {
         trackItemsCount: Int,
         startIndex: Int?
     ) async -> Bool {
-        guard !sonosControlAPIState.settings.mode.canSendCommands else {
+        guard allowsLocalSourcePlaybackFallback else {
             sonoicPlaybackDebugLog(
                 "playlistQueue generatedPlanSkipped noLocalPlaybackFallback=true parent='\(parentItem.title)'"
             )
@@ -253,7 +257,7 @@ extension SonoicModel {
             throw SonoicSourceActionError.playbackPayloadUnavailable
         }
 
-        guard !sonosControlAPIState.settings.mode.canSendCommands else {
+        guard allowsLocalSourcePlaybackFallback else {
             sonoicPlaybackDebugLog(
                 "sourceFallback noLocalPlaybackFallback=true item='\(item.title)'"
             )

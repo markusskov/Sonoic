@@ -260,7 +260,7 @@ describe('Sonoic Cloud Queue worker', () => {
 		expect(alarmAt).toEqual(expect.any(Number));
 	});
 
-	it('returns the first queue item as the default item window playhead', async () => {
+	it('returns the queue start item as the default item window playhead', async () => {
 		const createResponse = await createCloudQueue({ startItemId: 'sonoic-track-2' });
 		const queueBaseUrl = String(createResponse.queueBaseUrl);
 		const request = new IncomingRequest(`${queueBaseUrl}/itemWindow?upcomingWindowSize=2`);
@@ -271,11 +271,11 @@ describe('Sonoic Cloud Queue worker', () => {
 
 		expect(response.status).toBe(200);
 		const body = (await response.json()) as Record<string, unknown>;
-		expect(body.windowPlayhead).toMatchObject({ itemId: 'sonoic-track-1', positionMillis: 0 });
+		expect(body.windowPlayhead).toMatchObject({ itemId: 'sonoic-track-2', positionMillis: 0 });
 		expect(body.items).toEqual(
 			expect.arrayContaining([
-				expect.objectContaining({ id: 'sonoic-track-1' }),
 				expect.objectContaining({ id: 'sonoic-track-2' }),
+				expect.objectContaining({ id: 'sonoic-track-3' }),
 			]),
 		);
 	});
