@@ -3,6 +3,14 @@ import Foundation
 extension SonoicModel {
     private static let manualTransportSyncDelay: Duration = .milliseconds(300)
 
+    var canControlManualPlayback: Bool {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return sonosControlAPIState.canSendCommands
+        }
+
+        return hasManualSonosHost
+    }
+
     func toggleManualSonosPlayback() async {
         switch nowPlaying.playbackState {
         case .playing:
