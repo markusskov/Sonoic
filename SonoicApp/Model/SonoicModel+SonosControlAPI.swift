@@ -7,7 +7,7 @@ extension SonoicModel {
     private static let sonosControlAPISeekSlotWaitDelay: Duration = .milliseconds(100)
     private static let sonosControlAPISeekSlotWaitAttempts = 36
 
-    private struct SonosControlAPICommandContext {
+    struct SonosControlAPICommandContext {
         var householdID: String?
         var groupID: String
         var accessToken: String
@@ -743,15 +743,38 @@ extension SonoicModel {
     ) -> SonosNowPlayingSnapshot {
         let track = metadataStatus.currentItem?.track
         let container = metadataStatus.container
+        let cloudQueueIndex = sonosControlAPICloudQueueCurrentIndex(
+            from: [
+                playbackStatus.itemId,
+                metadataStatus.currentItem?.id
+            ]
+        )
+        let cloudQueuePayload = cloudQueueIndex.flatMap { index in
+            manualQueueContextPayloads.flatMap { $0.indices.contains(index) ? $0[index] : nil }
+        }
+        let cloudQueueTrack = cloudQueueIndex.flatMap { index in
+            sonosControlAPICloudQueueTracks.flatMap { $0.indices.contains(index) ? $0[index] : nil }
+        }
+        let cloudQueueSubtitleParts = sonosControlAPISubtitleParts(from: cloudQueuePayload?.subtitle)
         let title = track?.name?.sonoicNonEmptyTrimmed
+            ?? cloudQueueTrack?.name?.sonoicNonEmptyTrimmed
+            ?? cloudQueuePayload?.title.sonoicNonEmptyTrimmed
             ?? metadataStatus.streamInfo?.sonoicNonEmptyTrimmed
             ?? fallback.title
         let artistName = track?.artist?.name.sonoicNonEmptyTrimmed
+            ?? cloudQueueTrack?.artist?.name.sonoicNonEmptyTrimmed
+            ?? cloudQueueSubtitleParts.first
         let albumTitle = track?.album?.name.sonoicNonEmptyTrimmed
+            ?? cloudQueueTrack?.album?.name.sonoicNonEmptyTrimmed
+            ?? cloudQueueSubtitleParts.dropFirst().first
         let sourceName = track?.service?.name?.sonoicNonEmptyTrimmed
+            ?? cloudQueueTrack?.service?.name?.sonoicNonEmptyTrimmed
             ?? container?.service?.name?.sonoicNonEmptyTrimmed
+            ?? cloudQueuePayload?.service?.name.sonoicNonEmptyTrimmed
             ?? fallback.sourceName
         let artworkURL = track?.imageUrl?.sonoicNonEmptyTrimmed
+            ?? cloudQueueTrack?.imageUrl?.sonoicNonEmptyTrimmed
+            ?? cloudQueuePayload?.artworkURL?.sonoicNonEmptyTrimmed
             ?? container?.imageUrl?.sonoicNonEmptyTrimmed
             ?? fallback.artworkURL
         let artworkIdentifier = artworkURL == fallback.artworkURL ? fallback.artworkIdentifier : nil
@@ -765,7 +788,10 @@ extension SonoicModel {
             artworkURL: artworkURL,
             artworkIdentifier: artworkIdentifier,
             elapsedTime: playbackStatus.positionMillis.map { TimeInterval($0) / 1_000 },
-            duration: track?.durationMillis.map { TimeInterval($0) / 1_000 } ?? fallback.duration,
+            duration: track?.durationMillis.map { TimeInterval($0) / 1_000 }
+                ?? cloudQueueTrack?.durationMillis.map { TimeInterval($0) / 1_000 }
+                ?? cloudQueuePayload?.duration
+                ?? fallback.duration,
             transportActions: sonosControlAPITransportActions(
                 playbackStatus: playbackStatus,
                 metadataStatus: metadataStatus
@@ -1019,7 +1045,7 @@ extension SonoicModel {
         await validSonosControlAPITokenSetForCommands(logPrefix: logPrefix) != nil
     }
 
-    private func sonosControlAPICommandContext(
+    func sonosControlAPICommandContext(
         requiresActiveTargetMatch: Bool = false,
         logPrefix: String? = nil
     ) async -> SonosControlAPICommandContext? {
@@ -1712,7 +1738,7 @@ extension SonoicModel {
         }
     }
 
-    private func isSonosControlAPIAuthorizationFailure(_ error: Error) -> Bool {
+    func isSonosControlAPIAuthorizationFailure(_ error: Error) -> Bool {
         guard let transportError = error as? SonosControlAPITransport.TransportError else {
             return false
         }

@@ -99,6 +99,13 @@ extension SonoicModel {
             startingAtIndex: startIndex,
             shuffled: shuffled
         )
+        let favoriteCloudFallback = sourcePlaylistFavoriteFallback(
+            for: parentItem,
+            startIndex: startIndex,
+            shuffled: shuffled,
+            allowStartOffset: false,
+            log: false
+        )
 
         if let generatedPlan,
            await playSonosControlAPICloudQueueIfAvailable(parentItem: parentItem, plan: generatedPlan)
@@ -110,6 +117,17 @@ extension SonoicModel {
             return true
         }
 
+        if sonosControlAPIState.settings.mode.canSendCommands,
+           let favorite = favoriteCloudFallback,
+           await playManualSonosFavorite(favorite)
+        {
+            recordRecentSourceItem(parentItem, replayPayload: sourcePlaylistFallbackPayload(for: parentItem))
+            sonoicPlaybackDebugLog(
+                "playlistQueue cloudFavoriteFallback result=true parent='\(parentItem.title)'"
+            )
+            return true
+        }
+
         guard allowsLocalSourcePlaybackFallback else {
             sonoicPlaybackDebugLog(
                 "playlistQueue cloudQueue result=false noLocalPlaybackFallback=true parent='\(parentItem.title)'"
@@ -117,8 +135,13 @@ extension SonoicModel {
             return false
         }
 
-        if !shuffled,
-           let favorite = sonosFavoriteBackedPlaylist(for: parentItem, log: true)
+        if let favorite = sourcePlaylistFavoriteFallback(
+            for: parentItem,
+            startIndex: startIndex,
+            shuffled: shuffled,
+            allowStartOffset: true,
+            log: true
+        )
         {
             let sourceIndex = startIndex ?? 0
             guard sourceIndex >= 0,
@@ -175,6 +198,22 @@ extension SonoicModel {
             trackItemsCount: trackItems.count,
             startIndex: startIndex
         )
+    }
+
+    private func sourcePlaylistFavoriteFallback(
+        for parentItem: SonoicSourceItem,
+        startIndex: Int?,
+        shuffled: Bool,
+        allowStartOffset: Bool,
+        log: Bool
+    ) -> SonosFavoriteItem? {
+        guard !shuffled,
+              allowStartOffset || startIndex == nil || startIndex == 0
+        else {
+            return nil
+        }
+
+        return sonosFavoriteBackedPlaylist(for: parentItem, log: log)
     }
 
     private func playGeneratedSourcePlaylistQueue(

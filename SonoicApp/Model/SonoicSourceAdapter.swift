@@ -151,21 +151,11 @@ extension SonoicModel {
 
         switch parentItem.service.kind {
         case .appleMusic:
-            guard let plan = appleMusicPlaylistPlaybackPlan(
+            return appleMusicPlaylistPlaybackPlan(
                 parentItem: parentItem,
                 trackItems: trackItems,
                 startingAtIndex: startIndex,
                 shuffled: shuffled
-            ) else {
-                return nil
-            }
-
-            return SonoicSourcePlaylistPlaybackPlan(
-                payloads: plan.payloads,
-                items: plan.items,
-                startingTrackNumber: plan.startingTrackNumber,
-                localNowPlayingPayload: plan.localNowPlayingPayload,
-                recentPlaybackPayload: plan.recentPlaybackPayload
             )
         case .spotify, .sonosRadio, .genericStreaming:
             return nil

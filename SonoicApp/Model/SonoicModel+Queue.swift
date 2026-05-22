@@ -21,35 +21,30 @@ extension SonoicModel {
     }
 
     func refreshQueue(showLoading: Bool = true) async {
-        restoreSonosControlAPICloudQueueContextIfNeeded(
-            groupID: activeSonosControlAPIGroupID(),
-            queueVersion: nil
-        )
-
-        if sonosControlAPIState.canSendCommands,
-           let snapshot = sonosControlAPICloudQueueSnapshot(
-               currentItemIndex: queueState.snapshot?.currentItemIndex,
-               sourceURI: queueState.snapshot?.sourceURI
-           )
-        {
-            queueDiagnostics = SonosQueueDiagnostics(
-                observedAt: Date(),
-                currentURI: snapshot.sourceURI ?? nowPlayingDiagnostics.currentURI,
-                itemCount: snapshot.items.count,
-                lastRefreshErrorDetail: nil,
-                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
-            )
-            queueState = .loaded(snapshot)
-            isQueueRefreshing = false
-            return
-        }
-
         if sonosControlAPIState.settings.mode.canSendCommands {
+            guard sonosControlAPIState.canSendCommands else {
+                queueDiagnostics = SonosQueueDiagnostics(
+                    observedAt: Date(),
+                    currentURI: nowPlayingDiagnostics.currentURI,
+                    itemCount: nil,
+                    lastRefreshErrorDetail: sonosControlAPIQueueUnavailableDetail,
+                    lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+                )
+                queueState = .unavailable(sonosControlAPIQueueUnavailableDetail)
+                isQueueRefreshing = false
+                return
+            }
+
+            if await refreshSonosControlAPICloudQueueSnapshot() {
+                isQueueRefreshing = false
+                return
+            }
+
             queueDiagnostics = SonosQueueDiagnostics(
                 observedAt: Date(),
                 currentURI: nowPlayingDiagnostics.currentURI,
                 itemCount: nil,
-                lastRefreshErrorDetail: "Sonoic does not have a Cloud Queue snapshot for this playback source.",
+                lastRefreshErrorDetail: "Sonoic does not have a confirmed Cloud Queue snapshot for this playback source.",
                 lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
             )
             queueState = .unavailable("Queue is unavailable for this Cloud playback source.")
@@ -110,6 +105,17 @@ extension SonoicModel {
         }
     }
 
+    private var sonosControlAPIQueueUnavailableDetail: String {
+        switch sonosControlAPIState.authorizationStatus {
+        case .expired:
+            "Sonos Cloud sign-in has expired."
+        case .notConfigured:
+            "Sonos Cloud is not connected."
+        case .ready:
+            sonosControlAPIState.lastErrorDetail ?? "Sonos Cloud is unavailable."
+        }
+    }
+
     private func queueSnapshotEnrichedFromManualContext(_ snapshot: SonosQueueSnapshot) -> SonosQueueSnapshot {
         guard let payloads = manualQueueContextPayloads,
               payloads.count == snapshot.items.count
@@ -148,25 +154,8 @@ extension SonoicModel {
     }
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
-        restoreSonosControlAPICloudQueueContextIfNeeded(
-            groupID: activeSonosControlAPIGroupID(),
-            queueVersion: nil
-        )
-
-        if sonosControlAPIState.canSendCommands,
-           let snapshot = sonosControlAPICloudQueueSnapshot(
-               currentItemIndex: queueState.snapshot?.currentItemIndex,
-               sourceURI: queueState.snapshot?.sourceURI
-           )
-        {
-            queueDiagnostics = SonosQueueDiagnostics(
-                observedAt: Date(),
-                currentURI: snapshot.sourceURI ?? nowPlayingDiagnostics.currentURI,
-                itemCount: snapshot.items.count,
-                lastRefreshErrorDetail: nil,
-                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
-            )
-            queueState = .loaded(snapshot)
+        if sonosControlAPIState.canSendCommands {
+            _ = await refreshSonosControlAPICloudQueueSnapshot()
             return
         }
 
@@ -195,6 +184,71 @@ extension SonoicModel {
         }
 
         await refreshQueue(showLoading: false)
+    }
+
+    private func refreshSonosControlAPICloudQueueSnapshot() async -> Bool {
+        guard let context = await sonosControlAPICommandContext(logPrefix: "cloudQueueRefresh") else {
+            return false
+        }
+
+        do {
+            async let playbackStatusTask = sonosControlAPIClient.playbackStatus(
+                groupID: context.groupID,
+                accessToken: context.accessToken
+            )
+            async let metadataStatusTask = sonosControlAPIClient.playbackMetadata(
+                groupID: context.groupID,
+                accessToken: context.accessToken
+            )
+
+            let playbackStatus = try await playbackStatusTask
+            let metadataStatus = try? await metadataStatusTask
+            guard let queueVersion = playbackStatus.queueVersion?.sonoicNonEmptyTrimmed else {
+                clearSonosControlAPICloudQueueContext()
+                return false
+            }
+
+            guard restoreSonosControlAPICloudQueueContextIfNeeded(
+                groupID: context.groupID,
+                queueVersion: queueVersion
+            ) else {
+                return false
+            }
+
+            if updateSonosControlAPICloudQueueCurrentItem(
+                itemIDCandidates: [
+                    playbackStatus.itemId,
+                    metadataStatus?.currentItem?.id
+                ]
+            ) {
+                return true
+            }
+
+            guard let snapshot = sonosControlAPICloudQueueSnapshot(
+                currentItemIndex: nil,
+                sourceURI: queueState.snapshot?.sourceURI
+            ) else {
+                return false
+            }
+
+            queueDiagnostics = SonosQueueDiagnostics(
+                observedAt: Date(),
+                currentURI: snapshot.sourceURI ?? nowPlayingDiagnostics.currentURI,
+                itemCount: snapshot.items.count,
+                lastRefreshErrorDetail: "Cloud Queue is loaded, but Sonos has not confirmed the current item yet.",
+                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+            )
+            queueState = .loaded(snapshot)
+            return true
+        } catch {
+            recordSonosControlAPIError(error)
+            if isSonosControlAPIAuthorizationFailure(error) {
+                sonosControlAPIState.authorizationStatus = .expired
+                sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
+                clearSonosControlAPICloudQueueContext()
+            }
+            return false
+        }
     }
 
     func clearQueue() async -> Bool {
@@ -549,7 +603,7 @@ extension SonoicModel {
         return true
     }
 
-    private func sonosControlAPICloudQueueCurrentIndex(from itemIDCandidates: [String?]) -> Int? {
+    func sonosControlAPICloudQueueCurrentIndex(from itemIDCandidates: [String?]) -> Int? {
         guard let itemIDs = sonosControlAPICloudQueueItemIDs else {
             return nil
         }
