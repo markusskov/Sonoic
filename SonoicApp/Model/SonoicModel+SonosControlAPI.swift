@@ -775,10 +775,12 @@ extension SonoicModel {
         let availableActions = playbackStatus.availablePlaybackActions
         var rawActions: Set<String> = []
 
-        if playbackStatus.playbackState != .playing || availableActions?.canPause != false {
+        if playbackStatus.playbackState == .paused || playbackStatus.playbackState == .idle {
             rawActions.insert("Play")
         }
-        if availableActions?.canPause != false {
+        if (playbackStatus.playbackState == .playing || playbackStatus.playbackState == .buffering),
+           availableActions?.canPause != false
+        {
             rawActions.insert("Pause")
         }
         if availableActions?.canStop == true {
