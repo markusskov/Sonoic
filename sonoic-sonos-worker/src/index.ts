@@ -7,6 +7,7 @@ const BROKER_CODE_PRUNE_GRACE_SECONDS = 60;
 const CLOUD_QUEUE_API_VERSION = 'v2.3';
 const CLOUD_QUEUE_STORAGE_PREFIX = 'cloud-queue:';
 const CLOUD_QUEUE_TTL_SECONDS = 24 * 60 * 60;
+const CLOUD_QUEUE_PRUNE_GRACE_SECONDS = 60;
 const CLOUD_QUEUE_MAX_WINDOW_ITEMS = 20;
 const EXTERNAL_ORIGIN_HEADER = 'X-Sonoic-External-Origin';
 const textEncoder = new TextEncoder();
@@ -154,8 +155,6 @@ export class SonoicCloudQueues {
 	async fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
 		try {
-			await this.pruneExpiredQueues();
-
 			if (request.method === 'POST' && url.pathname === '/create') {
 				return await this.createQueue(request);
 			}
@@ -206,6 +205,7 @@ export class SonoicCloudQueues {
 		};
 
 		await this.state.storage.put(`${CLOUD_QUEUE_STORAGE_PREFIX}${queueId}`, record);
+		await this.schedulePrune(record.expiresAt);
 		const queueBaseUrl = `${externalOrigin(request)}/cloud-queues/${queueId}/${CLOUD_QUEUE_API_VERSION}`;
 		const startItem = items.find((item) => item.id === startItemId) ?? items[0];
 		const responseBody: JsonObject = {
@@ -256,6 +256,11 @@ export class SonoicCloudQueues {
 		}
 
 		return record;
+	}
+
+	async alarm(): Promise<void> {
+		await this.pruneExpiredQueues();
+		await this.scheduleNextStoredExpiration();
 	}
 
 	private contextResponse(record: CloudQueueRecord): JsonObject {
@@ -315,6 +320,29 @@ export class SonoicCloudQueues {
 			.map(([key]) => key);
 
 		await Promise.all(expiredKeys.map((key) => this.state.storage.delete(key)));
+	}
+
+	private async schedulePrune(expiresAt: number): Promise<void> {
+		const alarmAt = (expiresAt + CLOUD_QUEUE_PRUNE_GRACE_SECONDS) * 1_000;
+		const currentAlarm = await this.state.storage.getAlarm();
+		if (currentAlarm === null || alarmAt < currentAlarm) {
+			await this.state.storage.setAlarm(alarmAt);
+		}
+	}
+
+	private async scheduleNextStoredExpiration(): Promise<void> {
+		const entries = await this.state.storage.list<CloudQueueRecord>({ prefix: CLOUD_QUEUE_STORAGE_PREFIX });
+		const nextExpiration = [...entries].reduce<number | undefined>((next, [, record]) => {
+			if (next === undefined || record.expiresAt < next) {
+				return record.expiresAt;
+			}
+
+			return next;
+		}, undefined);
+
+		if (nextExpiration !== undefined) {
+			await this.schedulePrune(nextExpiration);
+		}
 	}
 }
 

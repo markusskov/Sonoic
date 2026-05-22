@@ -1,4 +1,4 @@
-import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
+import { createExecutionContext, env, runInDurableObject, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
 
@@ -250,6 +250,16 @@ describe('Sonoic Cloud Queue worker', () => {
 		);
 	});
 
+	it('schedules cloud queue pruning outside normal request handling', async () => {
+		const createResponse = await createCloudQueue({ startItemId: 'sonoic-track-2' });
+		const stub = cloudQueuesStub();
+
+		const alarmAt = await runInDurableObject(stub, async (_instance, state) => state.storage.getAlarm());
+
+		expect(createResponse.queueId).toEqual(expect.any(String));
+		expect(alarmAt).toEqual(expect.any(Number));
+	});
+
 	it('returns the first queue item as the default item window playhead', async () => {
 		const createResponse = await createCloudQueue({ startItemId: 'sonoic-track-2' });
 		const queueBaseUrl = String(createResponse.queueBaseUrl);
@@ -339,6 +349,11 @@ function authenticatedCloudQueueHeaders(): HeadersInit {
 		'Content-Type': 'application/json',
 		Authorization: 'Bearer access-1',
 	};
+}
+
+function cloudQueuesStub(): DurableObjectStub {
+	const namespace = env.SONOIC_CLOUD_QUEUES;
+	return namespace.get(namespace.idFromName('global'));
 }
 
 function stubSuccessfulSonosTokenValidation(): ReturnType<typeof vi.fn> {
