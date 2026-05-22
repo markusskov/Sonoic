@@ -51,6 +51,7 @@ final class SonoicModel {
     @ObservationIgnored var manualQueueContextPayloads: [SonosPlayablePayload]?
     @ObservationIgnored var manualRecentPlaybackContextPayload: SonosPlayablePayload?
     @ObservationIgnored var sonosControlAPICloudQueueSessionID: String?
+    @ObservationIgnored var sonosControlAPICloudQueueGroupID: String?
     @ObservationIgnored var sonosControlAPICloudQueueVersion: String?
     @ObservationIgnored var sonosControlAPICloudQueueItemIDs: [String]?
     @ObservationIgnored var sonosControlAPICloudQueueTracks: [SonosControlAPITrack]?

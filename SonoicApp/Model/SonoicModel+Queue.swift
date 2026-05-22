@@ -374,9 +374,91 @@ extension SonoicModel {
 
     func clearSonosControlAPICloudQueueContext() {
         sonosControlAPICloudQueueSessionID = nil
+        sonosControlAPICloudQueueGroupID = nil
         sonosControlAPICloudQueueVersion = nil
         sonosControlAPICloudQueueItemIDs = nil
         sonosControlAPICloudQueueTracks = nil
+        sharedStore?.clearCloudQueueSessionContext()
+    }
+
+    func persistSonosControlAPICloudQueueContext(groupID: String? = nil) {
+        guard let sessionID = sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed,
+              let itemIDs = sonosControlAPICloudQueueItemIDs,
+              !itemIDs.isEmpty
+        else {
+            sharedStore?.clearCloudQueueSessionContext()
+            return
+        }
+
+        let context = SonosControlAPICloudQueueSessionContext(
+            sessionID: sessionID,
+            groupID: groupID?.sonoicNonEmptyTrimmed ?? sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed,
+            queueVersion: sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed,
+            itemIDs: itemIDs,
+            tracks: sonosControlAPICloudQueueTracks ?? [],
+            updatedAt: Date()
+        )
+        guard context.isUsable else {
+            sharedStore?.clearCloudQueueSessionContext()
+            return
+        }
+
+        do {
+            try sharedStore?.saveCloudQueueSessionContext(context)
+        } catch {
+            sonoicPlaybackDebugLog("cloudQueue persistContext failed error='\(error.localizedDescription)'")
+        }
+    }
+
+    @discardableResult
+    func restoreSonosControlAPICloudQueueContextIfNeeded(groupID: String?, queueVersion: String?) -> Bool {
+        let normalizedGroupID = groupID?.sonoicNonEmptyTrimmed
+        let normalizedQueueVersion = queueVersion?.sonoicNonEmptyTrimmed
+
+        if sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed != nil,
+           sonosControlAPICloudQueueItemIDs?.isEmpty == false,
+           sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed == normalizedGroupID,
+           sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed == normalizedQueueVersion
+        {
+            return true
+        }
+
+        guard let context = sharedStore?.loadCloudQueueSessionContext(),
+              context.isUsable,
+              context.isFresh
+        else {
+            return false
+        }
+
+        if let storedGroupID = context.groupID?.sonoicNonEmptyTrimmed,
+           let normalizedGroupID,
+           storedGroupID != normalizedGroupID
+        {
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext skipped groupMismatch stored=\(sonoicPlaybackDebugID(storedGroupID)) current=\(sonoicPlaybackDebugID(normalizedGroupID))"
+            )
+            return false
+        }
+
+        if let storedQueueVersion = context.queueVersion?.sonoicNonEmptyTrimmed,
+           let normalizedQueueVersion,
+           storedQueueVersion != normalizedQueueVersion
+        {
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext skipped queueVersionMismatch stored=\(sonoicPlaybackDebugID(storedQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+            )
+            return false
+        }
+
+        sonosControlAPICloudQueueSessionID = context.sessionID
+        sonosControlAPICloudQueueGroupID = context.groupID
+        sonosControlAPICloudQueueVersion = context.queueVersion
+        sonosControlAPICloudQueueItemIDs = context.itemIDs
+        sonosControlAPICloudQueueTracks = context.tracks
+        sonoicPlaybackDebugLog(
+            "cloudQueue restoreContext session=\(sonoicPlaybackDebugID(context.sessionID)) itemCount=\(context.itemIDs.count)"
+        )
+        return true
     }
 
     func sonosControlAPICloudQueueSnapshot(

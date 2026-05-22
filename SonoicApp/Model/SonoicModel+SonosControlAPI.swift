@@ -242,6 +242,10 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "cloudseek status canSeek=\(String(describing: status.availablePlaybackActions?.canSeek)) itemID=\(sonoicPlaybackDebugID(status.itemId)) positionMillis=\(String(describing: status.positionMillis))"
             )
+            restoreSonosControlAPICloudQueueContextIfNeeded(
+                groupID: context.groupID,
+                queueVersion: status.queueVersion
+            )
             let itemIDCandidates = sonosControlAPISeekItemIDCandidates(from: status)
             sonoicPlaybackDebugLog(
                 "cloudseek seekPayload candidates=\(itemIDCandidates.map { "\($0.label):\($0.itemID.map(sonoicPlaybackDebugID) ?? "omitted")" }.joined(separator: ",")) rawItemID=\(sonoicPlaybackDebugID(status.itemId))"
@@ -292,29 +296,11 @@ extension SonoicModel {
                     break
                 } catch {
                     lastSeekError = error
-                    if sonosControlAPIError(error, matchesStatus: 499, detailContains: "ERROR_DISALLOWED_BY_POLICY"),
-                       let positionMillis = status.positionMillis
-                    {
-                        let deltaMillis = targetMillis - positionMillis
+                    if sonosControlAPIError(error, matchesStatus: 499, detailContains: "ERROR_DISALLOWED_BY_POLICY") {
                         sonoicPlaybackDebugLog(
-                            "cloudseek absoluteDisallowed retryRelative deltaMillis=\(deltaMillis) currentMillis=\(positionMillis) targetMillis=\(targetMillis) candidate=\(candidate.label) itemID=\(candidate.itemID.map(sonoicPlaybackDebugID) ?? "omitted")"
+                            "cloudseek disallowedByPolicy currentMillis=\(String(describing: status.positionMillis)) targetMillis=\(targetMillis) candidate=\(candidate.label) itemID=\(candidate.itemID.map(sonoicPlaybackDebugID) ?? "omitted")"
                         )
-                        do {
-                            try await sonosControlAPIClient.seekRelative(
-                                groupID: context.groupID,
-                                deltaMillis: deltaMillis,
-                                itemID: candidate.itemID,
-                                accessToken: context.accessToken
-                            )
-                            lastSeekError = nil
-                            break
-                        } catch {
-                            lastSeekError = error
-                            sonoicPlaybackDebugLog(
-                                "cloudseek relativeFailed candidate=\(candidate.label) itemID=\(candidate.itemID.map(sonoicPlaybackDebugID) ?? "omitted") error='\(error.localizedDescription)'"
-                            )
-                            continue
-                        }
+                        throw error
                     }
 
                     if sonosControlAPIError(error, matchesStatus: 400, detailContains: "ERROR_INVALID_OBJECT_ID") {
@@ -1179,6 +1165,7 @@ extension SonoicModel {
         let previousQueueContextPayloads = manualQueueContextPayloads
         let previousRecentPlaybackContextPayload = manualRecentPlaybackContextPayload
         let previousCloudQueueSessionID = sonosControlAPICloudQueueSessionID
+        let previousCloudQueueGroupID = sonosControlAPICloudQueueGroupID
         let previousCloudQueueVersion = sonosControlAPICloudQueueVersion
         let previousCloudQueueItemIDs = sonosControlAPICloudQueueItemIDs
         let previousCloudQueueTracks = sonosControlAPICloudQueueTracks
@@ -1200,6 +1187,7 @@ extension SonoicModel {
         manualRecentPlaybackContextPayload = plan.recentPlaybackPayload
         manualPlaybackContextPayload = confirmationPayload
         sonosControlAPICloudQueueSessionID = nil
+        sonosControlAPICloudQueueGroupID = context.groupID
         sonosControlAPICloudQueueVersion = nil
         sonosControlAPICloudQueueItemIDs = queueItemIDs
         sonosControlAPICloudQueueTracks = queueTracks
@@ -1243,9 +1231,11 @@ extension SonoicModel {
                 accessToken: context.accessToken
             )
             sonosControlAPICloudQueueSessionID = sessionID
+            sonosControlAPICloudQueueGroupID = context.groupID
             sonosControlAPICloudQueueVersion = cloudQueue.queueVersion
             sonosControlAPICloudQueueItemIDs = queueItemIDs
             sonosControlAPICloudQueueTracks = queueTracks
+            persistSonosControlAPICloudQueueContext()
             if let snapshot = sonosControlAPICloudQueueSnapshot(
                 currentItemIndex: startIndex,
                 sourceURI: "sonoic-cloud-queue:\(cloudQueue.queueId)"
@@ -1269,9 +1259,11 @@ extension SonoicModel {
             manualQueueContextPayloads = previousQueueContextPayloads
             manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
             sonosControlAPICloudQueueSessionID = previousCloudQueueSessionID
+            sonosControlAPICloudQueueGroupID = previousCloudQueueGroupID
             sonosControlAPICloudQueueVersion = previousCloudQueueVersion
             sonosControlAPICloudQueueItemIDs = previousCloudQueueItemIDs
             sonosControlAPICloudQueueTracks = previousCloudQueueTracks
+            persistSonosControlAPICloudQueueContext()
         }
 
         sonoicPlaybackDebugLog(
@@ -1560,6 +1552,7 @@ extension SonoicModel {
         let previousQueueContextPayloads = manualQueueContextPayloads
         let previousRecentPlaybackContextPayload = manualRecentPlaybackContextPayload
         let previousCloudQueueSessionID = sonosControlAPICloudQueueSessionID
+        let previousCloudQueueGroupID = sonosControlAPICloudQueueGroupID
         let previousCloudQueueVersion = sonosControlAPICloudQueueVersion
         let previousCloudQueueItemIDs = sonosControlAPICloudQueueItemIDs
         let previousCloudQueueTracks = sonosControlAPICloudQueueTracks
@@ -1601,9 +1594,11 @@ extension SonoicModel {
             manualQueueContextPayloads = previousQueueContextPayloads
             manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
             sonosControlAPICloudQueueSessionID = previousCloudQueueSessionID
+            sonosControlAPICloudQueueGroupID = previousCloudQueueGroupID
             sonosControlAPICloudQueueVersion = previousCloudQueueVersion
             sonosControlAPICloudQueueItemIDs = previousCloudQueueItemIDs
             sonosControlAPICloudQueueTracks = previousCloudQueueTracks
+            persistSonosControlAPICloudQueueContext()
         }
 
         sonoicPlaybackDebugLog(
