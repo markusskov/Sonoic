@@ -8,7 +8,11 @@ extension SonoicModel {
     }
 
     var hasActiveSonosControlTarget: Bool {
-        hasManualSonosHost || hasSonosControlAPICommandTarget
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return hasSonosControlAPICommandTarget
+        }
+
+        return hasManualSonosHost
     }
 
     var activeSonosControlTargetRefreshKey: String {
@@ -21,7 +25,7 @@ extension SonoicModel {
         ].joined(separator: "|")
     }
 
-    private var hasSonosControlAPICommandTarget: Bool {
+    var hasSonosControlAPICommandTarget: Bool {
         sonosControlAPIState.canSendCommands
             && sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed != nil
     }

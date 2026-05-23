@@ -40,7 +40,19 @@ enum SonoicSourceActionError: LocalizedError {
 
 extension SonoicModel {
     func canPlaySourceItem(_ item: SonoicSourceItem) -> Bool {
-        (try? sourcePlayablePayload(for: item, purpose: .directPlay)) != nil
+        guard canSendPrimarySourcePlaybackCommands else {
+            return false
+        }
+
+        return (try? sourcePlayablePayload(for: item, purpose: .directPlay)) != nil
+    }
+
+    private var canSendPrimarySourcePlaybackCommands: Bool {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return hasSonosControlAPICommandTarget
+        }
+
+        return hasManualSonosHost
     }
 
     func sourcePlaylistFallbackPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {

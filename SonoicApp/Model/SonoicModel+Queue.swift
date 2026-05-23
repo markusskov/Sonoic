@@ -160,12 +160,8 @@ extension SonoicModel {
     }
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
-        if sonosControlAPIState.canSendCommands {
+        if sonosControlAPIState.settings.mode.canSendCommands {
             await refreshQueue(showLoading: false)
-            return
-        }
-
-        guard !sonosControlAPIState.settings.mode.canSendCommands else {
             return
         }
 

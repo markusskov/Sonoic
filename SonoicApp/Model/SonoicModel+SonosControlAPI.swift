@@ -58,6 +58,11 @@ extension SonoicModel {
         var settings = sonosControlAPIState.settings
         var didChangeSettings = false
 
+        if settings.mode == .off {
+            settings.mode = .preferred
+            didChangeSettings = true
+        }
+
         if let target = snapshot.preferredCommandTarget(
             settings: settings,
             activeTargetID: activeTarget.id
@@ -71,11 +76,66 @@ extension SonoicModel {
                 settings.selectedGroupID = target.groupID
                 didChangeSettings = true
             }
+
+            if let nextActiveTarget = sonosActiveTarget(from: target, snapshot: snapshot),
+               activeTarget != nextActiveTarget
+            {
+                sonoicPlaybackDebugLog(
+                    "cloudSnapshot activeTarget name='\(nextActiveTarget.name)' id=\(sonoicPlaybackDebugID(nextActiveTarget.id)) group=\(sonoicPlaybackDebugID(target.groupID)) household=\(sonoicPlaybackDebugID(target.householdID))"
+                )
+                activeTarget = nextActiveTarget
+            }
+
+            manualHostIdentityStatus = .resolved
+            manualHostTopologyStatus = .resolved
         }
 
         if didChangeSettings {
             updateSonosControlAPISettings(settings)
         }
+    }
+
+    private func sonosActiveTarget(
+        from target: SonosControlAPITargetIdentity,
+        snapshot: SonosControlAPICloudSnapshot
+    ) -> SonosActiveTarget? {
+        guard let groupSnapshot = snapshot.groupsByHouseholdID[target.householdID],
+              let group = groupSnapshot.groups.first(where: { $0.id == target.groupID })
+        else {
+            return nil
+        }
+
+        let playersByID = Dictionary(uniqueKeysWithValues: groupSnapshot.players.map { ($0.id, $0) })
+        let groupedPlayers = group.playerIds.compactMap { playersByID[$0] }
+        let memberNames = groupedPlayers
+            .map { player in
+                player.roomName?.sonoicNonEmptyTrimmed
+                    ?? player.name?.sonoicNonEmptyTrimmed
+                    ?? player.id
+            }
+        let fallbackName = group.name?.sonoicNonEmptyTrimmed
+            ?? memberNames.first
+            ?? groupedPlayers.first?.name?.sonoicNonEmptyTrimmed
+            ?? "Sonos"
+        let primaryPlayer = target.coordinatorPlayerID
+            .flatMap { playersByID[$0] }
+            ?? target.playerID.flatMap { playersByID[$0] }
+            ?? groupedPlayers.first
+        let primaryProductName = primaryPlayer?.name?.sonoicNonEmptyTrimmed
+            ?? primaryPlayer?.roomName?.sonoicNonEmptyTrimmed
+            ?? "Sonos"
+        let kind: SonosActiveTarget.Kind = groupedPlayers.count > 1 ? .group : .room
+        let activeTargetID = kind == .group
+            ? group.id
+            : (primaryPlayer?.id ?? target.playerID ?? group.id)
+
+        return SonosActiveTarget(
+            id: activeTargetID,
+            name: fallbackName,
+            householdName: primaryProductName,
+            kind: kind,
+            memberNames: memberNames.isEmpty ? [fallbackName] : memberNames
+        )
     }
 
     func recordSonosControlAPICommand(_ description: String) {

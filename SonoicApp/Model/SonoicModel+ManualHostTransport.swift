@@ -5,7 +5,7 @@ extension SonoicModel {
 
     var canControlManualPlayback: Bool {
         if sonosControlAPIState.settings.mode.canSendCommands {
-            return sonosControlAPIState.canSendCommands
+            return hasSonosControlAPICommandTarget
         }
 
         return hasManualSonosHost

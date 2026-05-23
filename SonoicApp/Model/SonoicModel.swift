@@ -320,5 +320,6 @@ final class SonoicModel {
         configureNowPlayableSessionController()
         configureSonosDiscoveryBrowser()
         refreshSonosControlAPIAuthorizationState()
+        refreshSonosControlAPICloudSnapshotIfConnected()
     }
 }

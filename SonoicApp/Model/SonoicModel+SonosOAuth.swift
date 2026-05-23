@@ -25,6 +25,7 @@ extension SonoicModel {
                 sonosControlAPICloudState = .idle
                 sonosControlAPIState.authorizationStatus = .expired
             } else {
+                restoreSonosControlAPICommandModeIfNeeded()
                 markSonosControlAPIAuthorizationReady()
             }
         } catch {
@@ -129,6 +130,7 @@ extension SonoicModel {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(
                 status: .connected(expiresAt: refreshedTokenSet.expiresAt)
             )
+            restoreSonosControlAPICommandModeIfNeeded()
             markSonosControlAPIAuthorizationReady()
 
             if let logPrefix {
@@ -222,6 +224,16 @@ extension SonoicModel {
         !Task.isCancelled && sonosControlAPITokenRefreshGeneration == generation
     }
 
+    private func restoreSonosControlAPICommandModeIfNeeded() {
+        guard sonosControlAPIState.settings.mode == .off else {
+            return
+        }
+
+        var settings = sonosControlAPIState.settings
+        settings.mode = .preferred
+        updateSonosControlAPISettings(settings)
+    }
+
     func refreshSonosControlAPICloudSnapshotIfConnected() {
         guard sonosOAuthConfiguration.isConfigured else {
             sonosControlAPICloudState = .idle
@@ -252,6 +264,10 @@ extension SonoicModel {
             let snapshot = try await sonosControlAPIClient.fetchCloudSnapshot(tokenSet: tokenSet)
             sonosControlAPICloudState = SonosControlAPICloudState(status: .verified(snapshot))
             applyVerifiedSonosControlAPICloudSnapshot(snapshot)
+            _ = await syncSonosControlAPIPlaybackStateIfAvailable(
+                showProgress: false,
+                forceRoomRefresh: false
+            )
         } catch let error as SonosControlAPITransport.TransportError where error.isAuthorizationFailure {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
             sonosControlAPIState.authorizationStatus = .expired

@@ -28,6 +28,8 @@ extension SonoicModel {
         case .active:
             isSceneActive = true
             endBackgroundExecutionIfNeeded()
+            refreshSonosControlAPIAuthorizationState()
+            refreshSonosControlAPICloudSnapshotIfConnected()
             startSonosDiscoveryIfPossible()
             scheduleBackgroundPlayerRefreshIfPossible()
             startManualHostRefreshLoopIfPossible()
