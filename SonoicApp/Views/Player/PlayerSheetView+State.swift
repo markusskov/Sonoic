@@ -42,18 +42,22 @@ extension PlayerSheetView {
     }
 
     var artworkReloadKey: String {
-        [
-            model.nowPlaying.artworkIdentifier,
-            model.nowPlaying.title,
-            model.nowPlaying.artistName,
-            model.nowPlaying.albumTitle,
-            model.nowPlaying.sourceName,
+        let nowPlaying = model.effectiveNowPlayingSnapshotForActiveTarget
+
+        return [
+            nowPlaying.artworkIdentifier,
+            nowPlaying.title,
+            nowPlaying.artistName,
+            nowPlaying.albumTitle,
+            nowPlaying.sourceName,
         ]
         .compactMap { $0 }
         .joined(separator: "|")
     }
 
     var progressContentIdentity: String {
+        let nowPlaying = model.effectiveNowPlayingSnapshotForActiveTarget
+
         if let queueSnapshot = model.queueState.snapshot,
            let currentItem = queueSnapshot.currentItem
         {
@@ -65,10 +69,10 @@ extension PlayerSheetView {
                 currentItem.title,
                 currentItem.artistName,
                 currentItem.albumTitle,
-                model.nowPlaying.title,
-                model.nowPlaying.artistName,
-                model.nowPlaying.albumTitle,
-                model.nowPlaying.sourceName,
+                nowPlaying.title,
+                nowPlaying.artistName,
+                nowPlaying.albumTitle,
+                nowPlaying.sourceName,
             ]
 
             return values
@@ -77,10 +81,10 @@ extension PlayerSheetView {
         }
 
         let values: [String?] = [
-            model.nowPlaying.title,
-            model.nowPlaying.artistName,
-            model.nowPlaying.albumTitle,
-            model.nowPlaying.sourceName,
+            nowPlaying.title,
+            nowPlaying.artistName,
+            nowPlaying.albumTitle,
+            nowPlaying.sourceName,
         ]
 
         return values

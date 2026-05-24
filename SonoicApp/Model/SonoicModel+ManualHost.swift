@@ -15,6 +15,15 @@ extension SonoicModel {
         return hasManualSonosHost
     }
 
+    var hasResolvedSonosPlaybackTarget: Bool {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed != nil
+                || activeTarget.id != Self.unconfiguredTarget.id
+        }
+
+        return hasManualSonosHost
+    }
+
     var activeSonosControlTargetRefreshKey: String {
         [
             manualSonosHost.sonoicNonEmptyTrimmed ?? "",

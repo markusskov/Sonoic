@@ -8,10 +8,10 @@ struct HomeView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                if model.hasActiveSonosControlTarget {
+                if model.hasResolvedSonosPlaybackTarget {
                     HomeNowPlayingCard(
                         activeTarget: model.activeTarget,
-                        nowPlaying: model.nowPlaying,
+                        nowPlaying: model.effectiveNowPlayingSnapshotForActiveTarget,
                         queueState: model.queueState,
                         togglePlayback: togglePlayback,
                         openRooms: openRooms,
@@ -63,7 +63,7 @@ struct HomeView: View {
         .miniPlayerContentInset()
         .scrollIndicators(.hidden)
         .refreshable {
-            guard model.hasActiveSonosControlTarget else {
+            guard model.hasResolvedSonosPlaybackTarget else {
                 return
             }
 

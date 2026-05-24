@@ -14,6 +14,7 @@ struct PlayerSheetView: View {
         GeometryReader { geometry in
             let contentWidth = max(geometry.size.width - 60, 1)
             let heroSize = CGSize(width: geometry.size.width, height: heroHeight(for: geometry))
+            let nowPlaying = model.effectiveNowPlayingSnapshotForActiveTarget
 
             ZStack {
                 PlayerFullscreenArtworkBackground(
@@ -31,17 +32,17 @@ struct PlayerSheetView: View {
 
                     VStack(spacing: controlSpacing(for: geometry)) {
                         PlayerFullscreenTitleBlock(
-                            title: model.nowPlaying.title,
-                            subtitle: model.nowPlaying.subtitle ?? model.nowPlaying.sourceName,
-                            artistName: model.nowPlaying.artistName,
+                            title: nowPlaying.title,
+                            subtitle: nowPlaying.subtitle ?? nowPlaying.sourceName,
+                            artistName: nowPlaying.artistName,
                             openArtist: openArtist
                         )
 
                         PlayerProgressSection(
-                            nowPlaying: model.nowPlaying,
+                            nowPlaying: nowPlaying,
                             observedAt: model.nowPlayingObservedAt,
                             contentIdentity: progressContentIdentity,
-                            isEnabled: model.canControlManualPlayback && model.nowPlaying.canSeek,
+                            isEnabled: model.canControlManualPlayback && nowPlaying.canSeek,
                             showsTimeLabels: true,
                             showsThumb: false,
                             seek: { timeInterval in
@@ -50,7 +51,7 @@ struct PlayerSheetView: View {
                         )
 
                         PlayerTransportControls(
-                            nowPlaying: model.nowPlaying,
+                            nowPlaying: nowPlaying,
                             skipPrevious: skipToPreviousTrack,
                             togglePlayback: togglePlayback,
                             skipNext: skipToNextTrack
@@ -82,7 +83,7 @@ struct PlayerSheetView: View {
         .ignoresSafeArea()
         .task(id: artworkReloadKey) {
             artworkImage = await PlayerArtworkImageLoader.loadArtworkImage(
-                artworkIdentifier: model.nowPlaying.artworkIdentifier,
+                artworkIdentifier: model.effectiveNowPlayingSnapshotForActiveTarget.artworkIdentifier,
                 maxPixelDimension: max(geometryIndependentArtworkDimension * displayScale, 1)
             )
         }

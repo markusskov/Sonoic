@@ -5,7 +5,7 @@ struct SonoicCloudQueueClient {
         case missingCreateURL
         case insecureCreateURL
         case invalidResponse
-        case httpStatus(Int)
+        case httpStatus(Int, String?)
 
         var errorDescription: String? {
             switch self {
@@ -15,8 +15,12 @@ struct SonoicCloudQueueClient {
                 "The Sonoic Cloud Queue endpoint must use HTTPS."
             case .invalidResponse:
                 "The Sonoic Cloud Queue endpoint returned an unreadable response."
-            case let .httpStatus(status):
-                "The Sonoic Cloud Queue endpoint returned HTTP \(status)."
+            case let .httpStatus(status, detail):
+                if let detail {
+                    "The Sonoic Cloud Queue endpoint returned HTTP \(status): \(detail)"
+                } else {
+                    "The Sonoic Cloud Queue endpoint returned HTTP \(status)."
+                }
             }
         }
     }
@@ -58,7 +62,10 @@ struct SonoicCloudQueueClient {
         }
 
         guard (200 ..< 300).contains(httpResponse.statusCode) else {
-            throw ClientError.httpStatus(httpResponse.statusCode)
+            throw ClientError.httpStatus(
+                httpResponse.statusCode,
+                String(data: data, encoding: .utf8)?.sonoicNonEmptyTrimmed
+            )
         }
 
         return try decoder.decode(SonoicCloudQueueCreateResponse.self, from: data)

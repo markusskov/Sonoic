@@ -77,13 +77,17 @@ extension SonoicModel {
                 didChangeSettings = true
             }
 
-            if let nextActiveTarget = sonosActiveTarget(from: target, snapshot: snapshot),
-               activeTarget != nextActiveTarget
-            {
-                sonoicPlaybackDebugLog(
-                    "cloudSnapshot activeTarget name='\(nextActiveTarget.name)' id=\(sonoicPlaybackDebugID(nextActiveTarget.id)) group=\(sonoicPlaybackDebugID(target.groupID)) household=\(sonoicPlaybackDebugID(target.householdID))"
-                )
-                activeTarget = nextActiveTarget
+            if let nextActiveTarget = sonosActiveTarget(from: target, snapshot: snapshot) {
+                if activeTarget != nextActiveTarget {
+                    sonoicPlaybackDebugLog(
+                        "cloudSnapshot activeTarget name='\(nextActiveTarget.name)' id=\(sonoicPlaybackDebugID(nextActiveTarget.id)) group=\(sonoicPlaybackDebugID(target.groupID)) household=\(sonoicPlaybackDebugID(target.householdID))"
+                    )
+                    activeTarget = nextActiveTarget
+                }
+
+                if nowPlaying.isIdlePlaceholder {
+                    nowPlaying = .connectedIdle(targetName: nextActiveTarget.name)
+                }
             }
 
             manualHostIdentityStatus = .resolved
@@ -121,9 +125,15 @@ extension SonoicModel {
             .flatMap { playersByID[$0] }
             ?? target.playerID.flatMap { playersByID[$0] }
             ?? groupedPlayers.first
-        let primaryProductName = primaryPlayer?.name?.sonoicNonEmptyTrimmed
+        let localRoomMetadata = localDiscoveredPlayerMatchingCloudRoom(
+            roomName: primaryPlayer?.roomName ?? fallbackName,
+            productName: primaryPlayer?.name
+        )
+        let primaryProductName = localRoomMetadata?.modelName?.sonoicNonEmptyTrimmed
+            ?? primaryPlayer?.name?.sonoicNonEmptyTrimmed
             ?? primaryPlayer?.roomName?.sonoicNonEmptyTrimmed
             ?? "Sonos"
+        let bondedAccessories = localRoomMetadata?.bondedAccessories ?? []
         let kind: SonosActiveTarget.Kind = groupedPlayers.count > 1 ? .group : .room
         let activeTargetID = kind == .group
             ? group.id
@@ -134,8 +144,24 @@ extension SonoicModel {
             name: fallbackName,
             householdName: primaryProductName,
             kind: kind,
-            memberNames: memberNames.isEmpty ? [fallbackName] : memberNames
+            memberNames: memberNames.isEmpty ? [fallbackName] : memberNames,
+            bondedAccessories: bondedAccessories
         )
+    }
+
+    private func localDiscoveredPlayerMatchingCloudRoom(
+        roomName: String?,
+        productName: String?
+    ) -> SonosDiscoveredPlayer? {
+        let normalizedRoomName = roomName?.sonoicNonEmptyTrimmed?.localizedLowercase
+        let normalizedProductName = productName?.sonoicNonEmptyTrimmed?.localizedLowercase
+
+        return discoveredPlayers.first { player in
+            let discoveredName = player.name.localizedLowercase
+            let discoveredModel = player.modelName?.sonoicNonEmptyTrimmed?.localizedLowercase
+            return discoveredName == normalizedRoomName
+                || discoveredModel == normalizedProductName
+        }
     }
 
     func recordSonosControlAPICommand(_ description: String) {
@@ -350,9 +376,9 @@ extension SonoicModel {
 
             if sonosControlAPIHasCloudQueueContext {
                 sonoicPlaybackDebugLog(
-                    "cloudseek sessionContextUnmapped clearingContextForGroupSeek rawItemID=\(sonoicPlaybackDebugID(status.itemId)) metadataItemID=\(sonoicPlaybackDebugID(metadataStatus?.currentItem?.id)) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0)"
+                    "cloudseek sessionContextUnmapped sessionSeekRequired rawItemID=\(sonoicPlaybackDebugID(status.itemId)) metadataItemID=\(sonoicPlaybackDebugID(metadataStatus?.currentItem?.id)) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0)"
                 )
-                clearSonosControlAPICloudQueueContext()
+                throw SonosControlAPISeekFailure.sessionItemUnavailable
             }
 
             var lastSeekError: Error?
@@ -752,7 +778,7 @@ extension SonoicModel {
             var nextNowPlaying = sonosControlAPINowPlayingSnapshot(
                 playbackStatus: playbackStatus,
                 metadataStatus: metadataStatus,
-                fallback: nowPlaying
+                fallback: effectiveNowPlayingSnapshotForActiveTarget
             )
             nextNowPlaying = smoothedNowPlayingSnapshot(nextNowPlaying, diagnostics: .empty)
             nextNowPlaying.artworkIdentifier = try? await syncArtworkIdentifier(for: nextNowPlaying)
@@ -801,6 +827,13 @@ extension SonoicModel {
         metadataStatus: SonosControlAPIMetadataStatus,
         fallback: SonosNowPlayingSnapshot
     ) -> SonosNowPlayingSnapshot {
+        if let lineInSnapshot = sonosControlAPILineInNowPlayingSnapshot(
+            playbackStatus: playbackStatus,
+            metadataStatus: metadataStatus
+        ) {
+            return lineInSnapshot
+        }
+
         let track = metadataStatus.currentItem?.track
         let container = metadataStatus.container
         let cloudQueueIndex = sonosControlAPICloudQueueCurrentIndex(
@@ -859,6 +892,55 @@ extension SonoicModel {
         )
     }
 
+    private func sonosControlAPILineInNowPlayingSnapshot(
+        playbackStatus: SonosControlAPIPlaybackStatus,
+        metadataStatus: SonosControlAPIMetadataStatus
+    ) -> SonosNowPlayingSnapshot? {
+        guard metadataStatus.currentItem?.track == nil,
+              let container = metadataStatus.container,
+              let containerType = container.type?.sonoicNonEmptyTrimmed
+        else {
+            return nil
+        }
+
+        let normalizedType = containerType.lowercased()
+        guard normalizedType.hasPrefix("linein") else {
+            return nil
+        }
+
+        let containerName = container.name?.sonoicNonEmptyTrimmed
+        let normalizedName = containerName?.lowercased() ?? ""
+        let isTVAudio = normalizedType.contains("hometheater")
+            || normalizedType.contains("home_theater")
+            || normalizedName.contains("tv")
+
+        let title: String
+        let sourceName: String
+        if isTVAudio {
+            title = containerName ?? "TV Audio"
+            sourceName = "HDMI"
+        } else {
+            title = containerName ?? "Line-In"
+            sourceName = "Line-In"
+        }
+
+        return SonosNowPlayingSnapshot(
+            title: title,
+            artistName: nil,
+            albumTitle: nil,
+            sourceName: sourceName,
+            playbackState: sonosControlAPIPlaybackState(playbackStatus.playbackState),
+            artworkURL: container.imageUrl?.sonoicNonEmptyTrimmed,
+            artworkIdentifier: nil,
+            elapsedTime: nil,
+            duration: nil,
+            transportActions: sonosControlAPITransportActions(
+                playbackStatus: playbackStatus,
+                metadataStatus: metadataStatus
+            )
+        )
+    }
+
     private func sonosControlAPIPlaybackState(
         _ playbackState: SonosControlAPIPlaybackState
     ) -> SonosNowPlayingSnapshot.PlaybackState {
@@ -894,7 +976,12 @@ extension SonoicModel {
         if availableActions?.canStop == true {
             rawActions.insert("Stop")
         }
-        if availableActions?.canSeek == true && metadataStatus.currentItem?.track?.durationMillis != nil {
+        if availableActions?.canSeek == true,
+           sonosControlAPISeekableDurationMillis(
+            playbackStatus: playbackStatus,
+            metadataStatus: metadataStatus
+           ) != nil
+        {
             rawActions.insert("Seek")
         }
         if availableActions?.canSkip == true {
@@ -905,6 +992,45 @@ extension SonoicModel {
         }
 
         return SonosTransportActions(rawActions: rawActions)
+    }
+
+    private func sonosControlAPISeekableDurationMillis(
+        playbackStatus: SonosControlAPIPlaybackStatus,
+        metadataStatus: SonosControlAPIMetadataStatus
+    ) -> Int? {
+        if let durationMillis = metadataStatus.currentItem?.track?.durationMillis,
+           durationMillis > 0
+        {
+            return durationMillis
+        }
+
+        let cloudQueueIndex = sonosControlAPICloudQueueCurrentIndex(
+            from: [
+                playbackStatus.itemId,
+                metadataStatus.currentItem?.id,
+                queueState.snapshot?.currentItemIndex.map { String($0 + 1) }
+            ]
+        )
+
+        if let cloudQueueIndex,
+           let durationMillis = sonosControlAPICloudQueueTracks.flatMap({ tracks in
+            tracks.indices.contains(cloudQueueIndex) ? tracks[cloudQueueIndex].durationMillis : nil
+           }),
+           durationMillis > 0
+        {
+            return durationMillis
+        }
+
+        if let cloudQueueIndex,
+           let duration = manualQueueContextPayloads.flatMap({ payloads in
+            payloads.indices.contains(cloudQueueIndex) ? payloads[cloudQueueIndex].duration : nil
+           })
+        {
+            let durationMillis = Int((duration * 1_000).rounded())
+            return durationMillis > 0 ? durationMillis : nil
+        }
+
+        return nil
     }
 
     private func sonosControlAPIError(
@@ -1282,8 +1408,17 @@ extension SonoicModel {
             return false
         }
 
+        let serviceAccount = sonosControlAPICloudQueueAccountID(for: parentItem)
+        let serviceAccountID: String? = nil
+        sonoicPlaybackDebugLog(
+            "cloudQueue accountID=omitted rawAccountID=\(sonoicPlaybackDebugID(serviceAccount?.raw)) parent='\(parentItem.title)'"
+        )
         guard plan.items.count == plan.payloads.count,
-              let request = sonosControlAPICloudQueueCreateRequest(parentItem: parentItem, plan: plan)
+              let request = sonosControlAPICloudQueueCreateRequest(
+                parentItem: parentItem,
+                plan: plan,
+                accountID: serviceAccountID
+              )
         else {
             sonoicPlaybackDebugLog("cloudQueue unavailable invalidPlan parent='\(parentItem.title)'")
             return false
@@ -1335,38 +1470,79 @@ extension SonoicModel {
             description: "Cloud queue",
             refreshQueueAfterSuccess: false
         ) {
-            let cloudQueue = try await sonoicCloudQueueClient.createQueue(
-                request,
-                configuration: sonosOAuthConfiguration,
-                accessToken: context.accessToken
+            sonoicPlaybackDebugLog(
+                "cloudQueue createQueue start parent='\(parentItem.title)' items=\(request.items.count) startItem=\(sonoicPlaybackDebugID(request.startItemId)) accountID=\(sonoicPlaybackDebugID(serviceAccountID))"
             )
-            let sessionStatus = try await sonosControlAPIClient.createPlaybackSession(
-                groupID: context.groupID,
-                appID: "Sonoic",
-                appContext: parentItem.title,
-                accountID: nil,
-                customData: parentItem.id,
-                accessToken: context.accessToken
+            let cloudQueue: SonoicCloudQueueCreateResponse
+            do {
+                cloudQueue = try await sonoicCloudQueueClient.createQueue(
+                    request,
+                    configuration: sonosOAuthConfiguration,
+                    accessToken: context.accessToken
+                )
+            } catch {
+                sonoicPlaybackDebugLog(
+                    "cloudQueue createQueue failed parent='\(parentItem.title)' error='\(error.localizedDescription)'"
+                )
+                throw error
+            }
+            sonoicPlaybackDebugLog(
+                "cloudQueue createQueue success queue=\(sonoicPlaybackDebugID(cloudQueue.queueId)) version=\(sonoicPlaybackDebugID(cloudQueue.queueVersion)) startItem=\(sonoicPlaybackDebugID(cloudQueue.startItemId)) base='\(cloudQueue.queueBaseUrl)'"
             )
+            sonoicPlaybackDebugLog(
+                "cloudQueue createSession start group=\(sonoicPlaybackDebugID(context.groupID)) accountID=\(sonoicPlaybackDebugID(serviceAccountID))"
+            )
+            let sessionStatus: SonosControlAPISessionStatus
+            do {
+                sessionStatus = try await sonosControlAPIClient.createPlaybackSession(
+                    groupID: context.groupID,
+                    appID: "Sonoic",
+                    appContext: parentItem.title,
+                    accountID: serviceAccountID,
+                    customData: parentItem.id,
+                    accessToken: context.accessToken
+                )
+            } catch {
+                sonoicPlaybackDebugLog(
+                    "cloudQueue createSession failed group=\(sonoicPlaybackDebugID(context.groupID)) accountID=\(sonoicPlaybackDebugID(serviceAccountID)) error='\(error.localizedDescription)'"
+                )
+                throw error
+            }
             guard let sessionID = sessionStatus.sessionId?.sonoicNonEmptyTrimmed else {
+                sonoicPlaybackDebugLog(
+                    "cloudQueue createSession invalidSessionID group=\(sonoicPlaybackDebugID(context.groupID))"
+                )
                 throw SonosControlAPITransport.TransportError.invalidResponse
             }
             sonoicPlaybackDebugLog(
+                "cloudQueue createSession success session=\(sonoicPlaybackDebugID(sessionID))"
+            )
+            sonoicPlaybackDebugLog(
                 "cloudQueue load session=\(sonoicPlaybackDebugID(sessionID)) queue=\(sonoicPlaybackDebugID(cloudQueue.queueId)) startItem=\(sonoicPlaybackDebugID(cloudQueue.startItemId))"
             )
-            try await sonosControlAPIClient.loadCloudQueue(
-                sessionID: sessionID,
-                request: SonosControlAPILoadCloudQueueRequest(
-                    queueBaseUrl: cloudQueue.queueBaseUrl,
-                    httpAuthorization: nil,
-                    useHttpAuthorizationForMedia: nil,
-                    itemId: cloudQueue.startItemId,
-                    queueVersion: cloudQueue.queueVersion,
-                    positionMillis: 0,
-                    playOnCompletion: true,
-                    trackMetadata: cloudQueue.trackMetadata
-                ),
-                accessToken: context.accessToken
+            do {
+                try await sonosControlAPIClient.loadCloudQueue(
+                    sessionID: sessionID,
+                    request: SonosControlAPILoadCloudQueueRequest(
+                        queueBaseUrl: cloudQueue.queueBaseUrl,
+                        httpAuthorization: nil,
+                        useHttpAuthorizationForMedia: nil,
+                        itemId: cloudQueue.startItemId,
+                        queueVersion: cloudQueue.queueVersion,
+                        positionMillis: 0,
+                        playOnCompletion: true,
+                        trackMetadata: cloudQueue.trackMetadata
+                    ),
+                    accessToken: context.accessToken
+                )
+            } catch {
+                sonoicPlaybackDebugLog(
+                    "cloudQueue load failed session=\(sonoicPlaybackDebugID(sessionID)) queue=\(sonoicPlaybackDebugID(cloudQueue.queueId)) startItem=\(sonoicPlaybackDebugID(cloudQueue.startItemId)) version=\(sonoicPlaybackDebugID(cloudQueue.queueVersion)) base='\(cloudQueue.queueBaseUrl)' error='\(error.localizedDescription)'"
+                )
+                throw error
+            }
+            sonoicPlaybackDebugLog(
+                "cloudQueue load success session=\(sonoicPlaybackDebugID(sessionID))"
             )
             sonosControlAPICloudQueueSessionID = sessionID
             sonosControlAPICloudQueueGroupID = context.groupID
@@ -1404,15 +1580,22 @@ extension SonoicModel {
             persistSonosControlAPICloudQueueContext()
         }
 
-        sonoicPlaybackDebugLog(
-            "cloudQueue result=\(didLoad) parent='\(parentItem.title)'"
-        )
+        if didLoad {
+            sonoicPlaybackDebugLog(
+                "cloudQueue result=true parent='\(parentItem.title)'"
+            )
+        } else {
+            sonoicPlaybackDebugLog(
+                "cloudQueue result=false parent='\(parentItem.title)' error='\(sonosControlAPIState.lastErrorDetail ?? "unknown")'"
+            )
+        }
         return didLoad
     }
 
     private func sonosControlAPICloudQueueCreateRequest(
         parentItem: SonoicSourceItem,
-        plan: SonoicSourcePlaylistPlaybackPlan
+        plan: SonoicSourcePlaylistPlaybackPlan,
+        accountID: String?
     ) -> SonoicCloudQueueCreateRequest? {
         var queueItems: [SonosControlAPIQueueItem] = []
         var seenItemIDs: Set<String> = []
@@ -1439,6 +1622,7 @@ extension SonoicModel {
                     payload: pair.1,
                     objectID: objectID,
                     contentType: contentType,
+                    accountID: accountID,
                     trackNumber: index + 1
                 ),
                 deleted: nil,
@@ -1452,17 +1636,22 @@ extension SonoicModel {
 
         let startIndex = max(0, min(plan.startingTrackNumber - 1, queueItems.count - 1))
         return SonoicCloudQueueCreateRequest(
-            container: sonosControlAPIContainer(for: parentItem),
+            container: sonosControlAPIContainer(for: parentItem, accountID: accountID),
             items: queueItems,
             startItemId: queueItems[startIndex].id
         )
     }
 
-    private func sonosControlAPIContainer(for item: SonoicSourceItem) -> SonosControlAPIContainer {
+    private func sonosControlAPIContainer(
+        for item: SonoicSourceItem,
+        accountID: String?
+    ) -> SonosControlAPIContainer {
         SonosControlAPIContainer(
             name: item.title,
             type: item.kind.rawValue,
-            id: sonosControlAPICollectionObjectID(for: item).map(sonosControlAPIUniversalMusicObjectID),
+            id: sonosControlAPICollectionObjectID(for: item).map {
+                sonosControlAPIUniversalMusicObjectID($0, accountID: accountID)
+            },
             service: sonosControlAPIAppleMusicService(for: item),
             imageUrl: item.artworkURL?.sonoicNonEmptyTrimmed
         )
@@ -1473,6 +1662,7 @@ extension SonoicModel {
         payload: SonosPlayablePayload,
         objectID: String,
         contentType: String,
+        accountID: String?,
         trackNumber: Int
     ) -> SonosControlAPITrack {
         let subtitleParts = sonosControlAPISubtitleParts(from: item.subtitle ?? payload.subtitle)
@@ -1486,7 +1676,7 @@ extension SonoicModel {
             contentType: contentType,
             album: albumName.map { SonosControlAPIAlbum(name: $0, artist: artist, id: nil) },
             artist: artist,
-            id: sonosControlAPIUniversalMusicObjectID(objectID),
+            id: sonosControlAPIUniversalMusicObjectID(objectID, accountID: accountID),
             service: sonosControlAPIAppleMusicService(for: item),
             durationMillis: sonosControlAPIDurationMillis(item.duration ?? payload.duration),
             trackNumber: trackNumber,
@@ -1528,12 +1718,56 @@ extension SonoicModel {
         )
     }
 
-    private func sonosControlAPIUniversalMusicObjectID(_ objectID: String) -> SonosControlAPIUniversalMusicObjectID {
+    private func sonosControlAPIUniversalMusicObjectID(
+        _ objectID: String,
+        accountID: String?
+    ) -> SonosControlAPIUniversalMusicObjectID {
         SonosControlAPIUniversalMusicObjectID(
             serviceId: SonosServiceDescriptor.appleMusic.sonosServiceID ?? "204",
             objectId: objectID,
-            accountId: nil
+            accountId: accountID?.sonoicNonEmptyTrimmed
         )
+    }
+
+    private func sonosControlAPICloudQueueAccountID(for item: SonoicSourceItem) -> (raw: String, formatted: String)? {
+        guard item.service.kind == .appleMusic else {
+            return nil
+        }
+
+        let appleMusicRow = sonosMusicServiceProbeState.snapshot?.knownServiceRows.first { $0.service == .appleMusic }
+        let playbackHint = appleMusicRow?.playbackHint
+        let rawAccountID = playbackHint?.preferredLaunchSerial?.sonoicNonEmptyTrimmed
+            ?? playbackHint?.trackSerials.first?.sonoicNonEmptyTrimmed
+            ?? appleMusicRow?.accounts.first?.serialNumber.sonoicNonEmptyTrimmed
+        guard let rawAccountID else {
+            return nil
+        }
+
+        return (
+            raw: rawAccountID,
+            formatted: sonosControlAPIFormattedMusicAccountID(rawAccountID)
+        )
+    }
+
+    private func sonosControlAPIFormattedMusicAccountID(_ rawAccountID: String) -> String {
+        let trimmed = rawAccountID.sonoicTrimmed
+        let lowercased = trimmed.lowercased()
+        if lowercased.hasPrefix("sn_") || lowercased.hasPrefix("mhhid_") {
+            return trimmed
+        }
+
+        if lowercased.hasPrefix("sn ") {
+            let serial = String(trimmed.dropFirst(3)).sonoicTrimmed
+            if let serial = serial.sonoicNonEmptyTrimmed {
+                return "sn_\(serial)"
+            }
+        }
+
+        if trimmed.allSatisfy(\.isNumber) {
+            return "sn_\(trimmed)"
+        }
+
+        return trimmed
     }
 
     private func sonosControlAPIObjectID(
@@ -1758,6 +1992,7 @@ extension SonoicModel {
         _ action: () async throws -> Void
     ) async -> Bool {
         guard !isManualTransportCommandInFlight else {
+            sonoicPlaybackDebugLog("cloudCommand skipped description='\(description)' reason=inFlight")
             return false
         }
 
@@ -1787,6 +2022,9 @@ extension SonoicModel {
             setManualPlayTransitionAwaitingConfirmation(false)
             clearManualSeekConfirmation()
             recordSonosControlAPIError(error)
+            sonoicPlaybackDebugLog(
+                "cloudCommand failed description='\(description)' error='\(error.localizedDescription)'"
+            )
             if isSonosControlAPIAuthorizationFailure(error) {
                 sonosControlAPIState.authorizationStatus = .expired
                 sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)

@@ -6,7 +6,7 @@ extension SonoicModel {
     private static let sharedStoreKeepAliveInterval: TimeInterval = 45
 
     var externalControlState: SonoicExternalControlState {
-        guard hasActiveSonosControlTarget else {
+        guard hasResolvedSonosPlaybackTarget else {
             return .unconfigured
         }
 
@@ -16,11 +16,19 @@ extension SonoicModel {
                 name: activeTarget.name,
                 kind: externalTargetKind
             ),
-            nowPlayingSnapshot: nowPlaying,
+            nowPlayingSnapshot: effectiveNowPlayingSnapshotForActiveTarget,
             volume: externalVolume,
             availability: externalAvailability,
             updatedAt: externalControlStateUpdatedAt
         )
+    }
+
+    var effectiveNowPlayingSnapshotForActiveTarget: SonosNowPlayingSnapshot {
+        guard nowPlaying.isIdlePlaceholder, hasResolvedSonosPlaybackTarget else {
+            return nowPlaying
+        }
+
+        return .connectedIdle(targetName: activeTarget.name)
     }
 
     func handleScenePhase(_ scenePhase: ScenePhase) {
@@ -52,7 +60,7 @@ extension SonoicModel {
     }
 
     private var externalAvailability: SonoicExternalControlState.Availability {
-        guard hasActiveSonosControlTarget else {
+        guard hasResolvedSonosPlaybackTarget else {
             return .unavailable
         }
 
@@ -77,7 +85,7 @@ extension SonoicModel {
         scheduleSharedExternalControlStatePersistence(state, forceImmediate: forceImmediate)
 
         nowPlayableSessionController.update(
-            nowPlaying: nowPlaying,
+            nowPlaying: effectiveNowPlayingSnapshotForActiveTarget,
             observedAt: nowPlayingObservedAt,
             activeTargetName: activeTarget.name,
             canControlPlayback: canControlManualPlayback,

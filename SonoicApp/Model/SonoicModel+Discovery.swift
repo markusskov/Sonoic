@@ -206,8 +206,19 @@ extension SonoicModel {
 
         discoveredPlayers = snapshot.players
         discoveredGroups = snapshot.groups
+        refreshCloudActiveTargetTopologyFromLocalDiscoveryIfNeeded()
         isSonosDiscoveryRefreshing = false
         lastSonosDiscoveryRefreshAt = .now
+    }
+
+    private func refreshCloudActiveTargetTopologyFromLocalDiscoveryIfNeeded() {
+        guard case let .verified(snapshot) = sonosControlAPICloudState.status,
+              sonosControlAPIState.settings.mode.canSendCommands
+        else {
+            return
+        }
+
+        applyVerifiedSonosControlAPICloudSnapshot(snapshot)
     }
 
     private func fetchDiscoveryTopologies(for hosts: [String]) async -> [String: SonosZoneGroupTopology] {
