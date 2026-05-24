@@ -758,10 +758,7 @@ extension SonoicModel {
                 groupID: context.groupID,
                 accessToken: context.accessToken
             )
-            async let refreshedGroupVolume = sonosControlAPIClient.groupVolume(
-                groupID: context.groupID,
-                accessToken: context.accessToken
-            )
+            async let refreshedExternalVolume = fetchSonosControlAPIActiveTargetVolume()
 
             let playbackStatus = try await refreshedPlaybackStatus
             let metadataStatus = try await refreshedMetadataStatus
@@ -791,11 +788,9 @@ extension SonoicModel {
                 nowPlayingDiagnostics = .empty
             }
 
-            if let volumeState = try? await refreshedGroupVolume {
-                let nextVolume = sonoicExternalVolume(from: volumeState)
-                if externalVolume != nextVolume {
-                    externalVolume = nextVolume
-                }
+            if let nextVolume = try? await refreshedExternalVolume,
+               externalVolume != nextVolume {
+                externalVolume = nextVolume
             }
 
             if forceRoomRefresh {
