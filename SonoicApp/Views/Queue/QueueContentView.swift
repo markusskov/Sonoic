@@ -11,7 +11,7 @@ struct QueueContentView: View {
             ContentUnavailableView {
                 Label("No Room Selected", systemImage: "speaker.slash.fill")
             } description: {
-                Text("Choose a discovered Sonos room before trying to inspect the active queue.")
+                Text("Choose a room first.")
             } actions: {
                 Button("Open Rooms") {
                     model.selectedTab = .rooms
@@ -29,7 +29,7 @@ struct QueueContentView: View {
             ContentUnavailableView {
                 Label("Loading Queue", systemImage: "arrow.clockwise")
             } description: {
-                Text("Reading queue...")
+                Text("Loading...")
             }
         case let .unavailable(detail):
             ContentUnavailableView {
@@ -58,7 +58,7 @@ struct QueueContentView: View {
             ContentUnavailableView {
                 Label("Queue Is Empty", systemImage: "music.note.list")
             } description: {
-                Text("The current Sonos queue has no items right now.")
+                Text("Nothing queued.")
             }
         } else {
             QueueSnapshotList(

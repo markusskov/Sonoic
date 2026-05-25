@@ -9,14 +9,13 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 if model.hasResolvedSonosPlaybackTarget {
-                    HomeNowPlayingCard(
-                        activeTarget: model.activeTarget,
-                        nowPlaying: model.effectiveNowPlayingSnapshotForActiveTarget,
-                        queueState: model.queueState,
-                        togglePlayback: togglePlayback,
-                        openRooms: openRooms,
-                        openQueue: openQueue
-                    )
+                    if !model.homeSources.isEmpty {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HomeSectionHeader(title: "Sources")
+
+                            HomeServicesSection(sources: model.homeSources)
+                        }
+                    }
 
                     if !recentPlays.isEmpty {
                         VStack(alignment: .leading, spacing: 14) {
@@ -45,13 +44,6 @@ struct HomeView: View {
                         }
                     }
 
-                    if !model.homeSources.isEmpty {
-                        VStack(alignment: .leading, spacing: 14) {
-                            HomeSectionHeader(title: "Sources")
-
-                            HomeServicesSection(sources: model.homeSources)
-                        }
-                    }
                 } else {
                     HomeSetupCard {
                         openRooms()
@@ -90,16 +82,8 @@ struct HomeView: View {
         _ = await model.playManualSonosFavorite(favorite)
     }
 
-    private func togglePlayback() async {
-        await model.toggleManualSonosPlayback()
-    }
-
     private func openRooms() {
         model.selectedTab = .rooms
-    }
-
-    private func openQueue() {
-        model.selectedTab = .queue
     }
 }
 

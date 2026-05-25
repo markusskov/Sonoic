@@ -65,31 +65,31 @@ extension RoomsView {
 
     var currentRoomSubtitle: String {
         if activeTargetIsGroup {
-            return "Your selected Sonos group and grouped rooms."
+            return "Grouped rooms."
         }
 
         if model.hasManualSonosHost {
-            return "Your selected room and bonded setup."
+            return "Selected room."
         }
 
         if model.hasDiscoveredPlayers {
-            return "Choose one room below to start controlling it."
+            return "Choose a room."
         }
 
-        return "Sonoic is scanning your local network for Sonos speakers."
+        return "Searching..."
     }
 
     var roomListSubtitle: String {
         if activeTargetIsGroup {
-            return "Individual rooms stay visible here with their current group membership."
+            return "Rooms in this group."
         }
 
-        return "Tap a room to make it the active player throughout Sonoic."
+        return "Tap to switch rooms."
     }
 
     var currentRoomDiscoveryDetail: String {
         if model.hasDiscoveredPlayers {
-            return "Pick a discovered room below to load its queue, favorites, and now-playing state."
+            return "Choose a room below."
         }
 
         return model.roomDiscoveryStatus.detail

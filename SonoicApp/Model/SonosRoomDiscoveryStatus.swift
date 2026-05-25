@@ -22,11 +22,11 @@ enum SonosRoomDiscoveryStatus: Equatable {
     var detail: String {
         switch self {
         case .scanning:
-            "Sonoic is scanning your local network for Sonos speakers through Bonjour."
+            "Searching nearby rooms."
         case .resolving:
-            "Sonoic found Sonos speakers and is loading room names, models, and bonded setup."
+            "Loading rooms."
         case .ready:
-            "Tap a room below to make it the active player throughout Sonoic."
+            "Tap to switch rooms."
         case let .failed(detail):
             detail
         }

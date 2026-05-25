@@ -30,7 +30,7 @@ extension HomeTheaterView {
     }
 
     var tvDiagnosticsSubtitle: String {
-        isTVAudioActive ? "Sonoic sees active TV audio on this room." : "Current transport and TV-control state."
+        isTVAudioActive ? "TV audio is active." : "TV state and controls."
     }
 
     var isTVAudioActive: Bool {

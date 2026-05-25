@@ -39,7 +39,7 @@ private struct SettingsAppleMusicServiceDetailsRows: View {
             SettingsStatusRow(
                 title: "Apple Music Details",
                 statusTitle: "Not Refreshed",
-                detail: "Refresh Apple Music details to read storefront, subscription, and cloud library status.",
+                detail: "Refresh to check account details.",
                 systemImage: "music.note",
                 tint: .secondary
             )
@@ -47,7 +47,7 @@ private struct SettingsAppleMusicServiceDetailsRows: View {
             SettingsStatusRow(
                 title: "Apple Music Details",
                 statusTitle: "Refreshing",
-                detail: "Reading Apple Music account metadata.",
+                detail: "Refreshing account details.",
                 systemImage: "arrow.clockwise",
                 tint: .orange
             )

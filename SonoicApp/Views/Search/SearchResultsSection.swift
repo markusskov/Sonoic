@@ -131,7 +131,7 @@ struct SearchResultsSection: View {
         return sourceStaleDetail(
             failureDetail,
             lastUpdatedAt: lastUpdatedAt,
-            prefix: "Showing previous results from"
+            prefix: "Last updated"
         )
     }
 }

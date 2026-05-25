@@ -77,7 +77,7 @@ struct RoomsViewContent: View {
             } else {
                 RoomResolutionStateCard(
                     title: "Resolving Room",
-                    detail: "Sonoic is loading the current room name and bonded setup from the configured player.",
+                    detail: "Loading room details.",
                     systemImage: "arrow.clockwise",
                     tint: .secondary,
                     isLoading: true,
@@ -103,7 +103,7 @@ struct RoomsViewContent: View {
         if model.hasManualSonosHost {
             RoomsSectionHeader(
                 title: "Home Theater",
-                subtitle: "Room tuning, cinema controls, and TV audio state."
+                subtitle: "TV, speech, night sound, and tuning."
             )
 
             NavigationLink {
@@ -128,7 +128,7 @@ struct RoomsViewContent: View {
         if model.hasDiscoveredGroups {
             RoomsSectionHeader(
                 title: "Groups",
-                subtitle: "Current Sonos room groups across your household."
+                subtitle: "Current groups."
             )
 
             RoomsGroupListCard(
@@ -146,8 +146,8 @@ struct RoomsViewContent: View {
             RoomsSectionHeader(
                 title: "Group Control",
                 subtitle: model.activeTarget.kind == .group
-                    ? "Manage grouped rooms and per-room volume."
-                    : "Build a group from the active room."
+                    ? "Rooms and volume."
+                    : "Add rooms and adjust volume."
             )
 
             RoomsGroupControlCard(
@@ -168,14 +168,14 @@ struct RoomsViewContent: View {
             RoomsSectionHeader(
                 title: "Room List",
                 subtitle: model.roomListItems.isEmpty
-                    ? "Nearby Sonos rooms appear here as discovery resolves."
+                    ? "No rooms yet."
                     : roomListSubtitle
             )
 
             if model.roomListItems.isEmpty {
                 RoomResolutionStateCard(
                     title: "No Rooms Yet",
-                    detail: "Sonoic will populate this list as your Sonos speakers answer discovery.",
+                    detail: "Refresh to search again.",
                     systemImage: "speaker.wave.2.circle",
                     tint: .secondary,
                     isLoading: model.isSonosDiscoveryRefreshing,
@@ -196,7 +196,7 @@ struct RoomsViewContent: View {
         VStack(alignment: .leading, spacing: 16) {
             RoomsSectionHeader(
                 title: "Discovery",
-                subtitle: "Real-time Sonos household discovery over your local network."
+                subtitle: "Refresh nearby rooms."
             )
 
             RoomsDiscoveryStatusCard(

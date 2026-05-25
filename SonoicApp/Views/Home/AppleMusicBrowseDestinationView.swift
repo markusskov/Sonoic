@@ -69,7 +69,7 @@ struct AppleMusicBrowseDestinationView: View {
 
             if let failureDetail = state.failureDetail {
                 SourceMessageCard(
-                    title: "Showing Cached \(destination.title)",
+                    title: destination.title,
                     detail: sourceStaleDetail(failureDetail, lastUpdatedAt: state.lastUpdatedAt),
                     systemImage: "exclamationmark.triangle"
                 )
@@ -88,7 +88,7 @@ struct AppleMusicBrowseDestinationView: View {
 
             if let failureDetail = state.failureDetail {
                 SourceMessageCard(
-                    title: "Showing Cached Categories",
+                    title: "Categories",
                     detail: sourceStaleDetail(failureDetail, lastUpdatedAt: state.lastUpdatedAt),
                     systemImage: "exclamationmark.triangle"
                 )
