@@ -439,6 +439,7 @@ extension SonoicModel {
         sonosControlAPICloudQueueVersion = nil
         sonosControlAPICloudQueueItemIDs = nil
         sonosControlAPICloudQueueTracks = nil
+        sonosControlAPICloudQueueVersionMismatchLogKey = nil
         sharedStore?.clearCloudQueueSessionContext()
     }
 
@@ -487,9 +488,14 @@ extension SonoicModel {
                    let inMemoryQueueVersion,
                    inMemoryQueueVersion != normalizedQueueVersion
                 {
-                    sonoicPlaybackDebugLog(
-                        "cloudQueue restoreContext keepingMemory versionChanged stored=\(sonoicPlaybackDebugID(inMemoryQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+                    logCloudQueueVersionMismatchOnce(
+                        source: "keepingMemory",
+                        groupID: inMemoryGroupID,
+                        storedVersion: inMemoryQueueVersion,
+                        currentVersion: normalizedQueueVersion
                     )
+                } else {
+                    sonosControlAPICloudQueueVersionMismatchLogKey = nil
                 }
                 return true
             }
@@ -522,9 +528,14 @@ extension SonoicModel {
            let normalizedQueueVersion,
            storedQueueVersion != normalizedQueueVersion
         {
-            sonoicPlaybackDebugLog(
-                "cloudQueue restoreContext keepingStored versionChanged stored=\(sonoicPlaybackDebugID(storedQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+            logCloudQueueVersionMismatchOnce(
+                source: "keepingStored",
+                groupID: context.groupID?.sonoicNonEmptyTrimmed,
+                storedVersion: storedQueueVersion,
+                currentVersion: normalizedQueueVersion
             )
+        } else {
+            sonosControlAPICloudQueueVersionMismatchLogKey = nil
         }
 
         sonosControlAPICloudQueueSessionID = context.sessionID
@@ -536,6 +547,23 @@ extension SonoicModel {
             "cloudQueue restoreContext session=\(sonoicPlaybackDebugID(context.sessionID)) itemCount=\(context.itemIDs.count)"
         )
         return true
+    }
+
+    private func logCloudQueueVersionMismatchOnce(
+        source: String,
+        groupID: String?,
+        storedVersion: String,
+        currentVersion: String
+    ) {
+        let logKey = "\(source)|\(groupID ?? "any")|\(storedVersion)|\(currentVersion)"
+        guard sonosControlAPICloudQueueVersionMismatchLogKey != logKey else {
+            return
+        }
+
+        sonosControlAPICloudQueueVersionMismatchLogKey = logKey
+        sonoicPlaybackDebugLog(
+            "cloudQueue restoreContext \(source) versionChanged stored=\(sonoicPlaybackDebugID(storedVersion)) current=\(sonoicPlaybackDebugID(currentVersion))"
+        )
     }
 
     func sonosControlAPICloudQueueSnapshot(

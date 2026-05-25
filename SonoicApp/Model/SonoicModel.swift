@@ -55,6 +55,7 @@ final class SonoicModel {
     @ObservationIgnored var sonosControlAPICloudQueueVersion: String?
     @ObservationIgnored var sonosControlAPICloudQueueItemIDs: [String]?
     @ObservationIgnored var sonosControlAPICloudQueueTracks: [SonosControlAPITrack]?
+    @ObservationIgnored var sonosControlAPICloudQueueVersionMismatchLogKey: String?
     @ObservationIgnored var sonosControlAPITokenRefreshTask: Task<SonosOAuthTokenSet?, Never>?
     @ObservationIgnored var sonosControlAPITokenRefreshGeneration = 0
     @ObservationIgnored var backgroundExecutionIdentifier: UIBackgroundTaskIdentifier = .invalid
