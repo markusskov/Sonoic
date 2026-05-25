@@ -6,7 +6,7 @@ extension SonoicModel {
     private static let sharedStoreKeepAliveInterval: TimeInterval = 45
 
     var externalControlState: SonoicExternalControlState {
-        guard hasManualSonosHost else {
+        guard hasResolvedSonosPlaybackTarget else {
             return .unconfigured
         }
 
@@ -16,11 +16,19 @@ extension SonoicModel {
                 name: activeTarget.name,
                 kind: externalTargetKind
             ),
-            nowPlayingSnapshot: nowPlaying,
+            nowPlayingSnapshot: effectiveNowPlayingSnapshotForActiveTarget,
             volume: externalVolume,
             availability: externalAvailability,
             updatedAt: externalControlStateUpdatedAt
         )
+    }
+
+    var effectiveNowPlayingSnapshotForActiveTarget: SonosNowPlayingSnapshot {
+        guard nowPlaying.isIdlePlaceholder, hasResolvedSonosPlaybackTarget else {
+            return nowPlaying
+        }
+
+        return .connectedIdle(targetName: activeTarget.name)
     }
 
     func handleScenePhase(_ scenePhase: ScenePhase) {
@@ -28,6 +36,8 @@ extension SonoicModel {
         case .active:
             isSceneActive = true
             endBackgroundExecutionIfNeeded()
+            refreshSonosControlAPIAuthorizationState()
+            refreshSonosControlAPICloudSnapshotIfConnected()
             startSonosDiscoveryIfPossible()
             scheduleBackgroundPlayerRefreshIfPossible()
             startManualHostRefreshLoopIfPossible()
@@ -50,8 +60,12 @@ extension SonoicModel {
     }
 
     private var externalAvailability: SonoicExternalControlState.Availability {
-        guard hasManualSonosHost else {
+        guard hasResolvedSonosPlaybackTarget else {
             return .unavailable
+        }
+
+        guard hasManualSonosHost else {
+            return sonosControlAPIState.canSendCommands ? .ready : .unavailable
         }
 
         switch manualHostRefreshStatus {
@@ -71,10 +85,10 @@ extension SonoicModel {
         scheduleSharedExternalControlStatePersistence(state, forceImmediate: forceImmediate)
 
         nowPlayableSessionController.update(
-            nowPlaying: nowPlaying,
+            nowPlaying: effectiveNowPlayingSnapshotForActiveTarget,
             observedAt: nowPlayingObservedAt,
             activeTargetName: activeTarget.name,
-            canControlPlayback: hasManualSonosHost,
+            canControlPlayback: canControlManualPlayback,
             canAdvanceProgress: canAdvanceProgress
         )
     }

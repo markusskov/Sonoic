@@ -66,6 +66,31 @@ struct SonosNowPlayingSnapshot: Equatable {
         playbackState: .paused
     )
 
+    static func connectedIdle(targetName: String) -> SonosNowPlayingSnapshot {
+        SonosNowPlayingSnapshot(
+            title: targetName,
+            artistName: nil,
+            albumTitle: nil,
+            sourceName: "Ready",
+            playbackState: .paused
+        )
+    }
+
+    var isUnconfigured: Bool {
+        title == Self.unconfigured.title
+    }
+
+    var isIdlePlaceholder: Bool {
+        isUnconfigured || (
+            playbackState == .paused
+                && sourceName == "Ready"
+                && artistName == nil
+                && albumTitle == nil
+                && artworkURL == nil
+                && duration == nil
+        )
+    }
+
     var subtitle: String? {
         var parts: [String] = []
 
@@ -117,11 +142,11 @@ struct SonosNowPlayingSnapshot: Equatable {
             return false
         }
 
-        return true
+        return transportActions?.canSeek ?? true
     }
 }
 
-struct SonosTransportActions: Equatable, Hashable {
+nonisolated struct SonosTransportActions: Equatable, Hashable {
     private var normalizedActions: Set<String>
 
     init(rawActions: Set<String>) {

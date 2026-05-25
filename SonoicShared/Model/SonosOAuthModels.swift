@@ -11,6 +11,7 @@ nonisolated struct SonosOAuthConfiguration: Equatable, Sendable {
     var tokenRefreshURL: URL?
     var authorizationEndpoint: URL
     var scopes: [String]
+    var cloudQueueCreateURL: URL? = nil
 
     static func load(from bundle: Bundle = .main) -> SonosOAuthConfiguration {
         let clientID = bundle.sonoicOAuthString(for: "SonoicSonosOAuthClientID")
@@ -18,6 +19,9 @@ nonisolated struct SonosOAuthConfiguration: Equatable, Sendable {
         let callbackScheme = bundle.sonoicOAuthString(for: "SonoicSonosOAuthCallbackScheme")
         let tokenExchangeURL = URL(string: bundle.sonoicOAuthString(for: "SonoicSonosOAuthTokenExchangeURL"))
         let tokenRefreshURL = URL(string: bundle.sonoicOAuthString(for: "SonoicSonosOAuthTokenRefreshURL"))
+        let explicitCloudQueueCreateURL = URL(string: bundle.sonoicOAuthString(for: "SonoicSonosCloudQueueCreateURL"))
+        let cloudQueueCreateURL = explicitCloudQueueCreateURL
+            ?? defaultCloudQueueCreateURL(from: tokenExchangeURL)
         let authorizationEndpoint = URL(string: bundle.sonoicOAuthString(for: "SonoicSonosOAuthAuthorizationURL"))
             ?? defaultAuthorizationEndpoint
         let scopeString = bundle.sonoicOAuthString(for: "SonoicSonosOAuthScopes")
@@ -33,7 +37,8 @@ nonisolated struct SonosOAuthConfiguration: Equatable, Sendable {
             tokenExchangeURL: tokenExchangeURL,
             tokenRefreshURL: tokenRefreshURL,
             authorizationEndpoint: authorizationEndpoint,
-            scopes: scopes.isEmpty ? defaultScopes : scopes
+            scopes: scopes.isEmpty ? defaultScopes : scopes,
+            cloudQueueCreateURL: cloudQueueCreateURL
         )
     }
 
@@ -44,6 +49,10 @@ nonisolated struct SonosOAuthConfiguration: Equatable, Sendable {
             && isSecureEndpoint(authorizationEndpoint)
             && tokenExchangeURL.map(isSecureEndpoint) == true
             && (tokenRefreshURL == nil || tokenRefreshURL.map(isSecureEndpoint) == true)
+    }
+
+    var canCreateCloudQueues: Bool {
+        cloudQueueCreateURL.map(isSecureEndpoint) == true
     }
 
     private var isSecureRedirectURI: Bool {
@@ -60,6 +69,19 @@ nonisolated struct SonosOAuthConfiguration: Equatable, Sendable {
 
     var scopeValue: String {
         scopes.joined(separator: " ")
+    }
+
+    static func defaultCloudQueueCreateURL(from tokenExchangeURL: URL?) -> URL? {
+        guard let tokenExchangeURL,
+              var components = URLComponents(url: tokenExchangeURL, resolvingAgainstBaseURL: false)
+        else {
+            return nil
+        }
+
+        components.path = "/api/sonos/cloud-queues"
+        components.query = nil
+        components.fragment = nil
+        return components.url
     }
 }
 

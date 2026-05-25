@@ -134,6 +134,14 @@ struct SonosOAuthClientTests {
     }
 
     @Test
+    func derivesCloudQueueCreateURLFromTokenBroker() throws {
+        let tokenExchangeURL = URL(string: "https://sonoic.example.com/api/sonos/token")!
+        let cloudQueueURL = try #require(SonosOAuthConfiguration.defaultCloudQueueCreateURL(from: tokenExchangeURL))
+
+        #expect(cloudQueueURL.absoluteString == "https://sonoic.example.com/api/sonos/cloud-queues")
+    }
+
+    @Test
     func treatsTokenAsExpiredInsideLeeway() {
         let token = SonosOAuthTokenSet(
             accessToken: "access",

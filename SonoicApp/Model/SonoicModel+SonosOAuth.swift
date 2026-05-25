@@ -1,6 +1,8 @@
 import Foundation
 
 extension SonoicModel {
+    private static let sonosControlAPITokenRefreshLeeway: TimeInterval = 120
+
     func refreshSonosControlAPIAuthorizationState() {
         guard sonosOAuthConfiguration.isConfigured else {
             sonosControlAPIAuthorizationState = .notConfigured
@@ -23,12 +25,136 @@ extension SonoicModel {
                 sonosControlAPICloudState = .idle
                 sonosControlAPIState.authorizationStatus = .expired
             } else {
+                restoreSonosControlAPICommandModeIfNeeded()
                 markSonosControlAPIAuthorizationReady()
             }
         } catch {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .failed(error.localizedDescription))
             sonosControlAPICloudState = .idle
             markSonosControlAPIAuthorizationUnavailable(error.localizedDescription)
+        }
+    }
+
+    func validSonosControlAPITokenSetForCommands(
+        logPrefix: String? = nil
+    ) async -> SonosOAuthTokenSet? {
+        guard sonosOAuthConfiguration.isConfigured else {
+            sonosControlAPIAuthorizationState = .notConfigured
+            markSonosControlAPIAuthorizationUnavailable()
+            return nil
+        }
+
+        do {
+            guard let tokenSet = try keychainStore.loadSonosTokenSet() else {
+                sonosControlAPIAuthorizationState = .disconnected
+                sonosControlAPICloudState = .idle
+                markSonosControlAPIAuthorizationUnavailable()
+                return nil
+            }
+
+            guard tokenSet.isExpired(leeway: Self.sonosControlAPITokenRefreshLeeway) else {
+                sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(
+                    status: .connected(expiresAt: tokenSet.expiresAt)
+                )
+                markSonosControlAPIAuthorizationReady()
+                return tokenSet
+            }
+
+            guard let refreshToken = tokenSet.refreshToken?.sonoicNonEmptyTrimmed else {
+                sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
+                sonosControlAPIState.authorizationStatus = .expired
+                sonosControlAPICloudState = .idle
+                clearSonosControlAPICloudQueueContext()
+                return nil
+            }
+
+            if let refreshTask = sonosControlAPITokenRefreshTask {
+                if let logPrefix {
+                    sonoicPlaybackDebugLog("\(logPrefix) refreshToken join")
+                }
+                return await refreshTask.value
+            }
+
+            if let logPrefix {
+                sonoicPlaybackDebugLog("\(logPrefix) refreshToken start")
+            }
+
+            let refreshGeneration = sonosControlAPITokenRefreshGeneration
+            let refreshTask = Task { @MainActor in
+                await refreshSonosControlAPITokenSet(
+                    refreshToken: refreshToken,
+                    generation: refreshGeneration,
+                    logPrefix: logPrefix
+                )
+            }
+            sonosControlAPITokenRefreshTask = refreshTask
+            defer { sonosControlAPITokenRefreshTask = nil }
+
+            let refreshedTokenSet = await refreshTask.value
+            return refreshedTokenSet
+        } catch {
+            sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
+            sonosControlAPIState.authorizationStatus = .expired
+            sonosControlAPICloudState = .idle
+            clearSonosControlAPICloudQueueContext()
+            recordSonosControlAPIError(error)
+            if let logPrefix {
+                sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false error='\(error.localizedDescription)'")
+            }
+            return nil
+        }
+    }
+
+    private func refreshSonosControlAPITokenSet(
+        refreshToken: String,
+        generation: Int,
+        logPrefix: String?
+    ) async -> SonosOAuthTokenSet? {
+        do {
+            var refreshedTokenSet = try await sonosTokenBrokerClient.refreshToken(
+                refreshToken,
+                configuration: sonosOAuthConfiguration
+            )
+            if refreshedTokenSet.refreshToken?.sonoicNonEmptyTrimmed == nil {
+                refreshedTokenSet.refreshToken = refreshToken
+            }
+
+            guard canCommitSonosControlAPITokenRefresh(generation: generation) else {
+                if let logPrefix {
+                    sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false cancelled=true generation=\(generation)")
+                }
+                return nil
+            }
+
+            try keychainStore.saveSonosTokenSet(refreshedTokenSet)
+            sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(
+                status: .connected(expiresAt: refreshedTokenSet.expiresAt)
+            )
+            restoreSonosControlAPICommandModeIfNeeded()
+            markSonosControlAPIAuthorizationReady()
+
+            if let logPrefix {
+                sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=true")
+            }
+
+            return refreshedTokenSet
+        } catch {
+            if Task.isCancelled {
+                if let logPrefix {
+                    sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false cancelled=true")
+                }
+                return nil
+            }
+
+            sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
+            sonosControlAPIState.authorizationStatus = .expired
+            sonosControlAPICloudState = .idle
+            clearSonosControlAPICloudQueueContext()
+            recordSonosControlAPIError(error)
+            if let logPrefix {
+                sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false error='\(error.localizedDescription)'")
+            }
+            return nil
         }
     }
 
@@ -43,6 +169,9 @@ extension SonoicModel {
             return
         }
 
+        sonosControlAPITokenRefreshGeneration += 1
+        sonosControlAPITokenRefreshTask?.cancel()
+        sonosControlAPITokenRefreshTask = nil
         sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .connecting)
 
         do {
@@ -64,7 +193,7 @@ extension SonoicModel {
             markSonosControlAPIAuthorizationReady()
             if sonosControlAPIState.settings.mode == .off {
                 var settings = sonosControlAPIState.settings
-                settings.mode = .fallback
+                settings.mode = .preferred
                 updateSonosControlAPISettings(settings)
             }
             await refreshSonosControlAPICloudSnapshot()
@@ -78,6 +207,9 @@ extension SonoicModel {
 
     func disconnectSonosAccount() {
         do {
+            sonosControlAPITokenRefreshGeneration += 1
+            sonosControlAPITokenRefreshTask?.cancel()
+            sonosControlAPITokenRefreshTask = nil
             try keychainStore.deleteSonosTokenSet()
             sonosControlAPIAuthorizationState = sonosOAuthConfiguration.isConfigured ? .disconnected : .notConfigured
             sonosControlAPICloudState = .idle
@@ -88,8 +220,22 @@ extension SonoicModel {
         }
     }
 
+    private func canCommitSonosControlAPITokenRefresh(generation: Int) -> Bool {
+        !Task.isCancelled && sonosControlAPITokenRefreshGeneration == generation
+    }
+
+    private func restoreSonosControlAPICommandModeIfNeeded() {
+        guard sonosControlAPIState.settings.mode == .off else {
+            return
+        }
+
+        var settings = sonosControlAPIState.settings
+        settings.mode = .preferred
+        updateSonosControlAPISettings(settings)
+    }
+
     func refreshSonosControlAPICloudSnapshotIfConnected() {
-        guard sonosControlAPIAuthorizationState.isConnected else {
+        guard sonosOAuthConfiguration.isConfigured else {
             sonosControlAPICloudState = .idle
             return
         }
@@ -100,7 +246,7 @@ extension SonoicModel {
     }
 
     func refreshSonosControlAPICloudSnapshot() async {
-        guard sonosControlAPIAuthorizationState.isConnected else {
+        guard sonosOAuthConfiguration.isConfigured else {
             sonosControlAPICloudState = .idle
             return
         }
@@ -108,20 +254,25 @@ extension SonoicModel {
         sonosControlAPICloudState = SonosControlAPICloudState(status: .loading)
 
         do {
-            guard let tokenSet = try keychainStore.loadSonosTokenSet() else {
-                sonosControlAPIAuthorizationState = .disconnected
+            guard let tokenSet = await validSonosControlAPITokenSetForCommands(
+                logPrefix: "cloudSnapshot"
+            ) else {
                 sonosControlAPICloudState = .idle
-                markSonosControlAPIAuthorizationUnavailable()
                 return
             }
 
             let snapshot = try await sonosControlAPIClient.fetchCloudSnapshot(tokenSet: tokenSet)
             sonosControlAPICloudState = SonosControlAPICloudState(status: .verified(snapshot))
             applyVerifiedSonosControlAPICloudSnapshot(snapshot)
+            _ = await syncSonosControlAPIPlaybackStateIfAvailable(
+                showProgress: false,
+                forceRoomRefresh: false
+            )
         } catch let error as SonosControlAPITransport.TransportError where error.isAuthorizationFailure {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
             sonosControlAPIState.authorizationStatus = .expired
             sonosControlAPICloudState = SonosControlAPICloudState(status: .failed(error.localizedDescription))
+            clearSonosControlAPICloudQueueContext()
         } catch {
             sonosControlAPICloudState = SonosControlAPICloudState(status: .failed(error.localizedDescription))
         }

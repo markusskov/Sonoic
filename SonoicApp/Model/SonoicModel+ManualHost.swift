@@ -7,8 +7,40 @@ extension SonoicModel {
         manualSonosHost.sonoicNonEmptyTrimmed != nil
     }
 
+    var hasActiveSonosControlTarget: Bool {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return hasSonosControlAPICommandTarget
+        }
+
+        return hasManualSonosHost
+    }
+
+    var hasResolvedSonosPlaybackTarget: Bool {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed != nil
+                || activeTarget.id != Self.unconfiguredTarget.id
+        }
+
+        return hasManualSonosHost
+    }
+
+    var activeSonosControlTargetRefreshKey: String {
+        [
+            manualSonosHost.sonoicNonEmptyTrimmed ?? "",
+            sonosControlAPIState.settings.mode.rawValue,
+            sonosControlAPIState.settings.selectedHouseholdID?.sonoicNonEmptyTrimmed ?? "",
+            sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed ?? "",
+            String(describing: sonosControlAPIState.authorizationStatus)
+        ].joined(separator: "|")
+    }
+
+    var hasSonosControlAPICommandTarget: Bool {
+        sonosControlAPIState.canSendCommands
+            && sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed != nil
+    }
+
     func refreshManualSonosPlayerState(forceRoomRefresh: Bool = true) async {
-        guard hasManualSonosHost else {
+        guard hasActiveSonosControlTarget else {
             manualHostRefreshStatus = .idle
             stopManualHostRefreshLoop()
             return
@@ -65,7 +97,7 @@ extension SonoicModel {
     }
 
     private var shouldRunManualHostRefreshLoop: Bool {
-        guard hasManualSonosHost else {
+        guard hasActiveSonosControlTarget else {
             return false
         }
 
@@ -76,6 +108,13 @@ extension SonoicModel {
     }
 
     func syncManualSonosState(showProgress: Bool, forceRoomRefresh: Bool = false) async -> Bool {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return await syncSonosControlAPIPlaybackStateIfAvailable(
+                showProgress: showProgress,
+                forceRoomRefresh: forceRoomRefresh
+            )
+        }
+
         if showProgress {
             manualHostRefreshStatus = .refreshing
         }
@@ -152,7 +191,7 @@ extension SonoicModel {
         return try? await avTransportClient.fetchCurrentTransportActions(host: host)
     }
 
-    private func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {
+    func syncArtworkIdentifier(for snapshot: SonosNowPlayingSnapshot) async throws -> String? {
         let normalizedIncomingArtworkURL = snapshot.artworkURL.sonoicNonEmptyTrimmed
         let normalizedCurrentArtworkURL = nowPlaying.artworkURL.sonoicNonEmptyTrimmed
 

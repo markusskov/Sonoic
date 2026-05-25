@@ -21,6 +21,43 @@ extension SonoicModel {
     }
 
     func refreshQueue(showLoading: Bool = true) async {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            guard !isQueueRefreshing else {
+                return
+            }
+
+            isQueueRefreshing = true
+            defer {
+                isQueueRefreshing = false
+            }
+
+            guard sonosControlAPIState.canSendCommands else {
+                queueDiagnostics = SonosQueueDiagnostics(
+                    observedAt: Date(),
+                    currentURI: nowPlayingDiagnostics.currentURI,
+                    itemCount: nil,
+                    lastRefreshErrorDetail: sonosControlAPIQueueUnavailableDetail,
+                    lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+                )
+                queueState = .unavailable(sonosControlAPIQueueUnavailableDetail)
+                return
+            }
+
+            if await refreshSonosControlAPICloudQueueSnapshot() {
+                return
+            }
+
+            queueDiagnostics = SonosQueueDiagnostics(
+                observedAt: Date(),
+                currentURI: nowPlayingDiagnostics.currentURI,
+                itemCount: nil,
+                lastRefreshErrorDetail: "Sonoic does not have a confirmed Cloud Queue snapshot for this playback source.",
+                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+            )
+            queueState = .unavailable("Queue is unavailable for this Cloud playback source.")
+            return
+        }
+
         guard hasManualSonosHost else {
             queueState = .idle
             queueDiagnostics = .empty
@@ -74,6 +111,17 @@ extension SonoicModel {
         }
     }
 
+    private var sonosControlAPIQueueUnavailableDetail: String {
+        switch sonosControlAPIState.authorizationStatus {
+        case .expired:
+            "Sonos Cloud sign-in has expired."
+        case .notConfigured:
+            "Sonos Cloud is not connected."
+        case .ready:
+            sonosControlAPIState.lastErrorDetail ?? "Sonos Cloud is unavailable."
+        }
+    }
+
     private func queueSnapshotEnrichedFromManualContext(_ snapshot: SonosQueueSnapshot) -> SonosQueueSnapshot {
         guard let payloads = manualQueueContextPayloads,
               payloads.count == snapshot.items.count
@@ -112,6 +160,11 @@ extension SonoicModel {
     }
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            await refreshQueue(showLoading: false)
+            return
+        }
+
         guard hasManualSonosHost,
               !isQueueRefreshing,
               !isQueueClearing,
@@ -133,6 +186,66 @@ extension SonoicModel {
         }
 
         await refreshQueue(showLoading: false)
+    }
+
+    private func refreshSonosControlAPICloudQueueSnapshot() async -> Bool {
+        guard let context = await sonosControlAPICommandContext(logPrefix: "cloudQueueRefresh") else {
+            return false
+        }
+
+        do {
+            async let playbackStatusTask = sonosControlAPIClient.playbackStatus(
+                groupID: context.groupID,
+                accessToken: context.accessToken
+            )
+            async let metadataStatusTask = sonosControlAPIClient.playbackMetadata(
+                groupID: context.groupID,
+                accessToken: context.accessToken
+            )
+
+            let playbackStatus = try await playbackStatusTask
+            let metadataStatus = try? await metadataStatusTask
+            guard restoreSonosControlAPICloudQueueContextIfNeeded(
+                groupID: context.groupID,
+                queueVersion: playbackStatus.queueVersion
+            ) else {
+                return false
+            }
+
+            if updateSonosControlAPICloudQueueCurrentItem(
+                itemIDCandidates: [
+                    playbackStatus.itemId,
+                    metadataStatus?.currentItem?.id
+                ]
+            ) {
+                return true
+            }
+
+            guard let snapshot = sonosControlAPICloudQueueSnapshot(
+                currentItemIndex: nil,
+                sourceURI: queueState.snapshot?.sourceURI
+            ) else {
+                return false
+            }
+
+            queueDiagnostics = SonosQueueDiagnostics(
+                observedAt: Date(),
+                currentURI: snapshot.sourceURI ?? nowPlayingDiagnostics.currentURI,
+                itemCount: snapshot.items.count,
+                lastRefreshErrorDetail: "Cloud Queue is loaded, but Sonos has not confirmed the current item yet.",
+                lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+            )
+            queueState = .loaded(snapshot)
+            return true
+        } catch {
+            recordSonosControlAPIError(error)
+            if isSonosControlAPIAuthorizationFailure(error) {
+                sonosControlAPIState.authorizationStatus = .expired
+                sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
+                clearSonosControlAPICloudQueueContext()
+            }
+            return false
+        }
     }
 
     func clearQueue() async -> Bool {
@@ -318,5 +431,188 @@ extension SonoicModel {
             .localizedDescription
         queueDiagnostics.lastMutationErrorDetail = queueOperationErrorDetail
         return false
+    }
+
+    func clearSonosControlAPICloudQueueContext() {
+        sonosControlAPICloudQueueSessionID = nil
+        sonosControlAPICloudQueueGroupID = nil
+        sonosControlAPICloudQueueVersion = nil
+        sonosControlAPICloudQueueItemIDs = nil
+        sonosControlAPICloudQueueTracks = nil
+        sharedStore?.clearCloudQueueSessionContext()
+    }
+
+    func persistSonosControlAPICloudQueueContext(groupID: String? = nil) {
+        guard let sessionID = sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed,
+              let itemIDs = sonosControlAPICloudQueueItemIDs,
+              !itemIDs.isEmpty
+        else {
+            sharedStore?.clearCloudQueueSessionContext()
+            return
+        }
+
+        let context = SonosControlAPICloudQueueSessionContext(
+            sessionID: sessionID,
+            groupID: groupID?.sonoicNonEmptyTrimmed ?? sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed,
+            queueVersion: sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed,
+            itemIDs: itemIDs,
+            tracks: sonosControlAPICloudQueueTracks ?? [],
+            updatedAt: Date()
+        )
+        guard context.isUsable else {
+            sharedStore?.clearCloudQueueSessionContext()
+            return
+        }
+
+        do {
+            try sharedStore?.saveCloudQueueSessionContext(context)
+        } catch {
+            sonoicPlaybackDebugLog("cloudQueue persistContext failed error='\(error.localizedDescription)'")
+        }
+    }
+
+    @discardableResult
+    func restoreSonosControlAPICloudQueueContextIfNeeded(groupID: String?, queueVersion: String?) -> Bool {
+        let normalizedGroupID = groupID?.sonoicNonEmptyTrimmed
+        let normalizedQueueVersion = queueVersion?.sonoicNonEmptyTrimmed
+
+        if sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed != nil,
+           sonosControlAPICloudQueueItemIDs?.isEmpty == false
+        {
+            let inMemoryGroupID = sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed
+            let inMemoryQueueVersion = sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed
+            let groupMatches = normalizedGroupID.map { inMemoryGroupID == $0 } ?? true
+            if groupMatches {
+                if let normalizedQueueVersion,
+                   let inMemoryQueueVersion,
+                   inMemoryQueueVersion != normalizedQueueVersion
+                {
+                    sonoicPlaybackDebugLog(
+                        "cloudQueue restoreContext keepingMemory versionChanged stored=\(sonoicPlaybackDebugID(inMemoryQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+                    )
+                }
+                return true
+            }
+
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext clearing staleMemory group=\(sonoicPlaybackDebugID(inMemoryGroupID)) currentGroup=\(sonoicPlaybackDebugID(normalizedGroupID)) version=\(sonoicPlaybackDebugID(inMemoryQueueVersion)) currentVersion=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+            )
+            clearSonosControlAPICloudQueueContext()
+        }
+
+        guard let context = sharedStore?.loadCloudQueueSessionContext(),
+              context.isUsable,
+              context.isFresh
+        else {
+            return false
+        }
+
+        if let storedGroupID = context.groupID?.sonoicNonEmptyTrimmed,
+           let normalizedGroupID,
+           storedGroupID != normalizedGroupID
+        {
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext skipped groupMismatch stored=\(sonoicPlaybackDebugID(storedGroupID)) current=\(sonoicPlaybackDebugID(normalizedGroupID))"
+            )
+            clearSonosControlAPICloudQueueContext()
+            return false
+        }
+
+        if let storedQueueVersion = context.queueVersion?.sonoicNonEmptyTrimmed,
+           let normalizedQueueVersion,
+           storedQueueVersion != normalizedQueueVersion
+        {
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext keepingStored versionChanged stored=\(sonoicPlaybackDebugID(storedQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+            )
+        }
+
+        sonosControlAPICloudQueueSessionID = context.sessionID
+        sonosControlAPICloudQueueGroupID = context.groupID
+        sonosControlAPICloudQueueVersion = context.queueVersion
+        sonosControlAPICloudQueueItemIDs = context.itemIDs
+        sonosControlAPICloudQueueTracks = context.tracks
+        sonoicPlaybackDebugLog(
+            "cloudQueue restoreContext session=\(sonoicPlaybackDebugID(context.sessionID)) itemCount=\(context.itemIDs.count)"
+        )
+        return true
+    }
+
+    func sonosControlAPICloudQueueSnapshot(
+        currentItemIndex: Int? = nil,
+        sourceURI: String? = nil
+    ) -> SonosQueueSnapshot? {
+        let payloads = manualQueueContextPayloads ?? []
+        let tracks = sonosControlAPICloudQueueTracks ?? []
+        let itemIDs = sonosControlAPICloudQueueItemIDs
+        let itemCount = max(payloads.count, tracks.count, itemIDs?.count ?? 0)
+
+        guard itemCount > 0 else {
+            return nil
+        }
+
+        let items = (0..<itemCount).map { index in
+            let payload = payloads.indices.contains(index) ? payloads[index] : nil
+            let track = tracks.indices.contains(index) ? tracks[index] : nil
+            let subtitleParts = payload?.subtitle?
+                .components(separatedBy: "•")
+                .map(\.sonoicTrimmed)
+                .filter { !$0.isEmpty } ?? []
+            let itemID = itemIDs.flatMap { $0.indices.contains(index) ? $0[index] : nil }
+            return SonosQueueItem(
+                id: itemID ?? payload?.id ?? "sonoic-cloud-queue-\(index + 1)",
+                title: track?.name?.sonoicNonEmptyTrimmed ?? payload?.title ?? "Unknown Track",
+                artistName: track?.artist?.name.sonoicNonEmptyTrimmed ?? subtitleParts.first,
+                albumTitle: track?.album?.name.sonoicNonEmptyTrimmed ?? subtitleParts.dropFirst().first,
+                artworkURL: track?.imageUrl?.sonoicNonEmptyTrimmed ?? payload?.artworkURL,
+                duration: track?.durationMillis.map { TimeInterval($0) / 1_000 } ?? payload?.duration
+            )
+        }
+
+        return SonosQueueSnapshot(
+            items: items,
+            currentItemIndex: currentItemIndex.flatMap { items.indices.contains($0) ? $0 : nil },
+            sourceURI: sourceURI ?? "sonoic-cloud-queue"
+        )
+    }
+
+    @discardableResult
+    func updateSonosControlAPICloudQueueCurrentItem(itemID: String?) -> Bool {
+        updateSonosControlAPICloudQueueCurrentItem(itemIDCandidates: [itemID])
+    }
+
+    @discardableResult
+    func updateSonosControlAPICloudQueueCurrentItem(itemIDCandidates: [String?]) -> Bool {
+        guard let currentIndex = sonosControlAPICloudQueueCurrentIndex(
+            from: itemIDCandidates
+        ),
+              let snapshot = sonosControlAPICloudQueueSnapshot(
+                currentItemIndex: currentIndex,
+                sourceURI: queueState.snapshot?.sourceURI
+              )
+        else {
+            return false
+        }
+
+        queueState = .loaded(snapshot)
+        queueDiagnostics = SonosQueueDiagnostics(
+            observedAt: Date(),
+            currentURI: snapshot.sourceURI ?? nowPlayingDiagnostics.currentURI,
+            itemCount: snapshot.items.count,
+            lastRefreshErrorDetail: nil,
+            lastMutationErrorDetail: queueDiagnostics.lastMutationErrorDetail
+        )
+        return true
+    }
+
+    func sonosControlAPICloudQueueCurrentIndex(from itemIDCandidates: [String?]) -> Int? {
+        guard let itemIDs = sonosControlAPICloudQueueItemIDs else {
+            return nil
+        }
+
+        return SonoicSonosControlAPIQueueCurrentIndexResolver.currentIndex(
+            itemIDs: itemIDs,
+            candidates: itemIDCandidates
+        )
     }
 }

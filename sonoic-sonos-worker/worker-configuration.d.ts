@@ -4,13 +4,14 @@
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "BrokerCodeRedemptions";
+		durableNamespaces: "BrokerCodeRedemptions" | "SonoicCloudQueues";
 	}
 	interface Env {
 		SONOS_CLIENT_ID: "f59853ac-4888-406b-b883-c421a08dcb6f";
 		SONOS_REDIRECT_URI: "https://sonos.ryvus.app/oauth/sonos/callback";
 		SONOIC_APP_REDIRECT_URI: "sonoic://sonos-auth";
 		SONOS_BROKER_CODE_REDEMPTIONS: DurableObjectNamespace<import("./src/index").BrokerCodeRedemptions>;
+		SONOIC_CLOUD_QUEUES: DurableObjectNamespace<import("./src/index").SonoicCloudQueues>;
 	}
 }
 interface Env extends Cloudflare.Env {}

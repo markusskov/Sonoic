@@ -35,7 +35,7 @@ struct SourceItemDetailSectionView: View {
                 SonoicLazyListRows(previewItems) { item, index in
                     SourceItemNavigationRow(
                         item: item,
-                        playOverride: playlistTrackPlayAction(for: item, at: index),
+                        playOverride: containerTrackPlayAction(for: item, at: index),
                         isCompact: true
                     )
                 }
@@ -44,7 +44,7 @@ struct SourceItemDetailSectionView: View {
                     SonoicListRows(previewItems) { item, index in
                         SourceItemNavigationRow(
                             item: item,
-                            playOverride: playlistTrackPlayAction(for: item, at: index)
+                            playOverride: containerTrackPlayAction(for: item, at: index)
                         )
                     }
 
@@ -63,22 +63,22 @@ struct SourceItemDetailSectionView: View {
         visibleItemCount = min(section.items.count, visibleItemCount + visibleItemIncrement)
     }
 
-    private func playlistTrackPlayAction(
+    private func containerTrackPlayAction(
         for item: SonoicSourceItem,
         at index: Int
     ) -> (() async -> Void)? {
-        guard parentItem.kind == .playlist,
+        guard parentItem.kind == .playlist || parentItem.kind == .album,
               item.kind == .song
         else {
             return nil
         }
 
         return {
-            await playPlaylistTrack(at: index)
+            await playContainerTrack(at: index)
         }
     }
 
-    private func playPlaylistTrack(at index: Int) async {
+    private func playContainerTrack(at index: Int) async {
         let itemTitle = section.items.indices.contains(index) ? section.items[index].title : "unknown"
         sonoicPlaybackDebugLog(
             "rowTap parent='\(parentItem.title)' parentKind=\(parentItem.kind.rawValue) section=\(section.id) index=\(index) item='\(itemTitle)' sectionItems=\(section.items.count)"

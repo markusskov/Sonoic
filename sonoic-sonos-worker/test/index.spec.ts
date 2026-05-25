@@ -1,4 +1,4 @@
-import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
+import { createExecutionContext, env, runInDurableObject, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
 
@@ -198,11 +198,198 @@ describe('Sonos OAuth worker', () => {
 	});
 });
 
+describe('Sonoic Cloud Queue worker', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('rejects unauthenticated cloud queue creation', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/cloud-queues', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(cloudQueueBody()),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(401);
+		await expect(response.json()).resolves.toMatchObject({ error: 'missing_authorization' });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('creates a seekable cloud queue with the requested start item id', async () => {
+		const fetchMock = stubSuccessfulSonosTokenValidation();
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/cloud-queues', {
+			method: 'POST',
+			headers: authenticatedCloudQueueHeaders(),
+			body: JSON.stringify(cloudQueueBody({ startItemId: 'sonoic-track-2' })),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(201);
+		const body = (await response.json()) as Record<string, unknown>;
+		expect(body.queueId).toEqual(expect.any(String));
+		expect(body.queueBaseUrl).toContain('https://sonos.ryvus.app');
+		expect(body.queueBaseUrl).toContain(`/cloud-queues/${body.queueId}/v2.3`);
+		expect(body.startItemId).toBe('sonoic-track-2');
+		expect(body.trackMetadata).toMatchObject({ name: 'Track 2' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			'https://api.ws.sonos.com/control/api/v1/households',
+			expect.objectContaining({
+				method: 'GET',
+				headers: expect.objectContaining({ Authorization: 'Bearer access-1' }),
+			}),
+		);
+	});
+
+	it('schedules cloud queue pruning outside normal request handling', async () => {
+		const createResponse = await createCloudQueue({ startItemId: 'sonoic-track-2' });
+		const stub = cloudQueuesStub();
+
+		const alarmAt = await runInDurableObject(stub, async (_instance, state) => state.storage.getAlarm());
+
+		expect(createResponse.queueId).toEqual(expect.any(String));
+		expect(alarmAt).toEqual(expect.any(Number));
+	});
+
+	it('returns the queue start item as the default item window playhead', async () => {
+		const createResponse = await createCloudQueue({ startItemId: 'sonoic-track-2' });
+		const queueBaseUrl = String(createResponse.queueBaseUrl);
+		const request = new IncomingRequest(`${queueBaseUrl}/itemWindow?upcomingWindowSize=2`);
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as Record<string, unknown>;
+		expect(body.windowPlayhead).toMatchObject({ itemId: 'sonoic-track-2', positionMillis: 0 });
+		expect(body.items).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ id: 'sonoic-track-2' }),
+				expect.objectContaining({ id: 'sonoic-track-3' }),
+			]),
+		);
+	});
+
+	it('returns requested cloud queue item ids unchanged for seek status mapping', async () => {
+		const createResponse = await createCloudQueue({ startItemId: 'sonoic-track-2' });
+		const queueBaseUrl = String(createResponse.queueBaseUrl);
+		const request = new IncomingRequest(`${queueBaseUrl}/itemWindow?itemId=sonoic-track-2&previousWindowSize=1&upcomingWindowSize=1`);
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as Record<string, unknown>;
+		expect(body.windowPlayhead).toMatchObject({ itemId: 'sonoic-track-2', positionMillis: 0 });
+		expect(body.items).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ id: 'sonoic-track-1' }),
+				expect.objectContaining({ id: 'sonoic-track-2' }),
+				expect.objectContaining({ id: 'sonoic-track-3' }),
+			]),
+		);
+	});
+
+	it('rejects track items without a content type', async () => {
+		stubSuccessfulSonosTokenValidation();
+		const body = cloudQueueBody();
+		const firstItem = body.items[0] as Record<string, unknown>;
+		const firstTrack = firstItem.track as Record<string, unknown>;
+		delete firstTrack.contentType;
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/cloud-queues', {
+			method: 'POST',
+			headers: authenticatedCloudQueueHeaders(),
+			body: JSON.stringify(body),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(400);
+		await expect(response.json()).resolves.toMatchObject({ error: 'cloud_queue_item_invalid_track:0' });
+	});
+});
+
 function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
 	return {
 		...env,
 		SONOS_CLIENT_SECRET: 'secret-1',
 		SONOS_BROKER_CODE_REDEMPTIONS: makeRedemptionNamespace(),
+	};
+}
+
+async function createCloudQueue(options: { startItemId?: string } = {}): Promise<Record<string, unknown>> {
+	stubSuccessfulSonosTokenValidation();
+	const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/cloud-queues', {
+		method: 'POST',
+		headers: authenticatedCloudQueueHeaders(),
+		body: JSON.stringify(cloudQueueBody(options)),
+	});
+	const ctx = createExecutionContext();
+	const response = await worker.fetch(request, testEnv(), ctx);
+	await waitOnExecutionContext(ctx);
+	expect(response.status).toBe(201);
+	return (await response.json()) as Record<string, unknown>;
+}
+
+function authenticatedCloudQueueHeaders(): HeadersInit {
+	return {
+		'Content-Type': 'application/json',
+		Authorization: 'Bearer access-1',
+	};
+}
+
+function cloudQueuesStub(): DurableObjectStub {
+	const namespace = env.SONOIC_CLOUD_QUEUES;
+	return namespace.get(namespace.idFromName('global'));
+}
+
+function stubSuccessfulSonosTokenValidation(): ReturnType<typeof vi.fn> {
+	const fetchMock = vi.fn().mockResolvedValue(
+		new Response(JSON.stringify({ households: [{ id: 'household-1' }] }), {
+			status: 200,
+			headers: { 'Content-Type': 'application/json' },
+		}),
+	);
+	vi.stubGlobal('fetch', fetchMock);
+	return fetchMock;
+}
+
+function cloudQueueBody(options: { startItemId?: string } = {}): Record<string, unknown> {
+	return {
+		container: {
+			id: { serviceId: '204', objectId: 'libraryplaylist:playlist-1' },
+			name: 'Playlist 1',
+			type: 'playlist',
+			service: { id: '204', name: 'Apple Music' },
+			playbackPolicies: { canSeek: true },
+		},
+		items: [1, 2, 3].map((number) => ({
+			id: `sonoic-track-${number}`,
+			track: {
+				id: { serviceId: '204', objectId: `librarytrack:track-${number}` },
+				name: `Track ${number}`,
+				contentType: 'application/vnd.apple.mpegurl',
+				artist: { name: 'Artist' },
+				album: { name: 'Album' },
+				durationMillis: 180_000,
+				service: { id: '204', name: 'Apple Music' },
+			},
+			playbackPolicies: { canSeek: true },
+		})),
+		startItemId: options.startItemId,
 	};
 }
 

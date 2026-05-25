@@ -40,11 +40,27 @@ enum SonoicSourceActionError: LocalizedError {
 
 extension SonoicModel {
     func canPlaySourceItem(_ item: SonoicSourceItem) -> Bool {
-        (try? sourcePlayablePayload(for: item, purpose: .directPlay)) != nil
+        guard canSendPrimarySourcePlaybackCommands else {
+            return false
+        }
+
+        return (try? sourcePlayablePayload(for: item, purpose: .directPlay)) != nil
+    }
+
+    private var canSendPrimarySourcePlaybackCommands: Bool {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return hasSonosControlAPICommandTarget
+        }
+
+        return hasManualSonosHost
     }
 
     func sourcePlaylistFallbackPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {
         try? sourcePlayablePayload(for: item, purpose: .metadata)
+    }
+
+    private var allowsLocalSourcePlaybackFallback: Bool {
+        !sonosControlAPIState.settings.mode.canSendCommands
     }
 
     func canPlaySourcePlaylistQueue(
@@ -63,6 +79,17 @@ extension SonoicModel {
             throw SonoicSourceActionError.playbackPayloadUnavailable
         }
 
+        if let plan = sourceSingleItemPlaybackPlan(for: item, payload: payload),
+           await playSonosControlAPICloudQueueIfAvailable(parentItem: item, plan: plan)
+        {
+            recordRecentSourceItem(item, replayPayload: plan.recentPlaybackPayload)
+            return true
+        }
+
+        guard allowsLocalSourcePlaybackFallback else {
+            return false
+        }
+
         return await playManualSonosPayload(payload)
     }
 
@@ -77,8 +104,56 @@ extension SonoicModel {
             "playlistQueue start parent='\(parentItem.title)' kind=\(parentItem.kind.rawValue) origin=\(parentItem.origin.rawValue) service=\(parentItem.service.name) trackCount=\(trackItems.count) startIndex=\(String(describing: startIndex)) shuffled=\(shuffled)"
         )
 
-        if !shuffled,
-           let favorite = sonosFavoriteBackedPlaylist(for: parentItem, log: true)
+        await refreshSourcePlaybackContextIfNeeded(for: parentItem.service)
+        let generatedPlan = sourcePlaylistPlaybackPlan(
+            parentItem: parentItem,
+            trackItems: trackItems,
+            startingAtIndex: startIndex,
+            shuffled: shuffled
+        )
+        let favoriteCloudFallback = sourcePlaylistFavoriteFallback(
+            for: parentItem,
+            startIndex: startIndex,
+            shuffled: shuffled,
+            allowStartOffset: false,
+            log: false
+        )
+
+        if let generatedPlan,
+           await playSonosControlAPICloudQueueIfAvailable(parentItem: parentItem, plan: generatedPlan)
+        {
+            recordRecentSourceItem(parentItem, replayPayload: generatedPlan.recentPlaybackPayload)
+            sonoicPlaybackDebugLog(
+                "playlistQueue cloudQueue result=true parent='\(parentItem.title)'"
+            )
+            return true
+        }
+
+        if sonosControlAPIState.settings.mode.canSendCommands,
+           let favorite = favoriteCloudFallback,
+           await playManualSonosFavorite(favorite)
+        {
+            recordRecentSourceItem(parentItem, replayPayload: sourcePlaylistFallbackPayload(for: parentItem))
+            sonoicPlaybackDebugLog(
+                "playlistQueue cloudFavoriteFallback result=true parent='\(parentItem.title)'"
+            )
+            return true
+        }
+
+        guard allowsLocalSourcePlaybackFallback else {
+            sonoicPlaybackDebugLog(
+                "playlistQueue cloudQueue result=false noLocalPlaybackFallback=true parent='\(parentItem.title)'"
+            )
+            return false
+        }
+
+        if let favorite = sourcePlaylistFavoriteFallback(
+            for: parentItem,
+            startIndex: startIndex,
+            shuffled: shuffled,
+            allowStartOffset: true,
+            log: true
+        )
         {
             let sourceIndex = startIndex ?? 0
             guard sourceIndex >= 0,
@@ -99,9 +174,9 @@ extension SonoicModel {
                 )
                 return await playGeneratedSourcePlaylistQueue(
                     parentItem: parentItem,
-                    trackItems: trackItems,
-                    startingAtIndex: startIndex,
-                    shuffled: shuffled
+                    plan: generatedPlan,
+                    trackItemsCount: trackItems.count,
+                    startIndex: startIndex
                 )
             }
 
@@ -116,9 +191,9 @@ extension SonoicModel {
                     )
                     return await playGeneratedSourcePlaylistQueue(
                         parentItem: parentItem,
-                        trackItems: trackItems,
-                        startingAtIndex: startIndex,
-                        shuffled: shuffled
+                        plan: generatedPlan,
+                        trackItemsCount: trackItems.count,
+                        startIndex: startIndex
                     )
                 }
             }
@@ -131,28 +206,44 @@ extension SonoicModel {
 
         return await playGeneratedSourcePlaylistQueue(
             parentItem: parentItem,
-            trackItems: trackItems,
-            startingAtIndex: startIndex,
-            shuffled: shuffled
+            plan: generatedPlan,
+            trackItemsCount: trackItems.count,
+            startIndex: startIndex
         )
+    }
+
+    private func sourcePlaylistFavoriteFallback(
+        for parentItem: SonoicSourceItem,
+        startIndex: Int?,
+        shuffled: Bool,
+        allowStartOffset: Bool,
+        log: Bool
+    ) -> SonosFavoriteItem? {
+        guard !shuffled,
+              allowStartOffset || startIndex == nil || startIndex == 0
+        else {
+            return nil
+        }
+
+        return sonosFavoriteBackedPlaylist(for: parentItem, log: log)
     }
 
     private func playGeneratedSourcePlaylistQueue(
         parentItem: SonoicSourceItem,
-        trackItems: [SonoicSourceItem],
-        startingAtIndex startIndex: Int?,
-        shuffled: Bool
+        plan: SonoicSourcePlaylistPlaybackPlan?,
+        trackItemsCount: Int,
+        startIndex: Int?
     ) async -> Bool {
-        await refreshSourcePlaybackContextIfNeeded(for: parentItem.service)
-
-        guard let plan = sourcePlaylistPlaybackPlan(
-            parentItem: parentItem,
-            trackItems: trackItems,
-            startingAtIndex: startIndex,
-            shuffled: shuffled
-        ) else {
+        guard allowsLocalSourcePlaybackFallback else {
             sonoicPlaybackDebugLog(
-                "playlistQueue generatedPlanUnavailable parent='\(parentItem.title)' trackCount=\(trackItems.count) startIndex=\(String(describing: startIndex))"
+                "playlistQueue generatedPlanSkipped noLocalPlaybackFallback=true parent='\(parentItem.title)'"
+            )
+            return false
+        }
+
+        guard let plan else {
+            sonoicPlaybackDebugLog(
+                "playlistQueue generatedPlanUnavailable parent='\(parentItem.title)' trackCount=\(trackItemsCount) startIndex=\(String(describing: startIndex))"
             )
             return false
         }
@@ -178,6 +269,25 @@ extension SonoicModel {
         return didStartPlayback
     }
 
+    private func sourceSingleItemPlaybackPlan(
+        for item: SonoicSourceItem,
+        payload: SonosPlayablePayload
+    ) -> SonoicSourcePlaylistPlaybackPlan? {
+        guard sourceAdapter(for: item).capabilities.supportsSonosPlaybackPayloads else {
+            return nil
+        }
+
+        let queuePayload = (try? sourcePlayablePayload(for: item, purpose: .queueEntry)) ?? payload
+        let metadataPayload = (try? sourcePlayablePayload(for: item, purpose: .metadata)) ?? queuePayload
+        return SonoicSourcePlaylistPlaybackPlan(
+            payloads: [queuePayload],
+            items: [item],
+            startingTrackNumber: 1,
+            localNowPlayingPayload: metadataPayload,
+            recentPlaybackPayload: metadataPayload
+        )
+    }
+
     private func refreshSourcePlaybackContextIfNeeded(for service: SonosServiceDescriptor) async {
         guard service.kind == .appleMusic else {
             return
@@ -196,6 +306,13 @@ extension SonoicModel {
     func playSourcePlaylistFallback(_ item: SonoicSourceItem) async throws -> Bool {
         guard let payload = sourcePlaylistFallbackPayload(for: item) else {
             throw SonoicSourceActionError.playbackPayloadUnavailable
+        }
+
+        guard allowsLocalSourcePlaybackFallback else {
+            sonoicPlaybackDebugLog(
+                "sourceFallback noLocalPlaybackFallback=true item='\(item.title)'"
+            )
+            return false
         }
 
         let didStartPlayback = await playManualSonosPayload(

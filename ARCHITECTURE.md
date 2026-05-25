@@ -39,6 +39,17 @@ Source browsing stays inside `SonoicApp` because it combines app navigation, Mus
 - Artists, albums, and playlists route to one shared source detail screen regardless of whether the entry point is Search, Home, Recently Played, Favorites, a row menu, or the player.
 - Songs do not have a detail route. Song rows play only when the adapter can provide a trustworthy Sonos-owned payload.
 
+## Sonos Control Plane
+
+Sonoic is a Sonos Cloud controller with a small LAN-only tuning island.
+
+- Sonos Control API owns normal playback commands, seek, now-playing refresh, group/player volume, mute, and Cloud Queue playback.
+- Cloud identity uses household, group, and player IDs. Local host/RINCON details are accessory data, not the app's primary target model.
+- Normal transport paths must not silently fall back to LAN when Cloud command mode is active. If Cloud cannot send a command, the UI should surface unavailable or stale state instead of pretending a second control plane succeeded.
+- Cloud Queue playback uses Sonoic's worker-backed queue endpoint and Sonos playback sessions so playlist starts preserve real queue context.
+- LAN remains available for local discovery/bootstrap, Advanced diagnostics, manual local mode, and tuning surfaces that the Cloud API does not cover well enough yet.
+- EQ, home theater tuning, Sub/surround controls, and low-level diagnostic SOAP reads belong in the local tuning island until Sonos exposes equivalent Cloud behavior that is reliable on device.
+
 ## Sonoic Plus
 
 Sonoic Plus is an app-only purchase and personalization layer. It must not gate core Sonos control: discovery, playback, queue, rooms, Lock Screen, Control Center, and the default Home experience stay free.

@@ -2,6 +2,10 @@ import Foundation
 
 extension SonoicModel {
     func fetchExternalVolumeForActiveTarget() async throws -> SonoicExternalControlState.Volume {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return try await fetchSonosControlAPIActiveTargetVolume()
+        }
+
         guard activeTarget.kind == .group else {
             return try await renderingControlClient.fetchVolume(host: manualSonosHost)
         }
@@ -14,6 +18,11 @@ extension SonoicModel {
     }
 
     func setExternalMuteForActiveTarget(_ isMuted: Bool) async throws {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            try await setSonosControlAPIActiveTargetMute(isMuted)
+            return
+        }
+
         if activeTarget.kind == .group {
             try await groupRenderingControlClient.setMute(host: activeGroupRenderingHost(), isMuted: isMuted)
         } else {
@@ -22,6 +31,11 @@ extension SonoicModel {
     }
 
     func setExternalVolumeForActiveTarget(to level: Int) async throws {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            try await setSonosControlAPIActiveTargetVolume(to: level)
+            return
+        }
+
         if activeTarget.kind == .group {
             try await groupRenderingControlClient.setVolume(host: activeGroupRenderingHost(), level: level)
         } else {

@@ -222,6 +222,25 @@ nonisolated struct SonosControlAPITrackQuality: Codable, Equatable {
     var immersive: Bool?
 }
 
+nonisolated struct SonosControlAPICloudQueueSessionContext: Codable, Equatable {
+    static let staleInterval: TimeInterval = 12 * 60 * 60
+
+    var sessionID: String
+    var groupID: String?
+    var queueVersion: String?
+    var itemIDs: [String]
+    var tracks: [SonosControlAPITrack]
+    var updatedAt: Date
+
+    var isUsable: Bool {
+        !sessionID.sonoicTrimmed.isEmpty && !itemIDs.isEmpty
+    }
+
+    var isFresh: Bool {
+        Date().timeIntervalSince(updatedAt) < Self.staleInterval
+    }
+}
+
 nonisolated struct SonosControlAPIPlaybackPolicy: Codable, Equatable {
     var canSkip: Bool?
     var canSkipBack: Bool?
@@ -269,6 +288,20 @@ nonisolated struct SonosControlAPISeekRequest: Codable, Equatable {
 nonisolated struct SonosControlAPISeekRelativeRequest: Codable, Equatable {
     var deltaMillis: Int
     var itemId: String?
+}
+
+nonisolated struct SonosControlAPIVolumeState: Codable, Equatable {
+    var volume: Int
+    var muted: Bool
+    var fixed: Bool?
+}
+
+nonisolated struct SonosControlAPISetVolumeRequest: Codable, Equatable {
+    var volume: Int
+}
+
+nonisolated struct SonosControlAPISetMuteRequest: Codable, Equatable {
+    var muted: Bool
 }
 
 nonisolated struct SonosControlAPICreateSessionRequest: Codable, Equatable {

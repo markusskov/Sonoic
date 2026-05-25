@@ -1,19 +1,12 @@
 import Foundation
 
-struct SonoicAppleMusicPlaylistPlaybackPlan {
-    var payloads: [SonosPlayablePayload]
-    var startingTrackNumber: Int
-    var localNowPlayingPayload: SonosPlayablePayload?
-    var recentPlaybackPayload: SonosPlayablePayload?
-}
-
 extension SonoicModel {
     func appleMusicPlaylistPlaybackPlan(
         parentItem: SonoicSourceItem,
         trackItems: [SonoicSourceItem],
         startingAtIndex startIndex: Int? = nil,
         shuffled: Bool = false
-    ) -> SonoicAppleMusicPlaylistPlaybackPlan? {
+    ) -> SonoicSourcePlaylistPlaybackPlan? {
         var playablePairs = trackItems.enumerated().compactMap { index, item -> (
             sourceIndex: Int,
             item: SonoicSourceItem,
@@ -50,8 +43,9 @@ extension SonoicModel {
 
         let startingItem = playablePairs[startingIndex].item
 
-        return SonoicAppleMusicPlaylistPlaybackPlan(
+        return SonoicSourcePlaylistPlaybackPlan(
             payloads: playablePairs.map(\.payload),
+            items: playablePairs.map(\.item),
             startingTrackNumber: startingIndex + 1,
             localNowPlayingPayload: try? appleMusicPlayablePayload(for: startingItem, purpose: .metadata),
             recentPlaybackPayload: try? appleMusicPlayablePayload(for: parentItem, purpose: .metadata)

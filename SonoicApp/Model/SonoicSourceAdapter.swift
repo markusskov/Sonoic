@@ -33,6 +33,7 @@ enum SonoicSourceAdapterError: LocalizedError {
 
 struct SonoicSourcePlaylistPlaybackPlan {
     var payloads: [SonosPlayablePayload]
+    var items: [SonoicSourceItem]
     var startingTrackNumber: Int
     var localNowPlayingPayload: SonosPlayablePayload?
     var recentPlaybackPayload: SonosPlayablePayload?
@@ -150,20 +151,11 @@ extension SonoicModel {
 
         switch parentItem.service.kind {
         case .appleMusic:
-            guard let plan = appleMusicPlaylistPlaybackPlan(
+            return appleMusicPlaylistPlaybackPlan(
                 parentItem: parentItem,
                 trackItems: trackItems,
                 startingAtIndex: startIndex,
                 shuffled: shuffled
-            ) else {
-                return nil
-            }
-
-            return SonoicSourcePlaylistPlaybackPlan(
-                payloads: plan.payloads,
-                startingTrackNumber: plan.startingTrackNumber,
-                localNowPlayingPayload: plan.localNowPlayingPayload,
-                recentPlaybackPayload: plan.recentPlaybackPayload
             )
         case .spotify, .sonosRadio, .genericStreaming:
             return nil

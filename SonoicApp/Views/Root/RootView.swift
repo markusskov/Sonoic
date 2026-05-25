@@ -60,9 +60,9 @@ struct RootView: View {
         }
         .tint(SonoicTheme.Colors.tabAccent)
         .overlay(alignment: .bottom) {
-            if model.hasCompletedOnboarding, model.hasManualSonosHost {
+            if model.hasCompletedOnboarding, model.hasResolvedSonosPlaybackTarget {
                 PlayerMiniBar(
-                    nowPlaying: model.nowPlaying,
+                    nowPlaying: model.effectiveNowPlayingSnapshotForActiveTarget,
                     openPlayer: {
                         isPlayerPresented = true
                     },

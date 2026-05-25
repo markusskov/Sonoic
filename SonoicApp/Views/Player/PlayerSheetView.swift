@@ -14,6 +14,7 @@ struct PlayerSheetView: View {
         GeometryReader { geometry in
             let contentWidth = max(geometry.size.width - 60, 1)
             let heroSize = CGSize(width: geometry.size.width, height: heroHeight(for: geometry))
+            let nowPlaying = model.effectiveNowPlayingSnapshotForActiveTarget
 
             ZStack {
                 PlayerFullscreenArtworkBackground(
@@ -31,25 +32,26 @@ struct PlayerSheetView: View {
 
                     VStack(spacing: controlSpacing(for: geometry)) {
                         PlayerFullscreenTitleBlock(
-                            title: model.nowPlaying.title,
-                            subtitle: model.nowPlaying.subtitle ?? model.nowPlaying.sourceName,
-                            artistName: model.nowPlaying.artistName,
+                            title: nowPlaying.title,
+                            subtitle: nowPlaying.subtitle ?? nowPlaying.sourceName,
+                            artistName: nowPlaying.artistName,
                             openArtist: openArtist
                         )
 
                         PlayerProgressSection(
-                            nowPlaying: model.nowPlaying,
+                            nowPlaying: nowPlaying,
                             observedAt: model.nowPlayingObservedAt,
-                            isEnabled: model.hasManualSonosHost && model.nowPlaying.canSeek,
+                            contentIdentity: progressContentIdentity,
+                            isEnabled: model.canControlManualPlayback && nowPlaying.canSeek,
                             showsTimeLabels: true,
                             showsThumb: false,
                             seek: { timeInterval in
-                                seek(to: timeInterval)
+                                await seek(to: timeInterval)
                             }
                         )
 
                         PlayerTransportControls(
-                            nowPlaying: model.nowPlaying,
+                            nowPlaying: nowPlaying,
                             skipPrevious: skipToPreviousTrack,
                             togglePlayback: togglePlayback,
                             skipNext: skipToNextTrack
@@ -57,14 +59,14 @@ struct PlayerSheetView: View {
 
                         PlayerFullscreenVolumeBar(
                             volume: volumeBinding,
-                            isEnabled: model.hasManualSonosHost,
+                            isEnabled: model.hasActiveSonosControlTarget,
                             volumeEditingChanged: handleVolumeEditingChanged
                         )
 
                         PlayerFullscreenSonosActions(
                             activeTargetSystemImage: model.activeTarget.kind.systemImage,
                             muteButtonSystemImage: muteButtonSystemImage,
-                            isEnabled: model.hasManualSonosHost,
+                            isEnabled: model.hasActiveSonosControlTarget,
                             openRooms: openRooms,
                             toggleMute: toggleMute,
                             openQueue: openQueue
@@ -81,7 +83,7 @@ struct PlayerSheetView: View {
         .ignoresSafeArea()
         .task(id: artworkReloadKey) {
             artworkImage = await PlayerArtworkImageLoader.loadArtworkImage(
-                artworkIdentifier: model.nowPlaying.artworkIdentifier,
+                artworkIdentifier: model.effectiveNowPlayingSnapshotForActiveTarget.artworkIdentifier,
                 maxPixelDimension: max(geometryIndependentArtworkDimension * displayScale, 1)
             )
         }

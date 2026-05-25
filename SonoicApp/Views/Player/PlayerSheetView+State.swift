@@ -42,21 +42,61 @@ extension PlayerSheetView {
     }
 
     var artworkReloadKey: String {
-        [
-            model.nowPlaying.artworkIdentifier,
-            model.nowPlaying.title,
-            model.nowPlaying.artistName,
-            model.nowPlaying.albumTitle,
-            model.nowPlaying.sourceName,
+        let nowPlaying = model.effectiveNowPlayingSnapshotForActiveTarget
+
+        return [
+            nowPlaying.artworkIdentifier,
+            nowPlaying.title,
+            nowPlaying.artistName,
+            nowPlaying.albumTitle,
+            nowPlaying.sourceName,
         ]
         .compactMap { $0 }
         .joined(separator: "|")
     }
 
-    func seek(to timeInterval: TimeInterval) {
-        Task {
-            _ = await model.seekManualSonosPlayback(to: timeInterval)
+    var progressContentIdentity: String {
+        let nowPlaying = model.effectiveNowPlayingSnapshotForActiveTarget
+
+        if let queueSnapshot = model.queueState.snapshot,
+           let currentItem = queueSnapshot.currentItem
+        {
+            let values: [String?] = [
+                "queue",
+                queueSnapshot.sourceURI,
+                queueSnapshot.currentItemIndex.map { String($0) },
+                currentItem.id,
+                currentItem.title,
+                currentItem.artistName,
+                currentItem.albumTitle,
+                nowPlaying.title,
+                nowPlaying.artistName,
+                nowPlaying.albumTitle,
+                nowPlaying.sourceName,
+            ]
+
+            return values
+                .compactMap { $0?.sonoicNonEmptyTrimmed }
+                .joined(separator: "|")
         }
+
+        let values: [String?] = [
+            nowPlaying.title,
+            nowPlaying.artistName,
+            nowPlaying.albumTitle,
+            nowPlaying.sourceName,
+        ]
+
+        return values
+            .compactMap { $0?.sonoicNonEmptyTrimmed }
+            .joined(separator: "|")
+    }
+
+    func seek(to timeInterval: TimeInterval) async -> Bool {
+        sonoicPlaybackDebugLog("playerSeek request target=\(timeInterval)")
+        let didSeek = await model.seekManualSonosPlayback(to: timeInterval)
+        sonoicPlaybackDebugLog("playerSeek result=\(didSeek) target=\(timeInterval)")
+        return didSeek
     }
 
     func handleVolumeEditingChanged(_ isEditing: Bool) {
