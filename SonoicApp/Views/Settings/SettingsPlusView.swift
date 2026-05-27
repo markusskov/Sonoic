@@ -74,9 +74,9 @@ struct SettingsPlusView: View {
                     }
                 } else {
                     SettingsStatusRow(
-                        title: "RevenueCat",
-                        statusTitle: "Not Configured",
-                        detail: "Add RevenueCatAPIKey to the app bundle when the product is ready.",
+                        title: "Sonoic Plus",
+                        statusTitle: "Coming Soon",
+                        detail: "Themes, icons, and room presets are being prepared.",
                         systemImage: "sparkles",
                         tint: .secondary
                     )

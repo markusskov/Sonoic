@@ -72,7 +72,7 @@ struct RootView: View {
                         }
                     }
                 )
-                .padding(.horizontal, 12)
+                .padding(.horizontal, MiniPlayerLayout.horizontalPadding)
                 .padding(.bottom, MiniPlayerLayout.bottomSpacing)
             }
         }

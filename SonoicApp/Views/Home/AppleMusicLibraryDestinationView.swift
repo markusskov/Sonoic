@@ -13,7 +13,6 @@ struct AppleMusicLibraryDestinationView: View {
         ScrollView {
             GlassEffectContainer(spacing: 18) {
                 VStack(alignment: .leading, spacing: 20) {
-                    header
                     content
                 }
                 .padding(20)
@@ -37,13 +36,6 @@ struct AppleMusicLibraryDestinationView: View {
         .refreshable {
             refreshTapped()
         }
-    }
-
-    private var header: some View {
-        Label(destination.title, systemImage: destination.systemImage)
-            .font(.largeTitle.weight(.bold))
-            .foregroundStyle(.primary)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -77,10 +69,6 @@ struct AppleMusicLibraryDestinationView: View {
     @ViewBuilder
     private var libraryItemsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: destination.title
-            )
-
             if let failureDetail = state.failureDetail {
                 SourceMessageCard(
                     title: destination.title,

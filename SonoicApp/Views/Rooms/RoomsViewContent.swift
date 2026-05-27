@@ -29,10 +29,10 @@ struct RoomsViewContent: View {
         GlassEffectContainer(spacing: 18) {
             VStack(alignment: .leading, spacing: 28) {
                 currentRoomSection
-                homeTheaterSection
-                groupsSection
                 groupControlSection
                 roomListSection
+                homeTheaterSection
+                groupsSection
                 discoverySection
             }
             .padding(20)
