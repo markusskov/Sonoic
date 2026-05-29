@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Sonoic's agent harness structure."""
+"""Validate Sonoic's repository docs and hygiene guardrails."""
 
 from __future__ import annotations
 
@@ -16,40 +16,20 @@ REQUIRED_FILES = [
     "ARCHITECTURE.md",
     "README.md",
     "CONTRIBUTING.md",
-    "plan.md",
-    "docs/agent-harness.md",
-    "docs/design-docs/index.md",
-    "docs/design-docs/core-beliefs.md",
-    "docs/exec-plans/index.md",
-    "docs/exec-plans/template.md",
-    "docs/exec-plans/active/README.md",
-    "docs/exec-plans/completed/README.md",
-    "docs/exec-plans/tech-debt-tracker.md",
-    "docs/generated/README.md",
-    "docs/product-specs/index.md",
-    "docs/references/index.md",
-    "docs/QUALITY_SCORE.md",
+    "CODE_OF_CONDUCT.md",
+    "docs/README.md",
+    "docs/ROADMAP.md",
     "docs/RELIABILITY.md",
     "docs/SECURITY.md",
+    "docs/apple-music-roadmap.md",
+    "docs/manual-host-refresh-verification.md",
+    "docs/sonos-native-playback-research.md",
+    "docs/sonos-oauth-dev-setup.md",
 ]
 
 REQUIRED_DIRS = [
-    "docs/design-docs",
-    "docs/exec-plans/active",
-    "docs/exec-plans/completed",
-    "docs/generated",
-    "docs/product-specs",
-    "docs/references",
+    "docs",
     "scripts",
-]
-
-EXEC_PLAN_TEMPLATE_SECTIONS = [
-    "## Goal",
-    "## Scope",
-    "## Acceptance Criteria",
-    "## Validation",
-    "## Decision Log",
-    "## Progress",
 ]
 
 FORBIDDEN_TRACKED_PATTERNS = [
@@ -71,7 +51,6 @@ def main() -> int:
 
     errors.extend(check_required_paths())
     errors.extend(check_agents_size())
-    errors.extend(check_exec_plan_template())
     errors.extend(check_markdown_links())
     errors.extend(check_tracked_local_artifacts())
 
@@ -111,19 +90,6 @@ def check_agents_size() -> list[str]:
         return [f"AGENTS.md should stay map-sized. Current line count: {line_count}; limit: 120"]
 
     return []
-
-
-def check_exec_plan_template() -> list[str]:
-    path = ROOT / "docs/exec-plans/template.md"
-    if not path.exists():
-        return []
-
-    text = path.read_text(encoding="utf-8")
-    return [
-        f"Execution plan template is missing required section: {section}"
-        for section in EXEC_PLAN_TEMPLATE_SECTIONS
-        if section not in text
-    ]
 
 
 def check_markdown_links() -> list[str]:
