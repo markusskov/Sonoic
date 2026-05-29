@@ -36,7 +36,8 @@ struct SearchView: View {
                             sources: searchableSources
                         ),
                         hasQuery: model.sourceSearchSession.hasQuery,
-                        submit: searchCatalog
+                        submit: searchCatalog,
+                        exitSearchMode: exitSearchMode
                     )
 
                     if shouldShowSearchResults {
@@ -72,11 +73,6 @@ struct SearchView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Search")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            if searchableSources.contains(where: { $0.service.kind == .appleMusic }) {
-                await model.refreshSonosMusicServiceProbeIfNeeded()
-            }
-        }
     }
 
     private func orderedServices(_ services: [SonosServiceDescriptor]) -> [SonosServiceDescriptor] {
@@ -152,6 +148,11 @@ struct SearchView: View {
 
     private func clearRecentSearches() {
         model.clearRecentSourceSearches(for: searchableSources)
+    }
+
+    private func exitSearchMode() {
+        isSearchFieldFocused = false
+        model.resetSourceSearchSession()
     }
 
     private func selectSource(_ serviceID: String?) {

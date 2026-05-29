@@ -172,14 +172,7 @@ struct SettingsMusicServicesSection: View {
     private func statusTitle(for service: SonosServiceDescriptor) -> String {
         switch service.kind {
         case .appleMusic:
-            switch model.appleMusicAuthorizationState.status {
-            case .authorized:
-                "Connected"
-            case .requesting:
-                "Connecting"
-            default:
-                model.appleMusicAuthorizationState.title
-            }
+            model.appleMusicAuthorizationState.title
         case .spotify:
             "Unavailable"
         case .sonosRadio, .genericStreaming:
@@ -190,16 +183,7 @@ struct SettingsMusicServicesSection: View {
     private func detailText(for service: SonosServiceDescriptor) -> String? {
         switch service.kind {
         case .appleMusic:
-            switch model.appleMusicAuthorizationState.status {
-            case .authorized:
-                nil
-            case .requesting:
-                "Connecting..."
-            case .notDetermined:
-                nil
-            case .denied, .restricted, .unavailable:
-                model.appleMusicAuthorizationState.detail
-            }
+            model.appleMusicAuthorizationState.settingsDetail
         case .spotify:
             nil
         case .sonosRadio, .genericStreaming:

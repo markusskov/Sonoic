@@ -43,6 +43,10 @@ extension SonoicModel {
         sourceSearchSession.selectedServiceID = serviceID
     }
 
+    func resetSourceSearchSession() {
+        sourceSearchSession = SonoicSourceSearchSessionState()
+    }
+
     func updateSourceSearchQuery(_ query: String, for source: SonoicSource) {
         let currentState = sourceSearchState(for: source)
         let shouldPreserveResults = currentState.query.sonoicSearchCacheKey == query.sonoicSearchCacheKey

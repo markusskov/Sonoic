@@ -48,8 +48,8 @@ struct SourceItemDetailHeader: View {
             .frame(maxWidth: 260)
             .frame(maxWidth: .infinity, alignment: .center)
 
-            VStack(alignment: item.kind == .playlist ? .center : .leading, spacing: 6) {
-                if item.kind != .playlist {
+            VStack(alignment: headerAlignment, spacing: 6) {
+                if showsKindLabel {
                     Label(item.kind.title, systemImage: item.kind.systemImage)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -57,11 +57,11 @@ struct SourceItemDetailHeader: View {
 
                 Text(item.title)
                     .font(.largeTitle.weight(.bold))
-                    .multilineTextAlignment(item.kind == .playlist ? .center : .leading)
+                    .multilineTextAlignment(headerTextAlignment)
                     .lineLimit(3)
                     .minimumScaleFactor(0.72)
 
-                if item.kind != .playlist, let subtitle = item.subtitle {
+                if let subtitle = displayedSubtitle {
                     Text(subtitle)
                         .font(.title3)
                         .foregroundStyle(.secondary)
@@ -80,9 +80,36 @@ struct SourceItemDetailHeader: View {
             }
             .frame(
                 maxWidth: .infinity,
-                alignment: item.kind == .playlist ? .center : .leading
+                alignment: headerFrameAlignment
             )
         }
+    }
+
+    private var showsKindLabel: Bool {
+        item.kind != .playlist && item.kind != .artist
+    }
+
+    private var displayedSubtitle: String? {
+        guard item.kind != .playlist,
+              let subtitle = item.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !subtitle.isEmpty
+        else {
+            return nil
+        }
+
+        return subtitle.caseInsensitiveCompare(item.kind.title) == .orderedSame ? nil : subtitle
+    }
+
+    private var headerAlignment: HorizontalAlignment {
+        item.kind == .playlist ? .center : .leading
+    }
+
+    private var headerTextAlignment: TextAlignment {
+        item.kind == .playlist ? .center : .leading
+    }
+
+    private var headerFrameAlignment: Alignment {
+        item.kind == .playlist ? .center : .leading
     }
 }
 
