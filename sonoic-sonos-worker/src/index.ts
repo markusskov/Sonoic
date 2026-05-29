@@ -17,6 +17,7 @@ const textDecoder = new TextDecoder();
 
 type WorkerEnv = Env & {
 	SONOS_CLIENT_SECRET?: string;
+	BROKER_CODE_SIGNING_SECRET?: string;
 	SONOS_BROKER_CODE_REDEMPTIONS?: DurableObjectNamespace;
 	SONOIC_CLOUD_QUEUES?: DurableObjectNamespace;
 };
@@ -772,10 +773,17 @@ function isBrokerCodePayload(payload: unknown): payload is BrokerCodePayload {
 }
 
 async function hmacSignature(env: WorkerEnv, value: string): Promise<string> {
-	const secret = requiredEnv(env, 'SONOS_CLIENT_SECRET');
+	const secret = brokerCodeSigningSecret(env);
 	const key = await crypto.subtle.importKey('raw', textEncoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 	const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(value));
 	return base64URLEncode(new Uint8Array(signature));
+}
+
+function brokerCodeSigningSecret(env: WorkerEnv): string {
+	const dedicatedSecret = env.BROKER_CODE_SIGNING_SECRET;
+	return typeof dedicatedSecret === 'string' && dedicatedSecret.length > 0
+		? dedicatedSecret
+		: requiredEnv(env, 'SONOS_CLIENT_SECRET');
 }
 
 async function sha256Digest(value: string): Promise<string> {

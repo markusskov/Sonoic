@@ -72,6 +72,75 @@ describe('Sonos OAuth worker', () => {
 		);
 	});
 
+	it('signs broker codes with a dedicated signing secret when configured', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					access_token: 'access-1',
+					refresh_token: 'refresh-1',
+					token_type: 'Bearer',
+					expires_in: 3600,
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } },
+			),
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const localEnv = testEnv({ brokerCodeSigningSecret: 'broker-secret-1' });
+		const callbackRequest = new IncomingRequest(
+			'https://sonos.ryvus.app/oauth/sonos/callback?state=state-1&code=sonos-code',
+		);
+		const callbackContext = createExecutionContext();
+		const callbackResponse = await worker.fetch(callbackRequest, localEnv, callbackContext);
+		await waitOnExecutionContext(callbackContext);
+		const location = new URL(callbackResponse.headers.get('location') ?? '');
+		const brokerCode = location.searchParams.get('broker_code');
+		const tokenRequest = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				code: brokerCode,
+				state: 'state-1',
+				redirect_uri: env.SONOS_REDIRECT_URI,
+			}),
+		});
+		const tokenContext = createExecutionContext();
+
+		const response = await worker.fetch(tokenRequest, localEnv, tokenContext);
+		await waitOnExecutionContext(tokenContext);
+
+		expect(response.status).toBe(200);
+		await expect(response.json()).resolves.toMatchObject({
+			access_token: 'access-1',
+			refresh_token: 'refresh-1',
+		});
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
+	it('rejects client-secret signed broker codes when a dedicated signing secret is configured', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+
+		const brokerCode = await makeBrokerCode('sonos-code', 'state-1');
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				code: brokerCode,
+				state: 'state-1',
+				redirect_uri: env.SONOS_REDIRECT_URI,
+			}),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv({ brokerCodeSigningSecret: 'broker-secret-1' }), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(400);
+		await expect(response.json()).resolves.toMatchObject({ error: 'invalid_broker_code' });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
 	it('rejects replayed broker codes before calling Sonos again', async () => {
 		const fetchMock = vi.fn().mockResolvedValue(
 			new Response(
@@ -489,10 +558,14 @@ describe('Sonoic Cloud Queue worker', () => {
 	});
 });
 
-function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
+function testEnv(options: { brokerCodeSigningSecret?: string } = {}): Env & {
+	SONOS_CLIENT_SECRET: string;
+	BROKER_CODE_SIGNING_SECRET?: string;
+} {
 	return {
 		...env,
 		SONOS_CLIENT_SECRET: 'secret-1',
+		BROKER_CODE_SIGNING_SECRET: options.brokerCodeSigningSecret,
 		SONOS_BROKER_CODE_REDEMPTIONS: makeRedemptionNamespace(),
 	};
 }
