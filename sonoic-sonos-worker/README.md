@@ -33,8 +33,9 @@ npm test
 npm run deploy
 ```
 
-After deploy, verify:
+After deploy, verify your Worker route. The project deployment currently uses
+`https://sonos.ryvus.app`, but forks should use their own route.
 
 ```bash
-curl https://sonos.ryvus.app/healthz
+curl https://<your-worker-route>/healthz
 ```

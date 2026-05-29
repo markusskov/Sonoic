@@ -31,11 +31,14 @@ Deploy:
 npm run deploy
 ```
 
-The Worker is routed to:
+The project Worker is currently routed to:
 
 ```text
 https://sonos.ryvus.app
 ```
+
+Forks or independent deployments should replace this with their own Worker
+route in Cloudflare, the Sonos Developer Portal, and local Xcode settings.
 
 Health check:
 

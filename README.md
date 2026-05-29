@@ -1,163 +1,122 @@
 # Sonoic
 
-Sonoic is an iPhone-first Sonos controller focused on fast everyday control, especially for the current active room or group.
+Sonoic is an iPhone-first Sonos controller focused on fast, honest control of the active room or group.
 
-The app is being built as a local-first Sonos hub rather than a generic music client. The near-term goal is simple: make playback and sound control faster, clearer, and more dependable than the current default experience.
+The app is cloud-first for everyday Sonos control. The Sonos Control API owns normal playback, seek, now-playing refresh, volume, mute, and cloud queue playback. LAN control is kept as a small, explicit island for discovery, manual local mode, diagnostics, and tuning surfaces that the cloud path does not cover well enough yet.
 
 ## Status
 
-Sonoic is still an early work-in-progress, but the core Sonos control experience is now real across playback, rooms, queue, Home, and home theater controls.
+Sonoic is an early work-in-progress, but the core controller shape is real.
 
 What works today:
 
 - iPhone app shell with `Home`, `Rooms`, `Queue`, and `Settings`
-- `Home` showing real Sonos favorites, collections, recently played items, now-playing context, and a sources row
-- real bottom mini-player and expandable player sheet
-- local network discovery for nearby Sonos players
-- room and group selection from discovered household topology
-- real room naming and bonded home theater member details for the selected player
-- `Rooms` tab showing the current room or group, discovered groups, room list, discovery state, and home theater entry point
-- `Queue` tab showing the active Sonos queue with current-item highlighting, tap-to-play, clear, remove, and reorder
-- `Settings` with quiet everyday configuration, manual connection fallback, and Advanced diagnostics
-- real local `play/pause`, `next`, `previous`, `mute`, seek, and volume commands
-- real now-playing metadata, artwork, source attribution, and progress reads
-- manual playback transition smoothing so Sonoic waits for Sonos confirmation before advancing app-owned progress
-- shared parser/transport test target for core Sonos parsing behavior
-- widget backed by shared app state
-- native Apple now-playing integration with play/pause, next/previous, artwork, progress, and lock-screen scrubbing when Sonos exposes duration
-- home theater controls for EQ, sub level, speech enhancement, and night sound
-- shared source browsing surface with Apple Music as the first live adapter, multi-source search state, saved library lanes, recently added items, grouped search results, and shared artist/album/playlist detail pages
-- explicit service playback capability labels so metadata-only service items are not presented as Sonos-playable
+- Sonos OAuth through a Cloudflare Worker token broker so the iOS app does not ship the Sonos client secret
+- Sonos Control API command path for play, pause, next, previous, seek, group/player volume, mute, now-playing, favorites, playlists, and cloud queue playback
+- local discovery/bootstrap for nearby Sonos players and manual local mode for advanced LAN-only behavior
+- real mini-player, expandable player sheet, queue inspection/editing, room selection, group awareness, volume controls, and home theater tuning
+- shared app/widget state with artwork caching
+- native Apple now-playing integration for Lock Screen and Control Center controls when Sonos exposes enough metadata
+- Apple Music as the first live source adapter for metadata, library/search/browse surfaces, and Sonos-owned playback payload research
 - RevenueCat-backed Sonoic Plus foundation for future support and personalization features
+- focused Swift tests around Sonos Control API, cloud queue context, Apple Music payload generation, shared artwork storage, and cloud-first state invariants
 
-What is still in progress:
+Still in progress:
 
-- actual Sonoic Plus personalization features such as themes, alternate icons, Home ordering, widgets, and room presets
-- stable Lock Screen / Control Center ownership through Apple’s native now-playing surfaces
-- Sonos-native playback payloads for more Apple Music catalog and library items
-- live adapters for Spotify, Tidal, Sonos Radio, SoundCloud, and other source destinations
-- queue-derived flows from `Home`
-- broader home theater validation across more Sonos products
-- App Intents, shortcuts, and richer outside-app entry points
+- broader real-device validation across Sonos households and home theater products
+- more reliable Apple Music catalog/library playback coverage through Sonos-owned payloads and cloud queues
+- App Intents, shortcuts, widgets, and deeper outside-app entry points
+- additional source adapters such as Spotify, Tidal, Sonos Radio, and SoundCloud
+- actual Sonoic Plus personalization features such as themes, app icons, Home ordering, widget styles, and room presets
 
 ## Product Direction
 
-Sonoic is intentionally narrow.
+Sonoic is intentionally narrow:
 
-- It is local-first.
-- It targets Sonos households, not arbitrary speakers.
-- It starts with one real household and expands only when a feature proves its value.
-- It prioritizes fast control of the active room over broad browsing features.
+- Sonos is the audio owner.
+- Cloud commands are the normal control path.
+- LAN behavior is explicit, not a hidden fallback.
+- The active room or group matters more than broad music-client features.
+- Stale or unavailable state should be visible instead of disguised as fresh state.
 
-The current MVP direction is outside-app control for the active target:
+The near-term product goal is to make everyday control of one real Sonos household feel faster and clearer than the default experience.
 
-- Lock Screen and Control Center playback controls
-- reliable `play/pause`, `next`, `previous`, and scrubbing
-- fast volume and mute access
-- clear stale or unavailable state when Sonoic cannot confirm fresh data
-
-## Architecture
-
-The codebase follows the spirit of Apple’s modern SwiftUI sample apps: direct, feature-shaped, and intentionally light on abstraction.
-
-Principles:
-
-- keep one clear top-level app model until the code proves otherwise
-- use typed environment injection instead of generic service containers
-- organize by feature and screen, not by abstract layers
-- keep helper views and helpers narrow
-- prefer modern SwiftUI APIs only when they improve clarity
-- avoid protocol-heavy or manager-heavy scaffolding before it is needed
-
-Top-level structure:
+## Repository Shape
 
 ```text
-SonoicShared/
-  Model/
-  Sonos/
-  Storage/
-
 SonoicApp/
-  App/
-  Model/
-  Views/
-    Home/
-    Player/
-    Queue/
-    Root/
-    Rooms/
-    Settings/
-    Shared/
+  App/       app entry, scene wiring, background refresh hooks
+  Model/     app state, source browsing, command orchestration
+  Views/     SwiftUI surfaces organized by feature
+
+SonoicShared/
+  Model/     data snapshots shared across app and widget targets
+  Sonos/     Sonos clients, parsers, Control API models, queue helpers
+  Storage/   App Group shared state and artwork storage
+
+SonoicWidgets/
+  widget views and widget state loading
+
+sonoic-sonos-worker/
+  Cloudflare Worker token broker for Sonos OAuth
+
+docs/
+  public project docs, roadmap, reliability, security, and setup notes
 ```
+
+For more detail, read [ARCHITECTURE.md](ARCHITECTURE.md) and the [docs index](docs/README.md).
 
 ## Running The App
 
 Requirements:
 
-- latest Xcode with Swift 6.3 support
+- Xcode with Swift 6.3 support
 - an iPhone or simulator build environment
-- a Sonos player reachable on the same local network for the real control path
+- a Sonos household for real device validation
+- a Sonos Control API integration for cloud control
 
 Before running on your own Apple developer account:
 
 1. Open `Sonoic.xcodeproj` in Xcode.
 2. Update signing for the app and widget targets.
-3. Replace the current bundle identifiers and App Group identifier with your own namespace.
-4. If you change the App Group or bundle namespace, update the matching identifiers in:
-   - `SonoicApp/Sonoic.entitlements`
-   - `SonoicWidgetsExtension.entitlements`
-   - `SonoicShared/Storage/SonoicSharedStore.swift`
-   - `SonoicApp/App/SonoicBackgroundRefresh.swift`
-   - `SonoicApp/Info.plist`
-5. Run the app on a device connected to the same local network as your Sonos household.
+3. Replace bundle identifiers and App Group identifiers with your own namespace.
+4. Configure Sonos OAuth using [docs/sonos-oauth-dev-setup.md](docs/sonos-oauth-dev-setup.md).
+5. Run on a device connected to the same local network as your Sonos household.
 6. Open `Rooms`, allow local-network access, and choose a discovered player or group.
 
 Notes:
 
-- Sonoic uses Bonjour discovery first and keeps manual host entry as a fallback in `Settings`.
-- `Home` is now a music hub for favorites, collections, recent plays, sources, and the current session. Source browsing uses shared artist/album/playlist routes, with Apple Music as the first live catalog adapter while playback stays Sonos-owned.
-- `Rooms` can show discovered rooms, current groups, selected target state, bonded home theater setup, and home theater controls.
-- `Queue` can inspect, jump, clear, remove, and reorder the active Sonos queue. Adding new queue items from arbitrary services is still future work.
-- `Settings` keeps everyday configuration quiet, with fallback connection and diagnostics available from Advanced.
-- The app requests local-network access because Sonos control currently happens over the LAN.
-- The app requests Apple Music access for metadata and service browsing. Sonoic does not use MusicKit app-owned playback as the main path because Sonos should remain the audio owner.
+- The app requests local-network access for discovery, diagnostics, manual local mode, and local-only tuning controls.
+- The app requests Apple Music access for metadata and service browsing. Sonoic does not use MusicKit app-owned playback as its main play path.
 - Sonoic Plus uses RevenueCat. To preview the paywall path, add a `RevenueCatAPIKey` bundle value and keep the Plus entitlement identifier as `plus`, or override it with `SonoicPlusEntitlementIdentifier`.
-- Lock Screen and Control Center support depend on what Sonos exposes for the current source, especially duration, progress, and queue ownership.
+- Lock Screen and Control Center support depend on what Sonos exposes for the current source, especially duration, progress, item identity, and queue ownership.
 
-## Development Roadmap
+## Development
 
-The public development roadmap lives in [plan.md](plan.md).
+Useful commands:
 
-Agent-facing project context starts in [AGENTS.md](AGENTS.md). The harness setup and docs map live in [docs/agent-harness.md](docs/agent-harness.md).
+```sh
+python3 scripts/agent_harness_check.py
+xcodebuild -project Sonoic.xcodeproj -scheme Sonoic -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+```
 
-The short version:
+Start with:
 
-1. finish the native now-playing path cleanly
-2. validate discovery, queue, Home, and home theater controls on more real Sonos households
-3. expand shared source browsing into Sonos-native playback payload research and additional service adapters
-4. add App Intents, shortcuts, and deeper outside-app entry points
+- [CONTRIBUTING.md](CONTRIBUTING.md) for contribution and PR expectations
+- [ARCHITECTURE.md](ARCHITECTURE.md) for dependency rules and control-plane boundaries
+- [docs/ROADMAP.md](docs/ROADMAP.md) for current priorities
+- [AGENTS.md](AGENTS.md) for AI-assisted contributor guidance
 
 ## Open Source Notes
 
-Sonoic is being prepared for open-source development, but the repository is still settling into its public shape.
+Sonoic is being prepared for open-source development, but the public baseline is still settling.
 
 That currently means:
 
 - the code is real and buildable
-- the docs now describe the project for contributors rather than for internal handoff
-- the repo is being cleaned up to avoid tracking personal Xcode state
+- public docs should describe product direction, setup, architecture, and validation
+- internal working-memory docs should stay out of the public tree unless they are useful to outside contributors
 - a public license has not been chosen yet
-
-## Contributing
-
-Contributions are welcome once the repo settles into a stable public baseline.
-
-For now:
-
-- start with [CONTRIBUTING.md](CONTRIBUTING.md)
-- keep pull requests focused and incremental
-- prefer real vertical slices over broad “foundation” rewrites
-- preserve the simple feature-first structure unless there is a clear reason to change it
 
 ## Disclaimer
 
