@@ -1,5 +1,11 @@
 import SwiftUI
 
+private enum SourcePlaylistPendingAction {
+    case shuffle
+    case play
+    case favorite
+}
+
 struct SourcePlaylistActionRow: View {
     let isFavorite: Bool
     var canShuffle = true
@@ -7,13 +13,12 @@ struct SourcePlaylistActionRow: View {
     let shuffle: () async -> Void
     let play: () async -> Void
     let favorite: () async -> Void
+    @State private var pendingAction: SourcePlaylistPendingAction?
 
     var body: some View {
         HStack(spacing: 14) {
             Button {
-                Task {
-                    await shuffle()
-                }
+                run(.shuffle, operation: shuffle)
             } label: {
                 Image(systemName: "shuffle")
                     .font(.title3.weight(.semibold))
@@ -21,14 +26,13 @@ struct SourcePlaylistActionRow: View {
             }
             .buttonStyle(.plain)
             .glassEffect(.regular.interactive(), in: Circle())
+            .sonoicCommandPulse(isActive: pendingAction == .shuffle, cornerRadius: 27)
             .disabled(!canShuffle)
             .opacity(canShuffle ? 1 : 0.42)
             .accessibilityLabel("Shuffle")
 
             Button {
-                Task {
-                    await play()
-                }
+                run(.play, operation: play)
             } label: {
                 Label("Play", systemImage: "play.fill")
                     .font(.headline.weight(.semibold))
@@ -37,13 +41,12 @@ struct SourcePlaylistActionRow: View {
             }
             .buttonStyle(.plain)
             .glassEffect(.regular.interactive(), in: .capsule)
+            .sonoicCommandPulse(isActive: pendingAction == .play, cornerRadius: 27)
             .accessibilityLabel("Play")
 
             if canFavorite {
                 Button {
-                    Task {
-                        await favorite()
-                    }
+                    run(.favorite, operation: favorite)
                 } label: {
                     Image(systemName: isFavorite ? "heart.fill" : "heart")
                         .font(.title3.weight(.semibold))
@@ -51,7 +54,23 @@ struct SourcePlaylistActionRow: View {
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive(), in: Circle())
+                .sonoicCommandPulse(isActive: pendingAction == .favorite, cornerRadius: 27)
                 .accessibilityLabel(isFavorite ? "Saved to Sonos Favorites" : "Save to Sonos Favorites")
+            }
+        }
+    }
+
+    private func run(_ action: SourcePlaylistPendingAction, operation: @escaping () async -> Void) {
+        pendingAction = action
+
+        Task {
+            await operation()
+            try? await Task.sleep(for: .milliseconds(160))
+
+            await MainActor.run {
+                if pendingAction == action {
+                    pendingAction = nil
+                }
             }
         }
     }
@@ -85,13 +104,10 @@ struct SourcePlaylistActionSkeletonRow: View {
 
 struct SourceItemActionCard: View {
     let play: () async -> Void
+    @State private var isPending = false
 
     var body: some View {
-        Button {
-            Task {
-                await play()
-            }
-        } label: {
+        Button(action: playTapped) {
             Label("Play", systemImage: "play.fill")
                 .font(.headline.weight(.semibold))
                 .frame(maxWidth: .infinity)
@@ -99,6 +115,20 @@ struct SourceItemActionCard: View {
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .capsule)
+        .sonoicCommandPulse(isActive: isPending, cornerRadius: 27)
         .accessibilityLabel("Play")
+    }
+
+    private func playTapped() {
+        isPending = true
+
+        Task {
+            await play()
+            try? await Task.sleep(for: .milliseconds(160))
+
+            await MainActor.run {
+                isPending = false
+            }
+        }
     }
 }

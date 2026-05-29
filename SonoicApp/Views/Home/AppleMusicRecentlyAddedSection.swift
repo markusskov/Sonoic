@@ -45,7 +45,7 @@ struct AppleMusicRecentlyAddedSection: View {
 
             if let failureDetail = state.failureDetail {
                 SourceMessageCard(
-                    title: "Showing Cached Recently Added",
+                    title: "Recently Added",
                     detail: sourceStaleDetail(failureDetail, lastUpdatedAt: state.lastUpdatedAt),
                     systemImage: "exclamationmark.triangle"
                 )

@@ -64,8 +64,12 @@ extension SonoicModel {
             return .unavailable
         }
 
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return hasSonosControlAPICommandTarget ? .ready : .unavailable
+        }
+
         guard hasManualSonosHost else {
-            return sonosControlAPIState.canSendCommands ? .ready : .unavailable
+            return .unavailable
         }
 
         switch manualHostRefreshStatus {
@@ -196,15 +200,34 @@ extension SonoicModel {
     }
 
     private func shouldReloadWidgetTimelines(for state: SonoicExternalControlState) -> Bool {
-        let widgetPresentation = state.widgetPresentation
+        let widgetTimelinePresentation = state.widgetTimelinePresentation
         defer {
-            lastReloadedWidgetPresentation = widgetPresentation
+            lastReloadedWidgetTimelinePresentation = widgetTimelinePresentation
         }
 
-        return lastReloadedWidgetPresentation != widgetPresentation
+        return lastReloadedWidgetTimelinePresentation != widgetTimelinePresentation
     }
 
     private var externalControlStateUpdatedAt: Date {
+        if sonosControlAPIState.settings.mode.canSendCommands {
+            return cloudExternalControlStateUpdatedAt
+        }
+
+        return manualExternalControlStateUpdatedAt
+    }
+
+    private var cloudExternalControlStateUpdatedAt: Date {
+        [
+            sonosControlAPIState.lastUpdatedAt,
+            manualHostRefreshStatus.updatedAt,
+            manualHostLastSuccessfulRefreshAt,
+            nowPlayingObservedAt
+        ]
+        .compactMap { $0 }
+        .max() ?? nowPlayingObservedAt
+    }
+
+    private var manualExternalControlStateUpdatedAt: Date {
         switch manualHostRefreshStatus {
         case .updated(let updatedAt):
             return updatedAt

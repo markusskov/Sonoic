@@ -7,6 +7,7 @@ struct SearchInputCard: View {
     let isSearching: Bool
     let hasQuery: Bool
     let submit: () -> Void
+    let exitSearchMode: () -> Void
     @FocusState private var fieldIsFocused: Bool
 
     var body: some View {
@@ -28,13 +29,17 @@ struct SearchInputCard: View {
             .frame(height: 56)
             .frame(maxWidth: .infinity)
             .background(.quaternary.opacity(0.38), in: Capsule())
+            .contentShape(Capsule())
+            .onTapGesture {
+                focusSearchField()
+            }
             .overlay {
                 Capsule()
                     .strokeBorder(fieldIsFocused ? Color.accentColor.opacity(0.65) : Color.white.opacity(0.08), lineWidth: 1)
             }
 
             if fieldIsFocused || query.sonoicNonEmptyTrimmed != nil {
-                Button(action: clearQuery) {
+                Button(action: clearOrExitSearch) {
                     Image(systemName: "xmark")
                         .font(.body.weight(.semibold))
                         .frame(width: 48, height: 48)
@@ -49,8 +54,8 @@ struct SearchInputCard: View {
             isFocused = newValue
         }
         .onChange(of: isFocused) { _, newValue in
-            if !newValue {
-                fieldIsFocused = false
+            if fieldIsFocused != newValue {
+                fieldIsFocused = newValue
             }
         }
     }
@@ -74,8 +79,20 @@ struct SearchInputCard: View {
         }
     }
 
-    private func clearQuery() {
-        query = ""
+    private func focusSearchField() {
+        fieldIsFocused = true
+        isFocused = true
+    }
+
+    private func clearOrExitSearch() {
+        if query.sonoicNonEmptyTrimmed != nil {
+            query = ""
+            focusSearchField()
+        } else {
+            fieldIsFocused = false
+            isFocused = false
+            exitSearchMode()
+        }
     }
 }
 

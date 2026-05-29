@@ -56,9 +56,9 @@ struct SettingsSonosMusicServiceProbeSection: View {
     private var statusDetail: String? {
         switch model.sonosMusicServiceProbeState.status {
         case .idle:
-            "Reads Sonos music services and accounts."
+            "Checks music services and accounts."
         case .loading:
-            "Reading local Sonos service setup."
+            "Refreshing service setup."
         case .loaded:
             nil
         case .failed(let detail):
@@ -166,9 +166,9 @@ struct SettingsSonosContentDirectoryProbeSection: View {
     private var statusDetail: String? {
         switch model.sonosContentDirectoryProbeState.status {
         case .idle:
-            "Browses Sonos content containers."
+            "Checks content containers."
         case .loading:
-            "Reading local Sonos content."
+            "Refreshing content."
         case .loaded:
             nil
         case .failed(let detail):

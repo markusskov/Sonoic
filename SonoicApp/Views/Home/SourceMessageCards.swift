@@ -66,7 +66,7 @@ struct SourceCatalogPlaceholderCard: View {
 func sourceStaleDetail(
     _ failureDetail: String,
     lastUpdatedAt: Date?,
-    prefix: String = "Last successful load was"
+    prefix: String = "Last updated"
 ) -> String {
     guard let lastUpdatedAt else {
         return failureDetail

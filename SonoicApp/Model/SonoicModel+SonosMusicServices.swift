@@ -2,9 +2,19 @@ import Foundation
 
 extension SonoicModel {
     func refreshSonosMusicServiceProbeIfNeeded() async {
-        guard sonosMusicServiceProbeState.snapshot == nil,
-              sonosMusicServiceProbeState.status != .loading
-        else {
+        guard sonosMusicServiceProbeState.status != .loading else {
+            return
+        }
+
+        if let snapshot = sonosMusicServiceProbeState.snapshot {
+            let enrichedSnapshot = snapshot.includingObservedAccounts(from: observedSonosServiceAccountValues)
+            if enrichedSnapshot != snapshot {
+                sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+                    status: sonosMusicServiceProbeState.status,
+                    snapshot: enrichedSnapshot
+                )
+            }
+
             return
         }
 

@@ -20,6 +20,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         let candidate = try #require(candidates.first { $0.strategy == .catalogHLS })
 
         #expect(candidate.isUserPlayable)
+        #expect(candidate.isQueuePlayable)
         #expect(candidate.serialNumber == "3")
         #expect(candidate.uri == "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3")
         #expect(candidate.metadataXML.contains("<dc:title>Sweet Jane</dc:title>"))
@@ -36,6 +37,25 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
     }
 
     @Test
+    func encodesCatalogIDsAndSerialsInGeneratedURIs() throws {
+        let item = appleMusicSong(catalogID: "song id/1&2", libraryID: nil)
+        let candidates = probe.candidates(
+            for: item,
+            playbackHint: SonosMusicServicePlaybackHint(
+                launchSerials: ["A&B 7"],
+                trackSerials: []
+            )
+        )
+
+        let candidate = try #require(candidates.first { $0.strategy == .catalogHLS })
+
+        #expect(candidate.serialNumber == "A&B 7")
+        #expect(candidate.uri == "x-sonosapi-hls:song%3asong%20id%2F1%262?sid=204&sn=A%26B%207")
+        #expect(candidate.metadataXML.contains("id=\"song:song id/1&amp;2\""))
+        #expect(candidate.metadataXML.contains("x-sonosapi-hls:song%3asong%20id%2F1%262?sid=204&amp;sn=A%26B%207"))
+    }
+
+    @Test
     func buildsStaticCatalogCandidateFromTrackSerialForDiagnostics() throws {
         let item = appleMusicSong(catalogID: "1440857781", libraryID: nil)
         let candidates = probe.candidates(
@@ -49,6 +69,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         let candidate = try #require(candidates.first { $0.strategy == .catalogStaticHLS })
 
         #expect(!candidate.isUserPlayable)
+        #expect(candidate.isQueuePlayable)
         #expect(candidate.serialNumber == "7")
         #expect(candidate.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
     }
@@ -67,6 +88,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         let candidate = try #require(candidates.first { $0.strategy == .libraryTrack })
 
         #expect(!candidate.isUserPlayable)
+        #expect(candidate.isQueuePlayable)
         #expect(candidate.serialNumber == "7")
         #expect(candidate.uri == "x-sonos-http:librarytrack%3ai.BOVNeOxU6BVbp8.m4p?sid=204&flags=8232&sn=7")
         #expect(candidate.metadataXML.contains("librarytrack:i.BOVNeOxU6BVbp8"))
@@ -128,6 +150,7 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
         let candidate = try #require(candidates.first { $0.strategy == .catalogPlaylistContainer })
 
         #expect(candidate.isUserPlayable)
+        #expect(!candidate.isQueuePlayable)
         #expect(candidate.serialNumber == "3")
         #expect(candidate.uri == "x-rincon-cpcontainer:1006206cplaylist%3ap.abc123?sid=204&flags=8300&sn=3")
         #expect(candidate.metadataXML.contains("<container id=\"playlist:p.abc123\""))
@@ -137,6 +160,29 @@ struct SonoicAppleMusicSonosPayloadProbeTests {
 
         let payload = candidate.playbackPayload(for: item)
         #expect(payload.kind == .collection)
+    }
+
+    @Test
+    func queueCandidateIgnoresPlaylistContainers() {
+        let item = SonoicSourceItem.appleMusicMetadata(
+            id: "p.abc123",
+            title: "Road Songs",
+            subtitle: "Apple Music",
+            artworkURL: nil,
+            kind: .playlist,
+            origin: .catalogSearch,
+            catalogID: "p.abc123"
+        )
+
+        let candidate = probe.queueCandidate(
+            for: item,
+            playbackHint: SonosMusicServicePlaybackHint(
+                launchSerials: ["3"],
+                trackSerials: ["7"]
+            )
+        )
+
+        #expect(candidate == nil)
     }
 
     @Test

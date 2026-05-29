@@ -11,38 +11,11 @@ struct SonosMusicServiceProbeStateTests {
             observedAt: Date(timeIntervalSince1970: 0),
             serviceListVersion: "123",
             services: [
-                SonosMusicServiceDescriptor(
-                    id: "204",
-                    name: "Apple Music",
-                    uri: nil,
-                    secureURI: "https://apple.example/ws",
-                    containerType: nil,
-                    capabilities: nil,
-                    authPolicy: "AppLink",
-                    presentationMapURI: nil,
-                    stringsURI: nil
-                ),
-                SonosMusicServiceDescriptor(
-                    id: "9",
-                    name: "Spotify",
-                    uri: nil,
-                    secureURI: "https://spotify.example/ws",
-                    containerType: nil,
-                    capabilities: nil,
-                    authPolicy: "OAuth",
-                    presentationMapURI: nil,
-                    stringsURI: nil
-                ),
+                appleMusicDescriptor(secureURI: "https://apple.example/ws", authPolicy: "AppLink"),
+                spotifyDescriptor(secureURI: "https://spotify.example/ws", authPolicy: "OAuth"),
             ],
             accounts: [
-                SonosMusicServiceAccountSummary(
-                    serviceType: "52231",
-                    serialNumber: "7",
-                    nickname: nil,
-                    hasUsername: true,
-                    hasOAuthDeviceID: true,
-                    hasKey: true
-                ),
+                appleMusicAccount(serialNumber: "7"),
             ]
         )
 
@@ -58,24 +31,7 @@ struct SonosMusicServiceProbeStateTests {
 
     @Test("infers account serials from Sonos playback URIs")
     func infersAccountsFromPlaybackURIs() throws {
-        let snapshot = SonosMusicServiceProbeSnapshot(
-            observedAt: Date(timeIntervalSince1970: 0),
-            serviceListVersion: nil,
-            services: [
-                SonosMusicServiceDescriptor(
-                    id: "204",
-                    name: "Apple Music",
-                    uri: nil,
-                    secureURI: nil,
-                    containerType: nil,
-                    capabilities: nil,
-                    authPolicy: nil,
-                    presentationMapURI: nil,
-                    stringsURI: nil
-                ),
-            ],
-            accounts: []
-        ).includingObservedAccounts(from: [
+        let snapshot = appleMusicSnapshot().includingObservedAccounts(from: [
             "x-sonos-http:librarytrack%3aabc.m4p?sid=204&flags=8232&sn=7",
             "x-rincon-cpcontainer:1006206cplaylist%3aabc?sid=204&amp;flags=8300&amp;sn=7",
         ])
@@ -91,24 +47,7 @@ struct SonosMusicServiceProbeStateTests {
 
     @Test("labels observed account origins")
     func labelsObservedAccountOrigins() throws {
-        let snapshot = SonosMusicServiceProbeSnapshot(
-            observedAt: Date(timeIntervalSince1970: 0),
-            serviceListVersion: nil,
-            services: [
-                SonosMusicServiceDescriptor(
-                    id: "204",
-                    name: "Apple Music",
-                    uri: nil,
-                    secureURI: nil,
-                    containerType: nil,
-                    capabilities: nil,
-                    authPolicy: nil,
-                    presentationMapURI: nil,
-                    stringsURI: nil
-                ),
-            ],
-            accounts: []
-        ).includingObservedAccounts(from: [
+        let snapshot = appleMusicSnapshot().includingObservedAccounts(from: [
             SonosMusicServiceObservedValue(
                 value: "x-sonos-http:librarytrack%3aabc.m4p?sid=204&flags=8232&sn=7",
                 origin: .trackURI
@@ -124,26 +63,35 @@ struct SonosMusicServiceProbeStateTests {
         #expect(appleMusic.accounts.first?.redactedDetail == "sn 7 · track URI · saved item URI")
     }
 
+    @Test("merges observed origins into matching status account")
+    func mergesObservedOriginsIntoMatchingStatusAccount() throws {
+        let snapshot = appleMusicSnapshot(
+            accounts: [
+                appleMusicAccount(serialNumber: "7"),
+            ]
+        ).includingObservedAccounts(from: [
+            SonosMusicServiceObservedValue(
+                value: "x-rincon-cpcontainer:1006206cplaylist%3aabc?sid=204&flags=8300&sn=7",
+                origin: .currentURI
+            ),
+            SonosMusicServiceObservedValue(
+                value: "x-sonos-http:librarytrack%3aabc.m4p?sid=204&flags=8232&sn=7",
+                origin: .trackURI
+            ),
+        ])
+
+        let appleMusic = try #require(snapshot.knownServiceRows.first { $0.service == .appleMusic })
+        let account = try #require(appleMusic.accounts.first)
+
+        #expect(appleMusic.statusTitle == "Ready")
+        #expect(appleMusic.accounts.count == 1)
+        #expect(account.hasStatusAccount)
+        #expect(account.redactedDetail == "sn 7 · user · oauth device · key · current URI · track URI")
+    }
+
     @Test("summarizes playback account hints")
     func summarizesPlaybackAccountHints() throws {
-        let snapshot = SonosMusicServiceProbeSnapshot(
-            observedAt: Date(timeIntervalSince1970: 0),
-            serviceListVersion: nil,
-            services: [
-                SonosMusicServiceDescriptor(
-                    id: "204",
-                    name: "Apple Music",
-                    uri: nil,
-                    secureURI: nil,
-                    containerType: nil,
-                    capabilities: nil,
-                    authPolicy: nil,
-                    presentationMapURI: nil,
-                    stringsURI: nil
-                ),
-            ],
-            accounts: []
-        ).includingObservedAccounts(from: [
+        let snapshot = appleMusicSnapshot().includingObservedAccounts(from: [
             SonosMusicServiceObservedValue(
                 value: "x-rincon-cpcontainer:1006206cplaylist%3aabc?sid=204&flags=8300&sn=3",
                 origin: .currentURI
@@ -168,20 +116,66 @@ struct SonosMusicServiceProbeStateTests {
 
     @Test("service type derives from Sonos service id")
     func serviceTypeDerivesFromServiceID() {
-        let appleMusic = SonosMusicServiceDescriptor(
-            id: "204",
-            name: "Apple Music",
-            uri: nil,
-            secureURI: nil,
-            containerType: nil,
-            capabilities: nil,
-            authPolicy: nil,
-            presentationMapURI: nil,
-            stringsURI: nil
-        )
+        let appleMusic = appleMusicDescriptor()
 
         #expect(appleMusic.serviceType == "52231")
         #expect(SonosServiceDescriptor.appleMusic.sonosServiceType == "52231")
         #expect(SonosServiceDescriptor.spotify.sonosServiceType == "2311")
+    }
+
+    private func appleMusicSnapshot(
+        accounts: [SonosMusicServiceAccountSummary] = []
+    ) -> SonosMusicServiceProbeSnapshot {
+        SonosMusicServiceProbeSnapshot(
+            observedAt: Date(timeIntervalSince1970: 0),
+            serviceListVersion: nil,
+            services: [appleMusicDescriptor()],
+            accounts: accounts
+        )
+    }
+
+    private func appleMusicDescriptor(
+        secureURI: String? = nil,
+        authPolicy: String? = nil
+    ) -> SonosMusicServiceDescriptor {
+        SonosMusicServiceDescriptor(
+            id: "204",
+            name: "Apple Music",
+            uri: nil,
+            secureURI: secureURI,
+            containerType: nil,
+            capabilities: nil,
+            authPolicy: authPolicy,
+            presentationMapURI: nil,
+            stringsURI: nil
+        )
+    }
+
+    private func spotifyDescriptor(
+        secureURI: String? = nil,
+        authPolicy: String? = nil
+    ) -> SonosMusicServiceDescriptor {
+        SonosMusicServiceDescriptor(
+            id: "9",
+            name: "Spotify",
+            uri: nil,
+            secureURI: secureURI,
+            containerType: nil,
+            capabilities: nil,
+            authPolicy: authPolicy,
+            presentationMapURI: nil,
+            stringsURI: nil
+        )
+    }
+
+    private func appleMusicAccount(serialNumber: String) -> SonosMusicServiceAccountSummary {
+        SonosMusicServiceAccountSummary(
+            serviceType: "52231",
+            serialNumber: serialNumber,
+            nickname: nil,
+            hasUsername: true,
+            hasOAuthDeviceID: true,
+            hasKey: true
+        )
     }
 }

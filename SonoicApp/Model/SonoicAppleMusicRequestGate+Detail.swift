@@ -82,7 +82,7 @@ extension SonoicMusicKitRequestGate {
         return AppleMusicItemMetadataSection(
             id: "albums",
             title: "Albums",
-            subtitle: "\(albums.count) albums",
+            subtitle: nil,
             items: albums
         )
     }

@@ -45,9 +45,21 @@ struct SonoicSharedArtworkStore {
             throw StoreError.unavailableAppGroup(SonoicSharedStore.appGroupIdentifier)
         }
 
+        try self.init(
+            fileManager: fileManager,
+            transport: transport,
+            artworkDirectoryURL: containerURL.appendingPathComponent("Artwork", isDirectory: true)
+        )
+    }
+
+    nonisolated init(
+        fileManager: FileManager = .default,
+        transport: SonosControlTransport = SonosControlTransport(),
+        artworkDirectoryURL: URL
+    ) throws {
         self.fileManager = fileManager
         self.transport = transport
-        artworkDirectoryURL = containerURL.appendingPathComponent("Artwork", isDirectory: true)
+        self.artworkDirectoryURL = artworkDirectoryURL
 
         if !fileManager.fileExists(atPath: artworkDirectoryURL.path()) {
             try fileManager.createDirectory(at: artworkDirectoryURL, withIntermediateDirectories: true)
@@ -77,7 +89,7 @@ struct SonoicSharedArtworkStore {
             throw StoreError.invalidResponse
         }
 
-        try validateArtworkPayload(payload)
+        try Self.validateArtworkPayload(payload)
 
         let fileURL = artworkDirectoryURL.appending(
             path: fileName(
@@ -110,7 +122,7 @@ struct SonoicSharedArtworkStore {
     }
 
     nonisolated private func preferredPathExtension(for remoteURL: URL, contentType: String?) -> String {
-        if let mappedExtension = fileExtension(for: contentType) {
+        if let mappedExtension = Self.fileExtension(for: contentType) {
             return mappedExtension
         }
 
@@ -121,7 +133,7 @@ struct SonoicSharedArtworkStore {
         return "img"
     }
 
-    nonisolated private func fileExtension(for contentType: String?) -> String? {
+    nonisolated private static func fileExtension(for contentType: String?) -> String? {
         guard let contentType = contentType.sonoicNonEmptyTrimmed?.lowercased() else {
             return nil
         }
@@ -164,7 +176,7 @@ struct SonoicSharedArtworkStore {
         return remotePath
     }
 
-    nonisolated private func validateArtworkPayload(_ payload: SonosControlTransport.HTTPPayload) throws {
+    nonisolated static func validateArtworkPayload(_ payload: SonosControlTransport.HTTPPayload) throws {
         if let contentLengthHeader = payload.response.value(forHTTPHeaderField: "Content-Length"),
            let contentLength = Int(contentLengthHeader),
            contentLength > Self.maximumArtworkByteCount
@@ -176,23 +188,29 @@ struct SonoicSharedArtworkStore {
             throw StoreError.artworkTooLarge(payload.data.count)
         }
 
-        if let mimeType = payload.response.mimeType.sonoicNonEmptyTrimmed?.lowercased(),
-           mimeType.hasPrefix("image/")
-        {
-            return
+        if let mimeType = payload.response.mimeType.sonoicNonEmptyTrimmed?.lowercased() {
+            guard mimeType.hasPrefix("image/"),
+                  Self.fileExtension(for: mimeType) != nil
+            else {
+                throw StoreError.unsupportedArtworkResponseType(payload.response.mimeType)
+            }
         }
 
-        guard isImageData(payload.data) else {
+        guard Self.isImageData(payload.data) else {
             throw StoreError.unsupportedArtworkResponseType(payload.response.mimeType)
         }
     }
 
-    nonisolated private func isImageData(_ data: Data) -> Bool {
+    nonisolated private static func isImageData(_ data: Data) -> Bool {
         let options: CFDictionary = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options) else {
             return false
         }
 
-        return CGImageSourceGetCount(source) > 0
+        guard CGImageSourceGetCount(source) > 0 else {
+            return false
+        }
+
+        return CGImageSourceCreateImageAtIndex(source, 0, options) != nil
     }
 }

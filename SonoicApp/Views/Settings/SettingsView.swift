@@ -92,11 +92,11 @@ struct SettingsView: View {
     private var identityStatusDetail: String? {
         switch model.manualHostIdentityStatus {
         case .idle:
-            "Waiting for a player refresh to resolve the current room."
+            "Waiting for refresh."
         case .loading:
-            "Reading the active room name from the selected player."
+            "Loading room name."
         case .resolved:
-            "The current room is available in the Rooms tab."
+            "Room is ready."
         case .failed(let detail):
             detail
         }
@@ -105,11 +105,11 @@ struct SettingsView: View {
     private var topologyStatusDetail: String? {
         switch model.manualHostTopologyStatus {
         case .idle:
-            "Waiting for a player refresh to load bonded setup details."
+            "Waiting for refresh."
         case .loading:
-            "Reading Sonos topology to resolve bonded products."
+            "Loading setup."
         case .resolved:
-            "Bonded setup details are available in the Rooms tab."
+            "Setup is ready."
         case .failed(let detail):
             detail
         }

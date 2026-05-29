@@ -63,6 +63,7 @@ struct RootView: View {
             if model.hasCompletedOnboarding, model.hasResolvedSonosPlaybackTarget {
                 PlayerMiniBar(
                     nowPlaying: model.effectiveNowPlayingSnapshotForActiveTarget,
+                    isPlaybackControlEnabled: model.canControlManualPlayback,
                     openPlayer: {
                         isPlayerPresented = true
                     },
@@ -72,7 +73,7 @@ struct RootView: View {
                         }
                     }
                 )
-                .padding(.horizontal, 12)
+                .padding(.horizontal, MiniPlayerLayout.horizontalPadding)
                 .padding(.bottom, MiniPlayerLayout.bottomSpacing)
             }
         }

@@ -6,6 +6,11 @@ struct SourceActionFailure: Identifiable {
     var detail: String
 }
 
+private enum SourceItemPendingAction {
+    case play
+    case favorite
+}
+
 struct SourceItemNavigationRow: View {
     @Environment(SonoicModel.self) private var model
 
@@ -13,6 +18,7 @@ struct SourceItemNavigationRow: View {
     var playOverride: (() async -> Void)?
     var isCompact = false
     @State private var actionFailure: SourceActionFailure?
+    @State private var pendingAction: SourceItemPendingAction?
 
     private var canPlay: Bool {
         playOverride != nil || (item.kind == .song && model.canPlaySourceItem(item))
@@ -47,6 +53,14 @@ struct SourceItemNavigationRow: View {
         item.kind == .song && !canPlay
     }
 
+    private var isNowPlayingSong: Bool {
+        guard item.kind == .song else {
+            return false
+        }
+
+        return model.effectiveNowPlayingSnapshotForActiveTarget.matchesSourceSong(item)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             rowContent
@@ -76,10 +90,15 @@ struct SourceItemNavigationRow: View {
         if shouldPlayOnRowTap {
             Button {
                 Task {
-                    await play()
+                    await playWithPulse()
                 }
             } label: {
-                SourceItemMetadataRow(item: item, isCompact: isCompact)
+                SourceItemMetadataRow(
+                    item: item,
+                    isCompact: isCompact,
+                    isNowPlaying: isNowPlayingSong
+                )
+                .sonoicCommandPulse(isActive: pendingAction == .play, cornerRadius: 14)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Play \(item.title)")
@@ -87,11 +106,19 @@ struct SourceItemNavigationRow: View {
             NavigationLink {
                 SourceItemDetailView(item: item)
             } label: {
-                SourceItemMetadataRow(item: item, isCompact: isCompact)
+                SourceItemMetadataRow(
+                    item: item,
+                    isCompact: isCompact,
+                    isNowPlaying: isNowPlayingSong
+                )
             }
             .buttonStyle(.plain)
         } else {
-            SourceItemMetadataRow(item: item, isCompact: isCompact)
+            SourceItemMetadataRow(
+                item: item,
+                isCompact: isCompact,
+                isNowPlaying: isNowPlayingSong
+            )
         }
     }
 
@@ -100,7 +127,7 @@ struct SourceItemNavigationRow: View {
             if canPlay {
                 Button {
                     Task {
-                        await play()
+                        await playWithPulse()
                     }
                 } label: {
                     Label("Play", systemImage: "play.fill")
@@ -115,7 +142,7 @@ struct SourceItemNavigationRow: View {
             if canFavorite {
                 Button {
                     Task {
-                        await toggleFavorite()
+                        await toggleFavoriteWithPulse()
                     }
                 } label: {
                     Label(
@@ -133,9 +160,32 @@ struct SourceItemNavigationRow: View {
             }
         } label: {
             SourceItemOptionsIcon()
+                .sonoicCommandPulse(isActive: pendingAction == .favorite, cornerRadius: 22)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("More options for \(item.title)")
+    }
+
+    @MainActor
+    private func playWithPulse() async {
+        pendingAction = .play
+        await play()
+        await clearPendingAction(.play)
+    }
+
+    @MainActor
+    private func toggleFavoriteWithPulse() async {
+        pendingAction = .favorite
+        await toggleFavorite()
+        await clearPendingAction(.favorite)
+    }
+
+    @MainActor
+    private func clearPendingAction(_ action: SourceItemPendingAction) async {
+        try? await Task.sleep(for: .milliseconds(160))
+        if pendingAction == action {
+            pendingAction = nil
+        }
     }
 
     private func play() async {
@@ -178,6 +228,7 @@ struct SourceItemNavigationRow: View {
 private struct SourceItemMetadataRow: View {
     let item: SonoicSourceItem
     var isCompact = false
+    var isNowPlaying = false
 
     private var artworkDimension: CGFloat {
         isCompact ? 52 : 58
@@ -193,10 +244,16 @@ private struct SourceItemMetadataRow: View {
             .frame(width: artworkDimension, height: artworkDimension)
 
             VStack(alignment: .leading, spacing: isCompact ? 3 : 5) {
-                Text(item.title)
-                    .font(SonoicTheme.Typography.listTitle)
-                    .foregroundStyle(SonoicTheme.Colors.primary)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    if isNowPlaying {
+                        ActiveSongWaveformView()
+                    }
+
+                    Text(item.title)
+                        .font(SonoicTheme.Typography.listTitle)
+                        .foregroundStyle(isNowPlaying ? SonoicTheme.Colors.tabAccent : SonoicTheme.Colors.primary)
+                        .lineLimit(1)
+                }
 
                 if let displaySubtitle {
                     Text(displaySubtitle)
@@ -225,11 +282,85 @@ private struct SourceItemMetadataRow: View {
     }
 }
 
+private struct ActiveSongWaveformView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isAnimating = false
+
+    private let barHeights: [CGFloat] = [5, 10, 7]
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 2) {
+            ForEach(barHeights.indices, id: \.self) { index in
+                Capsule()
+                    .fill(SonoicTheme.Colors.tabAccent)
+                    .frame(width: 3, height: reduceMotion ? barHeights[index] : (isAnimating ? barHeights[index] : 4))
+                    .animation(
+                        waveformAnimation(for: index),
+                        value: isAnimating
+                    )
+            }
+        }
+        .frame(width: 14, height: 12, alignment: .bottom)
+        .onAppear {
+            isAnimating = !reduceMotion
+        }
+        .onChange(of: reduceMotion) { _, reduceMotion in
+            isAnimating = !reduceMotion
+        }
+        .onDisappear {
+            isAnimating = false
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func waveformAnimation(for index: Int) -> Animation? {
+        guard !reduceMotion else {
+            return nil
+        }
+
+        return .easeInOut(duration: 0.52)
+            .repeatForever(autoreverses: true)
+            .delay(Double(index) * 0.12)
+    }
+}
+
 private struct SourceItemOptionsIcon: View {
     var body: some View {
         Image(systemName: "ellipsis")
             .font(.body.weight(.semibold))
             .foregroundStyle(SonoicTheme.Colors.secondary)
             .frame(width: 44, height: 44)
+    }
+}
+
+private extension SonosNowPlayingSnapshot {
+    func matchesSourceSong(_ item: SonoicSourceItem) -> Bool {
+        guard playbackState == .playing || playbackState == .buffering else {
+            return false
+        }
+
+        guard normalized(title) == normalized(item.title) else {
+            return false
+        }
+
+        guard let subtitle = item.subtitle?.sonoicNonEmptyTrimmed else {
+            return true
+        }
+
+        if let artistName = artistName?.sonoicNonEmptyTrimmed,
+           subtitle.localizedCaseInsensitiveContains(artistName) {
+            return true
+        }
+
+        if let albumTitle = albumTitle?.sonoicNonEmptyTrimmed,
+           subtitle.localizedCaseInsensitiveContains(albumTitle) {
+            return true
+        }
+
+        return artistName.sonoicNonEmptyTrimmed == nil && albumTitle.sonoicNonEmptyTrimmed == nil
+    }
+
+    private func normalized(_ value: String) -> String {
+        value.sonoicTrimmed.lowercased()
     }
 }

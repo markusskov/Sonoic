@@ -2,8 +2,11 @@ import SwiftUI
 
 struct PlayerMiniBar: View {
     let nowPlaying: SonosNowPlayingSnapshot
+    let isPlaybackControlEnabled: Bool
     let openPlayer: () -> Void
     let togglePlayback: () -> Void
+
+    @State private var isTogglePending = false
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
@@ -16,6 +19,7 @@ struct PlayerMiniBar: View {
                         maximumDisplayDimension: 52
                     )
                     .frame(width: 52, height: 52)
+                    .sonoicCrossfade(value: artworkReloadKey)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(nowPlaying.title)
@@ -29,9 +33,10 @@ struct PlayerMiniBar: View {
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .sonoicCrossfade(value: artworkReloadKey)
                 }
 
-                Button(action: togglePlayback) {
+                Button(action: togglePlaybackTapped) {
                     Label(
                         nowPlaying.playbackState.controlTitle,
                         systemImage: nowPlaying.playbackState.controlSystemImage
@@ -40,9 +45,11 @@ struct PlayerMiniBar: View {
                     .font(.title3.weight(.semibold))
                     .frame(width: 58, height: 58)
                     .contentShape(Rectangle())
+                    .sonoicCommandPulse(isActive: isTogglePending, cornerRadius: 16)
                 }
                 .foregroundStyle(.primary)
                 .buttonStyle(.plain)
+                .disabled(!canTogglePlayback)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -53,6 +60,11 @@ struct PlayerMiniBar: View {
             .accessibilityAction(named: "Open Player", openPlayer)
         }
         .shadow(color: .black.opacity(0.08), radius: 14, y: 8)
+        .onChange(of: canTogglePlayback) { _, canToggle in
+            if !canToggle {
+                isTogglePending = false
+            }
+        }
     }
 
     private var artworkReloadKey: String {
@@ -66,19 +78,61 @@ struct PlayerMiniBar: View {
         .compactMap { $0 }
         .joined(separator: "|")
     }
+
+    private var canTogglePlayback: Bool {
+        isPlaybackControlEnabled && nowPlaying.canTogglePlayback
+    }
+
+    private func togglePlaybackTapped() {
+        guard canTogglePlayback else {
+            isTogglePending = false
+            return
+        }
+
+        isTogglePending = true
+        togglePlayback()
+
+        Task {
+            try? await Task.sleep(for: .milliseconds(160))
+            await MainActor.run {
+                isTogglePending = false
+            }
+        }
+    }
 }
 
-#Preview {
-    PlayerMiniBar(
-        nowPlaying: SonosNowPlayingSnapshot(
-            title: "Unwritten",
-            artistName: "Natasha Bedingfield",
-            albumTitle: "Unwritten",
-            sourceName: "Apple Music",
-            playbackState: .playing
-        ),
-        openPlayer: {},
-        togglePlayback: {}
-    )
+#Preview("Enabled") {
+    VStack(spacing: 16) {
+        PlayerMiniBar(
+            nowPlaying: SonosNowPlayingSnapshot(
+                title: "Unwritten",
+                artistName: "Natasha Bedingfield",
+                albumTitle: "Unwritten",
+                sourceName: "Apple Music",
+                playbackState: .playing
+            ),
+            isPlaybackControlEnabled: true,
+            openPlayer: {},
+            togglePlayback: {}
+        )
+    }
+    .padding()
+}
+
+#Preview("Cloud Target Unavailable") {
+    VStack(spacing: 16) {
+        PlayerMiniBar(
+            nowPlaying: SonosNowPlayingSnapshot(
+                title: "Unwritten",
+                artistName: "Natasha Bedingfield",
+                albumTitle: "Unwritten",
+                sourceName: "Apple Music",
+                playbackState: .playing
+            ),
+            isPlaybackControlEnabled: false,
+            openPlayer: {},
+            togglePlayback: {}
+        )
+    }
     .padding()
 }

@@ -15,7 +15,7 @@ struct HomeTheaterLoadingCard: View {
                     Text(isRefreshing ? "Loading Home Theater" : "Home Theater")
                         .font(.headline)
 
-                    Text("Reading EQ, cinema controls, and TV-control state from the selected room.")
+                    Text("Loading TV and tuning controls.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

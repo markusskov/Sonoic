@@ -1,8 +1,11 @@
 import SwiftUI
 
 enum MiniPlayerLayout {
+    static let horizontalPadding: CGFloat = 12
     static let bottomSpacing: CGFloat = 55
-    static let contentInset: CGFloat = 65
+    static let barHeight: CGFloat = 78
+    static let contentBreathingRoom: CGFloat = 28
+    static let contentInset: CGFloat = barHeight + bottomSpacing + contentBreathingRoom
 }
 
 private struct MiniPlayerContentInsetModifier: ViewModifier {

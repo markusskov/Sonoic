@@ -46,7 +46,7 @@ struct RoomDetailView: View {
                     if activeTarget.kind == .group {
                         RoomsSectionHeader(
                             title: "Group",
-                            subtitle: "The current Sonos group Sonoic is controlling right now."
+                            subtitle: "Selected group."
                         )
 
                         RoomSurfaceCard {
@@ -78,7 +78,7 @@ struct RoomDetailView: View {
                     } else {
                         RoomsSectionHeader(
                             title: "Name",
-                            subtitle: "The current room Sonoic is controlling right now."
+                            subtitle: "Selected room."
                         )
 
                         RoomSurfaceCard {

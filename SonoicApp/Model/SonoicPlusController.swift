@@ -123,7 +123,7 @@ private enum SonoicPlusError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .customerInfoUnavailable:
-            "RevenueCat did not return customer information."
+            "Plus status could not be refreshed."
         }
     }
 }

@@ -1,40 +1,34 @@
 import SwiftUI
 
 struct AppleMusicSourceHeader: View {
-    let source: SonoicSource
     let authorizationState: SonoicAppleMusicAuthorizationState
     let requestAuthorization: () -> Void
 
+    @ViewBuilder
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label("Apple Music", systemImage: source.service.systemImage)
-                .font(.largeTitle.weight(.bold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
+        if !authorizationState.allowsCatalogSearch {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(authorizationState.title)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
-            if !authorizationState.allowsCatalogSearch {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(authorizationState.title)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    if authorizationState.canRequestAuthorization {
-                        Button(action: requestAuthorization) {
-                            Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
-                        }
-                        .buttonStyle(.glass)
-                        .buttonBorderShape(.capsule)
-                    }
+                if authorizationState.canRequestAuthorization {
+                    authorizationButton
                 }
-            } else if authorizationState.canRequestAuthorization {
-                Button(action: requestAuthorization) {
-                    Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.capsule)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else if authorizationState.canRequestAuthorization {
+            authorizationButton
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var authorizationButton: some View {
+        Button(action: requestAuthorization) {
+            Label("Connect Apple Music", systemImage: "person.crop.circle.badge.checkmark")
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
     }
 }
 

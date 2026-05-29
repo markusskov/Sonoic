@@ -212,3 +212,34 @@ struct SonoicListMoreButton: View {
         .accessibilityLabel("Show more")
     }
 }
+
+private struct SonoicCommandPulseModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let isActive: Bool
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(!reduceMotion && isActive ? 0.97 : 1)
+            .overlay {
+                if isActive {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(SonoicTheme.Colors.tabAccent.opacity(0.52), lineWidth: 1)
+                        .transition(.opacity)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.16), value: isActive)
+    }
+}
+
+extension View {
+    func sonoicCommandPulse(isActive: Bool, cornerRadius: CGFloat = 999) -> some View {
+        modifier(SonoicCommandPulseModifier(isActive: isActive, cornerRadius: cornerRadius))
+    }
+
+    func sonoicCrossfade<Value: Equatable>(value: Value) -> some View {
+        contentTransition(.opacity)
+            .animation(.easeInOut(duration: 0.18), value: value)
+    }
+}

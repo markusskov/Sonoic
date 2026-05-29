@@ -196,21 +196,103 @@ struct SonoicAppleMusicPlaybackPayloadResolverTests {
         #expect(resolver.candidates(for: item, favorites: [favorite]).isEmpty)
     }
 
+    @Test
+    func directPlayPurposeKeepsFavoriteGeneratedNativeSelectionOrder() throws {
+        let item = purposeContractItem(nativePayloadID: "native-direct")
+        let exactFavorite = verifiedAppleMusicFavorite()
+
+        let favoriteModel = try model(favorites: [exactFavorite], includesAppleMusicPlaybackHint: true)
+        let favoritePayload = try favoriteModel.appleMusicPlayablePayload(for: item, purpose: .directPlay)
+        #expect(favoritePayload?.uri == exactFavorite.playbackURI)
+
+        let generatedModel = try model(includesAppleMusicPlaybackHint: true)
+        let generatedPayload = try generatedModel.appleMusicPlayablePayload(for: item, purpose: .directPlay)
+        #expect(generatedPayload?.uri == catalogHLSURI())
+
+        let nativeModel = try model(includesAppleMusicPlaybackHint: false)
+        let nativePayload = try nativeModel.appleMusicPlayablePayload(for: item, purpose: .directPlay)
+        #expect(nativePayload?.id == "native-direct")
+    }
+
+    @Test
+    func queueEntryPurposePrefersCloudQueuePayloadThenFavoriteThenNative() throws {
+        let item = purposeContractItem(nativePayloadID: "native-queue")
+        let exactFavorite = verifiedAppleMusicFavorite()
+
+        let generatedModel = try model(favorites: [exactFavorite], includesAppleMusicPlaybackHint: true)
+        let generatedPayload = try generatedModel.appleMusicPlayablePayload(for: item, purpose: .queueEntry)
+        #expect(generatedPayload?.uri == libraryTrackURI())
+
+        let favoriteModel = try model(favorites: [exactFavorite], includesAppleMusicPlaybackHint: false)
+        let favoritePayload = try favoriteModel.appleMusicPlayablePayload(for: item, purpose: .queueEntry)
+        #expect(favoritePayload?.uri == exactFavorite.playbackURI)
+
+        let nativeModel = try model(includesAppleMusicPlaybackHint: false)
+        let nativePayload = try nativeModel.appleMusicPlayablePayload(for: item, purpose: .queueEntry)
+        #expect(nativePayload?.id == "native-queue")
+    }
+
+    @Test
+    func favoritePurposeUsesGeneratedPayloadOrVerifiedFavoriteOnly() throws {
+        let item = purposeContractItem(nativePayloadID: "native-favorite")
+        let verifiedFavorite = verifiedAppleMusicFavorite()
+        let titleOnlyFavorite = titleOnlyAppleMusicFavorite()
+
+        let generatedModel = try model(favorites: [verifiedFavorite], includesAppleMusicPlaybackHint: true)
+        let generatedPayload = try generatedModel.appleMusicPlayablePayload(for: item, purpose: .favorite)
+        #expect(generatedPayload?.uri == catalogHLSURI())
+
+        let verifiedFavoriteModel = try model(favorites: [verifiedFavorite], includesAppleMusicPlaybackHint: false)
+        let verifiedFavoritePayload = try verifiedFavoriteModel.appleMusicPlayablePayload(for: item, purpose: .favorite)
+        #expect(verifiedFavoritePayload?.uri == verifiedFavorite.playbackURI)
+
+        let titleOnlyFavoriteModel = try model(favorites: [titleOnlyFavorite], includesAppleMusicPlaybackHint: false)
+        let titleOnlyPayload = try titleOnlyFavoriteModel.appleMusicPlayablePayload(for: item, purpose: .favorite)
+        #expect(titleOnlyPayload == nil)
+    }
+
+    @Test
+    func metadataPurposeKeepsFavoriteGeneratedNativeSelectionOrder() throws {
+        let item = purposeContractItem(nativePayloadID: "native-metadata")
+        let exactFavorite = verifiedAppleMusicFavorite()
+
+        let favoriteModel = try model(favorites: [exactFavorite], includesAppleMusicPlaybackHint: true)
+        let favoritePayload = try favoriteModel.appleMusicPlayablePayload(for: item, purpose: .metadata)
+        #expect(favoritePayload?.uri == exactFavorite.playbackURI)
+
+        let generatedModel = try model(includesAppleMusicPlaybackHint: true)
+        let generatedPayload = try generatedModel.appleMusicPlayablePayload(for: item, purpose: .metadata)
+        #expect(generatedPayload?.uri == catalogHLSURI())
+
+        let nativeModel = try model(includesAppleMusicPlaybackHint: false)
+        let nativePayload = try nativeModel.appleMusicPlayablePayload(for: item, purpose: .metadata)
+        #expect(nativePayload?.id == "native-metadata")
+    }
+
     private func appleMusicItem(
         title: String,
         subtitle: String?,
         kind: SonoicSourceItem.Kind,
-        catalogID: String? = nil
+        catalogID: String? = nil,
+        libraryID: String? = nil,
+        nativePayload: SonosPlayablePayload? = nil
     ) -> SonoicSourceItem {
-        SonoicSourceItem.appleMusicMetadata(
-            id: catalogID ?? "catalog-\(title)",
+        var item = SonoicSourceItem.appleMusicMetadata(
+            id: catalogID ?? libraryID ?? "catalog-\(title)",
             title: title,
             subtitle: subtitle,
             artworkURL: nil,
             kind: kind,
             origin: .catalogSearch,
-            catalogID: catalogID
+            catalogID: catalogID,
+            libraryID: libraryID
         )
+
+        if let nativePayload {
+            item.playbackCapability = .sonosNative(nativePayload)
+        }
+
+        return item
     }
 
     private func favorite(
@@ -230,5 +312,123 @@ struct SonoicAppleMusicPlaybackPayloadResolverTests {
             playbackMetadataXML: "<DIDL-Lite><item><dc:title>\(title)</dc:title></item></DIDL-Lite>",
             kind: kind
         )
+    }
+
+    private func purposeContractItem(nativePayloadID: String) -> SonoicSourceItem {
+        appleMusicItem(
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato • That Low and Lonesome Sound",
+            kind: .song,
+            catalogID: appleMusicContractCatalogID,
+            libraryID: appleMusicContractLibraryID,
+            nativePayload: playbackPayload(
+                id: nativePayloadID,
+                uri: "x-sonos-http:\(nativePayloadID).m4a"
+            )
+        )
+    }
+
+    private func verifiedAppleMusicFavorite() -> SonosFavoriteItem {
+        favorite(
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato",
+            service: .appleMusic,
+            uri: "x-sonosapi-hls:song%3a\(appleMusicContractCatalogID)?sid=204",
+            kind: .item
+        )
+    }
+
+    private func titleOnlyAppleMusicFavorite() -> SonosFavoriteItem {
+        favorite(
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato",
+            service: .appleMusic,
+            uri: "x-sonosapi-hls:song%3aother-song?sid=204",
+            kind: .item
+        )
+    }
+
+    private func model(
+        favorites: [SonosFavoriteItem] = [],
+        includesAppleMusicPlaybackHint: Bool
+    ) throws -> SonoicModel {
+        let suiteName = "SonoicAppleMusicPlaybackPayloadResolverTests-\(UUID().uuidString)"
+        let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+        userDefaults.removePersistentDomain(forName: suiteName)
+        let model = SonoicModel(
+            settingsStore: SonoicSettingsStore(userDefaults: userDefaults),
+            startInitialSonosControlAPICloudRefresh: false
+        )
+        model.homeFavoritesState = .loaded(SonosFavoritesSnapshot(items: favorites))
+
+        if includesAppleMusicPlaybackHint {
+            model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+                status: .loaded,
+                snapshot: appleMusicPlaybackHintSnapshot()
+            )
+        }
+
+        return model
+    }
+
+    private func appleMusicPlaybackHintSnapshot() -> SonosMusicServiceProbeSnapshot {
+        // The probe snapshot represents Sonos-observed Apple Music account serials,
+        // so generated payloads stay Sonos-owned.
+        return SonosMusicServiceProbeSnapshot(
+            observedAt: Date(timeIntervalSince1970: 0),
+            serviceListVersion: nil,
+            services: [
+                SonosMusicServiceDescriptor(
+                    id: "204",
+                    name: "Apple Music",
+                    uri: nil,
+                    secureURI: nil,
+                    containerType: nil,
+                    capabilities: nil,
+                    authPolicy: nil,
+                    presentationMapURI: nil,
+                    stringsURI: nil
+                ),
+            ],
+            accounts: []
+        ).includingObservedAccounts(from: [
+            SonosMusicServiceObservedValue(
+                value: catalogHLSURI(),
+                origin: .currentURI
+            ),
+            SonosMusicServiceObservedValue(
+                value: libraryTrackURI(),
+                origin: .trackURI
+            ),
+        ])
+    }
+
+    private func playbackPayload(id: String, uri: String) -> SonosPlayablePayload {
+        SonosPlayablePayload(
+            id: id,
+            title: "Native \(id)",
+            subtitle: "Apple Music",
+            artworkURL: nil,
+            service: .appleMusic,
+            uri: uri,
+            metadataXML: "<DIDL-Lite></DIDL-Lite>",
+            kind: .item
+        )
+    }
+
+    private var appleMusicContractCatalogID: String {
+        "1440857781"
+    }
+
+    private var appleMusicContractLibraryID: String {
+        "i.BOVNeOxU6BVbp8"
+    }
+
+    private func catalogHLSURI() -> String {
+        "x-sonosapi-hls:song%3a\(appleMusicContractCatalogID)?sid=204&sn=3"
+    }
+
+    private func libraryTrackURI() -> String {
+        "x-sonos-http:librarytrack%3a\(appleMusicContractLibraryID).m4p?sid=204&flags=8232&sn=7"
     }
 }

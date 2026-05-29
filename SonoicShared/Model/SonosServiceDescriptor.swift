@@ -13,6 +13,17 @@ struct SonosServiceDescriptor: Identifiable, Codable, Equatable, Hashable {
     var name: String
     var systemImage: String
 
+    var iconAssetName: String? {
+        switch kind {
+        case .appleMusic:
+            return "AppleMusicServiceIcon"
+        case .spotify:
+            return "SpotifyServiceIcon"
+        case .sonosRadio, .genericStreaming:
+            return nil
+        }
+    }
+
     static let appleMusic = SonosServiceDescriptor(
         kind: .appleMusic,
         id: "apple-music",

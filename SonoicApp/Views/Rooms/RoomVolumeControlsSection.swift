@@ -16,9 +16,9 @@ struct RoomVolumeControlsSection: View {
     private var sectionSubtitle: String {
         switch activeTarget.kind {
         case .group:
-            "Control the group volume, then fine-tune each room inside it."
+            "Group volume and rooms."
         case .room:
-            "Control the selected room directly from its detail page."
+            "Room volume."
         }
     }
 
@@ -57,7 +57,7 @@ struct RoomVolumeControlsSection: View {
         case .idle:
             RoomVolumeMessageRow(
                 title: "Room Volumes",
-                detail: "Open this page to load individual room controls.",
+                detail: "Load room controls.",
                 systemImage: "speaker.wave.2.circle",
                 isLoading: false,
                 actionTitle: "Load",
@@ -67,7 +67,7 @@ struct RoomVolumeControlsSection: View {
         case .loading:
             RoomVolumeMessageRow(
                 title: "Loading Room Volumes",
-                detail: "Sonoic is reading each grouped room.",
+                detail: "Loading rooms.",
                 systemImage: "arrow.clockwise",
                 isLoading: true,
                 actionTitle: nil,

@@ -9,6 +9,11 @@ struct SonoicExternalControlState: Codable, Equatable, Hashable {
         var availability: Availability
     }
 
+    struct WidgetTimelinePresentation: Equatable, Hashable {
+        var widgetPresentation: WidgetPresentation
+        var staleDate: Date
+    }
+
     struct Freshness: Equatable, Hashable {
         var isStale: Bool
 
@@ -227,6 +232,13 @@ extension SonoicExternalControlState {
             playbackState: playbackState,
             volume: volume,
             availability: availability
+        )
+    }
+
+    var widgetTimelinePresentation: WidgetTimelinePresentation {
+        WidgetTimelinePresentation(
+            widgetPresentation: widgetPresentation,
+            staleDate: staleDate
         )
     }
 }

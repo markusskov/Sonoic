@@ -76,6 +76,7 @@ struct QueueSnapshotList: View {
         .refreshable {
             await refreshAction()
         }
+        .animation(.easeInOut(duration: 0.2), value: snapshot.items.map(\.id))
     }
 
     private var isEditing: Bool {
@@ -102,16 +103,14 @@ private struct QueueItemRow: View {
     let canPlay: Bool
     let playAction: (Int) async -> Void
 
+    @State private var isPlayPending = false
+
     var body: some View {
         Group {
             if isEditing || !canPlay {
                 rowContent
             } else {
-                Button {
-                    Task {
-                        await playAction(position)
-                    }
-                } label: {
+                Button(action: playTapped) {
                     rowContent
                 }
                 .buttonStyle(.plain)
@@ -160,5 +159,18 @@ private struct QueueItemRow: View {
             }
         }
         .padding(.vertical, 4)
+        .sonoicCommandPulse(isActive: isPlayPending, cornerRadius: 10)
+    }
+
+    private func playTapped() {
+        isPlayPending = true
+
+        Task {
+            await playAction(position)
+            try? await Task.sleep(for: .milliseconds(160))
+            await MainActor.run {
+                isPlayPending = false
+            }
+        }
     }
 }

@@ -23,7 +23,6 @@ struct SourceDetailView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     if isAppleMusic {
                         AppleMusicSourceHeader(
-                            source: source,
                             authorizationState: model.appleMusicAuthorizationState,
                             requestAuthorization: requestAppleMusicAuthorization
                         )

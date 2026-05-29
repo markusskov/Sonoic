@@ -43,7 +43,7 @@ struct SonoicAppleMusicAuthorizationState: Equatable {
         }
     }
 
-    var detail: String {
+    nonisolated var detail: String {
         switch status {
         case .notDetermined:
             "Connect Apple Music to search."
@@ -60,7 +60,18 @@ struct SonoicAppleMusicAuthorizationState: Equatable {
         }
     }
 
-    var systemImage: String {
+    nonisolated var settingsDetail: String? {
+        switch status {
+        case .authorized, .notDetermined:
+            nil
+        case .requesting:
+            "Connecting..."
+        case .denied, .restricted, .unavailable:
+            detail
+        }
+    }
+
+    nonisolated var systemImage: String {
         switch status {
         case .authorized:
             "checkmark.circle.fill"

@@ -57,6 +57,7 @@ struct SonosNowPlayingSnapshot: Equatable {
     var elapsedTime: TimeInterval? = nil
     var duration: TimeInterval? = nil
     var transportActions: SonosTransportActions? = nil
+    var quality: SonosNowPlayingQuality? = nil
 
     static let unconfigured = SonosNowPlayingSnapshot(
         title: "No Player Connected",
@@ -143,6 +144,63 @@ struct SonosNowPlayingSnapshot: Equatable {
         }
 
         return transportActions?.canSeek ?? true
+    }
+}
+
+nonisolated struct SonosNowPlayingQuality: Equatable, Hashable {
+    var bitDepth: Int?
+    var sampleRate: Int?
+    var codec: String?
+    var isLossless: Bool
+    var isImmersive: Bool
+
+    init(
+        bitDepth: Int? = nil,
+        sampleRate: Int? = nil,
+        codec: String? = nil,
+        lossless: Bool? = nil,
+        immersive: Bool? = nil
+    ) {
+        self.bitDepth = bitDepth
+        self.sampleRate = sampleRate
+        self.codec = codec?.sonoicNonEmptyTrimmed
+        isLossless = lossless ?? false
+        isImmersive = immersive ?? false
+    }
+
+    var displayBadges: [String] {
+        var badges: [String] = []
+
+        if isImmersive || codec?.localizedCaseInsensitiveContains("atmos") == true {
+            badges.append("Atmos")
+        }
+
+        if isLossless {
+            badges.append("Lossless")
+        }
+
+        if badges.isEmpty, let codecBadge {
+            badges.append(codecBadge)
+        }
+
+        return badges
+    }
+
+    var hasDisplayBadges: Bool {
+        !displayBadges.isEmpty
+    }
+
+    private var codecBadge: String? {
+        guard let codec else {
+            return nil
+        }
+
+        let normalizedCodec = codec.lowercased()
+        guard normalizedCodec.contains("flac") || normalizedCodec.contains("alac") else {
+            return nil
+        }
+
+        return codec.uppercased()
     }
 }
 

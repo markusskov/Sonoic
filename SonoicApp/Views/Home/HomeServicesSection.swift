@@ -27,37 +27,36 @@ private struct HomeServiceChip: View {
     let source: SonoicSource
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Image(systemName: source.service.systemImage)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 38, height: 38)
-                    .glassEffect(.regular, in: Circle())
-
-                VStack(alignment: .leading, spacing: 3) {
-                    titleRow
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(width: 168, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 18))
+        serviceIcon
+            .frame(width: 78, height: 78)
+            .accessibilityLabel(source.service.name)
     }
 
-    private var titleRow: some View {
-        HStack(spacing: 6) {
-            Text(source.service.name)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-
-            if source.isCurrent {
-                Image(systemName: "speaker.wave.2.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
+    @ViewBuilder
+    private var serviceIcon: some View {
+        if let iconAssetName = source.service.iconAssetName {
+            Image(iconAssetName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 72, height: 72)
+                .clipShape(Circle())
+                .overlay(serviceBorder)
+                .shadow(color: .black.opacity(0.18), radius: 10, y: 6)
+        } else {
+            Image(systemName: source.service.systemImage)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(SonoicTheme.Colors.primary)
+                .frame(width: 72, height: 72)
+                .glassEffect(.regular, in: Circle())
+                .overlay(serviceBorder)
         }
+    }
+
+    private var serviceBorder: some View {
+        Circle()
+            .strokeBorder(
+                source.isCurrent ? SonoicTheme.Colors.tabAccent.opacity(0.9) : Color.white.opacity(0.12),
+                lineWidth: source.isCurrent ? 2 : 1
+            )
     }
 }

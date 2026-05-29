@@ -137,7 +137,7 @@ struct SourceItemDetailView: View {
 
             if let failureDetail = state.failureDetail {
                 SourceMessageCard(
-                    title: "Showing Cached Details",
+                    title: "Details",
                     detail: sourceStaleDetail(failureDetail, lastUpdatedAt: state.lastUpdatedAt),
                     systemImage: "exclamationmark.triangle"
                 )

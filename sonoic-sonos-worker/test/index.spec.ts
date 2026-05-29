@@ -301,24 +301,63 @@ describe('Sonoic Cloud Queue worker', () => {
 		);
 	});
 
-	it('rejects track items without a content type', async () => {
+	it.each([
+		{
+			name: 'without an item id',
+			mutate: (body: Record<string, unknown>) => {
+				const firstItem = cloudQueueItem(body, 0);
+				delete firstItem.id;
+			},
+			error: 'cloud_queue_item_missing_id:0',
+		},
+		{
+			name: 'with an overlong item id',
+			mutate: (body: Record<string, unknown>) => {
+				cloudQueueItem(body, 0).id = 'x'.repeat(129);
+			},
+			error: 'cloud_queue_item_id_too_long:0',
+		},
+		{
+			name: 'with duplicate item ids',
+			mutate: (body: Record<string, unknown>) => {
+				cloudQueueItem(body, 1).id = cloudQueueItem(body, 0).id;
+			},
+			error: 'cloud_queue_item_ids_must_be_unique',
+		},
+		{
+			name: 'without a track object',
+			mutate: (body: Record<string, unknown>) => {
+				const firstItem = cloudQueueItem(body, 0);
+				delete firstItem.track;
+			},
+			error: 'cloud_queue_item_missing_track:0',
+		},
+		{
+			name: 'without track content type',
+			mutate: (body: Record<string, unknown>) => {
+				const firstTrack = cloudQueueTrack(body, 0);
+				delete firstTrack.contentType;
+			},
+			error: 'cloud_queue_item_invalid_track:0',
+		},
+		{
+			name: 'without a track playback reference',
+			mutate: (body: Record<string, unknown>) => {
+				const firstTrack = cloudQueueTrack(body, 0);
+				delete firstTrack.id;
+				delete firstTrack.mediaUrl;
+			},
+			error: 'cloud_queue_item_invalid_track:0',
+		},
+	])('rejects cloud queue items $name', async ({ mutate, error }) => {
 		stubSuccessfulSonosTokenValidation();
 		const body = cloudQueueBody();
-		const firstItem = body.items[0] as Record<string, unknown>;
-		const firstTrack = firstItem.track as Record<string, unknown>;
-		delete firstTrack.contentType;
-		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/cloud-queues', {
-			method: 'POST',
-			headers: authenticatedCloudQueueHeaders(),
-			body: JSON.stringify(body),
-		});
-		const ctx = createExecutionContext();
+		mutate(body);
 
-		const response = await worker.fetch(request, testEnv(), ctx);
-		await waitOnExecutionContext(ctx);
+		const response = await createCloudQueueFromBody(body);
 
 		expect(response.status).toBe(400);
-		await expect(response.json()).resolves.toMatchObject({ error: 'cloud_queue_item_invalid_track:0' });
+		await expect(response.json()).resolves.toMatchObject({ error });
 	});
 });
 
@@ -332,16 +371,21 @@ function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
 
 async function createCloudQueue(options: { startItemId?: string } = {}): Promise<Record<string, unknown>> {
 	stubSuccessfulSonosTokenValidation();
+	const response = await createCloudQueueFromBody(cloudQueueBody(options));
+	expect(response.status).toBe(201);
+	return (await response.json()) as Record<string, unknown>;
+}
+
+async function createCloudQueueFromBody(body: Record<string, unknown>): Promise<Response> {
 	const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/cloud-queues', {
 		method: 'POST',
 		headers: authenticatedCloudQueueHeaders(),
-		body: JSON.stringify(cloudQueueBody(options)),
+		body: JSON.stringify(body),
 	});
 	const ctx = createExecutionContext();
 	const response = await worker.fetch(request, testEnv(), ctx);
 	await waitOnExecutionContext(ctx);
-	expect(response.status).toBe(201);
-	return (await response.json()) as Record<string, unknown>;
+	return response;
 }
 
 function authenticatedCloudQueueHeaders(): HeadersInit {
@@ -391,6 +435,15 @@ function cloudQueueBody(options: { startItemId?: string } = {}): Record<string, 
 		})),
 		startItemId: options.startItemId,
 	};
+}
+
+function cloudQueueItem(body: Record<string, unknown>, index: number): Record<string, unknown> {
+	const items = body.items as Record<string, unknown>[];
+	return items[index];
+}
+
+function cloudQueueTrack(body: Record<string, unknown>, index: number): Record<string, unknown> {
+	return cloudQueueItem(body, index).track as Record<string, unknown>;
 }
 
 function makeRedemptionNamespace(): DurableObjectNamespace {

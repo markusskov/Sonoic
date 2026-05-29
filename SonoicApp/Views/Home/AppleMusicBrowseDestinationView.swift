@@ -13,7 +13,6 @@ struct AppleMusicBrowseDestinationView: View {
         ScrollView {
             GlassEffectContainer(spacing: 18) {
                 VStack(alignment: .leading, spacing: 20) {
-                    header
                     content
                 }
                 .padding(20)
@@ -39,13 +38,6 @@ struct AppleMusicBrowseDestinationView: View {
         }
     }
 
-    private var header: some View {
-        Label(destination.title, systemImage: destination.systemImage)
-            .font(.largeTitle.weight(.bold))
-            .foregroundStyle(.primary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     @ViewBuilder
     private var content: some View {
         if state.isLoading && state.sections.isEmpty && state.genres.isEmpty {
@@ -69,7 +61,7 @@ struct AppleMusicBrowseDestinationView: View {
 
             if let failureDetail = state.failureDetail {
                 SourceMessageCard(
-                    title: "Showing Cached \(destination.title)",
+                    title: destination.title,
                     detail: sourceStaleDetail(failureDetail, lastUpdatedAt: state.lastUpdatedAt),
                     systemImage: "exclamationmark.triangle"
                 )
@@ -88,7 +80,7 @@ struct AppleMusicBrowseDestinationView: View {
 
             if let failureDetail = state.failureDetail {
                 SourceMessageCard(
-                    title: "Showing Cached Categories",
+                    title: "Categories",
                     detail: sourceStaleDetail(failureDetail, lastUpdatedAt: state.lastUpdatedAt),
                     systemImage: "exclamationmark.triangle"
                 )

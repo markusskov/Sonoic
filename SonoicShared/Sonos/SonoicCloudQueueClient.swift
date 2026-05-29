@@ -7,6 +7,14 @@ struct SonoicCloudQueueClient {
         case invalidResponse
         case httpStatus(Int, String?)
 
+        var isAuthorizationFailure: Bool {
+            if case let .httpStatus(statusCode, _) = self {
+                return statusCode == 401 || statusCode == 403
+            }
+
+            return false
+        }
+
         var errorDescription: String? {
             switch self {
             case .missingCreateURL:

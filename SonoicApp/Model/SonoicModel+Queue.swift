@@ -242,13 +242,17 @@ extension SonoicModel {
             if isSonosControlAPIAuthorizationFailure(error) {
                 sonosControlAPIState.authorizationStatus = .expired
                 sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
-                clearSonosControlAPICloudQueueContext()
+                clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
             }
             return false
         }
     }
 
     func clearQueue() async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            return recordLocalQueueMutationUnavailableInCloudMode()
+        }
+
         guard hasManualSonosHost else {
             queueState = .idle
             isQueueClearing = false
@@ -282,6 +286,10 @@ extension SonoicModel {
     }
 
     func removeQueueItems(atOffsets offsets: IndexSet) async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            return recordLocalQueueMutationUnavailableInCloudMode()
+        }
+
         guard let snapshot = queueState.snapshot else {
             return false
         }
@@ -309,6 +317,10 @@ extension SonoicModel {
     }
 
     func moveQueueItems(fromOffsets source: IndexSet, toOffset destination: Int) async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            return recordLocalQueueMutationUnavailableInCloudMode()
+        }
+
         guard let snapshot = queueState.snapshot else {
             return false
         }
@@ -357,6 +369,10 @@ extension SonoicModel {
         optimisticSnapshot: SonosQueueSnapshot,
         action: (String) async throws -> Void
     ) async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            return recordLocalQueueMutationUnavailableInCloudMode()
+        }
+
         guard hasManualSonosHost,
               !isQueueRefreshing,
               !isQueueClearing,
@@ -433,12 +449,19 @@ extension SonoicModel {
         return false
     }
 
+    private func recordLocalQueueMutationUnavailableInCloudMode() -> Bool {
+        queueOperationErrorDetail = "Queue edits are unavailable while Sonos Cloud command mode is active."
+        queueDiagnostics.lastMutationErrorDetail = queueOperationErrorDetail
+        return false
+    }
+
     func clearSonosControlAPICloudQueueContext() {
         sonosControlAPICloudQueueSessionID = nil
         sonosControlAPICloudQueueGroupID = nil
         sonosControlAPICloudQueueVersion = nil
         sonosControlAPICloudQueueItemIDs = nil
         sonosControlAPICloudQueueTracks = nil
+        sonosControlAPICloudQueueVersionMismatchLogKey = nil
         sharedStore?.clearCloudQueueSessionContext()
     }
 
@@ -487,9 +510,14 @@ extension SonoicModel {
                    let inMemoryQueueVersion,
                    inMemoryQueueVersion != normalizedQueueVersion
                 {
-                    sonoicPlaybackDebugLog(
-                        "cloudQueue restoreContext keepingMemory versionChanged stored=\(sonoicPlaybackDebugID(inMemoryQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+                    logCloudQueueVersionMismatchOnce(
+                        source: "keepingMemory",
+                        groupID: inMemoryGroupID,
+                        storedVersion: inMemoryQueueVersion,
+                        currentVersion: normalizedQueueVersion
                     )
+                } else {
+                    sonosControlAPICloudQueueVersionMismatchLogKey = nil
                 }
                 return true
             }
@@ -522,9 +550,14 @@ extension SonoicModel {
            let normalizedQueueVersion,
            storedQueueVersion != normalizedQueueVersion
         {
-            sonoicPlaybackDebugLog(
-                "cloudQueue restoreContext keepingStored versionChanged stored=\(sonoicPlaybackDebugID(storedQueueVersion)) current=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
+            logCloudQueueVersionMismatchOnce(
+                source: "keepingStored",
+                groupID: context.groupID?.sonoicNonEmptyTrimmed,
+                storedVersion: storedQueueVersion,
+                currentVersion: normalizedQueueVersion
             )
+        } else {
+            sonosControlAPICloudQueueVersionMismatchLogKey = nil
         }
 
         sonosControlAPICloudQueueSessionID = context.sessionID
@@ -536,6 +569,23 @@ extension SonoicModel {
             "cloudQueue restoreContext session=\(sonoicPlaybackDebugID(context.sessionID)) itemCount=\(context.itemIDs.count)"
         )
         return true
+    }
+
+    private func logCloudQueueVersionMismatchOnce(
+        source: String,
+        groupID: String?,
+        storedVersion: String,
+        currentVersion: String
+    ) {
+        let logKey = "\(source)|\(groupID ?? "any")|\(storedVersion)|\(currentVersion)"
+        guard sonosControlAPICloudQueueVersionMismatchLogKey != logKey else {
+            return
+        }
+
+        sonosControlAPICloudQueueVersionMismatchLogKey = logKey
+        sonoicPlaybackDebugLog(
+            "cloudQueue restoreContext \(source) versionChanged stored=\(sonoicPlaybackDebugID(storedVersion)) current=\(sonoicPlaybackDebugID(currentVersion))"
+        )
     }
 
     func sonosControlAPICloudQueueSnapshot(

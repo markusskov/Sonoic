@@ -19,8 +19,16 @@ struct SonoicKeychainStore {
         }
     }
 
-    private let service = "com.markusskov.Sonoic.sonos-control-api"
-    private let sonosTokenAccount = "sonos-oauth-token-set"
+    private let service: String
+    private let sonosTokenAccount: String
+
+    init(
+        service: String = "com.markusskov.Sonoic.sonos-control-api",
+        sonosTokenAccount: String = "sonos-oauth-token-set"
+    ) {
+        self.service = service
+        self.sonosTokenAccount = sonosTokenAccount
+    }
 
     func loadSonosTokenSet() throws -> SonosOAuthTokenSet? {
         var query = baseQuery(account: sonosTokenAccount)

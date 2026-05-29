@@ -35,6 +35,7 @@ struct RoomsGroupRow: View {
                 trailingState
             }
             .contentShape(Rectangle())
+            .sonoicCommandPulse(isActive: isSelecting, cornerRadius: 14)
         }
         .buttonStyle(.plain)
         .disabled(isSelecting)
@@ -120,6 +121,7 @@ struct RoomsListRow: View {
             trailingState
         }
         .contentShape(Rectangle())
+        .sonoicCommandPulse(isActive: isSelecting, cornerRadius: 14)
     }
 
     private var titleRow: some View {

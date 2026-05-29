@@ -27,7 +27,7 @@ final class SonoicModel {
     @ObservationIgnored var manualHostDeferredSyncTask: Task<Void, Never>?
     @ObservationIgnored var manualPlayConfirmationRetryTask: Task<Void, Never>?
     @ObservationIgnored var manualHostLastSuccessfulRefreshAt: Date?
-    @ObservationIgnored var lastReloadedWidgetPresentation: SonoicExternalControlState.WidgetPresentation?
+    @ObservationIgnored var lastReloadedWidgetTimelinePresentation: SonoicExternalControlState.WidgetTimelinePresentation?
     @ObservationIgnored var sharedStorePersistTask: Task<Void, Never>?
     @ObservationIgnored var pendingSharedExternalControlState: SonoicExternalControlState?
     @ObservationIgnored var lastPersistedSharedWidgetPresentation: SonoicExternalControlState.WidgetPresentation?
@@ -55,6 +55,7 @@ final class SonoicModel {
     @ObservationIgnored var sonosControlAPICloudQueueVersion: String?
     @ObservationIgnored var sonosControlAPICloudQueueItemIDs: [String]?
     @ObservationIgnored var sonosControlAPICloudQueueTracks: [SonosControlAPITrack]?
+    @ObservationIgnored var sonosControlAPICloudQueueVersionMismatchLogKey: String?
     @ObservationIgnored var sonosControlAPITokenRefreshTask: Task<SonosOAuthTokenSet?, Never>?
     @ObservationIgnored var sonosControlAPITokenRefreshGeneration = 0
     @ObservationIgnored var backgroundExecutionIdentifier: UIBackgroundTaskIdentifier = .invalid
@@ -89,39 +90,7 @@ final class SonoicModel {
     var hasCompletedOnboarding = false
     var manualSonosHost: String {
         didSet {
-            settingsStore.saveManualSonosHost(manualSonosHost)
-            manualHostRefreshStatus = .idle
-            manualHostIdentityStatus = .idle
-            manualHostTopologyStatus = .idle
-            manualHostLastSuccessfulRefreshAt = nil
-            queueState = .idle
-            homeFavoritesState = .idle
-            homeTheaterState = .idle
-            homeTheaterTVDiagnostics = .empty
-            roomVolumeState = .idle
-            isQueueRefreshing = false
-            isQueueMutating = false
-            isHomeTheaterRefreshing = false
-            isHomeTheaterMutating = false
-            mutatingRoomVolumeIDs = []
-            pendingRoomVolumeLevels = [:]
-            queueOperationErrorDetail = nil
-            queueDiagnostics = .empty
-            groupControlErrorDetail = nil
-            homeTheaterOperationErrorDetail = nil
-            roomVolumeOperationErrorDetail = nil
-            nowPlayingDiagnostics = .empty
-            clearManualSeekConfirmation()
-            manualPlaybackContextPayload = nil
-            manualQueueContextPayloads = nil
-            manualRecentPlaybackContextPayload = nil
-            clearSonosControlAPICloudQueueContext()
-            sonosMusicServiceProbeState = .idle
-            sonosContentDirectoryProbeState = .idle
-            resetManualHostIdentity()
-            stopManualHostRefreshLoop()
-            scheduleBackgroundPlayerRefreshIfPossible()
-            persistSharedExternalControlState(forceImmediate: true)
+            handleManualSonosHostChange()
         }
     }
     var manualHostRefreshStatus: SonosManualHostRefreshStatus = .idle
@@ -264,28 +233,71 @@ final class SonoicModel {
         return orderedServices
     }
 
-    init() {
-        settingsStore = SonoicSettingsStore()
-        let sonosControlTransport = SonosControlTransport()
+    private func handleManualSonosHostChange() {
+        settingsStore.saveManualSonosHost(manualSonosHost)
+        manualHostRefreshStatus = .idle
+        manualHostIdentityStatus = .idle
+        manualHostTopologyStatus = .idle
+        manualHostLastSuccessfulRefreshAt = nil
+        queueState = .idle
+        homeFavoritesState = .idle
+        homeTheaterState = .idle
+        homeTheaterTVDiagnostics = .empty
+        roomVolumeState = .idle
+        isQueueRefreshing = false
+        isQueueMutating = false
+        isHomeTheaterRefreshing = false
+        isHomeTheaterMutating = false
+        mutatingRoomVolumeIDs = []
+        pendingRoomVolumeLevels = [:]
+        queueOperationErrorDetail = nil
+        queueDiagnostics = .empty
+        groupControlErrorDetail = nil
+        homeTheaterOperationErrorDetail = nil
+        roomVolumeOperationErrorDetail = nil
+        nowPlayingDiagnostics = .empty
+        clearManualSeekConfirmation()
+        manualPlaybackContextPayload = nil
+        manualQueueContextPayloads = nil
+        manualRecentPlaybackContextPayload = nil
+        clearSonosControlAPICloudQueueContext()
+        sonosMusicServiceProbeState = .idle
+        sonosContentDirectoryProbeState = .idle
+        resetManualHostIdentity()
+        stopManualHostRefreshLoop()
+        scheduleBackgroundPlayerRefreshIfPossible()
+        persistSharedExternalControlState(forceImmediate: true)
+    }
+
+    init(
+        settingsStore: SonoicSettingsStore = SonoicSettingsStore(),
+        sonosControlAPIClient: SonosControlAPIClient = SonosControlAPIClient(),
+        sonosOAuthConfiguration: SonosOAuthConfiguration = SonosOAuthConfiguration.load(),
+        sonoicCloudQueueClient: SonoicCloudQueueClient = SonoicCloudQueueClient(),
+        keychainStore: SonoicKeychainStore = SonoicKeychainStore(),
+        startInitialSonosControlAPICloudRefresh: Bool = true
+    ) {
+        self.settingsStore = settingsStore
+        let lanSOAPTransport = SonosControlTransport()
         sonosDiscoveryBrowser = SonosBonjourBrowser()
-        deviceInfoClient = SonosDeviceInfoClient(transport: sonosControlTransport)
-        zoneGroupTopologyClient = SonosZoneGroupTopologyClient(transport: sonosControlTransport)
-        renderingControlClient = SonosRenderingControlClient(transport: sonosControlTransport)
-        groupRenderingControlClient = SonosGroupRenderingControlClient(transport: sonosControlTransport)
-        htControlClient = SonosHTControlClient(transport: sonosControlTransport)
-        avTransportClient = SonosAVTransportClient(transport: sonosControlTransport)
-        nowPlayingClient = SonosNowPlayingClient(transport: sonosControlTransport)
-        queueClient = SonosQueueClient(transport: sonosControlTransport)
-        favoritesClient = SonosFavoritesClient(transport: sonosControlTransport)
-        musicServicesClient = SonosMusicServicesClient(transport: sonosControlTransport)
-        contentDirectoryProbeClient = SonosContentDirectoryProbeClient(transport: sonosControlTransport)
-        sonosControlAPIClient = SonosControlAPIClient()
+        deviceInfoClient = SonosDeviceInfoClient(transport: lanSOAPTransport)
+        zoneGroupTopologyClient = SonosZoneGroupTopologyClient(transport: lanSOAPTransport)
+        renderingControlClient = SonosRenderingControlClient(transport: lanSOAPTransport)
+        groupRenderingControlClient = SonosGroupRenderingControlClient(transport: lanSOAPTransport)
+        htControlClient = SonosHTControlClient(transport: lanSOAPTransport)
+        avTransportClient = SonosAVTransportClient(transport: lanSOAPTransport)
+        nowPlayingClient = SonosNowPlayingClient(transport: lanSOAPTransport)
+        queueClient = SonosQueueClient(transport: lanSOAPTransport)
+        favoritesClient = SonosFavoritesClient(transport: lanSOAPTransport)
+        musicServicesClient = SonosMusicServicesClient(transport: lanSOAPTransport)
+        contentDirectoryProbeClient = SonosContentDirectoryProbeClient(transport: lanSOAPTransport)
+        self.sonosControlAPIClient = sonosControlAPIClient
         appleMusicCatalogSearchClient = SonoicAppleMusicCatalogSearchClient()
-        sonosOAuthConfiguration = SonosOAuthConfiguration.load()
+        self.sonosOAuthConfiguration = sonosOAuthConfiguration
         sonosOAuthClient = SonosOAuthClient()
         sonosTokenBrokerClient = SonosTokenBrokerClient()
-        sonoicCloudQueueClient = SonoicCloudQueueClient()
-        keychainStore = SonoicKeychainStore()
+        self.sonoicCloudQueueClient = sonoicCloudQueueClient
+        self.keychainStore = keychainStore
         sonosOAuthWebAuthenticator = SonosOAuthWebAuthenticator()
         nowPlayableSessionController = SonoicNowPlayableSessionController()
         plusController = SonoicPlusController()
@@ -320,6 +332,8 @@ final class SonoicModel {
         configureNowPlayableSessionController()
         configureSonosDiscoveryBrowser()
         refreshSonosControlAPIAuthorizationState()
-        refreshSonosControlAPICloudSnapshotIfConnected()
+        if startInitialSonosControlAPICloudRefresh {
+            refreshSonosControlAPICloudSnapshotIfConnected()
+        }
     }
 }

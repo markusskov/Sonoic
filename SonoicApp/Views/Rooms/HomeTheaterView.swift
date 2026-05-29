@@ -64,7 +64,7 @@ struct HomeTheaterView: View {
             ContentUnavailableView {
                 Label("No Room Selected", systemImage: "speaker.slash.fill")
             } description: {
-                Text("Choose a discovered Sonos room before tuning home theater controls.")
+                Text("Choose a room first.")
             } actions: {
                 Button("Open Rooms") {
                     model.selectedTab = .rooms
