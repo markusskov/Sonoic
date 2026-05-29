@@ -10,6 +10,7 @@ const CLOUD_QUEUE_TTL_SECONDS = 24 * 60 * 60;
 const CLOUD_QUEUE_PRUNE_GRACE_SECONDS = 60;
 const CLOUD_QUEUE_MAX_WINDOW_ITEMS = 20;
 const JSON_BODY_MAX_BYTES = 1024 * 1024;
+const CLOUD_QUEUE_MAX_STRING_BYTES = 4096;
 const EXTERNAL_ORIGIN_HEADER = 'X-Sonoic-External-Origin';
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -187,6 +188,11 @@ export class SonoicCloudQueues {
 		if (uniqueItemIDs.size !== itemIDs.length) {
 			throw new HTTPError(400, 'cloud_queue_item_ids_must_be_unique');
 		}
+
+		validateCloudQueueStringValues(container, 'container');
+		items.forEach((item, index) => {
+			validateCloudQueueStringValues(item, `items.${index}`, new Set([`items.${index}.id`]));
+		});
 
 		const requestedStartItemID = optionalString(body, 'startItemId');
 		const startItemId = requestedStartItemID && uniqueItemIDs.has(requestedStartItemID)
@@ -812,6 +818,27 @@ function validateCloudQueueItem(item: JsonObject, index: number): string {
 	const track = requiredCloudQueueTrack(item, index);
 	validateCloudQueueTrack(track, index);
 	return id;
+}
+
+function validateCloudQueueStringValues(value: unknown, path: string, skippedPaths: Set<string> = new Set()): void {
+	if (typeof value === 'string') {
+		if (!skippedPaths.has(path) && textEncoder.encode(value).byteLength > CLOUD_QUEUE_MAX_STRING_BYTES) {
+			throw new HTTPError(400, `cloud_queue_string_too_long:${path}`);
+		}
+
+		return;
+	}
+
+	if (Array.isArray(value)) {
+		value.forEach((entry, index) => validateCloudQueueStringValues(entry, `${path}.${index}`, skippedPaths));
+		return;
+	}
+
+	if (isJsonObject(value)) {
+		Object.entries(value).forEach(([key, entry]) => {
+			validateCloudQueueStringValues(entry, `${path}.${key}`, skippedPaths);
+		});
+	}
 }
 
 function validatedCloudQueueItemID(item: JsonObject, index: number): string {

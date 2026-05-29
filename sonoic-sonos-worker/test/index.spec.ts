@@ -398,6 +398,41 @@ describe('Sonoic Cloud Queue worker', () => {
 		expect(response.status).toBe(400);
 		await expect(response.json()).resolves.toMatchObject({ error });
 	});
+
+	it.each([
+		{
+			name: 'container name',
+			mutate: (body: Record<string, unknown>) => {
+				const container = body.container as Record<string, unknown>;
+				container.name = overlongCloudQueueString();
+			},
+			error: 'cloud_queue_string_too_long:container.name',
+		},
+		{
+			name: 'track name',
+			mutate: (body: Record<string, unknown>) => {
+				cloudQueueTrack(body, 0).name = overlongCloudQueueString();
+			},
+			error: 'cloud_queue_string_too_long:items.0.track.name',
+		},
+		{
+			name: 'nested track artist name',
+			mutate: (body: Record<string, unknown>) => {
+				const artist = cloudQueueTrack(body, 0).artist as Record<string, unknown>;
+				artist.name = overlongCloudQueueString();
+			},
+			error: 'cloud_queue_string_too_long:items.0.track.artist.name',
+		},
+	])('rejects cloud queue payloads with overlong $name', async ({ mutate, error }) => {
+		stubSuccessfulSonosTokenValidation();
+		const body = cloudQueueBody();
+		mutate(body);
+
+		const response = await createCloudQueueFromBody(body);
+
+		expect(response.status).toBe(400);
+		await expect(response.json()).resolves.toMatchObject({ error });
+	});
 });
 
 function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
@@ -483,6 +518,10 @@ function cloudQueueItem(body: Record<string, unknown>, index: number): Record<st
 
 function cloudQueueTrack(body: Record<string, unknown>, index: number): Record<string, unknown> {
 	return cloudQueueItem(body, index).track as Record<string, unknown>;
+}
+
+function overlongCloudQueueString(): string {
+	return 'x'.repeat(4097);
 }
 
 function makeRedemptionNamespace(): DurableObjectNamespace {
