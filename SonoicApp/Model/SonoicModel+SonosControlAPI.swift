@@ -24,6 +24,11 @@ extension SonoicModel {
         }
     }
 
+    private struct SonosControlAPICloudQueueLoadResult {
+        var cloudQueue: SonoicCloudQueueCreateResponse
+        var sessionID: String
+    }
+
     private struct SonosControlAPILoadRollbackState {
         private let queueState: SonosQueueState
         private let nowPlaying: SonosNowPlayingSnapshot
@@ -1541,91 +1546,23 @@ extension SonoicModel {
             description: "Cloud queue",
             refreshQueueAfterSuccess: false
         ) {
-            sonoicPlaybackDebugLog(
-                "cloudQueue createQueue start parent='\(parentItem.title)' items=\(request.items.count) startItem=\(sonoicPlaybackDebugID(request.startItemId)) accountID=\(sonoicPlaybackDebugID(serviceAccountID))"
-            )
-            let cloudQueue: SonoicCloudQueueCreateResponse
-            do {
-                cloudQueue = try await sonoicCloudQueueClient.createQueue(
-                    request,
-                    configuration: sonosOAuthConfiguration,
-                    accessToken: context.accessToken
-                )
-            } catch {
-                sonoicPlaybackDebugLog(
-                    "cloudQueue createQueue failed parent='\(parentItem.title)' error='\(error.localizedDescription)'"
-                )
-                throw error
-            }
-            sonoicPlaybackDebugLog(
-                "cloudQueue createQueue success queue=\(sonoicPlaybackDebugID(cloudQueue.queueId)) version=\(sonoicPlaybackDebugID(cloudQueue.queueVersion)) startItem=\(sonoicPlaybackDebugID(cloudQueue.startItemId)) base='\(cloudQueue.queueBaseUrl)'"
-            )
-            sonoicPlaybackDebugLog(
-                "cloudQueue createSession start group=\(sonoicPlaybackDebugID(context.groupID)) accountID=\(sonoicPlaybackDebugID(serviceAccountID))"
-            )
-            let sessionStatus: SonosControlAPISessionStatus
-            do {
-                sessionStatus = try await sonosControlAPIClient.createPlaybackSession(
-                    groupID: context.groupID,
-                    appID: "Sonoic",
-                    appContext: parentItem.title,
-                    accountID: serviceAccountID,
-                    customData: parentItem.id,
-                    accessToken: context.accessToken
-                )
-            } catch {
-                sonoicPlaybackDebugLog(
-                    "cloudQueue createSession failed group=\(sonoicPlaybackDebugID(context.groupID)) accountID=\(sonoicPlaybackDebugID(serviceAccountID)) error='\(error.localizedDescription)'"
-                )
-                throw error
-            }
-            guard let sessionID = sessionStatus.sessionId?.sonoicNonEmptyTrimmed else {
-                sonoicPlaybackDebugLog(
-                    "cloudQueue createSession invalidSessionID group=\(sonoicPlaybackDebugID(context.groupID))"
-                )
-                throw SonosControlAPITransport.TransportError.invalidResponse
-            }
-            sonoicPlaybackDebugLog(
-                "cloudQueue createSession success session=\(sonoicPlaybackDebugID(sessionID))"
-            )
-            sonoicPlaybackDebugLog(
-                "cloudQueue load session=\(sonoicPlaybackDebugID(sessionID)) queue=\(sonoicPlaybackDebugID(cloudQueue.queueId)) startItem=\(sonoicPlaybackDebugID(cloudQueue.startItemId))"
-            )
-            do {
-                try await sonosControlAPIClient.loadCloudQueue(
-                    sessionID: sessionID,
-                    request: SonosControlAPILoadCloudQueueRequest(
-                        queueBaseUrl: cloudQueue.queueBaseUrl,
-                        httpAuthorization: nil,
-                        useHttpAuthorizationForMedia: nil,
-                        itemId: cloudQueue.startItemId,
-                        queueVersion: cloudQueue.queueVersion,
-                        positionMillis: 0,
-                        playOnCompletion: true,
-                        trackMetadata: cloudQueue.trackMetadata
-                    ),
-                    accessToken: context.accessToken
-                )
-            } catch {
-                sonoicPlaybackDebugLog(
-                    "cloudQueue load failed session=\(sonoicPlaybackDebugID(sessionID)) queue=\(sonoicPlaybackDebugID(cloudQueue.queueId)) startItem=\(sonoicPlaybackDebugID(cloudQueue.startItemId)) version=\(sonoicPlaybackDebugID(cloudQueue.queueVersion)) base='\(cloudQueue.queueBaseUrl)' error='\(error.localizedDescription)'"
-                )
-                throw error
-            }
-            sonoicPlaybackDebugLog(
-                "cloudQueue load success session=\(sonoicPlaybackDebugID(sessionID))"
+            let loadResult = try await loadSonosControlAPICloudQueue(
+                parentItem: parentItem,
+                request: request,
+                context: context,
+                serviceAccountID: serviceAccountID
             )
             sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
-                sessionID: sessionID,
+                sessionID: loadResult.sessionID,
                 groupID: context.groupID,
-                queueVersion: cloudQueue.queueVersion,
+                queueVersion: loadResult.cloudQueue.queueVersion,
                 itemIDs: queueItemIDs,
                 tracks: queueTracks
             )
             persistSonosControlAPICloudQueueContext()
             if let snapshot = sonosControlAPICloudQueueSnapshot(
                 currentItemIndex: startIndex,
-                sourceURI: "sonoic-cloud-queue:\(cloudQueue.queueId)"
+                sourceURI: "sonoic-cloud-queue:\(loadResult.cloudQueue.queueId)"
             ) {
                 queueState = .loaded(snapshot)
                 queueDiagnostics = SonosQueueDiagnostics(
@@ -1656,6 +1593,92 @@ extension SonoicModel {
             )
         }
         return didLoad
+    }
+
+    private func loadSonosControlAPICloudQueue(
+        parentItem: SonoicSourceItem,
+        request: SonoicCloudQueueCreateRequest,
+        context: SonosControlAPICommandContext,
+        serviceAccountID: String?
+    ) async throws -> SonosControlAPICloudQueueLoadResult {
+        sonoicPlaybackDebugLog(
+            "cloudQueue createQueue start parent='\(parentItem.title)' items=\(request.items.count) startItem=\(sonoicPlaybackDebugID(request.startItemId)) accountID=\(sonoicPlaybackDebugID(serviceAccountID))"
+        )
+        let cloudQueue: SonoicCloudQueueCreateResponse
+        do {
+            cloudQueue = try await sonoicCloudQueueClient.createQueue(
+                request,
+                configuration: sonosOAuthConfiguration,
+                accessToken: context.accessToken
+            )
+        } catch {
+            sonoicPlaybackDebugLog(
+                "cloudQueue createQueue failed parent='\(parentItem.title)' error='\(error.localizedDescription)'"
+            )
+            throw error
+        }
+        sonoicPlaybackDebugLog(
+            "cloudQueue createQueue success queue=\(sonoicPlaybackDebugID(cloudQueue.queueId)) version=\(sonoicPlaybackDebugID(cloudQueue.queueVersion)) startItem=\(sonoicPlaybackDebugID(cloudQueue.startItemId)) base='\(cloudQueue.queueBaseUrl)'"
+        )
+        sonoicPlaybackDebugLog(
+            "cloudQueue createSession start group=\(sonoicPlaybackDebugID(context.groupID)) accountID=\(sonoicPlaybackDebugID(serviceAccountID))"
+        )
+        let sessionStatus: SonosControlAPISessionStatus
+        do {
+            sessionStatus = try await sonosControlAPIClient.createPlaybackSession(
+                groupID: context.groupID,
+                appID: "Sonoic",
+                appContext: parentItem.title,
+                accountID: serviceAccountID,
+                customData: parentItem.id,
+                accessToken: context.accessToken
+            )
+        } catch {
+            sonoicPlaybackDebugLog(
+                "cloudQueue createSession failed group=\(sonoicPlaybackDebugID(context.groupID)) accountID=\(sonoicPlaybackDebugID(serviceAccountID)) error='\(error.localizedDescription)'"
+            )
+            throw error
+        }
+        guard let sessionID = sessionStatus.sessionId?.sonoicNonEmptyTrimmed else {
+            sonoicPlaybackDebugLog(
+                "cloudQueue createSession invalidSessionID group=\(sonoicPlaybackDebugID(context.groupID))"
+            )
+            throw SonosControlAPITransport.TransportError.invalidResponse
+        }
+        sonoicPlaybackDebugLog(
+            "cloudQueue createSession success session=\(sonoicPlaybackDebugID(sessionID))"
+        )
+        sonoicPlaybackDebugLog(
+            "cloudQueue load session=\(sonoicPlaybackDebugID(sessionID)) queue=\(sonoicPlaybackDebugID(cloudQueue.queueId)) startItem=\(sonoicPlaybackDebugID(cloudQueue.startItemId))"
+        )
+        do {
+            try await sonosControlAPIClient.loadCloudQueue(
+                sessionID: sessionID,
+                request: SonosControlAPILoadCloudQueueRequest(
+                    queueBaseUrl: cloudQueue.queueBaseUrl,
+                    httpAuthorization: nil,
+                    useHttpAuthorizationForMedia: nil,
+                    itemId: cloudQueue.startItemId,
+                    queueVersion: cloudQueue.queueVersion,
+                    positionMillis: 0,
+                    playOnCompletion: true,
+                    trackMetadata: cloudQueue.trackMetadata
+                ),
+                accessToken: context.accessToken
+            )
+        } catch {
+            sonoicPlaybackDebugLog(
+                "cloudQueue load failed session=\(sonoicPlaybackDebugID(sessionID)) queue=\(sonoicPlaybackDebugID(cloudQueue.queueId)) startItem=\(sonoicPlaybackDebugID(cloudQueue.startItemId)) version=\(sonoicPlaybackDebugID(cloudQueue.queueVersion)) base='\(cloudQueue.queueBaseUrl)' error='\(error.localizedDescription)'"
+            )
+            throw error
+        }
+        sonoicPlaybackDebugLog(
+            "cloudQueue load success session=\(sonoicPlaybackDebugID(sessionID))"
+        )
+        return SonosControlAPICloudQueueLoadResult(
+            cloudQueue: cloudQueue,
+            sessionID: sessionID
+        )
     }
 
     private func sonosControlAPICloudQueueCreateRequest(
