@@ -235,6 +235,25 @@ describe('Sonos OAuth worker', () => {
 		await expect(response.json()).resolves.toMatchObject({ error: 'request_body_too_large' });
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
+
+	it('accepts Sonos event callbacks as an intentional no-op', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/events', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ event: 'ignored' }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(202);
+		await expect(response.json()).resolves.toMatchObject({ success: true });
+		expect(response.headers.get('cache-control')).toBe('no-store');
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
 });
 
 describe('Sonoic Cloud Queue worker', () => {

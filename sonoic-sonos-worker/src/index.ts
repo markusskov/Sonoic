@@ -376,7 +376,7 @@ export default {
 			}
 
 			if (request.method === 'POST' && url.pathname === '/api/sonos/events') {
-				return jsonResponse(202, { success: true });
+				return handleSonosEventCallback();
 			}
 
 			if (request.method === 'POST' && url.pathname === '/api/sonos/cloud-queues') {
@@ -397,6 +397,11 @@ export default {
 		}
 	},
 } satisfies ExportedHandler<Env>;
+
+function handleSonosEventCallback(): Response {
+	// Sonos requires a reachable event callback URL, but Sonoic does not consume event payloads yet.
+	return jsonResponse(202, { success: true });
+}
 
 async function handleCreateCloudQueue(request: Request, env: WorkerEnv): Promise<Response> {
 	const accessToken = requireBearerAccessToken(request);
