@@ -190,8 +190,10 @@ export class SonoicCloudQueues {
 		}
 
 		validateCloudQueueStringValues(container, 'container');
+		validateCloudQueueURLValues(container, 'container');
 		items.forEach((item, index) => {
 			validateCloudQueueStringValues(item, `items.${index}`, new Set([`items.${index}.id`]));
+			validateCloudQueueURLValues(item, `items.${index}`);
 		});
 
 		const requestedStartItemID = optionalString(body, 'startItemId');
@@ -838,6 +840,40 @@ function validateCloudQueueStringValues(value: unknown, path: string, skippedPat
 		Object.entries(value).forEach(([key, entry]) => {
 			validateCloudQueueStringValues(entry, `${path}.${key}`, skippedPaths);
 		});
+	}
+}
+
+function validateCloudQueueURLValues(value: unknown, path: string): void {
+	if (typeof value === 'string') {
+		if (pathKey(path).toLowerCase().endsWith('url') && value.length > 0 && !isHTTPURL(value)) {
+			throw new HTTPError(400, `cloud_queue_url_invalid:${path}`);
+		}
+
+		return;
+	}
+
+	if (Array.isArray(value)) {
+		value.forEach((entry, index) => validateCloudQueueURLValues(entry, `${path}.${index}`));
+		return;
+	}
+
+	if (isJsonObject(value)) {
+		Object.entries(value).forEach(([key, entry]) => {
+			validateCloudQueueURLValues(entry, `${path}.${key}`);
+		});
+	}
+}
+
+function pathKey(path: string): string {
+	return path.split('.').at(-1) ?? path;
+}
+
+function isHTTPURL(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === 'http:' || url.protocol === 'https:';
+	} catch {
+		return false;
 	}
 }
 

@@ -433,6 +433,41 @@ describe('Sonoic Cloud Queue worker', () => {
 		expect(response.status).toBe(400);
 		await expect(response.json()).resolves.toMatchObject({ error });
 	});
+
+	it.each([
+		{
+			name: 'container image URL',
+			mutate: (body: Record<string, unknown>) => {
+				const container = body.container as Record<string, unknown>;
+				container.imageUrl = 'javascript:alert(1)';
+			},
+			error: 'cloud_queue_url_invalid:container.imageUrl',
+		},
+		{
+			name: 'track media URL',
+			mutate: (body: Record<string, unknown>) => {
+				cloudQueueTrack(body, 0).mediaUrl = 'file:///tmp/track.m4a';
+			},
+			error: 'cloud_queue_url_invalid:items.0.track.mediaUrl',
+		},
+		{
+			name: 'nested service image URL',
+			mutate: (body: Record<string, unknown>) => {
+				const service = cloudQueueTrack(body, 0).service as Record<string, unknown>;
+				service.imageUrl = 'ftp://example.com/service.png';
+			},
+			error: 'cloud_queue_url_invalid:items.0.track.service.imageUrl',
+		},
+	])('rejects cloud queue payloads with invalid $name', async ({ mutate, error }) => {
+		stubSuccessfulSonosTokenValidation();
+		const body = cloudQueueBody();
+		mutate(body);
+
+		const response = await createCloudQueueFromBody(body);
+
+		expect(response.status).toBe(400);
+		await expect(response.json()).resolves.toMatchObject({ error });
+	});
 });
 
 function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
