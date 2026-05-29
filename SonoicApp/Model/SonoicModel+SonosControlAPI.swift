@@ -40,7 +40,27 @@ extension SonoicModel {
         sonosControlAPIState.authorizationStatus = .notConfigured
         sonosControlAPIState.lastErrorDetail = detail
         sonosControlAPIState.lastUpdatedAt = .now
+        clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
+    }
+
+    func clearSonosControlAPIPlaybackContextAfterAuthorizationLoss() {
+        let queueSnapshotIsCloudOwned = queueState.snapshot?.sourceURI?
+            .lowercased()
+            .hasPrefix("sonoic-cloud-queue") == true
+        clearManualSeekConfirmation()
+        manualPlaybackContextPayload = nil
+        manualQueueContextPayloads = nil
+        manualRecentPlaybackContextPayload = nil
         clearSonosControlAPICloudQueueContext()
+        if queueSnapshotIsCloudOwned {
+            queueState = .idle
+            queueOperationErrorDetail = nil
+            queueDiagnostics = .empty
+            isQueueRefreshing = false
+            isQueueClearing = false
+            isQueueMutating = false
+        }
+        persistSharedExternalControlState(forceImmediate: true)
     }
 
     func activeSonosControlAPIGroupID() -> String? {
@@ -181,6 +201,7 @@ extension SonoicModel {
         }
 
         let previousNowPlaying = nowPlaying
+        let previousNowPlayingObservedAt = nowPlayingObservedAt
         beginManualPlayTransitionGrace()
         markLocalPlaybackState(.playing)
 
@@ -196,6 +217,8 @@ extension SonoicModel {
 
         if !didPlay {
             nowPlaying = previousNowPlaying
+            nowPlayingObservedAt = previousNowPlayingObservedAt
+            persistSharedExternalControlState()
         }
 
         return didPlay
@@ -207,6 +230,7 @@ extension SonoicModel {
         }
 
         let previousNowPlaying = nowPlaying
+        let previousNowPlayingObservedAt = nowPlayingObservedAt
         manualPlayTransitionGraceDeadline = nil
         setManualPlayTransitionAwaitingConfirmation(false)
         freezeLocalPlaybackTimeIfNeeded()
@@ -224,6 +248,8 @@ extension SonoicModel {
 
         if !didPause {
             nowPlaying = previousNowPlaying
+            nowPlayingObservedAt = previousNowPlayingObservedAt
+            persistSharedExternalControlState()
         }
 
         return didPause
@@ -234,13 +260,16 @@ extension SonoicModel {
             return false
         }
 
+        let previousNowPlaying = nowPlaying
+        let previousNowPlayingObservedAt = nowPlayingObservedAt
+        let previousPlaybackContextPayload = manualPlaybackContextPayload
         manualPlaybackContextPayload = nil
         if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
             beginManualPlayTransitionGrace()
             markLocalPlaybackState(.playing)
         }
 
-        return await performSonosControlAPITransportCommand(
+        let didSkip = await performSonosControlAPITransportCommand(
             description: "Cloud next",
             refreshQueueAfterSuccess: true
         ) {
@@ -249,6 +278,15 @@ extension SonoicModel {
                 accessToken: context.accessToken
             )
         }
+
+        if !didSkip {
+            nowPlaying = previousNowPlaying
+            nowPlayingObservedAt = previousNowPlayingObservedAt
+            manualPlaybackContextPayload = previousPlaybackContextPayload
+            persistSharedExternalControlState()
+        }
+
+        return didSkip
     }
 
     func skipToPreviousSonosControlAPITrackIfAvailable() async -> Bool {
@@ -256,13 +294,16 @@ extension SonoicModel {
             return false
         }
 
+        let previousNowPlaying = nowPlaying
+        let previousNowPlayingObservedAt = nowPlayingObservedAt
+        let previousPlaybackContextPayload = manualPlaybackContextPayload
         manualPlaybackContextPayload = nil
         if nowPlaying.playbackState == .playing || nowPlaying.playbackState == .buffering {
             beginManualPlayTransitionGrace()
             markLocalPlaybackState(.playing)
         }
 
-        return await performSonosControlAPITransportCommand(
+        let didSkip = await performSonosControlAPITransportCommand(
             description: "Cloud previous",
             refreshQueueAfterSuccess: true
         ) {
@@ -271,6 +312,15 @@ extension SonoicModel {
                 accessToken: context.accessToken
             )
         }
+
+        if !didSkip {
+            nowPlaying = previousNowPlaying
+            nowPlayingObservedAt = previousNowPlayingObservedAt
+            manualPlaybackContextPayload = previousPlaybackContextPayload
+            persistSharedExternalControlState()
+        }
+
+        return didSkip
     }
 
     func seekSonosControlAPIPlaybackIfAvailable(to timeInterval: TimeInterval) async -> Bool {
@@ -810,7 +860,7 @@ extension SonoicModel {
             if isSonosControlAPIAuthorizationFailure(error) {
                 sonosControlAPIState.authorizationStatus = .expired
                 sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
-                clearSonosControlAPICloudQueueContext()
+                clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
             }
             manualHostRefreshStatus = .failed(error.localizedDescription)
             return false
@@ -883,8 +933,26 @@ extension SonoicModel {
             transportActions: sonosControlAPITransportActions(
                 playbackStatus: playbackStatus,
                 metadataStatus: metadataStatus
-            )
+            ),
+            quality: sonosControlAPINowPlayingQuality(from: track?.quality ?? cloudQueueTrack?.quality)
         )
+    }
+
+    private func sonosControlAPINowPlayingQuality(
+        from quality: SonosControlAPITrackQuality?
+    ) -> SonosNowPlayingQuality? {
+        guard let quality else {
+            return nil
+        }
+
+        let nowPlayingQuality = SonosNowPlayingQuality(
+            bitDepth: quality.bitDepth,
+            sampleRate: quality.sampleRate,
+            codec: quality.codec,
+            lossless: quality.lossless,
+            immersive: quality.immersive
+        )
+        return nowPlayingQuality.hasDisplayBadges ? nowPlayingQuality : nil
     }
 
     private func sonosControlAPILineInNowPlayingSnapshot(
@@ -2023,7 +2091,7 @@ extension SonoicModel {
             if isSonosControlAPIAuthorizationFailure(error) {
                 sonosControlAPIState.authorizationStatus = .expired
                 sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
-                clearSonosControlAPICloudQueueContext()
+                clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
             }
             manualHostRefreshStatus = .failed(error.localizedDescription)
             startManualHostRefreshLoopIfPossible()
@@ -2032,11 +2100,15 @@ extension SonoicModel {
     }
 
     func isSonosControlAPIAuthorizationFailure(_ error: Error) -> Bool {
-        guard let transportError = error as? SonosControlAPITransport.TransportError else {
-            return false
+        if let transportError = error as? SonosControlAPITransport.TransportError {
+            return transportError.isAuthorizationFailure
         }
 
-        return transportError.isAuthorizationFailure
+        if let cloudQueueError = error as? SonoicCloudQueueClient.ClientError {
+            return cloudQueueError.isAuthorizationFailure
+        }
+
+        return false
     }
 }
 

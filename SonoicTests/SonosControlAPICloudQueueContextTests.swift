@@ -4,6 +4,27 @@ import Testing
 @MainActor
 struct SonosControlAPICloudQueueContextTests {
     @Test
+    func cloudQueueUnauthorizedStatusExpiresSonosControlAPIAuth() {
+        let model = SonoicModel()
+
+        #expect(
+            model.isSonosControlAPIAuthorizationFailure(
+                SonoicCloudQueueClient.ClientError.httpStatus(401, nil)
+            )
+        )
+        #expect(
+            model.isSonosControlAPIAuthorizationFailure(
+                SonoicCloudQueueClient.ClientError.httpStatus(403, "Forbidden")
+            )
+        )
+        #expect(
+            !model.isSonosControlAPIAuthorizationFailure(
+                SonoicCloudQueueClient.ClientError.httpStatus(500, "Server error")
+            )
+        )
+    }
+
+    @Test
     func inMemoryCloudQueueContextSurvivesQueueVersionDrift() {
         let model = SonoicModel()
         model.sonosControlAPICloudQueueSessionID = "session-1"

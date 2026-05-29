@@ -11,6 +11,10 @@ extension SonoicModel {
         return hasManualSonosHost
     }
 
+    var allowsLocalManualTransportCommands: Bool {
+        !sonosControlAPIState.settings.mode.canSendCommands
+    }
+
     func toggleManualSonosPlayback() async {
         switch nowPlaying.playbackState {
         case .playing:
@@ -272,6 +276,11 @@ extension SonoicModel {
         localNowPlayingPayload: SonosPlayablePayload? = nil,
         recentPlaybackPayload: SonosPlayablePayload? = nil
     ) async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            sonoicPlaybackDebugLog("manualPayload cloudMode noLocalPlaybackFallback=true title='\(payload.title)'")
+            return false
+        }
+
         guard let preparedPayload = try? SonosPlayablePayloadPreparer().prepare(payload) else {
             return false
         }
@@ -330,6 +339,11 @@ extension SonoicModel {
         localNowPlayingPayload: SonosPlayablePayload? = nil,
         recentPlaybackPayload: SonosPlayablePayload? = nil
     ) async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            sonoicPlaybackDebugLog("manualQueuePayloads cloudMode noLocalPlaybackFallback=true count=\(payloads.count)")
+            return false
+        }
+
         guard !payloads.isEmpty,
               startingTrackNumber > 0,
               startingTrackNumber <= payloads.count

@@ -64,7 +64,7 @@ extension SonoicModel {
                 sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
                 sonosControlAPIState.authorizationStatus = .expired
                 sonosControlAPICloudState = .idle
-                clearSonosControlAPICloudQueueContext()
+                clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
                 return nil
             }
 
@@ -96,7 +96,7 @@ extension SonoicModel {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
             sonosControlAPIState.authorizationStatus = .expired
             sonosControlAPICloudState = .idle
-            clearSonosControlAPICloudQueueContext()
+            clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
             recordSonosControlAPIError(error)
             if let logPrefix {
                 sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false error='\(error.localizedDescription)'")
@@ -149,7 +149,7 @@ extension SonoicModel {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
             sonosControlAPIState.authorizationStatus = .expired
             sonosControlAPICloudState = .idle
-            clearSonosControlAPICloudQueueContext()
+            clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
             recordSonosControlAPIError(error)
             if let logPrefix {
                 sonoicPlaybackDebugLog("\(logPrefix) refreshToken result=false error='\(error.localizedDescription)'")
@@ -272,7 +272,7 @@ extension SonoicModel {
             sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
             sonosControlAPIState.authorizationStatus = .expired
             sonosControlAPICloudState = SonosControlAPICloudState(status: .failed(error.localizedDescription))
-            clearSonosControlAPICloudQueueContext()
+            clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
         } catch {
             sonosControlAPICloudState = SonosControlAPICloudState(status: .failed(error.localizedDescription))
         }

@@ -242,13 +242,17 @@ extension SonoicModel {
             if isSonosControlAPIAuthorizationFailure(error) {
                 sonosControlAPIState.authorizationStatus = .expired
                 sonosControlAPIAuthorizationState = SonosControlAPIAuthorizationState(status: .expired)
-                clearSonosControlAPICloudQueueContext()
+                clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
             }
             return false
         }
     }
 
     func clearQueue() async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            return recordLocalQueueMutationUnavailableInCloudMode()
+        }
+
         guard hasManualSonosHost else {
             queueState = .idle
             isQueueClearing = false
@@ -282,6 +286,10 @@ extension SonoicModel {
     }
 
     func removeQueueItems(atOffsets offsets: IndexSet) async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            return recordLocalQueueMutationUnavailableInCloudMode()
+        }
+
         guard let snapshot = queueState.snapshot else {
             return false
         }
@@ -309,6 +317,10 @@ extension SonoicModel {
     }
 
     func moveQueueItems(fromOffsets source: IndexSet, toOffset destination: Int) async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            return recordLocalQueueMutationUnavailableInCloudMode()
+        }
+
         guard let snapshot = queueState.snapshot else {
             return false
         }
@@ -357,6 +369,10 @@ extension SonoicModel {
         optimisticSnapshot: SonosQueueSnapshot,
         action: (String) async throws -> Void
     ) async -> Bool {
+        guard allowsLocalManualTransportCommands else {
+            return recordLocalQueueMutationUnavailableInCloudMode()
+        }
+
         guard hasManualSonosHost,
               !isQueueRefreshing,
               !isQueueClearing,
@@ -429,6 +445,12 @@ extension SonoicModel {
         queueOperationErrorDetail = SonosQueueClient.ClientError
             .unavailableForCurrentSource(currentURI: sourceURI)
             .localizedDescription
+        queueDiagnostics.lastMutationErrorDetail = queueOperationErrorDetail
+        return false
+    }
+
+    private func recordLocalQueueMutationUnavailableInCloudMode() -> Bool {
+        queueOperationErrorDetail = "Queue edits are unavailable while Sonos Cloud command mode is active."
         queueDiagnostics.lastMutationErrorDetail = queueOperationErrorDetail
         return false
     }
