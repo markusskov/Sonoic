@@ -99,9 +99,7 @@ extension SonoicModel {
     }
 
     func clearSonosControlAPIPlaybackContextAfterAuthorizationLoss() {
-        let queueSnapshotIsCloudOwned = queueState.snapshot?.sourceURI?
-            .lowercased()
-            .hasPrefix("sonoic-cloud-queue") == true
+        let queueSnapshotIsCloudOwned = queueState.isSonosControlAPICloudQueueBacked
         clearManualSeekConfirmation()
         manualPlaybackContextPayload = nil
         manualQueueContextPayloads = nil
