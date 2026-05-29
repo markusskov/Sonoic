@@ -196,6 +196,45 @@ describe('Sonos OAuth worker', () => {
 		await expect(response.json()).resolves.toMatchObject({ error: 'invalid_broker_code' });
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
+
+	it('rejects oversized JSON bodies from content length before parsing', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token/refresh', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Content-Length': String(1024 * 1024 + 1),
+			},
+			body: JSON.stringify({ refresh_token: 'refresh-1' }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(413);
+		await expect(response.json()).resolves.toMatchObject({ error: 'request_body_too_large' });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('rejects oversized JSON bodies after measuring the actual body bytes', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token/refresh', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refresh_token: 'x'.repeat(1024 * 1024) }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(413);
+		await expect(response.json()).resolves.toMatchObject({ error: 'request_body_too_large' });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
 });
 
 describe('Sonoic Cloud Queue worker', () => {

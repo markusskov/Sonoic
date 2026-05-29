@@ -9,6 +9,7 @@ const CLOUD_QUEUE_STORAGE_PREFIX = 'cloud-queue:';
 const CLOUD_QUEUE_TTL_SECONDS = 24 * 60 * 60;
 const CLOUD_QUEUE_PRUNE_GRACE_SECONDS = 60;
 const CLOUD_QUEUE_MAX_WINDOW_ITEMS = 20;
+const JSON_BODY_MAX_BYTES = 1024 * 1024;
 const EXTERNAL_ORIGIN_HEADER = 'X-Sonoic-External-Origin';
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -540,9 +541,22 @@ function redirectToApp(env: WorkerEnv, query: Record<string, string>): Response 
 }
 
 async function readJson(request: Request): Promise<JsonObject> {
+	const contentLength = request.headers.get('Content-Length');
+	if (contentLength !== null) {
+		const parsedContentLength = Number.parseInt(contentLength, 10);
+		if (Number.isFinite(parsedContentLength) && parsedContentLength > JSON_BODY_MAX_BYTES) {
+			throw new HTTPError(413, 'request_body_too_large');
+		}
+	}
+
+	const text = await request.text();
+	if (textEncoder.encode(text).byteLength > JSON_BODY_MAX_BYTES) {
+		throw new HTTPError(413, 'request_body_too_large');
+	}
+
 	let body: unknown;
 	try {
-		body = await request.json();
+		body = JSON.parse(text);
 	} catch {
 		throw new HTTPError(400, 'request_body_must_be_json');
 	}
