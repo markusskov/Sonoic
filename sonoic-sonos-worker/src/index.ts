@@ -794,6 +794,13 @@ function currentEpochSeconds(): number {
 }
 
 function validateCloudQueueItem(item: JsonObject, index: number): string {
+	const id = validatedCloudQueueItemID(item, index);
+	const track = requiredCloudQueueTrack(item, index);
+	validateCloudQueueTrack(track, index);
+	return id;
+}
+
+function validatedCloudQueueItemID(item: JsonObject, index: number): string {
 	const id = optionalString(item, 'id');
 	if (!id) {
 		throw new HTTPError(400, `cloud_queue_item_missing_id:${index}`);
@@ -803,21 +810,34 @@ function validateCloudQueueItem(item: JsonObject, index: number): string {
 		throw new HTTPError(400, `cloud_queue_item_id_too_long:${index}`);
 	}
 
+	return id;
+}
+
+function requiredCloudQueueTrack(item: JsonObject, index: number): JsonObject {
 	const track = item.track;
 	if (!isJsonObject(track)) {
 		throw new HTTPError(400, `cloud_queue_item_missing_track:${index}`);
 	}
 
-	const trackName = optionalString(track, 'name');
-	const contentType = optionalString(track, 'contentType');
-	const mediaUrl = optionalString(track, 'mediaUrl');
-	const trackID = track.id;
-	const hasTrackID = isJsonObject(trackID) && optionalString(trackID, 'objectId') !== undefined;
-	if (!trackName || !contentType || (!mediaUrl && !hasTrackID)) {
+	return track;
+}
+
+function validateCloudQueueTrack(track: JsonObject, index: number): void {
+	const hasRequiredMetadata =
+		optionalString(track, 'name') !== undefined &&
+		optionalString(track, 'contentType') !== undefined;
+	if (!hasRequiredMetadata || !cloudQueueTrackHasPlaybackReference(track)) {
 		throw new HTTPError(400, `cloud_queue_item_invalid_track:${index}`);
 	}
+}
 
-	return id;
+function cloudQueueTrackHasPlaybackReference(track: JsonObject): boolean {
+	if (optionalString(track, 'mediaUrl') !== undefined) {
+		return true;
+	}
+
+	const trackID = track.id;
+	return isJsonObject(trackID) && optionalString(trackID, 'objectId') !== undefined;
 }
 
 function clampedWindowSize(rawValue: string | null, defaultValue: number): number {
