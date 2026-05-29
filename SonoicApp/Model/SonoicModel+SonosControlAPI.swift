@@ -24,6 +24,56 @@ extension SonoicModel {
         }
     }
 
+    private struct SonosControlAPILoadRollbackState {
+        private let queueState: SonosQueueState
+        private let nowPlaying: SonosNowPlayingSnapshot
+        private let nowPlayingObservedAt: Date
+        private let manualPlaybackContextPayload: SonosPlayablePayload?
+        private let manualQueueContextPayloads: [SonosPlayablePayload]?
+        private let manualRecentPlaybackContextPayload: SonosPlayablePayload?
+        private let cloudQueueRuntimeState: SonosControlAPICloudQueueRuntimeState
+
+        @MainActor
+        init(_ model: SonoicModel) {
+            queueState = model.queueState
+            nowPlaying = model.nowPlaying
+            nowPlayingObservedAt = model.nowPlayingObservedAt
+            manualPlaybackContextPayload = model.manualPlaybackContextPayload
+            manualQueueContextPayloads = model.manualQueueContextPayloads
+            manualRecentPlaybackContextPayload = model.manualRecentPlaybackContextPayload
+            cloudQueueRuntimeState = model.sonosControlAPICloudQueueRuntimeState
+        }
+
+        @MainActor
+        func restoreFailedLoad(
+            on model: SonoicModel,
+            didLoseAuthorization: Bool,
+            clearManualContextOnAuthorizationLoss: Bool
+        ) {
+            if !didLoseAuthorization || !queueState.isSonosControlAPICloudQueueBacked {
+                model.queueState = queueState
+            }
+            model.nowPlaying = nowPlaying
+            model.nowPlayingObservedAt = nowPlayingObservedAt
+
+            if didLoseAuthorization {
+                if clearManualContextOnAuthorizationLoss {
+                    model.manualPlaybackContextPayload = nil
+                    model.manualQueueContextPayloads = nil
+                    model.manualRecentPlaybackContextPayload = nil
+                }
+                model.clearSonosControlAPICloudQueueContext()
+                return
+            }
+
+            model.manualPlaybackContextPayload = manualPlaybackContextPayload
+            model.manualQueueContextPayloads = manualQueueContextPayloads
+            model.manualRecentPlaybackContextPayload = manualRecentPlaybackContextPayload
+            model.sonosControlAPICloudQueueRuntimeState = cloudQueueRuntimeState
+            model.persistSonosControlAPICloudQueueContext()
+        }
+    }
+
     func updateSonosControlAPISettings(_ settings: SonosControlAPISettings) {
         settingsStore.saveSonosControlAPISettings(settings)
         sonosControlAPIState.settings = settings
@@ -1460,13 +1510,7 @@ extension SonoicModel {
             return false
         }
 
-        let previousQueueState = queueState
-        let previousNowPlaying = nowPlaying
-        let previousNowPlayingObservedAt = nowPlayingObservedAt
-        let previousPlaybackContextPayload = manualPlaybackContextPayload
-        let previousQueueContextPayloads = manualQueueContextPayloads
-        let previousRecentPlaybackContextPayload = manualRecentPlaybackContextPayload
-        let previousCloudQueueRuntimeState = sonosControlAPICloudQueueRuntimeState
+        let rollbackState = SonosControlAPILoadRollbackState(self)
         let startIndex = max(0, min(plan.startingTrackNumber - 1, plan.payloads.count - 1))
         let confirmationPayload = plan.payloads[startIndex]
         let queueItemIDs = request.items.compactMap(\.id)
@@ -1595,21 +1639,11 @@ extension SonoicModel {
         }
 
         if !didLoad {
-            let didLoseAuthorization = sonosControlAPIState.authorizationStatus == .expired
-            if !didLoseAuthorization || !previousQueueState.isSonosControlAPICloudQueueBacked {
-                queueState = previousQueueState
-            }
-            nowPlaying = previousNowPlaying
-            nowPlayingObservedAt = previousNowPlayingObservedAt
-            if didLoseAuthorization {
-                clearSonosControlAPICloudQueueContext()
-            } else {
-                manualPlaybackContextPayload = previousPlaybackContextPayload
-                manualQueueContextPayloads = previousQueueContextPayloads
-                manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
-                sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
-                persistSonosControlAPICloudQueueContext()
-            }
+            rollbackState.restoreFailedLoad(
+                on: self,
+                didLoseAuthorization: sonosControlAPIState.authorizationStatus == .expired,
+                clearManualContextOnAuthorizationLoss: false
+            )
         }
 
         if didLoad {
@@ -1935,13 +1969,7 @@ extension SonoicModel {
         action: () async throws -> Void
     ) async -> Bool {
         sonoicPlaybackDebugLog("cloudFavorite loadStart description='\(description)' title='\(localFavorite.title)'")
-        let previousQueueState = queueState
-        let previousNowPlaying = nowPlaying
-        let previousNowPlayingObservedAt = nowPlayingObservedAt
-        let previousPlaybackContextPayload = manualPlaybackContextPayload
-        let previousQueueContextPayloads = manualQueueContextPayloads
-        let previousRecentPlaybackContextPayload = manualRecentPlaybackContextPayload
-        let previousCloudQueueRuntimeState = sonosControlAPICloudQueueRuntimeState
+        let rollbackState = SonosControlAPILoadRollbackState(self)
 
         if let snapshot = queueState.snapshot {
             queueState = .loaded(SonosQueueSnapshot(
@@ -1973,24 +2001,11 @@ extension SonoicModel {
         if didLoad {
             recordRecentFavoritePlayback(localFavorite)
         } else {
-            let didLoseAuthorization = sonosControlAPIState.authorizationStatus == .expired
-            if !didLoseAuthorization || !previousQueueState.isSonosControlAPICloudQueueBacked {
-                queueState = previousQueueState
-            }
-            nowPlaying = previousNowPlaying
-            nowPlayingObservedAt = previousNowPlayingObservedAt
-            if didLoseAuthorization {
-                manualPlaybackContextPayload = nil
-                manualQueueContextPayloads = nil
-                manualRecentPlaybackContextPayload = nil
-                clearSonosControlAPICloudQueueContext()
-            } else {
-                manualPlaybackContextPayload = previousPlaybackContextPayload
-                manualQueueContextPayloads = previousQueueContextPayloads
-                manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
-                sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
-                persistSonosControlAPICloudQueueContext()
-            }
+            rollbackState.restoreFailedLoad(
+                on: self,
+                didLoseAuthorization: sonosControlAPIState.authorizationStatus == .expired,
+                clearManualContextOnAuthorizationLoss: true
+            )
         }
 
         sonoicPlaybackDebugLog(
