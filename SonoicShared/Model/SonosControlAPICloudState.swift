@@ -31,17 +31,20 @@ nonisolated struct SonosControlAPICloudSnapshot: Equatable {
     var groupsByHouseholdID: [String: SonosControlAPIGroupSnapshot]
     var favoritesByHouseholdID: [String: [SonosControlAPIFavorite]]
     var playlistsByHouseholdID: [String: [SonosControlAPIPlaylist]]
+    var contentFetchDiagnosticsByHouseholdID: [String: SonosControlAPICloudContentFetchDiagnostics]
 
     init(
         households: [SonosControlAPIHousehold],
         groupsByHouseholdID: [String: SonosControlAPIGroupSnapshot],
         favoritesByHouseholdID: [String: [SonosControlAPIFavorite]] = [:],
-        playlistsByHouseholdID: [String: [SonosControlAPIPlaylist]] = [:]
+        playlistsByHouseholdID: [String: [SonosControlAPIPlaylist]] = [:],
+        contentFetchDiagnosticsByHouseholdID: [String: SonosControlAPICloudContentFetchDiagnostics] = [:]
     ) {
         self.households = households
         self.groupsByHouseholdID = groupsByHouseholdID
         self.favoritesByHouseholdID = favoritesByHouseholdID
         self.playlistsByHouseholdID = playlistsByHouseholdID
+        self.contentFetchDiagnosticsByHouseholdID = contentFetchDiagnosticsByHouseholdID
     }
 
     var groupCount: Int {
@@ -257,6 +260,44 @@ nonisolated struct SonosControlAPICloudSnapshot: Equatable {
 }
 
 typealias SonosControlAPIGroupSnapshot = SonosControlAPIGroupsResponse
+
+nonisolated struct SonosControlAPICloudContentFetchDiagnostics: Equatable {
+    var favorites: SonosControlAPICloudContentFetchResult?
+    var playlists: SonosControlAPICloudContentFetchResult?
+
+    init(
+        favorites: SonosControlAPICloudContentFetchResult? = nil,
+        playlists: SonosControlAPICloudContentFetchResult? = nil
+    ) {
+        self.favorites = favorites
+        self.playlists = playlists
+    }
+}
+
+nonisolated struct SonosControlAPICloudContentFetchResult: Equatable {
+    enum Status: Equatable {
+        case loaded(count: Int, version: String?)
+        case failed(detail: String, isAuthorizationFailure: Bool)
+    }
+
+    var status: Status
+
+    static func loaded(count: Int, version: String?) -> SonosControlAPICloudContentFetchResult {
+        SonosControlAPICloudContentFetchResult(status: .loaded(count: count, version: version))
+    }
+
+    static func failed(
+        detail: String,
+        isAuthorizationFailure: Bool
+    ) -> SonosControlAPICloudContentFetchResult {
+        SonosControlAPICloudContentFetchResult(
+            status: .failed(
+                detail: detail,
+                isAuthorizationFailure: isAuthorizationFailure
+            )
+        )
+    }
+}
 
 private extension String {
     nonisolated var sonoicControlAPIMatchKey: String {

@@ -87,6 +87,11 @@ nonisolated struct SonosControlAPIPlayer: Codable, Equatable, Identifiable {
 nonisolated struct SonosControlAPIFavoritesResponse: Codable, Equatable {
     var version: String?
     var favorites: [SonosControlAPIFavorite]
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case favorites = "items"
+    }
 }
 
 nonisolated struct SonosControlAPIFavorite: Codable, Equatable, Identifiable {

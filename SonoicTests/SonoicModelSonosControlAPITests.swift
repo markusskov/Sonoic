@@ -352,6 +352,123 @@ struct SonoicModelSonosControlAPITests {
         #expect(favoritePlayback.model.isManualTransportCommandInFlight == false)
     }
 
+    @Test
+    func directFavoriteWithoutCloudMatchDoesNotCreateCloudQueue() async throws {
+        let favoritePlayback = try Self.makeModel()
+        defer {
+            try? favoritePlayback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: favoritePlayback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: favoritePlayback.model)
+        let previousNowPlaying = Self.nowPlayingSnapshot(title: "Before Favorite", playbackState: .paused)
+        let previousQueueState = SonosQueueState.loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "item-before",
+                        title: "Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "x-rincon-queue:RINCON_00000000000001400#0"
+            )
+        )
+        favoritePlayback.model.nowPlaying = previousNowPlaying
+        favoritePlayback.model.queueState = previousQueueState
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
+            recorder.record(request)
+            return Self.httpResponse(
+                for: request,
+                statusCode: 500,
+                body: #"{"message":"Unexpected direct favorite network request"}"#
+            )
+        }
+
+        let didPlay = await favoritePlayback.model.playManualSonosFavorite(Self.favoriteItem())
+
+        #expect(didPlay == false)
+        #expect(recorder.paths.isEmpty)
+        #expect(favoritePlayback.model.nowPlaying == previousNowPlaying)
+        #expect(favoritePlayback.model.queueState == previousQueueState)
+        #expect(favoritePlayback.model.manualPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.manualQueueContextPayloads == nil)
+        #expect(favoritePlayback.model.manualRecentPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
+    }
+
+    @Test
+    func matchedDirectFavoriteUsesControlAPIFavoriteEndpointWithoutCloudQueue() async throws {
+        let favoritePlayback = try Self.makeModel()
+        defer {
+            favoritePlayback.model.manualHostDeferredSyncTask?.cancel()
+            favoritePlayback.model.manualHostDeferredSyncTask = nil
+            try? favoritePlayback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: favoritePlayback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(
+            on: favoritePlayback.model,
+            snapshot: Self.cloudSnapshotWithContent(favorites: [Self.cloudFavorite()])
+        )
+        favoritePlayback.model.queueState = .loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "item-before",
+                        title: "Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "x-rincon-queue:RINCON_00000000000001400#0"
+            )
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
+            recorder.record(request)
+            if request.url?.path == "/control/api/v1/groups/group-1/favorites" {
+                return Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            }
+
+            return Self.httpResponse(
+                for: request,
+                statusCode: 500,
+                body: #"{"message":"Unexpected non-favorite endpoint"}"#
+            )
+        }
+
+        let didPlay = await favoritePlayback.model.playManualSonosFavorite(Self.favoriteItem())
+        favoritePlayback.model.manualHostDeferredSyncTask?.cancel()
+        favoritePlayback.model.manualHostDeferredSyncTask = nil
+
+        let request = try #require(recorder.requests.first)
+        let loadFavoriteRequest = try Self.loadFavoriteRequestBody(from: request)
+        #expect(didPlay)
+        #expect(recorder.paths == ["/control/api/v1/groups/group-1/favorites"])
+        #expect(loadFavoriteRequest.favoriteId == "cloud-favorite-1")
+        #expect(!recorder.paths.contains("/api/sonos/cloud-queues"))
+        #expect(favoritePlayback.model.nowPlaying.title == "Cloud Favorite")
+        #expect(favoritePlayback.model.nowPlaying.artistName == "Sonoic")
+        #expect(favoritePlayback.model.nowPlaying.playbackState == .playing)
+        #expect(favoritePlayback.model.manualPlaybackContextPayload == Self.favoriteItem().playablePayload)
+        #expect(favoritePlayback.model.manualQueueContextPayloads == nil)
+        #expect(favoritePlayback.model.manualRecentPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
+        #expect(favoritePlayback.model.queueState.snapshot?.sourceURI == "x-rincon-queue:RINCON_00000000000001400#0")
+        #expect(favoritePlayback.model.queueState.snapshot?.currentItemIndex == nil)
+    }
+
     private static func makeModel() throws -> (
         model: SonoicModel,
         keychainStore: SonoicKeychainStore,
@@ -443,6 +560,13 @@ struct SonoicModelSonosControlAPITests {
             )!,
             Data(body.utf8)
         )
+    }
+
+    private static func loadFavoriteRequestBody(
+        from request: SonoicModelSonosControlAPICapturedRequest
+    ) throws -> SonosControlAPILoadFavoriteRequest {
+        let body = try #require(request.body)
+        return try JSONDecoder().decode(SonosControlAPILoadFavoriteRequest.self, from: body)
     }
 
     private static var oauthConfiguration: SonosOAuthConfiguration {
@@ -673,5 +797,70 @@ private final class SonoicModelSonosControlAPIURLProtocol: URLProtocol {
         return responderLock.withLock {
             responders[id]
         }
+    }
+}
+
+private final class SonoicModelSonosControlAPIRequestRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedRequests: [SonoicModelSonosControlAPICapturedRequest] = []
+
+    var requests: [SonoicModelSonosControlAPICapturedRequest] {
+        lock.withLock {
+            recordedRequests
+        }
+    }
+
+    var paths: [String] {
+        lock.withLock {
+            recordedRequests.compactMap { $0.url?.path }
+        }
+    }
+
+    func record(_ request: URLRequest) {
+        let capturedRequest = SonoicModelSonosControlAPICapturedRequest(request)
+        lock.withLock {
+            recordedRequests.append(capturedRequest)
+        }
+    }
+}
+
+private struct SonoicModelSonosControlAPICapturedRequest: Sendable {
+    var url: URL?
+    var httpMethod: String?
+    var body: Data?
+
+    private var headers: [String: String]
+
+    init(_ request: URLRequest) {
+        url = request.url
+        httpMethod = request.httpMethod
+        body = request.httpBody ?? request.httpBodyStream.map(Self.bodyData)
+        headers = Dictionary(
+            uniqueKeysWithValues: (request.allHTTPHeaderFields ?? [:]).map { key, value in
+                (key.lowercased(), value)
+            }
+        )
+    }
+
+    func value(forHTTPHeaderField field: String) -> String? {
+        headers[field.lowercased()]
+    }
+
+    private static func bodyData(from stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 1_024)
+        while stream.hasBytesAvailable {
+            let bytesRead = stream.read(&buffer, maxLength: buffer.count)
+            guard bytesRead > 0 else {
+                break
+            }
+
+            data.append(buffer, count: bytesRead)
+        }
+
+        return data.isEmpty ? Data() : data
     }
 }

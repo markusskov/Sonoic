@@ -262,6 +262,7 @@ extension SonoicModel {
             }
 
             let snapshot = try await sonosControlAPIClient.fetchCloudSnapshot(tokenSet: tokenSet)
+            logSonosControlAPICloudContentFetchDiagnostics(snapshot)
             sonosControlAPICloudState = SonosControlAPICloudState(status: .verified(snapshot))
             applyVerifiedSonosControlAPICloudSnapshot(snapshot)
             _ = await syncSonosControlAPIPlaybackStateIfAvailable(
@@ -275,6 +276,21 @@ extension SonoicModel {
             clearSonosControlAPIPlaybackContextAfterAuthorizationLoss()
         } catch {
             sonosControlAPICloudState = SonosControlAPICloudState(status: .failed(error.localizedDescription))
+        }
+    }
+
+    private func logSonosControlAPICloudContentFetchDiagnostics(
+        _ snapshot: SonosControlAPICloudSnapshot
+    ) {
+        guard !snapshot.households.isEmpty else {
+            sonoicPlaybackDebugLog("cloudSnapshot content noHouseholds")
+            return
+        }
+
+        for household in snapshot.households {
+            sonoicPlaybackDebugLog(
+                "cloudSnapshot content household=\(sonoicPlaybackDebugID(household.id)) \(sonosControlAPICloudContentFetchDiagnosticsDescription(snapshot: snapshot, householdID: household.id))"
+            )
         }
     }
 

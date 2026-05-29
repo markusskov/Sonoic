@@ -16,6 +16,7 @@ struct SonosControlAPIClient {
         var groupsByHouseholdID: [String: SonosControlAPIGroupSnapshot] = [:]
         var favoritesByHouseholdID: [String: [SonosControlAPIFavorite]] = [:]
         var playlistsByHouseholdID: [String: [SonosControlAPIPlaylist]] = [:]
+        var contentFetchDiagnosticsByHouseholdID: [String: SonosControlAPICloudContentFetchDiagnostics] = [:]
 
         for household in householdsResponse.households {
             let groupsResponse = try await groups(
@@ -27,22 +28,68 @@ struct SonosControlAPIClient {
                 players: groupsResponse.players
             )
 
-            favoritesByHouseholdID[household.id] = try? await favorites(
-                householdID: household.id,
-                accessToken: tokenSet.accessToken
-            ).favorites
-            playlistsByHouseholdID[household.id] = try? await playlists(
-                householdID: household.id,
-                accessToken: tokenSet.accessToken
-            ).playlists
+            var contentDiagnostics = SonosControlAPICloudContentFetchDiagnostics()
+            do {
+                let favoritesResponse = try await favorites(
+                    householdID: household.id,
+                    accessToken: tokenSet.accessToken
+                )
+                favoritesByHouseholdID[household.id] = favoritesResponse.favorites
+                contentDiagnostics.favorites = .loaded(
+                    count: favoritesResponse.favorites.count,
+                    version: favoritesResponse.version
+                )
+            } catch {
+                contentDiagnostics.favorites = Self.cloudContentFetchFailure(from: error)
+            }
+
+            do {
+                let playlistsResponse = try await playlists(
+                    householdID: household.id,
+                    accessToken: tokenSet.accessToken
+                )
+                playlistsByHouseholdID[household.id] = playlistsResponse.playlists
+                contentDiagnostics.playlists = .loaded(
+                    count: playlistsResponse.playlists.count,
+                    version: playlistsResponse.version
+                )
+            } catch {
+                contentDiagnostics.playlists = Self.cloudContentFetchFailure(from: error)
+            }
+            contentFetchDiagnosticsByHouseholdID[household.id] = contentDiagnostics
         }
 
         return SonosControlAPICloudSnapshot(
             households: householdsResponse.households,
             groupsByHouseholdID: groupsByHouseholdID,
             favoritesByHouseholdID: favoritesByHouseholdID,
-            playlistsByHouseholdID: playlistsByHouseholdID
+            playlistsByHouseholdID: playlistsByHouseholdID,
+            contentFetchDiagnosticsByHouseholdID: contentFetchDiagnosticsByHouseholdID
         )
+    }
+
+    private static func cloudContentFetchFailure(
+        from error: Error
+    ) -> SonosControlAPICloudContentFetchResult {
+        let isAuthorizationFailure: Bool
+        if let transportError = error as? SonosControlAPITransport.TransportError {
+            isAuthorizationFailure = transportError.isAuthorizationFailure
+        } else {
+            isAuthorizationFailure = false
+        }
+
+        return .failed(
+            detail: Self.cloudContentFetchFailureDetail(from: error),
+            isAuthorizationFailure: isAuthorizationFailure
+        )
+    }
+
+    private static func cloudContentFetchFailureDetail(from error: Error) -> String {
+        if let decodingError = error as? DecodingError {
+            return decodingError.sonoicControlAPIDebugDescription
+        }
+
+        return error.localizedDescription
     }
 
     func households(accessToken: String) async throws -> SonosControlAPIHouseholdsResponse {
@@ -336,5 +383,32 @@ struct SonosControlAPIClient {
             Self.playbackSessionCommandPath(sessionID: sessionID, command: "refreshCloudQueue"),
             accessToken: accessToken
         )
+    }
+}
+
+private extension DecodingError {
+    nonisolated var sonoicControlAPIDebugDescription: String {
+        switch self {
+        case let .keyNotFound(key, context):
+            return "Decoding missing key '\(key.stringValue)' at '\(context.sonoicControlAPICodingPathDescription)': \(context.debugDescription)"
+        case let .valueNotFound(type, context):
+            return "Decoding missing value '\(String(describing: type))' at '\(context.sonoicControlAPICodingPathDescription)': \(context.debugDescription)"
+        case let .typeMismatch(type, context):
+            return "Decoding type mismatch '\(String(describing: type))' at '\(context.sonoicControlAPICodingPathDescription)': \(context.debugDescription)"
+        case let .dataCorrupted(context):
+            return "Decoding corrupted data at '\(context.sonoicControlAPICodingPathDescription)': \(context.debugDescription)"
+        @unknown default:
+            return localizedDescription
+        }
+    }
+}
+
+private extension DecodingError.Context {
+    nonisolated var sonoicControlAPICodingPathDescription: String {
+        guard !codingPath.isEmpty else {
+            return "$"
+        }
+
+        return codingPath.map(\.stringValue).joined(separator: ".")
     }
 }

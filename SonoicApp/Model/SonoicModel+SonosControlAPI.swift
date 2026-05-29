@@ -768,7 +768,7 @@ extension SonoicModel {
         context: SonosControlAPICommandContext
     ) async -> Bool? {
         sonoicPlaybackDebugLog(
-            "cloudFavorite matchContent start title='\(favorite.title)' household=\(sonoicPlaybackDebugID(householdID)) favorites=\(snapshot.favoritesByHouseholdID[householdID]?.count ?? 0) playlists=\(snapshot.playlistsByHouseholdID[householdID]?.count ?? 0)"
+            "cloudFavorite matchContent start title='\(favorite.title)' household=\(sonoicPlaybackDebugID(householdID)) \(sonosControlAPICloudContentFetchDiagnosticsDescription(snapshot: snapshot, householdID: householdID))"
         )
         if let cloudFavorite = snapshot.uniqueFavorite(
             matchingTitle: favorite.title,
@@ -834,6 +834,46 @@ extension SonoicModel {
         }
 
         return snapshot.households[0].id.sonoicNonEmptyTrimmed
+    }
+
+    func sonosControlAPICloudContentFetchDiagnosticsDescription(
+        snapshot: SonosControlAPICloudSnapshot,
+        householdID: String
+    ) -> String {
+        let diagnostics = snapshot.contentFetchDiagnosticsByHouseholdID[householdID]
+        return [
+            "favorites=\(sonosControlAPICloudContentFetchResultDescription(diagnostics?.favorites, fallbackCount: snapshot.favoritesByHouseholdID[householdID]?.count))",
+            "playlists=\(sonosControlAPICloudContentFetchResultDescription(diagnostics?.playlists, fallbackCount: snapshot.playlistsByHouseholdID[householdID]?.count))"
+        ].joined(separator: " ")
+    }
+
+    private func sonosControlAPICloudContentFetchResultDescription(
+        _ result: SonosControlAPICloudContentFetchResult?,
+        fallbackCount: Int?
+    ) -> String {
+        if let result {
+            switch result.status {
+            case let .loaded(count, version):
+                let state = count == 0 ? "loadedEmpty" : "loaded"
+                return "\(state) count=\(count) version=\(sonoicPlaybackDebugID(version))"
+            case let .failed(detail, isAuthorizationFailure):
+                return "failed auth=\(isAuthorizationFailure) detail='\(sonosControlAPIDebugDetail(detail))'"
+            }
+        }
+
+        guard let fallbackCount else {
+            return "missing"
+        }
+
+        return "\(fallbackCount == 0 ? "loadedEmpty" : "loaded") count=\(fallbackCount) version=nil"
+    }
+
+    private func sonosControlAPIDebugDetail(_ detail: String) -> String {
+        let singleLine = detail
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .sonoicTrimmed
+        return String(singleLine.prefix(180))
     }
 
     private func hasValidSonosControlAPITokenForPlayback(logPrefix: String? = nil) async -> Bool {

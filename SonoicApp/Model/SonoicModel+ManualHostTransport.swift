@@ -234,24 +234,6 @@ extension SonoicModel {
         }
 
         if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
-            if !favorite.isCollectionLike,
-               let payload = favorite.playablePayload
-            {
-                let sourceItem = SonoicSourceItem(favorite: favorite)
-                let plan = SonoicSourcePlaylistPlaybackPlan(
-                    payloads: [payload],
-                    items: [sourceItem],
-                    startingTrackNumber: 1,
-                    localNowPlayingPayload: payload,
-                    recentPlaybackPayload: payload
-                )
-                if await playSonosControlAPICloudQueueIfAvailable(parentItem: sourceItem, plan: plan) {
-                    recordRecentFavoritePlayback(favorite)
-                    sonoicPlaybackDebugLog("manualFavorite cloudQueueSuccess title='\(favorite.title)'")
-                    return true
-                }
-            }
-
             sonoicPlaybackDebugLog("manualFavorite cloudFailed noLocalPlaybackFallback=true title='\(favorite.title)'")
             return false
         }
