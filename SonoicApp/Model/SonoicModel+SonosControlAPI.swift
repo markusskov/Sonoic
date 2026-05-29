@@ -282,7 +282,9 @@ extension SonoicModel {
         if !didSkip {
             nowPlaying = previousNowPlaying
             nowPlayingObservedAt = previousNowPlayingObservedAt
-            manualPlaybackContextPayload = previousPlaybackContextPayload
+            if sonosControlAPIState.authorizationStatus != .expired {
+                manualPlaybackContextPayload = previousPlaybackContextPayload
+            }
             persistSharedExternalControlState()
         }
 
@@ -316,7 +318,9 @@ extension SonoicModel {
         if !didSkip {
             nowPlaying = previousNowPlaying
             nowPlayingObservedAt = previousNowPlayingObservedAt
-            manualPlaybackContextPayload = previousPlaybackContextPayload
+            if sonosControlAPIState.authorizationStatus != .expired {
+                manualPlaybackContextPayload = previousPlaybackContextPayload
+            }
             persistSharedExternalControlState()
         }
 

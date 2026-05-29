@@ -162,6 +162,66 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func cloudSkipAuthorizationFailureDoesNotRestorePlaybackContext() async throws {
+        let next = try Self.makeModel()
+        defer {
+            try? next.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: next.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: next.model)
+        let previousPayload = Self.playbackPayload(id: "current-payload")
+        let previousNowPlaying = Self.nowPlayingSnapshot(title: "Before Next", playbackState: .buffering)
+        let previousObservedAt = Date(timeIntervalSince1970: 789)
+        next.model.manualPlaybackContextPayload = previousPayload
+        next.model.nowPlaying = previousNowPlaying
+        next.model.nowPlayingObservedAt = previousObservedAt
+        Self.stubNetwork(for: next.networkStubID) { request in
+            Self.httpResponse(
+                for: request,
+                statusCode: 401,
+                body: #"{"message":"Injected next authorization failure"}"#
+            )
+        }
+
+        let didSkipNext = await next.model.skipToNextSonosControlAPITrackIfAvailable()
+
+        #expect(didSkipNext == false)
+        #expect(next.model.nowPlaying == previousNowPlaying)
+        #expect(next.model.nowPlayingObservedAt == previousObservedAt)
+        #expect(next.model.sonosControlAPIState.authorizationStatus == .expired)
+        #expect(next.model.sonosControlAPIAuthorizationState.status == .expired)
+        #expect(next.model.manualPlaybackContextPayload == nil)
+        #expect(next.model.isManualTransportCommandInFlight == false)
+
+        let previous = try Self.makeModel()
+        defer {
+            try? previous.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: previous.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: previous.model)
+        previous.model.manualPlaybackContextPayload = previousPayload
+        previous.model.nowPlaying = previousNowPlaying
+        previous.model.nowPlayingObservedAt = previousObservedAt
+        Self.stubNetwork(for: previous.networkStubID) { request in
+            Self.httpResponse(
+                for: request,
+                statusCode: 401,
+                body: #"{"message":"Injected previous authorization failure"}"#
+            )
+        }
+
+        let didSkipPrevious = await previous.model.skipToPreviousSonosControlAPITrackIfAvailable()
+
+        #expect(didSkipPrevious == false)
+        #expect(previous.model.nowPlaying == previousNowPlaying)
+        #expect(previous.model.nowPlayingObservedAt == previousObservedAt)
+        #expect(previous.model.sonosControlAPIState.authorizationStatus == .expired)
+        #expect(previous.model.sonosControlAPIAuthorizationState.status == .expired)
+        #expect(previous.model.manualPlaybackContextPayload == nil)
+        #expect(previous.model.isManualTransportCommandInFlight == false)
+    }
+
+    @Test
     func cloudQueueAuthorizationFailureDoesNotRestoreStaleQueueContext() async throws {
         let cloudQueue = try Self.makeModel()
         defer {
