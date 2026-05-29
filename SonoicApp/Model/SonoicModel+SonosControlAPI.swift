@@ -2019,18 +2019,28 @@ extension SonoicModel {
         if didLoad {
             recordRecentFavoritePlayback(localFavorite)
         } else {
-            queueState = previousQueueState
+            let didLoseAuthorization = sonosControlAPIState.authorizationStatus == .expired
+            if !didLoseAuthorization || !previousQueueState.isSonosControlAPICloudQueueBacked {
+                queueState = previousQueueState
+            }
             nowPlaying = previousNowPlaying
             nowPlayingObservedAt = previousNowPlayingObservedAt
-            manualPlaybackContextPayload = previousPlaybackContextPayload
-            manualQueueContextPayloads = previousQueueContextPayloads
-            manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
-            sonosControlAPICloudQueueSessionID = previousCloudQueueSessionID
-            sonosControlAPICloudQueueGroupID = previousCloudQueueGroupID
-            sonosControlAPICloudQueueVersion = previousCloudQueueVersion
-            sonosControlAPICloudQueueItemIDs = previousCloudQueueItemIDs
-            sonosControlAPICloudQueueTracks = previousCloudQueueTracks
-            persistSonosControlAPICloudQueueContext()
+            if didLoseAuthorization {
+                manualPlaybackContextPayload = nil
+                manualQueueContextPayloads = nil
+                manualRecentPlaybackContextPayload = nil
+                clearSonosControlAPICloudQueueContext()
+            } else {
+                manualPlaybackContextPayload = previousPlaybackContextPayload
+                manualQueueContextPayloads = previousQueueContextPayloads
+                manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
+                sonosControlAPICloudQueueSessionID = previousCloudQueueSessionID
+                sonosControlAPICloudQueueGroupID = previousCloudQueueGroupID
+                sonosControlAPICloudQueueVersion = previousCloudQueueVersion
+                sonosControlAPICloudQueueItemIDs = previousCloudQueueItemIDs
+                sonosControlAPICloudQueueTracks = previousCloudQueueTracks
+                persistSonosControlAPICloudQueueContext()
+            }
         }
 
         sonoicPlaybackDebugLog(

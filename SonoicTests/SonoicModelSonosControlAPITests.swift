@@ -285,6 +285,77 @@ struct SonoicModelSonosControlAPITests {
         #expect(cloudQueue.model.isManualTransportCommandInFlight == false)
     }
 
+    @Test
+    func cloudFavoriteAuthorizationFailureDoesNotRestoreStalePlaybackContext() async throws {
+        let favoritePlayback = try Self.makeModel()
+        defer {
+            try? favoritePlayback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: favoritePlayback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(
+            on: favoritePlayback.model,
+            snapshot: Self.cloudSnapshotWithContent(favorites: [Self.cloudFavorite()])
+        )
+        let previousPayload = Self.playbackPayload(id: "previous-payload")
+        let previousNowPlaying = Self.nowPlayingSnapshot(title: "Before Favorite", playbackState: .playing)
+        let previousObservedAt = Date(timeIntervalSince1970: 987)
+        favoritePlayback.model.queueState = .loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "item-before",
+                        title: "Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "sonoic-cloud-queue:previous"
+            )
+        )
+        favoritePlayback.model.nowPlaying = previousNowPlaying
+        favoritePlayback.model.nowPlayingObservedAt = previousObservedAt
+        favoritePlayback.model.manualPlaybackContextPayload = previousPayload
+        favoritePlayback.model.manualQueueContextPayloads = [previousPayload]
+        favoritePlayback.model.manualRecentPlaybackContextPayload = previousPayload
+        favoritePlayback.model.sonosControlAPICloudQueueSessionID = "session-before"
+        favoritePlayback.model.sonosControlAPICloudQueueGroupID = "group-before"
+        favoritePlayback.model.sonosControlAPICloudQueueVersion = "queue-before"
+        favoritePlayback.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
+        favoritePlayback.model.sonosControlAPICloudQueueTracks = [
+            Self.track(id: "previous-track", name: "Previous Track")
+        ]
+        Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
+            Self.httpResponse(
+                for: request,
+                statusCode: 401,
+                body: #"{"message":"Injected favorite authorization failure"}"#
+            )
+        }
+
+        let didLoadFavorite = await favoritePlayback.model.playSonosControlAPIFavoriteIfAvailable(
+            Self.favoriteItem()
+        )
+
+        #expect(didLoadFavorite == false)
+        #expect(favoritePlayback.model.sonosControlAPIState.authorizationStatus == .expired)
+        #expect(favoritePlayback.model.sonosControlAPIAuthorizationState.status == .expired)
+        #expect(favoritePlayback.model.queueState == .idle)
+        #expect(favoritePlayback.model.nowPlaying == previousNowPlaying)
+        #expect(favoritePlayback.model.nowPlayingObservedAt == previousObservedAt)
+        #expect(favoritePlayback.model.manualPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.manualQueueContextPayloads == nil)
+        #expect(favoritePlayback.model.manualRecentPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueSessionID == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueGroupID == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueVersion == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueItemIDs == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueTracks == nil)
+        #expect(favoritePlayback.model.isManualTransportCommandInFlight == false)
+    }
+
     private static func makeModel() throws -> (
         model: SonoicModel,
         keychainStore: SonoicKeychainStore,
@@ -330,7 +401,10 @@ struct SonoicModelSonosControlAPITests {
         return (model, keychainStore, networkStubID)
     }
 
-    private static func configureCloudCommandTarget(on model: SonoicModel) {
+    private static func configureCloudCommandTarget(
+        on model: SonoicModel,
+        snapshot: SonosControlAPICloudSnapshot = Self.cloudSnapshot
+    ) {
         model.sonosControlAPIState = SonosControlAPIState(
             settings: SonosControlAPISettings(
                 mode: .preferred,
@@ -342,7 +416,7 @@ struct SonoicModelSonosControlAPITests {
             lastCommandDescription: nil,
             lastUpdatedAt: nil
         )
-        model.sonosControlAPICloudState = SonosControlAPICloudState(status: .verified(Self.cloudSnapshot))
+        model.sonosControlAPICloudState = SonosControlAPICloudState(status: .verified(snapshot))
         model.activeTarget = SonosActiveTarget(
             id: "group-1",
             name: "Kitchen",
@@ -416,6 +490,28 @@ struct SonoicModelSonosControlAPITests {
         )
     }
 
+    private static func cloudSnapshotWithContent(
+        favorites: [SonosControlAPIFavorite] = [],
+        playlists: [SonosControlAPIPlaylist] = []
+    ) -> SonosControlAPICloudSnapshot {
+        SonosControlAPICloudSnapshot(
+            households: Self.cloudSnapshot.households,
+            groupsByHouseholdID: Self.cloudSnapshot.groupsByHouseholdID,
+            favoritesByHouseholdID: ["household-1": favorites],
+            playlistsByHouseholdID: ["household-1": playlists]
+        )
+    }
+
+    private static func cloudFavorite() -> SonosControlAPIFavorite {
+        SonosControlAPIFavorite(
+            id: "cloud-favorite-1",
+            name: "Cloud Favorite",
+            description: nil,
+            imageUrl: nil,
+            service: SonosControlAPIService(id: "204", name: "Apple Music", imageUrl: nil)
+        )
+    }
+
     private static func playlistItem() -> SonoicSourceItem {
         SonoicSourceItem.appleMusicMetadata(
             id: "playlist-1",
@@ -454,6 +550,19 @@ struct SonoicModelSonosControlAPITests {
             startingTrackNumber: 1,
             localNowPlayingPayload: payload,
             recentPlaybackPayload: payload
+        )
+    }
+
+    private static func favoriteItem() -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: "favorite-1",
+            title: "Cloud Favorite",
+            subtitle: "Sonoic",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonos-http:favorite-1.m4p",
+            playbackMetadataXML: "<DIDL-Lite></DIDL-Lite>",
+            kind: .item
         )
     }
 
