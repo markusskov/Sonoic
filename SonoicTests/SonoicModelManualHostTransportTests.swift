@@ -122,6 +122,23 @@ struct SonoicModelManualHostTransportTests {
         #expect(model.recentPlays.isEmpty)
     }
 
+    @Test(arguments: [SonosControlAPIMode.fallback, .preferred])
+    func cloudCommandModesStillProbeAppleMusicPlaybackContextWithManualHost(
+        mode: SonosControlAPIMode
+    ) async throws {
+        let model = try makeModel(savedManualHost: "bad host")
+        model.useCloudCommandMode(mode)
+
+        let didPlay = try await model.playSourceItem(Self.appleMusicSourceItem())
+
+        #expect(didPlay == false)
+        #expect(model.allowsLocalManualTransportCommands == false)
+        #expect(
+            model.sonosMusicServiceProbeState.status
+                == .failed("Enter a valid Sonos player host or IP address.")
+        )
+    }
+
     private func makeModel(savedManualHost: String = "") throws -> SonoicModel {
         let suiteName = "SonoicModelManualHostTransportTests-\(UUID().uuidString)"
         let userDefaults = try #require(UserDefaults(suiteName: suiteName))
@@ -146,6 +163,31 @@ struct SonoicModelManualHostTransportTests {
             kind: .item,
             launchMode: .direct,
             duration: 180
+        )
+    }
+
+    private static func appleMusicSourceItem() -> SonoicSourceItem {
+        sourceItem(
+            playbackPayload: playbackPayload(id: "apple-music-probe"),
+            service: .appleMusic
+        )
+    }
+
+    private static func sourceItem(
+        playbackPayload: SonosPlayablePayload,
+        service: SonosServiceDescriptor
+    ) -> SonoicSourceItem {
+        SonoicSourceItem(
+            id: "source-\(playbackPayload.id)",
+            title: playbackPayload.title,
+            subtitle: playbackPayload.subtitle,
+            artworkURL: playbackPayload.artworkURL,
+            artworkIdentifier: nil,
+            service: service,
+            origin: .library,
+            kind: .song,
+            playbackCapability: .sonosNative(playbackPayload),
+            duration: playbackPayload.duration
         )
     }
 

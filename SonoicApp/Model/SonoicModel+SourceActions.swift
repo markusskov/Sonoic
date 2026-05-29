@@ -297,11 +297,11 @@ extension SonoicModel {
             return
         }
 
-        if allowsLocalManualTransportCommands {
+        if allowsLocalManualTransportCommands || hasManualSonosHost {
             await refreshSonosMusicServiceProbeIfNeeded()
         } else {
             sonoicPlaybackDebugLog(
-                "sourcePlaybackContext cloudMode skipLocalProbe=true service='\(service.name)'"
+                "sourcePlaybackContext skipLocalProbe=true service='\(service.name)'"
             )
         }
 
