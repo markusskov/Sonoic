@@ -9,6 +9,7 @@ struct SonosPlaybackCommandRouteTests {
 
         #expect(!route.routesCommandsToSonosControlAPI)
         #expect(route.allowsLocalManualTransportCommands)
+        #expect(!route.hasReadySonosControlAPICommandAuthorization)
         #expect(route.hasActiveSonosControlTarget)
         #expect(route.canControlManualPlayback)
         #expect(route.canSendPrimarySourcePlaybackCommands)
@@ -26,6 +27,7 @@ struct SonosPlaybackCommandRouteTests {
         #expect(route.routesCommandsToSonosControlAPI)
         #expect(!route.allowsLocalManualTransportCommands)
         #expect(route.selectedGroupID == "group-1")
+        #expect(route.hasReadySonosControlAPICommandAuthorization)
         #expect(route.hasSonosControlAPICommandTarget)
         #expect(route.hasActiveSonosControlTarget)
         #expect(route.canControlManualPlayback)
@@ -42,6 +44,7 @@ struct SonosPlaybackCommandRouteTests {
 
         #expect(route.routesCommandsToSonosControlAPI)
         #expect(!route.allowsLocalManualTransportCommands)
+        #expect(route.hasReadySonosControlAPICommandAuthorization)
         #expect(!route.hasSonosControlAPICommandTarget)
         #expect(!route.hasActiveSonosControlTarget)
         #expect(!route.canControlManualPlayback)
@@ -59,6 +62,7 @@ struct SonosPlaybackCommandRouteTests {
 
         #expect(route.routesCommandsToSonosControlAPI)
         #expect(!route.allowsLocalManualTransportCommands)
+        #expect(!route.hasReadySonosControlAPICommandAuthorization)
         #expect(!route.hasSonosControlAPICommandTarget)
         #expect(!route.hasActiveSonosControlTarget)
         #expect(route.hasResolvedSonosPlaybackTarget)

@@ -27,9 +27,13 @@ nonisolated struct SonosPlaybackCommandRoute: Equatable {
         !routesCommandsToSonosControlAPI
     }
 
-    var hasSonosControlAPICommandTarget: Bool {
+    var hasReadySonosControlAPICommandAuthorization: Bool {
         routesCommandsToSonosControlAPI
             && authorizationStatus == .ready
+    }
+
+    var hasSonosControlAPICommandTarget: Bool {
+        hasReadySonosControlAPICommandAuthorization
             && selectedGroupID != nil
     }
 

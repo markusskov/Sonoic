@@ -31,7 +31,7 @@ extension SonoicModel {
                 isQueueRefreshing = false
             }
 
-            guard sonosControlAPIState.canSendCommands else {
+            guard sonosPlaybackCommandRoute.hasReadySonosControlAPICommandAuthorization else {
                 queueDiagnostics = SonosQueueDiagnostics(
                     observedAt: Date(),
                     currentURI: nowPlayingDiagnostics.currentURI,
