@@ -38,6 +38,7 @@ struct PlayerProgressSection: View {
                         ),
                         bounds: 0 ... durationSeconds,
                         isEnabled: isEnabled,
+                        isConfirming: pendingSeekTarget != nil,
                         showsThumb: showsThumb,
                         accessibilityLabel: "Playback position",
                         onEditingChanged: handleEditingChanged
@@ -46,7 +47,22 @@ struct PlayerProgressSection: View {
                     if showsTimeLabels {
                         HStack {
                             Text(elapsedLabelText(at: context.date))
-                            Spacer()
+
+                            if let qualityLabel {
+                                Spacer(minLength: 8)
+
+                                Text(qualityLabel)
+                                    .fontWeight(.semibold)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(.secondary.opacity(0.16), in: Capsule())
+
+                                Spacer(minLength: 8)
+                            } else {
+                                Spacer()
+                            }
+
                             Text(formatTime(durationSeconds))
                         }
                         .font(.caption.monospacedDigit())
@@ -97,6 +113,16 @@ struct PlayerProgressSection: View {
         }
 
         return duration
+    }
+
+    private var qualityLabel: String? {
+        guard let quality = nowPlaying.quality,
+              !quality.displayBadges.isEmpty
+        else {
+            return nil
+        }
+
+        return quality.displayBadges.joined(separator: " ")
     }
 
     private func elapsedLabelText(at date: Date) -> String {

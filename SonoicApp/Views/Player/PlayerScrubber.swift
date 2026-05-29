@@ -5,6 +5,7 @@ struct PlayerScrubber: View {
     let bounds: ClosedRange<Double>
     var step: Double?
     var isEnabled = true
+    var isConfirming = false
     var showsThumb = true
     var accessibilityLabel = "Scrubber"
     var onEditingChanged: (Bool) -> Void = { _ in }
@@ -34,13 +35,22 @@ struct PlayerScrubber: View {
                         .frame(width: thumbDiameter, height: thumbDiameter)
                         .shadow(color: .black.opacity(0.22), radius: 5, y: 2)
                         .overlay {
-                        Circle()
-                            .stroke(.white.opacity(0.36), lineWidth: 1)
+                            Circle()
+                                .stroke(.white.opacity(0.36), lineWidth: 1)
                         }
                         .offset(x: min(max(thumbCenterX - thumbDiameter / 2, 0), width - thumbDiameter))
                 }
             }
             .frame(height: thumbDiameter)
+            .overlay {
+                if isConfirming {
+                    Capsule()
+                        .stroke(SonoicTheme.Colors.tabAccent.opacity(0.45), lineWidth: 1)
+                        .frame(height: trackHeight + 8)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.18), value: isConfirming)
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
             .gesture(dragGesture(width: width))

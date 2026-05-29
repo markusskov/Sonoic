@@ -63,6 +63,7 @@ struct RootView: View {
             if model.hasCompletedOnboarding, model.hasResolvedSonosPlaybackTarget {
                 PlayerMiniBar(
                     nowPlaying: model.effectiveNowPlayingSnapshotForActiveTarget,
+                    isPlaybackControlEnabled: model.canControlManualPlayback,
                     openPlayer: {
                         isPlayerPresented = true
                     },

@@ -52,6 +52,7 @@ struct PlayerSheetView: View {
 
                         PlayerTransportControls(
                             nowPlaying: nowPlaying,
+                            isPlaybackControlEnabled: model.canControlManualPlayback,
                             skipPrevious: skipToPreviousTrack,
                             togglePlayback: togglePlayback,
                             skipNext: skipToNextTrack
