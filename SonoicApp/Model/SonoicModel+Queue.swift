@@ -21,7 +21,7 @@ extension SonoicModel {
     }
 
     func refreshQueue(showLoading: Bool = true) async {
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             guard !isQueueRefreshing else {
                 return
             }
@@ -160,7 +160,7 @@ extension SonoicModel {
     }
 
     func refreshQueueAfterPlaybackChangeIfNeeded() async {
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             await refreshQueue(showLoading: false)
             return
         }

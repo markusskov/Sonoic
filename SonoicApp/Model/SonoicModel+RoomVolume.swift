@@ -2,13 +2,13 @@ import Foundation
 
 extension SonoicModel {
     func refreshRoomVolumes(showLoading: Bool = true) async {
-        if sonosControlAPIState.settings.mode.canSendCommands,
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI,
            await refreshCloudRoomVolumes(showLoading: showLoading)
         {
             return
         }
 
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             roomVolumeState = .unavailable("Sonos Cloud volume is unavailable.")
             return
         }
@@ -89,7 +89,7 @@ extension SonoicModel {
             }
 
             do {
-                if sonosControlAPIState.settings.mode.canSendCommands {
+                if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
                     try await setSonosControlAPIPlayerVolume(playerID: item.id, to: nextLevel)
                 } else {
                     try await renderingControlClient.setVolume(host: item.host, level: nextLevel)
@@ -130,7 +130,7 @@ extension SonoicModel {
         }
 
         do {
-            if sonosControlAPIState.settings.mode.canSendCommands {
+            if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
                 try await setSonosControlAPIPlayerMute(playerID: item.id, isMuted: desiredMute)
             } else {
                 try await renderingControlClient.setMute(host: item.host, isMuted: desiredMute)

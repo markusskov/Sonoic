@@ -7,21 +7,20 @@ extension SonoicModel {
         manualSonosHost.sonoicNonEmptyTrimmed != nil
     }
 
-    var hasActiveSonosControlTarget: Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
-            return hasSonosControlAPICommandTarget
-        }
+    var sonosPlaybackCommandRoute: SonosPlaybackCommandRoute {
+        SonosPlaybackCommandRoute(
+            sonosControlAPIState: sonosControlAPIState,
+            hasManualHost: hasManualSonosHost,
+            hasConfiguredActiveTarget: activeTarget.id != Self.unconfiguredTarget.id
+        )
+    }
 
-        return hasManualSonosHost
+    var hasActiveSonosControlTarget: Bool {
+        sonosPlaybackCommandRoute.hasActiveSonosControlTarget
     }
 
     var hasResolvedSonosPlaybackTarget: Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
-            return sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed != nil
-                || activeTarget.id != Self.unconfiguredTarget.id
-        }
-
-        return hasManualSonosHost
+        sonosPlaybackCommandRoute.hasResolvedSonosPlaybackTarget
     }
 
     var activeSonosControlTargetRefreshKey: String {
@@ -35,8 +34,7 @@ extension SonoicModel {
     }
 
     var hasSonosControlAPICommandTarget: Bool {
-        sonosControlAPIState.canSendCommands
-            && sonosControlAPIState.settings.selectedGroupID?.sonoicNonEmptyTrimmed != nil
+        sonosPlaybackCommandRoute.hasSonosControlAPICommandTarget
     }
 
     func refreshManualSonosPlayerState(forceRoomRefresh: Bool = true) async {
@@ -108,7 +106,7 @@ extension SonoicModel {
     }
 
     func syncManualSonosState(showProgress: Bool, forceRoomRefresh: Bool = false) async -> Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             return await syncSonosControlAPIPlaybackStateIfAvailable(
                 showProgress: showProgress,
                 forceRoomRefresh: forceRoomRefresh

@@ -117,7 +117,7 @@ extension SonoicModel {
     }
 
     func activeSonosControlAPIGroupID() -> String? {
-        guard sonosControlAPIState.settings.mode.canSendCommands else {
+        guard sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI else {
             return nil
         }
 
@@ -382,7 +382,7 @@ extension SonoicModel {
 
     func seekSonosControlAPIPlaybackIfAvailable(to timeInterval: TimeInterval) async -> Bool {
         sonoicPlaybackDebugLog("cloudseek entry target=\(timeInterval)")
-        guard sonosControlAPIState.settings.mode.canSendCommands else {
+        guard sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI else {
             sonoicPlaybackDebugLog(
                 "cloudseek unavailable canSend=false auth=\(String(describing: sonosControlAPIState.authorizationStatus)) mode=\(sonosControlAPIState.settings.mode.rawValue) target=\(timeInterval)"
             )
@@ -1139,7 +1139,7 @@ extension SonoicModel {
         sonoicPlaybackDebugLog(
             "cloudFavorite start title='\(favorite.title)' canSend=\(sonosControlAPIState.canSendCommands) auth=\(String(describing: sonosControlAPIState.authorizationStatus)) target=\(activeTarget.id)"
         )
-        guard sonosControlAPIState.settings.mode.canSendCommands else {
+        guard sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI else {
             sonoicPlaybackDebugLog("cloudFavorite unavailable canSend=false title='\(favorite.title)'")
             return false
         }
@@ -1321,7 +1321,7 @@ extension SonoicModel {
         requiresActiveTargetMatch: Bool = false,
         logPrefix: String? = nil
     ) async -> SonosControlAPICommandContext? {
-        guard sonosControlAPIState.settings.mode.canSendCommands else {
+        guard sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI else {
             return nil
         }
 

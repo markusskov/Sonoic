@@ -213,7 +213,7 @@ extension SonoicModel {
 
     private func refreshCloudActiveTargetTopologyFromLocalDiscoveryIfNeeded() {
         guard case let .verified(snapshot) = sonosControlAPICloudState.status,
-              sonosControlAPIState.settings.mode.canSendCommands
+              sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI
         else {
             return
         }

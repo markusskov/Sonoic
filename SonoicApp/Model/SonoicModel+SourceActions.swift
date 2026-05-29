@@ -48,11 +48,7 @@ extension SonoicModel {
     }
 
     private var canSendPrimarySourcePlaybackCommands: Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
-            return hasSonosControlAPICommandTarget
-        }
-
-        return hasManualSonosHost
+        sonosPlaybackCommandRoute.canSendPrimarySourcePlaybackCommands
     }
 
     func sourcePlaylistFallbackPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {
@@ -133,7 +129,7 @@ extension SonoicModel {
             return true
         }
 
-        if sonosControlAPIState.settings.mode.canSendCommands,
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI,
            let favorite = favoriteCloudFallback,
            await playManualSonosFavorite(favorite)
         {

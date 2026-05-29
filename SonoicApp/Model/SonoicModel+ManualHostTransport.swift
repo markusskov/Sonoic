@@ -4,15 +4,11 @@ extension SonoicModel {
     private static let manualTransportSyncDelay: Duration = .milliseconds(300)
 
     var canControlManualPlayback: Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
-            return hasSonosControlAPICommandTarget
-        }
-
-        return hasManualSonosHost
+        sonosPlaybackCommandRoute.canControlManualPlayback
     }
 
     var allowsLocalManualTransportCommands: Bool {
-        !sonosControlAPIState.settings.mode.canSendCommands
+        sonosPlaybackCommandRoute.allowsLocalManualTransportCommands
     }
 
     func toggleManualSonosPlayback() async {
@@ -25,7 +21,7 @@ extension SonoicModel {
     }
 
     func playManualSonosPlayback() async -> Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             if await playSonosControlAPIPlaybackIfAvailable() {
                 return true
             }
@@ -38,7 +34,7 @@ extension SonoicModel {
     }
 
     func pauseManualSonosPlayback() async -> Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             if await pauseSonosControlAPIPlaybackIfAvailable() {
                 return true
             }
@@ -51,7 +47,7 @@ extension SonoicModel {
     }
 
     func skipToNextManualSonosTrack() async -> Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             if await skipToNextSonosControlAPITrackIfAvailable() {
                 return true
             }
@@ -64,7 +60,7 @@ extension SonoicModel {
     }
 
     func skipToPreviousManualSonosTrack() async -> Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             if await skipToPreviousSonosControlAPITrackIfAvailable() {
                 return true
             }
@@ -80,7 +76,7 @@ extension SonoicModel {
         sonoicPlaybackDebugLog(
             "manualSeek start target=\(timeInterval) canSeek=\(nowPlaying.canSeek) hasHost=\(hasManualSonosHost) cloudCanSend=\(sonosControlAPIState.canSendCommands) cloudAuth=\(String(describing: sonosControlAPIState.authorizationStatus)) cloudMode=\(sonosControlAPIState.settings.mode.rawValue)"
         )
-        if !sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.allowsLocalManualTransportCommands {
             return await seekLocalManualSonosPlayback(to: timeInterval)
         }
 
@@ -206,7 +202,7 @@ extension SonoicModel {
             return false
         }
 
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             return await skipSonosControlAPICloudQueueItemIfAvailable(at: position)
         }
 
@@ -237,7 +233,7 @@ extension SonoicModel {
             return true
         }
 
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             if !favorite.isCollectionLike,
                let payload = favorite.playablePayload
             {
