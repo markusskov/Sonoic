@@ -9,7 +9,7 @@ struct SonoicModelSonosControlAPITests {
         let directPlayback = try Self.makeModel()
         defer {
             try? directPlayback.keychainStore.deleteSonosTokenSet()
-            SonoicModelSonosControlAPIURLProtocol.responder = nil
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: directPlayback.networkStubID)
         }
         Self.configureCloudCommandTarget(on: directPlayback.model)
         let previousNowPlaying = Self.nowPlayingSnapshot(title: "Before Play", playbackState: .paused)
@@ -21,7 +21,7 @@ struct SonoicModelSonosControlAPITests {
         directPlayback.model.sonosControlAPICloudQueueVersion = "queue-before"
         directPlayback.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
 
-        Self.stubNetwork { request in
+        Self.stubNetwork(for: directPlayback.networkStubID) { request in
             Self.httpResponse(
                 for: request,
                 statusCode: 401,
@@ -44,7 +44,7 @@ struct SonoicModelSonosControlAPITests {
         let cloudQueue = try Self.makeModel()
         defer {
             try? cloudQueue.keychainStore.deleteSonosTokenSet()
-            SonoicModelSonosControlAPIURLProtocol.responder = nil
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: cloudQueue.networkStubID)
         }
         Self.configureCloudCommandTarget(on: cloudQueue.model)
         let previousQueueState = SonosQueueState.loaded(
@@ -79,7 +79,7 @@ struct SonoicModelSonosControlAPITests {
         cloudQueue.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
         cloudQueue.model.sonosControlAPICloudQueueTracks = previousCloudQueueTracks
 
-        Self.stubNetwork { request in
+        Self.stubNetwork(for: cloudQueue.networkStubID) { request in
             Self.httpResponse(
                 for: request,
                 statusCode: 500,
@@ -112,7 +112,7 @@ struct SonoicModelSonosControlAPITests {
         let next = try Self.makeModel()
         defer {
             try? next.keychainStore.deleteSonosTokenSet()
-            SonoicModelSonosControlAPIURLProtocol.responder = nil
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: next.networkStubID)
         }
         Self.configureCloudCommandTarget(on: next.model)
         let previousPayload = Self.playbackPayload(id: "current-payload")
@@ -121,7 +121,7 @@ struct SonoicModelSonosControlAPITests {
         next.model.manualPlaybackContextPayload = previousPayload
         next.model.nowPlaying = previousNowPlaying
         next.model.nowPlayingObservedAt = previousObservedAt
-        Self.stubNetwork { request in
+        Self.stubNetwork(for: next.networkStubID) { request in
             Self.httpResponse(
                 for: request,
                 statusCode: 500,
@@ -139,13 +139,13 @@ struct SonoicModelSonosControlAPITests {
         let previous = try Self.makeModel()
         defer {
             try? previous.keychainStore.deleteSonosTokenSet()
-            SonoicModelSonosControlAPIURLProtocol.responder = nil
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: previous.networkStubID)
         }
         Self.configureCloudCommandTarget(on: previous.model)
         previous.model.manualPlaybackContextPayload = previousPayload
         previous.model.nowPlaying = previousNowPlaying
         previous.model.nowPlayingObservedAt = previousObservedAt
-        Self.stubNetwork { request in
+        Self.stubNetwork(for: previous.networkStubID) { request in
             Self.httpResponse(
                 for: request,
                 statusCode: 500,
@@ -161,7 +161,75 @@ struct SonoicModelSonosControlAPITests {
         #expect(previous.model.manualPlaybackContextPayload == previousPayload)
     }
 
-    private static func makeModel() throws -> (model: SonoicModel, keychainStore: SonoicKeychainStore) {
+    @Test
+    func cloudQueueAuthorizationFailureDoesNotRestoreStaleQueueContext() async throws {
+        let cloudQueue = try Self.makeModel()
+        defer {
+            try? cloudQueue.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: cloudQueue.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: cloudQueue.model)
+        let previousPayload = Self.playbackPayload(id: "previous-payload")
+        cloudQueue.model.queueState = .loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "item-before",
+                        title: "Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "sonoic-cloud-queue:previous"
+            )
+        )
+        cloudQueue.model.manualPlaybackContextPayload = previousPayload
+        cloudQueue.model.manualQueueContextPayloads = [previousPayload]
+        cloudQueue.model.manualRecentPlaybackContextPayload = previousPayload
+        cloudQueue.model.sonosControlAPICloudQueueSessionID = "session-before"
+        cloudQueue.model.sonosControlAPICloudQueueGroupID = "group-before"
+        cloudQueue.model.sonosControlAPICloudQueueVersion = "queue-before"
+        cloudQueue.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
+        cloudQueue.model.sonosControlAPICloudQueueTracks = [
+            Self.track(id: "previous-track", name: "Previous Track")
+        ]
+
+        Self.stubNetwork(for: cloudQueue.networkStubID) { request in
+            Self.httpResponse(
+                for: request,
+                statusCode: 401,
+                body: #"{"message":"Injected cloud queue authorization failure"}"#
+            )
+        }
+
+        let didLoadQueue = await cloudQueue.model.playSonosControlAPICloudQueueIfAvailable(
+            parentItem: Self.playlistItem(),
+            plan: Self.playlistPlan()
+        )
+
+        #expect(didLoadQueue == false)
+        #expect(cloudQueue.model.sonosControlAPIState.authorizationStatus == .expired)
+        #expect(cloudQueue.model.sonosControlAPIAuthorizationState.status == .expired)
+        #expect(cloudQueue.model.queueState == .idle)
+        #expect(cloudQueue.model.manualPlaybackContextPayload == nil)
+        #expect(cloudQueue.model.manualQueueContextPayloads == nil)
+        #expect(cloudQueue.model.manualRecentPlaybackContextPayload == nil)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueSessionID == nil)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueGroupID == nil)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueVersion == nil)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueItemIDs == nil)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueTracks == nil)
+        #expect(cloudQueue.model.isManualTransportCommandInFlight == false)
+    }
+
+    private static func makeModel() throws -> (
+        model: SonoicModel,
+        keychainStore: SonoicKeychainStore,
+        networkStubID: String
+    ) {
         let keychainStore = SonoicKeychainStore(
             service: "com.markusskov.Sonoic.tests.\(UUID().uuidString)"
         )
@@ -178,7 +246,11 @@ struct SonoicModelSonosControlAPITests {
         let userDefaults = try #require(
             UserDefaults(suiteName: "SonoicModelSonosControlAPITests-\(UUID().uuidString)")
         )
+        let networkStubID = UUID().uuidString
         let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpAdditionalHeaders = [
+            SonoicModelSonosControlAPIURLProtocol.testStubHeader: networkStubID
+        ]
         configuration.protocolClasses = [SonoicModelSonosControlAPIURLProtocol.self]
         let session = URLSession(configuration: configuration)
         let model = SonoicModel(
@@ -195,7 +267,7 @@ struct SonoicModelSonosControlAPITests {
             startInitialSonosControlAPICloudRefresh: false
         )
 
-        return (model, keychainStore)
+        return (model, keychainStore, networkStubID)
     }
 
     private static func configureCloudCommandTarget(on model: SonoicModel) {
@@ -221,9 +293,10 @@ struct SonoicModelSonosControlAPITests {
     }
 
     private static func stubNetwork(
+        for id: String,
         _ responder: @escaping @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
     ) {
-        SonoicModelSonosControlAPIURLProtocol.responder = responder
+        SonoicModelSonosControlAPIURLProtocol.setResponder(id: id, responder)
     }
 
     nonisolated private static func httpResponse(
@@ -377,7 +450,27 @@ struct SonoicModelSonosControlAPITests {
 }
 
 private final class SonoicModelSonosControlAPIURLProtocol: URLProtocol {
-    nonisolated(unsafe) static var responder: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
+    static let testStubHeader = "X-Sonoic-Control-API-Test-ID"
+
+    private static let responderLock = NSLock()
+    nonisolated(unsafe) private static var responders: [
+        String: @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
+    ] = [:]
+
+    static func setResponder(
+        id: String,
+        _ responder: @escaping @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
+    ) {
+        responderLock.withLock {
+            responders[id] = responder
+        }
+    }
+
+    static func removeResponder(id: String) {
+        responderLock.withLock {
+            responders[id] = nil
+        }
+    }
 
     override class func canInit(with request: URLRequest) -> Bool {
         true
@@ -388,7 +481,7 @@ private final class SonoicModelSonosControlAPIURLProtocol: URLProtocol {
     }
 
     override func startLoading() {
-        guard let responder = Self.responder else {
+        guard let responder = Self.responder(for: request) else {
             client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
         }
@@ -404,4 +497,16 @@ private final class SonoicModelSonosControlAPIURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
+
+    private static func responder(
+        for request: URLRequest
+    ) -> (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))? {
+        guard let id = request.value(forHTTPHeaderField: Self.testStubHeader) else {
+            return nil
+        }
+
+        return responderLock.withLock {
+            responders[id]
+        }
+    }
 }

@@ -1629,18 +1629,25 @@ extension SonoicModel {
         }
 
         if !didLoad {
-            queueState = previousQueueState
+            let didLoseAuthorization = sonosControlAPIState.authorizationStatus == .expired
+            if !didLoseAuthorization || !previousQueueState.isSonosControlAPICloudQueueBacked {
+                queueState = previousQueueState
+            }
             nowPlaying = previousNowPlaying
             nowPlayingObservedAt = previousNowPlayingObservedAt
-            manualPlaybackContextPayload = previousPlaybackContextPayload
-            manualQueueContextPayloads = previousQueueContextPayloads
-            manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
-            sonosControlAPICloudQueueSessionID = previousCloudQueueSessionID
-            sonosControlAPICloudQueueGroupID = previousCloudQueueGroupID
-            sonosControlAPICloudQueueVersion = previousCloudQueueVersion
-            sonosControlAPICloudQueueItemIDs = previousCloudQueueItemIDs
-            sonosControlAPICloudQueueTracks = previousCloudQueueTracks
-            persistSonosControlAPICloudQueueContext()
+            if didLoseAuthorization {
+                clearSonosControlAPICloudQueueContext()
+            } else {
+                manualPlaybackContextPayload = previousPlaybackContextPayload
+                manualQueueContextPayloads = previousQueueContextPayloads
+                manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
+                sonosControlAPICloudQueueSessionID = previousCloudQueueSessionID
+                sonosControlAPICloudQueueGroupID = previousCloudQueueGroupID
+                sonosControlAPICloudQueueVersion = previousCloudQueueVersion
+                sonosControlAPICloudQueueItemIDs = previousCloudQueueItemIDs
+                sonosControlAPICloudQueueTracks = previousCloudQueueTracks
+                persistSonosControlAPICloudQueueContext()
+            }
         }
 
         if didLoad {
@@ -2109,6 +2116,14 @@ extension SonoicModel {
         }
 
         return false
+    }
+}
+
+private extension SonosQueueState {
+    var isSonosControlAPICloudQueueBacked: Bool {
+        snapshot?.sourceURI?
+            .lowercased()
+            .hasPrefix("sonoic-cloud-queue") == true
     }
 }
 
