@@ -394,7 +394,7 @@ extension SonoicModel {
                 queueVersion: status.queueVersion
             )
             sonoicPlaybackDebugLog(
-                "cloudseek cloudQueueContext restored=\(didRestoreCloudQueueContext) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0) rawItemID=\(sonoicPlaybackDebugID(status.itemId)) queueVersion=\(sonoicPlaybackDebugID(status.queueVersion))"
+                "cloudseek cloudQueueContext restored=\(didRestoreCloudQueueContext) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueRuntimeState.sessionID)) itemCount=\(sonosControlAPICloudQueueRuntimeState.itemCount) rawItemID=\(sonoicPlaybackDebugID(status.itemId)) queueVersion=\(sonoicPlaybackDebugID(status.queueVersion))"
             )
             let itemIDCandidates = sonosControlAPISeekItemIDCandidates(from: status)
             sonoicPlaybackDebugLog(
@@ -428,9 +428,9 @@ extension SonoicModel {
                 return
             }
 
-            if sonosControlAPIHasCloudQueueContext {
+            if sonosControlAPICloudQueueRuntimeState.hasSessionContext {
                 sonoicPlaybackDebugLog(
-                    "cloudseek sessionContextUnmapped sessionSeekRequired rawItemID=\(sonoicPlaybackDebugID(status.itemId)) metadataItemID=\(sonoicPlaybackDebugID(metadataStatus?.currentItem?.id)) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0)"
+                    "cloudseek sessionContextUnmapped sessionSeekRequired rawItemID=\(sonoicPlaybackDebugID(status.itemId)) metadataItemID=\(sonoicPlaybackDebugID(metadataStatus?.currentItem?.id)) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueRuntimeState.sessionID)) itemCount=\(sonosControlAPICloudQueueRuntimeState.itemCount)"
                 )
                 throw SonosControlAPISeekFailure.sessionItemUnavailable
             }
@@ -612,57 +612,25 @@ extension SonoicModel {
         from status: SonosControlAPIPlaybackStatus,
         metadataStatus: SonosControlAPIMetadataStatus?
     ) -> (sessionID: String, itemID: String, track: SonosControlAPITrack?)? {
-        guard let sessionID = sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed,
-              let itemIDs = sonosControlAPICloudQueueItemIDs,
-              !itemIDs.isEmpty
-        else {
-            return nil
-        }
-
-        if let index = sonosControlAPICloudQueueCurrentIndex(
+        let currentIndex = sonosControlAPICloudQueueCurrentIndex(
             from: status,
-            metadataStatus: metadataStatus,
-            itemIDs: itemIDs
-        ),
-           itemIDs.indices.contains(index),
-           let itemID = itemIDs[index].sonoicNonEmptyTrimmed
-        {
-            let track = sonosControlAPICloudQueueTracks.flatMap { tracks in
-                tracks.indices.contains(index) ? tracks[index] : nil
-            }
-            return (sessionID, itemID, track)
-        }
-
-        return nil
-    }
-
-    private var sonosControlAPIHasCloudQueueContext: Bool {
-        guard sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed != nil,
-              sonosControlAPICloudQueueItemIDs?.isEmpty == false
-        else {
-            return false
-        }
-
-        return true
+            metadataStatus: metadataStatus
+        )
+        return sonosControlAPICloudQueueRuntimeState
+            .playbackTarget(currentIndex: currentIndex)
+            .map { ($0.sessionID, $0.itemID, $0.track) }
     }
 
     private func sonosControlAPICloudQueueCurrentIndex(
         from status: SonosControlAPIPlaybackStatus,
-        metadataStatus: SonosControlAPIMetadataStatus?,
-        itemIDs: [String]
+        metadataStatus: SonosControlAPIMetadataStatus?
     ) -> Int? {
-        SonoicSonosControlAPIQueueCurrentIndexResolver.currentIndex(
-            itemIDs: itemIDs,
-            candidates: [
-                status.itemId,
-                metadataStatus?.currentItem?.id,
-                queueState.snapshot?.currentItemIndex.map { String($0 + 1) },
-                manualPlaybackContextPayload.flatMap { payload in
-                    manualQueueContextPayloads?.firstIndex { $0.id == payload.id }.map {
-                        String($0 + 1)
-                    }
-                }
-            ]
+        sonosControlAPICloudQueueRuntimeState.currentIndex(
+            playbackStatus: status,
+            metadataStatus: metadataStatus,
+            queueSnapshotCurrentItemIndex: queueState.snapshot?.currentItemIndex,
+            manualPlaybackContextPayload: manualPlaybackContextPayload,
+            manualQueueContextPayloads: manualQueueContextPayloads
         )
     }
 
@@ -895,7 +863,7 @@ extension SonoicModel {
             manualQueueContextPayloads.flatMap { $0.indices.contains(index) ? $0[index] : nil }
         }
         let cloudQueueTrack = cloudQueueIndex.flatMap { index in
-            sonosControlAPICloudQueueTracks.flatMap { $0.indices.contains(index) ? $0[index] : nil }
+            sonosControlAPICloudQueueRuntimeState.track(at: index)
         }
         let cloudQueueSubtitleParts = sonosControlAPISubtitleParts(from: cloudQueuePayload?.subtitle)
         let title = track?.name?.sonoicNonEmptyTrimmed
@@ -1080,9 +1048,7 @@ extension SonoicModel {
         )
 
         if let cloudQueueIndex,
-           let durationMillis = sonosControlAPICloudQueueTracks.flatMap({ tracks in
-            tracks.indices.contains(cloudQueueIndex) ? tracks[cloudQueueIndex].durationMillis : nil
-           }),
+           let durationMillis = sonosControlAPICloudQueueRuntimeState.track(at: cloudQueueIndex)?.durationMillis,
            durationMillis > 0
         {
             return durationMillis
@@ -1395,13 +1361,10 @@ extension SonoicModel {
         }
 
         let index = position - 1
-        guard let sessionID = sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed,
-              let itemIDs = sonosControlAPICloudQueueItemIDs,
-              itemIDs.indices.contains(index),
-              let itemID = itemIDs[index].sonoicNonEmptyTrimmed
+        guard let target = sonosControlAPICloudQueueRuntimeState.playbackTarget(at: index)
         else {
             sonoicPlaybackDebugLog(
-                "cloudQueueSkip unavailable position=\(position) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueSessionID)) itemCount=\(sonosControlAPICloudQueueItemIDs?.count ?? 0)"
+                "cloudQueueSkip unavailable position=\(position) session=\(sonoicPlaybackDebugID(sonosControlAPICloudQueueRuntimeState.sessionID)) itemCount=\(sonosControlAPICloudQueueRuntimeState.itemCount)"
             )
             return false
         }
@@ -1416,7 +1379,6 @@ extension SonoicModel {
         let previousNowPlayingObservedAt = nowPlayingObservedAt
         let previousPlaybackContextPayload = manualPlaybackContextPayload
         let payload = manualQueueContextPayloads.flatMap { $0.indices.contains(index) ? $0[index] : nil }
-        let track = sonosControlAPICloudQueueTracks.flatMap { $0.indices.contains(index) ? $0[index] : nil }
 
         manualPlaybackContextPayload = payload
         beginManualPlayTransitionGrace()
@@ -1437,18 +1399,18 @@ extension SonoicModel {
             refreshQueueAfterSuccess: false
         ) {
             try await sonosControlAPIClient.skipToItem(
-                sessionID: sessionID,
-                itemID: itemID,
-                queueVersion: sonosControlAPICloudQueueVersion,
+                sessionID: target.sessionID,
+                itemID: target.itemID,
+                queueVersion: target.queueVersion,
                 positionMillis: 0,
                 playOnCompletion: true,
-                trackMetadata: track,
+                trackMetadata: target.track,
                 accessToken: context.accessToken
             )
         }
 
         if didSkip {
-            updateSonosControlAPICloudQueueCurrentItem(itemID: itemID)
+            updateSonosControlAPICloudQueueCurrentItem(itemID: target.itemID)
         } else {
             queueState = previousQueueState
             nowPlaying = previousNowPlaying
@@ -1457,7 +1419,7 @@ extension SonoicModel {
         }
 
         sonoicPlaybackDebugLog(
-            "cloudQueueSkip result=\(didSkip) position=\(position) itemID=\(sonoicPlaybackDebugID(itemID))"
+            "cloudQueueSkip result=\(didSkip) position=\(position) itemID=\(sonoicPlaybackDebugID(target.itemID))"
         )
         return didSkip
     }
@@ -1504,11 +1466,7 @@ extension SonoicModel {
         let previousPlaybackContextPayload = manualPlaybackContextPayload
         let previousQueueContextPayloads = manualQueueContextPayloads
         let previousRecentPlaybackContextPayload = manualRecentPlaybackContextPayload
-        let previousCloudQueueSessionID = sonosControlAPICloudQueueSessionID
-        let previousCloudQueueGroupID = sonosControlAPICloudQueueGroupID
-        let previousCloudQueueVersion = sonosControlAPICloudQueueVersion
-        let previousCloudQueueItemIDs = sonosControlAPICloudQueueItemIDs
-        let previousCloudQueueTracks = sonosControlAPICloudQueueTracks
+        let previousCloudQueueRuntimeState = sonosControlAPICloudQueueRuntimeState
         let startIndex = max(0, min(plan.startingTrackNumber - 1, plan.payloads.count - 1))
         let confirmationPayload = plan.payloads[startIndex]
         let queueItemIDs = request.items.compactMap(\.id)
@@ -1526,11 +1484,13 @@ extension SonoicModel {
         manualQueueContextPayloads = plan.payloads
         manualRecentPlaybackContextPayload = plan.recentPlaybackPayload
         manualPlaybackContextPayload = confirmationPayload
-        sonosControlAPICloudQueueSessionID = nil
-        sonosControlAPICloudQueueGroupID = context.groupID
-        sonosControlAPICloudQueueVersion = nil
-        sonosControlAPICloudQueueItemIDs = queueItemIDs
-        sonosControlAPICloudQueueTracks = queueTracks
+        sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: nil,
+            groupID: context.groupID,
+            queueVersion: nil,
+            itemIDs: queueItemIDs,
+            tracks: queueTracks
+        )
         markLocalNowPlaying(from: plan.localNowPlayingPayload ?? confirmationPayload)
 
         let didLoad = await performSonosControlAPITransportCommand(
@@ -1611,11 +1571,13 @@ extension SonoicModel {
             sonoicPlaybackDebugLog(
                 "cloudQueue load success session=\(sonoicPlaybackDebugID(sessionID))"
             )
-            sonosControlAPICloudQueueSessionID = sessionID
-            sonosControlAPICloudQueueGroupID = context.groupID
-            sonosControlAPICloudQueueVersion = cloudQueue.queueVersion
-            sonosControlAPICloudQueueItemIDs = queueItemIDs
-            sonosControlAPICloudQueueTracks = queueTracks
+            sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+                sessionID: sessionID,
+                groupID: context.groupID,
+                queueVersion: cloudQueue.queueVersion,
+                itemIDs: queueItemIDs,
+                tracks: queueTracks
+            )
             persistSonosControlAPICloudQueueContext()
             if let snapshot = sonosControlAPICloudQueueSnapshot(
                 currentItemIndex: startIndex,
@@ -1645,11 +1607,7 @@ extension SonoicModel {
                 manualPlaybackContextPayload = previousPlaybackContextPayload
                 manualQueueContextPayloads = previousQueueContextPayloads
                 manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
-                sonosControlAPICloudQueueSessionID = previousCloudQueueSessionID
-                sonosControlAPICloudQueueGroupID = previousCloudQueueGroupID
-                sonosControlAPICloudQueueVersion = previousCloudQueueVersion
-                sonosControlAPICloudQueueItemIDs = previousCloudQueueItemIDs
-                sonosControlAPICloudQueueTracks = previousCloudQueueTracks
+                sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
                 persistSonosControlAPICloudQueueContext()
             }
         }
@@ -1983,11 +1941,7 @@ extension SonoicModel {
         let previousPlaybackContextPayload = manualPlaybackContextPayload
         let previousQueueContextPayloads = manualQueueContextPayloads
         let previousRecentPlaybackContextPayload = manualRecentPlaybackContextPayload
-        let previousCloudQueueSessionID = sonosControlAPICloudQueueSessionID
-        let previousCloudQueueGroupID = sonosControlAPICloudQueueGroupID
-        let previousCloudQueueVersion = sonosControlAPICloudQueueVersion
-        let previousCloudQueueItemIDs = sonosControlAPICloudQueueItemIDs
-        let previousCloudQueueTracks = sonosControlAPICloudQueueTracks
+        let previousCloudQueueRuntimeState = sonosControlAPICloudQueueRuntimeState
 
         if let snapshot = queueState.snapshot {
             queueState = .loaded(SonosQueueSnapshot(
@@ -2034,11 +1988,7 @@ extension SonoicModel {
                 manualPlaybackContextPayload = previousPlaybackContextPayload
                 manualQueueContextPayloads = previousQueueContextPayloads
                 manualRecentPlaybackContextPayload = previousRecentPlaybackContextPayload
-                sonosControlAPICloudQueueSessionID = previousCloudQueueSessionID
-                sonosControlAPICloudQueueGroupID = previousCloudQueueGroupID
-                sonosControlAPICloudQueueVersion = previousCloudQueueVersion
-                sonosControlAPICloudQueueItemIDs = previousCloudQueueItemIDs
-                sonosControlAPICloudQueueTracks = previousCloudQueueTracks
+                sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
                 persistSonosControlAPICloudQueueContext()
             }
         }

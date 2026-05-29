@@ -104,11 +104,13 @@ struct SonoicModelCloudFirstStateTests {
         model.queueState = .loaded(queueSnapshot())
         model.isQueueRefreshing = true
         model.isQueueMutating = true
-        model.sonosControlAPICloudQueueSessionID = "session-1"
-        model.sonosControlAPICloudQueueGroupID = "group-1"
-        model.sonosControlAPICloudQueueVersion = "version-1"
-        model.sonosControlAPICloudQueueItemIDs = ["item-1"]
-        model.sonosControlAPICloudQueueVersionMismatchLogKey = "group-1|version-2"
+        model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-1",
+            groupID: "group-1",
+            queueVersion: "version-1",
+            itemIDs: ["item-1"],
+            versionMismatchLogKey: "group-1|version-2"
+        )
         model.manualSeekConfirmationDeadline = Date().addingTimeInterval(5)
         model.manualSeekTargetElapsedTime = 42
         model.manualSeekContentKey = "uri:x-sonos-http:track.m4a"
@@ -122,12 +124,7 @@ struct SonoicModelCloudFirstStateTests {
         #expect(model.queueState == .idle)
         #expect(!model.isQueueRefreshing)
         #expect(!model.isQueueMutating)
-        #expect(model.sonosControlAPICloudQueueSessionID == nil)
-        #expect(model.sonosControlAPICloudQueueGroupID == nil)
-        #expect(model.sonosControlAPICloudQueueVersion == nil)
-        #expect(model.sonosControlAPICloudQueueItemIDs == nil)
-        #expect(model.sonosControlAPICloudQueueTracks == nil)
-        #expect(model.sonosControlAPICloudQueueVersionMismatchLogKey == nil)
+        #expect(model.sonosControlAPICloudQueueRuntimeState == .empty)
         #expect(model.manualSeekConfirmationDeadline == nil)
         #expect(model.manualSeekTargetElapsedTime == nil)
         #expect(model.manualSeekContentKey == nil)
@@ -184,11 +181,13 @@ struct SonoicModelCloudFirstStateTests {
         )
         model.isQueueRefreshing = true
         model.isQueueMutating = true
-        model.sonosControlAPICloudQueueSessionID = "session-1"
-        model.sonosControlAPICloudQueueGroupID = "group-1"
-        model.sonosControlAPICloudQueueVersion = "version-1"
-        model.sonosControlAPICloudQueueItemIDs = ["item-1"]
-        model.sonosControlAPICloudQueueVersionMismatchLogKey = "group-1|version-2"
+        model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-1",
+            groupID: "group-1",
+            queueVersion: "version-1",
+            itemIDs: ["item-1"],
+            versionMismatchLogKey: "group-1|version-2"
+        )
         model.manualSeekConfirmationDeadline = Date().addingTimeInterval(5)
         model.manualSeekTargetElapsedTime = 42
         model.manualSeekContentKey = "uri:x-sonos-http:track.m4a"
@@ -203,12 +202,7 @@ struct SonoicModelCloudFirstStateTests {
         #expect(model.queueState == .idle)
         #expect(model.isQueueRefreshing == false)
         #expect(model.isQueueMutating == false)
-        #expect(model.sonosControlAPICloudQueueSessionID == nil)
-        #expect(model.sonosControlAPICloudQueueGroupID == nil)
-        #expect(model.sonosControlAPICloudQueueVersion == nil)
-        #expect(model.sonosControlAPICloudQueueItemIDs == nil)
-        #expect(model.sonosControlAPICloudQueueTracks == nil)
-        #expect(model.sonosControlAPICloudQueueVersionMismatchLogKey == nil)
+        #expect(model.sonosControlAPICloudQueueRuntimeState == .empty)
         #expect(model.manualSeekConfirmationDeadline == nil)
         #expect(model.manualSeekTargetElapsedTime == nil)
         #expect(model.manualSeekContentKey == nil)

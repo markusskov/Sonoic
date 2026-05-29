@@ -50,12 +50,7 @@ final class SonoicModel {
     @ObservationIgnored var manualPlaybackContextPayload: SonosPlayablePayload?
     @ObservationIgnored var manualQueueContextPayloads: [SonosPlayablePayload]?
     @ObservationIgnored var manualRecentPlaybackContextPayload: SonosPlayablePayload?
-    @ObservationIgnored var sonosControlAPICloudQueueSessionID: String?
-    @ObservationIgnored var sonosControlAPICloudQueueGroupID: String?
-    @ObservationIgnored var sonosControlAPICloudQueueVersion: String?
-    @ObservationIgnored var sonosControlAPICloudQueueItemIDs: [String]?
-    @ObservationIgnored var sonosControlAPICloudQueueTracks: [SonosControlAPITrack]?
-    @ObservationIgnored var sonosControlAPICloudQueueVersionMismatchLogKey: String?
+    @ObservationIgnored var sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState.empty
     @ObservationIgnored var sonosControlAPITokenRefreshTask: Task<SonosOAuthTokenSet?, Never>?
     @ObservationIgnored var sonosControlAPITokenRefreshGeneration = 0
     @ObservationIgnored var backgroundExecutionIdentifier: UIBackgroundTaskIdentifier = .invalid

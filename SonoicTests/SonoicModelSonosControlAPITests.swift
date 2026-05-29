@@ -16,10 +16,12 @@ struct SonoicModelSonosControlAPITests {
         let previousNowPlayingObservedAt = Date(timeIntervalSince1970: 123)
         directPlayback.model.nowPlaying = previousNowPlaying
         directPlayback.model.nowPlayingObservedAt = previousNowPlayingObservedAt
-        directPlayback.model.sonosControlAPICloudQueueSessionID = "session-before"
-        directPlayback.model.sonosControlAPICloudQueueGroupID = "group-1"
-        directPlayback.model.sonosControlAPICloudQueueVersion = "queue-before"
-        directPlayback.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
+        directPlayback.model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-1",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"]
+        )
 
         Self.stubNetwork(for: directPlayback.networkStubID) { request in
             Self.httpResponse(
@@ -36,8 +38,7 @@ struct SonoicModelSonosControlAPITests {
         #expect(directPlayback.model.nowPlayingObservedAt == previousNowPlayingObservedAt)
         #expect(directPlayback.model.sonosControlAPIState.authorizationStatus == .expired)
         #expect(directPlayback.model.sonosControlAPIAuthorizationState.status == .expired)
-        #expect(directPlayback.model.sonosControlAPICloudQueueSessionID == nil)
-        #expect(directPlayback.model.sonosControlAPICloudQueueItemIDs == nil)
+        #expect(directPlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
         #expect(directPlayback.model.isManualTransportCommandInFlight == false)
         #expect(directPlayback.model.isManualPlayTransitionAwaitingConfirmation == false)
 
@@ -73,11 +74,14 @@ struct SonoicModelSonosControlAPITests {
         cloudQueue.model.manualPlaybackContextPayload = previousPayload
         cloudQueue.model.manualQueueContextPayloads = [previousPayload]
         cloudQueue.model.manualRecentPlaybackContextPayload = previousPayload
-        cloudQueue.model.sonosControlAPICloudQueueSessionID = "session-before"
-        cloudQueue.model.sonosControlAPICloudQueueGroupID = "group-before"
-        cloudQueue.model.sonosControlAPICloudQueueVersion = "queue-before"
-        cloudQueue.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
-        cloudQueue.model.sonosControlAPICloudQueueTracks = previousCloudQueueTracks
+        let previousCloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"],
+            tracks: previousCloudQueueTracks
+        )
+        cloudQueue.model.sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
 
         Self.stubNetwork(for: cloudQueue.networkStubID) { request in
             Self.httpResponse(
@@ -98,11 +102,7 @@ struct SonoicModelSonosControlAPITests {
         #expect(cloudQueue.model.manualPlaybackContextPayload == previousPayload)
         #expect(cloudQueue.model.manualQueueContextPayloads == [previousPayload])
         #expect(cloudQueue.model.manualRecentPlaybackContextPayload == previousPayload)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueSessionID == "session-before")
-        #expect(cloudQueue.model.sonosControlAPICloudQueueGroupID == "group-before")
-        #expect(cloudQueue.model.sonosControlAPICloudQueueVersion == "queue-before")
-        #expect(cloudQueue.model.sonosControlAPICloudQueueItemIDs == ["item-before"])
-        #expect(cloudQueue.model.sonosControlAPICloudQueueTracks == previousCloudQueueTracks)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueRuntimeState == previousCloudQueueRuntimeState)
         #expect(cloudQueue.model.isManualTransportCommandInFlight == false)
         #expect(cloudQueue.model.sonosControlAPIState.authorizationStatus == .ready)
     }
@@ -249,13 +249,15 @@ struct SonoicModelSonosControlAPITests {
         cloudQueue.model.manualPlaybackContextPayload = previousPayload
         cloudQueue.model.manualQueueContextPayloads = [previousPayload]
         cloudQueue.model.manualRecentPlaybackContextPayload = previousPayload
-        cloudQueue.model.sonosControlAPICloudQueueSessionID = "session-before"
-        cloudQueue.model.sonosControlAPICloudQueueGroupID = "group-before"
-        cloudQueue.model.sonosControlAPICloudQueueVersion = "queue-before"
-        cloudQueue.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
-        cloudQueue.model.sonosControlAPICloudQueueTracks = [
-            Self.track(id: "previous-track", name: "Previous Track")
-        ]
+        cloudQueue.model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"],
+            tracks: [
+                Self.track(id: "previous-track", name: "Previous Track")
+            ]
+        )
 
         Self.stubNetwork(for: cloudQueue.networkStubID) { request in
             Self.httpResponse(
@@ -277,11 +279,7 @@ struct SonoicModelSonosControlAPITests {
         #expect(cloudQueue.model.manualPlaybackContextPayload == nil)
         #expect(cloudQueue.model.manualQueueContextPayloads == nil)
         #expect(cloudQueue.model.manualRecentPlaybackContextPayload == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueSessionID == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueGroupID == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueVersion == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueItemIDs == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueTracks == nil)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueRuntimeState == .empty)
         #expect(cloudQueue.model.isManualTransportCommandInFlight == false)
     }
 
@@ -320,13 +318,15 @@ struct SonoicModelSonosControlAPITests {
         favoritePlayback.model.manualPlaybackContextPayload = previousPayload
         favoritePlayback.model.manualQueueContextPayloads = [previousPayload]
         favoritePlayback.model.manualRecentPlaybackContextPayload = previousPayload
-        favoritePlayback.model.sonosControlAPICloudQueueSessionID = "session-before"
-        favoritePlayback.model.sonosControlAPICloudQueueGroupID = "group-before"
-        favoritePlayback.model.sonosControlAPICloudQueueVersion = "queue-before"
-        favoritePlayback.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
-        favoritePlayback.model.sonosControlAPICloudQueueTracks = [
-            Self.track(id: "previous-track", name: "Previous Track")
-        ]
+        favoritePlayback.model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"],
+            tracks: [
+                Self.track(id: "previous-track", name: "Previous Track")
+            ]
+        )
         Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
             Self.httpResponse(
                 for: request,
@@ -348,11 +348,7 @@ struct SonoicModelSonosControlAPITests {
         #expect(favoritePlayback.model.manualPlaybackContextPayload == nil)
         #expect(favoritePlayback.model.manualQueueContextPayloads == nil)
         #expect(favoritePlayback.model.manualRecentPlaybackContextPayload == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueSessionID == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueGroupID == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueVersion == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueItemIDs == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueTracks == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
         #expect(favoritePlayback.model.isManualTransportCommandInFlight == false)
     }
 

@@ -456,33 +456,13 @@ extension SonoicModel {
     }
 
     func clearSonosControlAPICloudQueueContext() {
-        sonosControlAPICloudQueueSessionID = nil
-        sonosControlAPICloudQueueGroupID = nil
-        sonosControlAPICloudQueueVersion = nil
-        sonosControlAPICloudQueueItemIDs = nil
-        sonosControlAPICloudQueueTracks = nil
-        sonosControlAPICloudQueueVersionMismatchLogKey = nil
+        sonosControlAPICloudQueueRuntimeState.clear()
         sharedStore?.clearCloudQueueSessionContext()
     }
 
     func persistSonosControlAPICloudQueueContext(groupID: String? = nil) {
-        guard let sessionID = sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed,
-              let itemIDs = sonosControlAPICloudQueueItemIDs,
-              !itemIDs.isEmpty
+        guard let context = sonosControlAPICloudQueueRuntimeState.storedContext(groupID: groupID)
         else {
-            sharedStore?.clearCloudQueueSessionContext()
-            return
-        }
-
-        let context = SonosControlAPICloudQueueSessionContext(
-            sessionID: sessionID,
-            groupID: groupID?.sonoicNonEmptyTrimmed ?? sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed,
-            queueVersion: sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed,
-            itemIDs: itemIDs,
-            tracks: sonosControlAPICloudQueueTracks ?? [],
-            updatedAt: Date()
-        )
-        guard context.isUsable else {
             sharedStore?.clearCloudQueueSessionContext()
             return
         }
@@ -496,133 +476,54 @@ extension SonoicModel {
 
     @discardableResult
     func restoreSonosControlAPICloudQueueContextIfNeeded(groupID: String?, queueVersion: String?) -> Bool {
-        let normalizedGroupID = groupID?.sonoicNonEmptyTrimmed
-        let normalizedQueueVersion = queueVersion?.sonoicNonEmptyTrimmed
-
-        if sonosControlAPICloudQueueSessionID?.sonoicNonEmptyTrimmed != nil,
-           sonosControlAPICloudQueueItemIDs?.isEmpty == false
-        {
-            let inMemoryGroupID = sonosControlAPICloudQueueGroupID?.sonoicNonEmptyTrimmed
-            let inMemoryQueueVersion = sonosControlAPICloudQueueVersion?.sonoicNonEmptyTrimmed
-            let groupMatches = normalizedGroupID.map { inMemoryGroupID == $0 } ?? true
-            if groupMatches {
-                if let normalizedQueueVersion,
-                   let inMemoryQueueVersion,
-                   inMemoryQueueVersion != normalizedQueueVersion
-                {
-                    logCloudQueueVersionMismatchOnce(
-                        source: "keepingMemory",
-                        groupID: inMemoryGroupID,
-                        storedVersion: inMemoryQueueVersion,
-                        currentVersion: normalizedQueueVersion
-                    )
-                } else {
-                    sonosControlAPICloudQueueVersionMismatchLogKey = nil
-                }
-                return true
-            }
-
-            sonoicPlaybackDebugLog(
-                "cloudQueue restoreContext clearing staleMemory group=\(sonoicPlaybackDebugID(inMemoryGroupID)) currentGroup=\(sonoicPlaybackDebugID(normalizedGroupID)) version=\(sonoicPlaybackDebugID(inMemoryQueueVersion)) currentVersion=\(sonoicPlaybackDebugID(normalizedQueueVersion))"
-            )
-            clearSonosControlAPICloudQueueContext()
-        }
-
-        guard let context = sharedStore?.loadCloudQueueSessionContext(),
-              context.isUsable,
-              context.isFresh
-        else {
-            return false
-        }
-
-        if let storedGroupID = context.groupID?.sonoicNonEmptyTrimmed,
-           let normalizedGroupID,
-           storedGroupID != normalizedGroupID
-        {
-            sonoicPlaybackDebugLog(
-                "cloudQueue restoreContext skipped groupMismatch stored=\(sonoicPlaybackDebugID(storedGroupID)) current=\(sonoicPlaybackDebugID(normalizedGroupID))"
-            )
-            clearSonosControlAPICloudQueueContext()
-            return false
-        }
-
-        if let storedQueueVersion = context.queueVersion?.sonoicNonEmptyTrimmed,
-           let normalizedQueueVersion,
-           storedQueueVersion != normalizedQueueVersion
-        {
-            logCloudQueueVersionMismatchOnce(
-                source: "keepingStored",
-                groupID: context.groupID?.sonoicNonEmptyTrimmed,
-                storedVersion: storedQueueVersion,
-                currentVersion: normalizedQueueVersion
-            )
-        } else {
-            sonosControlAPICloudQueueVersionMismatchLogKey = nil
-        }
-
-        sonosControlAPICloudQueueSessionID = context.sessionID
-        sonosControlAPICloudQueueGroupID = context.groupID
-        sonosControlAPICloudQueueVersion = context.queueVersion
-        sonosControlAPICloudQueueItemIDs = context.itemIDs
-        sonosControlAPICloudQueueTracks = context.tracks
-        sonoicPlaybackDebugLog(
-            "cloudQueue restoreContext session=\(sonoicPlaybackDebugID(context.sessionID)) itemCount=\(context.itemIDs.count)"
+        let storedContext = sonosControlAPICloudQueueRuntimeState.isUsable
+            ? nil
+            : sharedStore?.loadCloudQueueSessionContext()
+        let result = sonosControlAPICloudQueueRuntimeState.restoreIfNeeded(
+            groupID: groupID,
+            queueVersion: queueVersion,
+            storedContext: storedContext
         )
-        return true
-    }
 
-    private func logCloudQueueVersionMismatchOnce(
-        source: String,
-        groupID: String?,
-        storedVersion: String,
-        currentVersion: String
-    ) {
-        let logKey = "\(source)|\(groupID ?? "any")|\(storedVersion)|\(currentVersion)"
-        guard sonosControlAPICloudQueueVersionMismatchLogKey != logKey else {
-            return
+        if let mismatch = result.clearedMemoryGroupMismatch {
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext clearing staleMemory group=\(sonoicPlaybackDebugID(mismatch.storedGroupID)) currentGroup=\(sonoicPlaybackDebugID(mismatch.currentGroupID)) version=\(sonoicPlaybackDebugID(mismatch.storedQueueVersion)) currentVersion=\(sonoicPlaybackDebugID(mismatch.currentQueueVersion))"
+            )
         }
 
-        sonosControlAPICloudQueueVersionMismatchLogKey = logKey
-        sonoicPlaybackDebugLog(
-            "cloudQueue restoreContext \(source) versionChanged stored=\(sonoicPlaybackDebugID(storedVersion)) current=\(sonoicPlaybackDebugID(currentVersion))"
-        )
+        if let mismatch = result.skippedStoredGroupMismatch {
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext skipped groupMismatch stored=\(sonoicPlaybackDebugID(mismatch.storedGroupID)) current=\(sonoicPlaybackDebugID(mismatch.currentGroupID))"
+            )
+        }
+
+        if let mismatch = result.versionMismatch {
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext \(mismatch.source) versionChanged stored=\(sonoicPlaybackDebugID(mismatch.storedVersion)) current=\(sonoicPlaybackDebugID(mismatch.currentVersion))"
+            )
+        }
+
+        if result.shouldClearStoredContext {
+            sharedStore?.clearCloudQueueSessionContext()
+        }
+
+        if let context = result.restoredStoredContext {
+            sonoicPlaybackDebugLog(
+                "cloudQueue restoreContext session=\(sonoicPlaybackDebugID(context.sessionID)) itemCount=\(context.itemIDs.count)"
+            )
+        }
+
+        return result.didRestore
     }
 
     func sonosControlAPICloudQueueSnapshot(
         currentItemIndex: Int? = nil,
         sourceURI: String? = nil
     ) -> SonosQueueSnapshot? {
-        let payloads = manualQueueContextPayloads ?? []
-        let tracks = sonosControlAPICloudQueueTracks ?? []
-        let itemIDs = sonosControlAPICloudQueueItemIDs
-        let itemCount = max(payloads.count, tracks.count, itemIDs?.count ?? 0)
-
-        guard itemCount > 0 else {
-            return nil
-        }
-
-        let items = (0..<itemCount).map { index in
-            let payload = payloads.indices.contains(index) ? payloads[index] : nil
-            let track = tracks.indices.contains(index) ? tracks[index] : nil
-            let subtitleParts = payload?.subtitle?
-                .components(separatedBy: "•")
-                .map(\.sonoicTrimmed)
-                .filter { !$0.isEmpty } ?? []
-            let itemID = itemIDs.flatMap { $0.indices.contains(index) ? $0[index] : nil }
-            return SonosQueueItem(
-                id: itemID ?? payload?.id ?? "sonoic-cloud-queue-\(index + 1)",
-                title: track?.name?.sonoicNonEmptyTrimmed ?? payload?.title ?? "Unknown Track",
-                artistName: track?.artist?.name.sonoicNonEmptyTrimmed ?? subtitleParts.first,
-                albumTitle: track?.album?.name.sonoicNonEmptyTrimmed ?? subtitleParts.dropFirst().first,
-                artworkURL: track?.imageUrl?.sonoicNonEmptyTrimmed ?? payload?.artworkURL,
-                duration: track?.durationMillis.map { TimeInterval($0) / 1_000 } ?? payload?.duration
-            )
-        }
-
-        return SonosQueueSnapshot(
-            items: items,
-            currentItemIndex: currentItemIndex.flatMap { items.indices.contains($0) ? $0 : nil },
-            sourceURI: sourceURI ?? "sonoic-cloud-queue"
+        sonosControlAPICloudQueueRuntimeState.snapshot(
+            payloads: manualQueueContextPayloads ?? [],
+            currentItemIndex: currentItemIndex,
+            sourceURI: sourceURI
         )
     }
 
@@ -656,13 +557,6 @@ extension SonoicModel {
     }
 
     func sonosControlAPICloudQueueCurrentIndex(from itemIDCandidates: [String?]) -> Int? {
-        guard let itemIDs = sonosControlAPICloudQueueItemIDs else {
-            return nil
-        }
-
-        return SonoicSonosControlAPIQueueCurrentIndexResolver.currentIndex(
-            itemIDs: itemIDs,
-            candidates: itemIDCandidates
-        )
+        sonosControlAPICloudQueueRuntimeState.currentIndex(from: itemIDCandidates)
     }
 }
