@@ -60,14 +60,18 @@ extension SonoicModel {
     }
 
     private var allowsLocalSourcePlaybackFallback: Bool {
-        !sonosControlAPIState.settings.mode.canSendCommands
+        allowsLocalManualTransportCommands
     }
 
     func canPlaySourcePlaylistQueue(
         parentItem: SonoicSourceItem,
         trackItems: [SonoicSourceItem]
     ) -> Bool {
-        sonosFavoriteBackedPlaylist(for: parentItem) != nil
+        guard canSendPrimarySourcePlaybackCommands else {
+            return false
+        }
+
+        return sonosFavoriteBackedPlaylist(for: parentItem) != nil
             || sourcePlaylistPlaybackPlan(parentItem: parentItem, trackItems: trackItems) != nil
     }
 
@@ -293,7 +297,13 @@ extension SonoicModel {
             return
         }
 
-        await refreshSonosMusicServiceProbeIfNeeded()
+        if allowsLocalManualTransportCommands {
+            await refreshSonosMusicServiceProbeIfNeeded()
+        } else {
+            sonoicPlaybackDebugLog(
+                "sourcePlaybackContext cloudMode skipLocalProbe=true service='\(service.name)'"
+            )
+        }
 
         let appleMusicRow = sonosMusicServiceProbeState.snapshot?.knownServiceRows.first { $0.service == .appleMusic }
         let hint = appleMusicRow?.playbackHint

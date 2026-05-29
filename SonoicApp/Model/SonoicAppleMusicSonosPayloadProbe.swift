@@ -19,6 +19,28 @@ struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
                 "Library Track"
             }
         }
+
+        var isUserPlayable: Bool {
+            switch self {
+            case .catalogHLS, .catalogPlaylistContainer:
+                true
+            case .catalogStaticHLS, .libraryTrack:
+                false
+            }
+        }
+
+        var queuePriority: Int? {
+            switch self {
+            case .libraryTrack:
+                0
+            case .catalogHLS:
+                1
+            case .catalogStaticHLS:
+                2
+            case .catalogPlaylistContainer:
+                nil
+            }
+        }
     }
 
     var strategy: Strategy
@@ -31,7 +53,11 @@ struct SonoicAppleMusicGeneratedPayloadCandidate: Identifiable, Equatable {
     }
 
     var isUserPlayable: Bool {
-        strategy == .catalogHLS || strategy == .catalogPlaylistContainer
+        strategy.isUserPlayable
+    }
+
+    var isQueuePlayable: Bool {
+        strategy.queuePriority != nil
     }
 
     func playbackPayload(for item: SonoicSourceItem) -> SonosPlayablePayload {
@@ -73,8 +99,9 @@ struct SonoicAppleMusicSonosPayloadProbe {
         if item.kind == .song,
            let catalogID = identity.catalogID.sonoicNonEmptyTrimmed,
            let launchSerial = playbackHint.preferredLaunchSerial?.sonoicNonEmptyTrimmed,
+           let encodedLaunchSerial = sonosPayloadQueryValue(launchSerial),
            let encodedCatalogID = sonosPayloadID(catalogID) {
-            let uri = "x-sonosapi-hls:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&sn=\(launchSerial)"
+            let uri = "x-sonosapi-hls:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&sn=\(encodedLaunchSerial)"
             candidates.append(
                 SonoicAppleMusicGeneratedPayloadCandidate(
                     strategy: .catalogHLS,
@@ -93,8 +120,9 @@ struct SonoicAppleMusicSonosPayloadProbe {
         if item.kind == .song,
            let catalogID = identity.catalogID.sonoicNonEmptyTrimmed,
            let trackSerial = playbackHint.trackSerials.first?.sonoicNonEmptyTrimmed,
+           let encodedTrackSerial = sonosPayloadQueryValue(trackSerial),
            let encodedCatalogID = sonosPayloadID(catalogID) {
-            let uri = "x-sonosapi-hls-static:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&flags=0&sn=\(trackSerial)"
+            let uri = "x-sonosapi-hls-static:song%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&flags=0&sn=\(encodedTrackSerial)"
             candidates.append(
                 SonoicAppleMusicGeneratedPayloadCandidate(
                     strategy: .catalogStaticHLS,
@@ -113,8 +141,9 @@ struct SonoicAppleMusicSonosPayloadProbe {
         if item.kind == .playlist,
            let catalogID = identity.catalogID.sonoicNonEmptyTrimmed,
            let launchSerial = playbackHint.preferredLaunchSerial?.sonoicNonEmptyTrimmed,
+           let encodedLaunchSerial = sonosPayloadQueryValue(launchSerial),
            let encodedCatalogID = sonosPayloadID(catalogID) {
-            let uri = "x-rincon-cpcontainer:1006206cplaylist%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&flags=8300&sn=\(launchSerial)"
+            let uri = "x-rincon-cpcontainer:1006206cplaylist%3a\(encodedCatalogID)?sid=\(appleMusicServiceID)&flags=8300&sn=\(encodedLaunchSerial)"
             candidates.append(
                 SonoicAppleMusicGeneratedPayloadCandidate(
                     strategy: .catalogPlaylistContainer,
@@ -133,8 +162,9 @@ struct SonoicAppleMusicSonosPayloadProbe {
         if item.kind == .song,
            let libraryID = identity.libraryID.sonoicNonEmptyTrimmed,
            let trackSerial = playbackHint.trackSerials.first?.sonoicNonEmptyTrimmed,
+           let encodedTrackSerial = sonosPayloadQueryValue(trackSerial),
            let encodedLibraryID = sonosPayloadID(libraryID) {
-            let uri = "x-sonos-http:librarytrack%3a\(encodedLibraryID).m4p?sid=\(appleMusicServiceID)&flags=8232&sn=\(trackSerial)"
+            let uri = "x-sonos-http:librarytrack%3a\(encodedLibraryID).m4p?sid=\(appleMusicServiceID)&flags=8232&sn=\(encodedTrackSerial)"
             candidates.append(
                 SonoicAppleMusicGeneratedPayloadCandidate(
                     strategy: .libraryTrack,
@@ -158,12 +188,27 @@ struct SonoicAppleMusicSonosPayloadProbe {
         playbackHint: SonosMusicServicePlaybackHint?
     ) -> SonoicAppleMusicGeneratedPayloadCandidate? {
         let candidates = candidates(for: item, playbackHint: playbackHint)
-        return candidates.first { $0.strategy == .libraryTrack }
-            ?? candidates.first { $0.strategy == .catalogHLS }
-            ?? candidates.first { $0.strategy == .catalogStaticHLS }
+        return candidates
+            .compactMap { candidate -> (priority: Int, candidate: SonoicAppleMusicGeneratedPayloadCandidate)? in
+                guard let priority = candidate.strategy.queuePriority else {
+                    return nil
+                }
+
+                return (priority, candidate)
+            }
+            .min { lhs, rhs in lhs.priority < rhs.priority }?
+            .candidate
     }
 
     private func sonosPayloadID(_ value: String) -> String? {
+        sonosPercentEncodedPayloadValue(value)
+    }
+
+    private func sonosPayloadQueryValue(_ value: String) -> String? {
+        sonosPercentEncodedPayloadValue(value)
+    }
+
+    private func sonosPercentEncodedPayloadValue(_ value: String) -> String? {
         let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
         return value.addingPercentEncoding(withAllowedCharacters: allowedCharacters)
     }
