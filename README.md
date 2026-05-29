@@ -80,9 +80,13 @@ Before running on your own Apple developer account:
 1. Open `Sonoic.xcodeproj` in Xcode.
 2. Update signing for the app and widget targets.
 3. Replace bundle identifiers and App Group identifiers with your own namespace.
-4. Configure Sonos OAuth using [docs/sonos-oauth-dev-setup.md](docs/sonos-oauth-dev-setup.md).
-5. Run on a device connected to the same local network as your Sonos household.
-6. Open `Rooms`, allow local-network access, and choose a discovered player or group.
+4. Make sure the App Group identifier matches in every app/widget/shared-state location:
+   - `SonoicApp/Sonoic.entitlements`
+   - `SonoicWidgetsExtension.entitlements`
+   - `SonoicShared/Storage/SonoicSharedStore.swift`
+5. Configure Sonos OAuth using [docs/sonos-oauth-dev-setup.md](docs/sonos-oauth-dev-setup.md).
+6. Run on a device connected to the same local network as your Sonos household.
+7. Open `Rooms`, allow local-network access, and choose a discovered player or group.
 
 Notes:
 
