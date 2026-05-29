@@ -293,11 +293,7 @@ extension SonoicModel {
         let displayPayload = preparedLocalPayload ?? preparedPayload
 
         if let snapshot = queueState.snapshot {
-            queueState = .loaded(SonosQueueSnapshot(
-                items: snapshot.items,
-                currentItemIndex: nil,
-                sourceURI: snapshot.sourceURI
-            ))
+            queueState = .loaded(snapshot.clearingCurrentItemIndex())
         }
 
         beginManualPlayTransitionGrace()
@@ -369,11 +365,7 @@ extension SonoicModel {
         let displayPayload = preparedLocalPayload ?? preparedPayloads[startingTrackNumber - 1]
 
         if let snapshot = queueState.snapshot {
-            queueState = .loaded(SonosQueueSnapshot(
-                items: snapshot.items,
-                currentItemIndex: nil,
-                sourceURI: snapshot.sourceURI
-            ))
+            queueState = .loaded(snapshot.clearingCurrentItemIndex())
         }
 
         beginManualPlayTransitionGrace()

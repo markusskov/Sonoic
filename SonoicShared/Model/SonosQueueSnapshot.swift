@@ -85,6 +85,14 @@ struct SonosQueueSnapshot: Equatable {
         return "Track \(currentItemIndex + 1) of \(items.count)"
     }
 
+    func clearingCurrentItemIndex() -> SonosQueueSnapshot {
+        SonosQueueSnapshot(
+            items: items,
+            currentItemIndex: nil,
+            sourceURI: sourceURI
+        )
+    }
+
     func removingItems(atOffsets offsets: IndexSet) -> SonosQueueSnapshot {
         var updatedItems = items
         let previousCurrentItemID = currentItem?.id
