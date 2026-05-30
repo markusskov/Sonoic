@@ -1004,8 +1004,8 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
-    func settingsRoundTripThroughUserDefaults() {
-        let defaults = UserDefaults(suiteName: "SonosControlAPITransportTests-\(UUID().uuidString)")!
+    func settingsRoundTripThroughUserDefaults() throws {
+        let defaults = try Self.makeUserDefaults()
         let store = SonoicSettingsStore(userDefaults: defaults)
         let settings = SonosControlAPISettings(
             mode: .diagnosticsOnly,
@@ -1016,6 +1016,13 @@ struct SonosControlAPITransportTests {
         store.saveSonosControlAPISettings(settings)
 
         #expect(store.loadSonosControlAPISettings() == settings)
+    }
+
+    private static func makeUserDefaults() throws -> UserDefaults {
+        let suiteName = "SonosControlAPITransportTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
     }
 
     private static func stubbedTransport(
