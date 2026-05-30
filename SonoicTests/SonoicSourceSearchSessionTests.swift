@@ -123,7 +123,7 @@ struct SonoicSourceSearchSessionTests {
 
     @Test
     func nonAppleSonosNativeItemsRemainPlayable() throws {
-        let model = SonoicModel()
+        let model = try makeModel(savedManualHost: "192.0.2.10")
         let payload = playablePayload(service: .spotify)
         let spotifyItem = item(
             id: "spotify-native",
@@ -138,8 +138,8 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
-    func nonAppleMetadataOnlyItemsRemainNonPlayable() {
-        let model = SonoicModel()
+    func nonAppleMetadataOnlyItemsRemainNonPlayable() throws {
+        let model = try makeModel(savedManualHost: "192.0.2.10")
         let spotifyItem = item(
             id: "spotify-metadata",
             title: "Sweet Jane",
@@ -151,8 +151,8 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
-    func updatingSameQueryPreservesCachedResults() {
-        let model = SonoicModel()
+    func updatingSameQueryPreservesCachedResults() throws {
+        let model = try makeModel()
         let appleMusicSource = source(.appleMusic)
         let cachedItem = item(
             id: "cached-song",
@@ -179,8 +179,8 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
-    func updatingNewQueryClearsCachedResults() {
-        let model = SonoicModel()
+    func updatingNewQueryClearsCachedResults() throws {
+        let model = try makeModel()
         let appleMusicSource = source(.appleMusic)
         let cachedItem = item(
             id: "cached-song",
@@ -203,6 +203,20 @@ struct SonoicSourceSearchSessionTests {
         #expect(state.items.isEmpty)
         #expect(state.status == .idle)
         #expect(state.lastUpdatedAt == nil)
+    }
+
+    private func makeModel(savedManualHost: String? = nil) throws -> SonoicModel {
+        let suiteName = "SonoicSourceSearchSessionTests-\(UUID().uuidString)"
+        let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+        userDefaults.removePersistentDomain(forName: suiteName)
+        let store = SonoicSettingsStore(userDefaults: userDefaults)
+        if let savedManualHost {
+            store.saveManualSonosHost(savedManualHost)
+        }
+        return SonoicModel(
+            settingsStore: store,
+            startInitialSonosControlAPICloudRefresh: false
+        )
     }
 
     private func source(_ service: SonosServiceDescriptor) -> SonoicSource {
