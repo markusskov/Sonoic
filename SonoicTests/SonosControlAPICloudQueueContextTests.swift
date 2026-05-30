@@ -5,8 +5,8 @@ import Testing
 @MainActor
 struct SonosControlAPICloudQueueContextTests {
     @Test
-    func cloudQueueUnauthorizedStatusExpiresSonosControlAPIAuth() {
-        let model = SonoicModel()
+    func cloudQueueUnauthorizedStatusExpiresSonosControlAPIAuth() throws {
+        let model = try Self.makeModel()
 
         #expect(
             model.isSonosControlAPIAuthorizationFailure(
@@ -105,8 +105,8 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
-    func inMemoryCloudQueueContextSurvivesQueueVersionDrift() {
-        let model = SonoicModel()
+    func inMemoryCloudQueueContextSurvivesQueueVersionDrift() throws {
+        let model = try Self.makeModel()
         model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
             sessionID: "session-1",
             groupID: "group-1",
@@ -129,8 +129,8 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
-    func inMemoryCloudQueueContextClearsOnGroupMismatch() {
-        let model = SonoicModel()
+    func inMemoryCloudQueueContextClearsOnGroupMismatch() throws {
+        let model = try Self.makeModel()
         model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
             sessionID: "session-1",
             groupID: "group-1",
@@ -145,6 +145,16 @@ struct SonosControlAPICloudQueueContextTests {
 
         #expect(!restored)
         #expect(model.sonosControlAPICloudQueueRuntimeState == .empty)
+    }
+
+    private static func makeModel() throws -> SonoicModel {
+        let suiteName = "SonosControlAPICloudQueueContextTests-\(UUID().uuidString)"
+        let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+        userDefaults.removePersistentDomain(forName: suiteName)
+        return SonoicModel(
+            settingsStore: SonoicSettingsStore(userDefaults: userDefaults),
+            startInitialSonosControlAPICloudRefresh: false
+        )
     }
 
     private static func playbackPayload(id: String) -> SonosPlayablePayload {
