@@ -1,4 +1,5 @@
 import BackgroundTasks
+import Foundation
 import UIKit
 
 extension SonoicModel {
@@ -19,7 +20,13 @@ extension SonoicModel {
         do {
             try BGTaskScheduler.shared.submit(request)
         } catch {
+            let nsError = error as NSError
+            sonoicPlaybackDebugLog(
+                "backgroundRefresh schedule failed domain='\(nsError.domain)' code=\(nsError.code) detail='\(nsError.localizedDescription)'"
+            )
+#if !targetEnvironment(simulator)
             assertionFailure("Unable to schedule background refresh: \(error)")
+#endif
         }
     }
 
