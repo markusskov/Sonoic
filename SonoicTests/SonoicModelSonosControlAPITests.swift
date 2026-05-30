@@ -487,9 +487,7 @@ struct SonoicModelSonosControlAPITests {
             )
         )
 
-        let userDefaults = try #require(
-            UserDefaults(suiteName: "SonoicModelSonosControlAPITests-\(UUID().uuidString)")
-        )
+        let userDefaults = try Self.makeUserDefaults()
         let networkStubID = UUID().uuidString
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpAdditionalHeaders = [
@@ -512,6 +510,13 @@ struct SonoicModelSonosControlAPITests {
         )
 
         return (model, keychainStore, networkStubID)
+    }
+
+    private static func makeUserDefaults() throws -> UserDefaults {
+        let suiteName = "SonoicModelSonosControlAPITests-\(UUID().uuidString)"
+        let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+        userDefaults.removePersistentDomain(forName: suiteName)
+        return userDefaults
     }
 
     private static func configureCloudCommandTarget(
