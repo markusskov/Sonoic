@@ -499,11 +499,11 @@ struct SonoicModelSonosControlAPITests {
             settingsStore: SonoicSettingsStore(userDefaults: userDefaults),
             sonosControlAPIClient: SonosControlAPIClient(
                 transport: SonosControlAPITransport(
-                    baseURL: URL(string: "https://sonos.test/control/api/v1")!,
+                    baseURL: try Self.fixtureURL("https://sonos.test/control/api/v1"),
                     urlSession: session
                 )
             ),
-            sonosOAuthConfiguration: Self.oauthConfiguration,
+            sonosOAuthConfiguration: try Self.oauthConfiguration(),
             sonoicCloudQueueClient: SonoicCloudQueueClient(session: session),
             keychainStore: keychainStore,
             startInitialSonosControlAPICloudRefresh: false
@@ -517,6 +517,10 @@ struct SonoicModelSonosControlAPITests {
         let userDefaults = try #require(UserDefaults(suiteName: suiteName))
         userDefaults.removePersistentDomain(forName: suiteName)
         return userDefaults
+    }
+
+    private static func fixtureURL(_ string: String) throws -> URL {
+        try #require(URL(string: string))
     }
 
     private static func configureCloudCommandTarget(
@@ -574,16 +578,16 @@ struct SonoicModelSonosControlAPITests {
         return try JSONDecoder().decode(SonosControlAPILoadFavoriteRequest.self, from: body)
     }
 
-    private static var oauthConfiguration: SonosOAuthConfiguration {
+    private static func oauthConfiguration() throws -> SonosOAuthConfiguration {
         SonosOAuthConfiguration(
             clientID: "client-id",
             redirectURI: "https://sonoic.test/callback",
             callbackScheme: "sonoic",
-            tokenExchangeURL: URL(string: "https://sonoic.test/api/token")!,
+            tokenExchangeURL: try fixtureURL("https://sonoic.test/api/token"),
             tokenRefreshURL: nil,
-            authorizationEndpoint: URL(string: "https://api.sonos.com/login/v3/oauth")!,
+            authorizationEndpoint: try fixtureURL("https://api.sonos.com/login/v3/oauth"),
             scopes: ["playback-control-all"],
-            cloudQueueCreateURL: URL(string: "https://sonoic.test/api/sonos/cloud-queues")!
+            cloudQueueCreateURL: try fixtureURL("https://sonoic.test/api/sonos/cloud-queues")
         )
     }
 
