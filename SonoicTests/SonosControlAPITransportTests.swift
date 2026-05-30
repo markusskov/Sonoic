@@ -477,7 +477,7 @@ struct SonosControlAPITransportTests {
 
     @Test
     func decodesGroupsResponse() throws {
-        let data = """
+        let data = try Self.jsonData("""
         {
           "groups": [
             {
@@ -496,7 +496,7 @@ struct SonosControlAPITransportTests {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """)
 
         let response = try JSONDecoder().decode(SonosControlAPIGroupsResponse.self, from: data)
 
@@ -508,7 +508,7 @@ struct SonosControlAPITransportTests {
 
     @Test
     func decodesFavoritesResponseWithDocumentedItemsKey() throws {
-        let data = """
+        let data = try Self.jsonData("""
         {
           "version": "favorites-v1",
           "items": [
@@ -523,7 +523,7 @@ struct SonosControlAPITransportTests {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """)
 
         let response = try JSONDecoder().decode(SonosControlAPIFavoritesResponse.self, from: data)
 
@@ -536,7 +536,7 @@ struct SonosControlAPITransportTests {
 
     @Test
     func decodesPlaybackStatusResponse() throws {
-        let data = """
+        let data = try Self.jsonData("""
         {
           "playbackState": "PLAYBACK_STATE_PLAYING",
           "queueVersion": "queue-1",
@@ -558,7 +558,7 @@ struct SonosControlAPITransportTests {
             "canStop": false
           }
         }
-        """.data(using: .utf8)!
+        """)
 
         let response = try JSONDecoder().decode(SonosControlAPIPlaybackStatus.self, from: data)
 
@@ -572,7 +572,7 @@ struct SonosControlAPITransportTests {
 
     @Test
     func decodesPlaybackMetadataResponse() throws {
-        let data = """
+        let data = try Self.jsonData("""
         {
           "container": {
             "name": "Easy Mode",
@@ -628,7 +628,7 @@ struct SonosControlAPITransportTests {
           },
           "streamInfo": "Now playing"
         }
-        """.data(using: .utf8)!
+        """)
 
         let response = try JSONDecoder().decode(SonosControlAPIMetadataStatus.self, from: data)
 
@@ -668,13 +668,13 @@ struct SonosControlAPITransportTests {
 
     @Test
     func decodesAndEncodesVolumeRequests() throws {
-        let data = """
+        let data = try Self.jsonData("""
         {
           "volume": 42,
           "muted": false,
           "fixed": false
         }
-        """.data(using: .utf8)!
+        """)
         let volume = try JSONDecoder().decode(SonosControlAPIVolumeState.self, from: data)
         let setVolume = SonosControlAPISetVolumeRequest(volume: 65)
         let setMute = SonosControlAPISetMuteRequest(muted: true)
@@ -1050,6 +1050,10 @@ struct SonosControlAPITransportTests {
         let body = try #require(request.body)
         let object = try JSONSerialization.jsonObject(with: body)
         return try #require(object as? [String: Any])
+    }
+
+    private static func jsonData(_ string: String) throws -> Data {
+        try #require(string.data(using: .utf8))
     }
 
     private static var tokenSet: SonosOAuthTokenSet {
