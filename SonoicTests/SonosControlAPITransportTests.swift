@@ -291,6 +291,78 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
+    func clientFetchCloudSnapshotRecordsPlaylistDecodingFailureDetail() async throws {
+        let stub = try Self.stubbedTransport { request in
+            switch request.url?.path {
+            case "/control/api/v1/households":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"households":[{"id":"household-1"}]}"#
+                )
+            case "/control/api/v1/households/household-1/groups":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "groups": [
+                        {
+                          "id": "group-1",
+                          "name": "Kitchen",
+                          "coordinatorId": "player-1",
+                          "playerIds": ["player-1"]
+                        }
+                      ],
+                      "players": [
+                        {
+                          "id": "player-1",
+                          "name": "Kitchen",
+                          "roomName": "Kitchen"
+                        }
+                      ]
+                    }
+                    """
+                )
+            case "/control/api/v1/households/household-1/favorites":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"version":"favorites-v1","items":[{"id":"favorite-1","name":"Cloud Favorite"}]}"#
+                )
+            case "/control/api/v1/households/household-1/playlists":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"version":"playlists-v1","playlists":[{"name":"Cloud Playlist"}]}"#
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 404,
+                    body: #"{"message":"Unexpected path"}"#
+                )
+            }
+        }
+        defer { stub.cleanup() }
+        let client = SonosControlAPIClient(transport: stub.transport)
+
+        let snapshot = try await client.fetchCloudSnapshot(tokenSet: Self.tokenSet)
+
+        let diagnostics = try #require(snapshot.contentFetchDiagnosticsByHouseholdID["household-1"])
+        #expect(snapshot.favoritesByHouseholdID["household-1"]?.count == 1)
+        #expect(snapshot.playlistsByHouseholdID["household-1"] == nil)
+        #expect(diagnostics.favorites?.status == .loaded(count: 1, version: "favorites-v1"))
+        guard case let .failed(detail, isAuthorizationFailure) = diagnostics.playlists?.status else {
+            Issue.record("Expected the playlists decode failure to be recorded.")
+            return
+        }
+        #expect(isAuthorizationFailure == false)
+        #expect(detail.contains("Decoding missing key 'id'"))
+        #expect(detail.contains("playlists"))
+    }
+
+    @Test
     func clientRefreshCloudQueueSendsPostWithoutBodyOrContentType() async throws {
         let recorder = SonosControlAPITransportRequestRecorder()
         let stub = try Self.stubbedTransport { request in
