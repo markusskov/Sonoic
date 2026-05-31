@@ -558,6 +558,29 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
+    func decodesMinimalPlaylistsResponseWithoutVersion() throws {
+        let data = try Self.jsonData("""
+        {
+          "playlists": [
+            {
+              "id": "playlist-1",
+              "name": "Morning Mix"
+            }
+          ]
+        }
+        """)
+
+        let response = try JSONDecoder().decode(SonosControlAPIPlaylistsResponse.self, from: data)
+
+        #expect(response.version == nil)
+        #expect(response.playlists.count == 1)
+        #expect(response.playlists.first?.id == "playlist-1")
+        #expect(response.playlists.first?.name == "Morning Mix")
+        #expect(response.playlists.first?.type == nil)
+        #expect(response.playlists.first?.trackCount == nil)
+    }
+
+    @Test
     func decodesPlaybackStatusResponse() throws {
         let data = try Self.jsonData("""
         {
