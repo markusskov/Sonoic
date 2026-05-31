@@ -535,6 +535,29 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
+    func decodesMinimalFavoritesResponseWithoutVersion() throws {
+        let data = try Self.jsonData("""
+        {
+          "items": [
+            {
+              "id": "favorite-1",
+              "name": "Let's Groove"
+            }
+          ]
+        }
+        """)
+
+        let response = try JSONDecoder().decode(SonosControlAPIFavoritesResponse.self, from: data)
+
+        #expect(response.version == nil)
+        #expect(response.favorites.count == 1)
+        #expect(response.favorites.first?.id == "favorite-1")
+        #expect(response.favorites.first?.name == "Let's Groove")
+        #expect(response.favorites.first?.description == nil)
+        #expect(response.favorites.first?.service == nil)
+    }
+
+    @Test
     func decodesPlaybackStatusResponse() throws {
         let data = try Self.jsonData("""
         {
