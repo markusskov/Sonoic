@@ -87,6 +87,11 @@ nonisolated struct SonosControlAPIPlayer: Codable, Equatable, Identifiable {
 nonisolated struct SonosControlAPIFavoritesResponse: Codable, Equatable {
     var version: String?
     var favorites: [SonosControlAPIFavorite]
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case favorites = "items"
+    }
 }
 
 nonisolated struct SonosControlAPIFavorite: Codable, Equatable, Identifiable {
@@ -272,12 +277,24 @@ nonisolated struct SonosControlAPISessionStatus: Codable, Equatable {
     var customData: String?
 }
 
+nonisolated enum SonosControlAPILoadContentAction: String, Codable, Equatable {
+    case replace = "REPLACE"
+    case append = "APPEND"
+    case insert = "INSERT"
+    case insertNext = "INSERT_NEXT"
+    case playNow = "PLAY_NOW"
+}
+
 nonisolated struct SonosControlAPILoadFavoriteRequest: Codable, Equatable {
     var favoriteId: String
+    var action: SonosControlAPILoadContentAction? = .replace
+    var playOnCompletion: Bool? = true
 }
 
 nonisolated struct SonosControlAPILoadPlaylistRequest: Codable, Equatable {
     var playlistId: String
+    var action: SonosControlAPILoadContentAction? = .replace
+    var playOnCompletion: Bool? = true
 }
 
 nonisolated struct SonosControlAPISeekRequest: Codable, Equatable {

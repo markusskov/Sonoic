@@ -9,12 +9,17 @@ const CLOUD_QUEUE_STORAGE_PREFIX = 'cloud-queue:';
 const CLOUD_QUEUE_TTL_SECONDS = 24 * 60 * 60;
 const CLOUD_QUEUE_PRUNE_GRACE_SECONDS = 60;
 const CLOUD_QUEUE_MAX_WINDOW_ITEMS = 20;
+const JSON_BODY_MAX_BYTES = 1024 * 1024;
+const CLOUD_QUEUE_MAX_STRING_BYTES = 4096;
 const EXTERNAL_ORIGIN_HEADER = 'X-Sonoic-External-Origin';
+const SAFE_SONOS_TOKEN_ERROR_KEYS = ['error', 'error_description'] as const;
+const MAX_SAFE_ERROR_DETAIL_LENGTH = 240;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
 type WorkerEnv = Env & {
 	SONOS_CLIENT_SECRET?: string;
+	BROKER_CODE_SIGNING_SECRET?: string;
 	SONOS_BROKER_CODE_REDEMPTIONS?: DurableObjectNamespace;
 	SONOIC_CLOUD_QUEUES?: DurableObjectNamespace;
 };
@@ -186,6 +191,13 @@ export class SonoicCloudQueues {
 		if (uniqueItemIDs.size !== itemIDs.length) {
 			throw new HTTPError(400, 'cloud_queue_item_ids_must_be_unique');
 		}
+
+		validateCloudQueueStringValues(container, 'container');
+		validateCloudQueueURLValues(container, 'container');
+		items.forEach((item, index) => {
+			validateCloudQueueStringValues(item, `items.${index}`, new Set([`items.${index}.id`]));
+			validateCloudQueueURLValues(item, `items.${index}`);
+		});
 
 		const requestedStartItemID = optionalString(body, 'startItemId');
 		const startItemId = requestedStartItemID && uniqueItemIDs.has(requestedStartItemID)
@@ -367,7 +379,7 @@ export default {
 			}
 
 			if (request.method === 'POST' && url.pathname === '/api/sonos/events') {
-				return jsonResponse(202, { success: true });
+				return handleSonosEventCallback();
 			}
 
 			if (request.method === 'POST' && url.pathname === '/api/sonos/cloud-queues') {
@@ -388,6 +400,11 @@ export default {
 		}
 	},
 } satisfies ExportedHandler<Env>;
+
+function handleSonosEventCallback(): Response {
+	// Sonos requires a reachable event callback URL, but Sonoic does not consume event payloads yet.
+	return jsonResponse(202, { success: true });
+}
 
 async function handleCreateCloudQueue(request: Request, env: WorkerEnv): Promise<Response> {
 	const accessToken = requireBearerAccessToken(request);
@@ -475,14 +492,7 @@ async function requestSonosToken(env: WorkerEnv, form: Record<string, string>): 
 	const text = await response.text();
 
 	if (!response.ok) {
-		let detail: unknown = text;
-		try {
-			detail = JSON.parse(text);
-		} catch {
-			// Sonos can return HTML for some OAuth errors. Preserve the status, not the page.
-		}
-
-		throw new HTTPError(response.status, 'sonos_error', { error: 'sonos_error', detail });
+		throw new HTTPError(response.status, 'sonos_error', sonosTokenErrorBody(response.status, text));
 	}
 
 	try {
@@ -490,6 +500,57 @@ async function requestSonosToken(env: WorkerEnv, form: Record<string, string>): 
 	} catch {
 		throw new HTTPError(502, 'invalid_sonos_response');
 	}
+}
+
+function sonosTokenErrorBody(status: number, text: string): JsonObject {
+	const body: JsonObject = { error: 'sonos_error', status };
+	const detail = safeSonosTokenErrorDetail(text);
+	if (detail !== undefined) {
+		body.detail = detail;
+	}
+
+	return body;
+}
+
+function safeSonosTokenErrorDetail(text: string): JsonObject | undefined {
+	if (!text.trim()) {
+		return undefined;
+	}
+
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		// Sonos can return HTML for some OAuth errors. Preserve the status, not the page.
+		return undefined;
+	}
+
+	if (!isJsonObject(parsed)) {
+		return undefined;
+	}
+
+	const detail: JsonObject = {};
+	for (const key of SAFE_SONOS_TOKEN_ERROR_KEYS) {
+		const value = parsed[key];
+		if (typeof value !== 'string') {
+			continue;
+		}
+
+		const trimmed = value.trim();
+		if (trimmed) {
+			detail[key] = trimSafeErrorDetail(trimmed);
+		}
+	}
+
+	return Object.keys(detail).length > 0 ? detail : undefined;
+}
+
+function trimSafeErrorDetail(value: string): string {
+	if (value.length <= MAX_SAFE_ERROR_DETAIL_LENGTH) {
+		return value;
+	}
+
+	return `${value.slice(0, MAX_SAFE_ERROR_DETAIL_LENGTH)}...`;
 }
 
 function requireBearerAccessToken(request: Request): string {
@@ -540,9 +601,22 @@ function redirectToApp(env: WorkerEnv, query: Record<string, string>): Response 
 }
 
 async function readJson(request: Request): Promise<JsonObject> {
+	const contentLength = request.headers.get('Content-Length');
+	if (contentLength !== null) {
+		const parsedContentLength = Number.parseInt(contentLength, 10);
+		if (Number.isFinite(parsedContentLength) && parsedContentLength > JSON_BODY_MAX_BYTES) {
+			throw new HTTPError(413, 'request_body_too_large');
+		}
+	}
+
+	const text = await request.text();
+	if (textEncoder.encode(text).byteLength > JSON_BODY_MAX_BYTES) {
+		throw new HTTPError(413, 'request_body_too_large');
+	}
+
 	let body: unknown;
 	try {
-		body = await request.json();
+		body = JSON.parse(text);
 	} catch {
 		throw new HTTPError(400, 'request_body_must_be_json');
 	}
@@ -745,10 +819,17 @@ function isBrokerCodePayload(payload: unknown): payload is BrokerCodePayload {
 }
 
 async function hmacSignature(env: WorkerEnv, value: string): Promise<string> {
-	const secret = requiredEnv(env, 'SONOS_CLIENT_SECRET');
+	const secret = brokerCodeSigningSecret(env);
 	const key = await crypto.subtle.importKey('raw', textEncoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 	const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(value));
 	return base64URLEncode(new Uint8Array(signature));
+}
+
+function brokerCodeSigningSecret(env: WorkerEnv): string {
+	const dedicatedSecret = env.BROKER_CODE_SIGNING_SECRET;
+	return typeof dedicatedSecret === 'string' && dedicatedSecret.length > 0
+		? dedicatedSecret
+		: requiredEnv(env, 'SONOS_CLIENT_SECRET');
 }
 
 async function sha256Digest(value: string): Promise<string> {
@@ -798,6 +879,61 @@ function validateCloudQueueItem(item: JsonObject, index: number): string {
 	const track = requiredCloudQueueTrack(item, index);
 	validateCloudQueueTrack(track, index);
 	return id;
+}
+
+function validateCloudQueueStringValues(value: unknown, path: string, skippedPaths: Set<string> = new Set()): void {
+	if (typeof value === 'string') {
+		if (!skippedPaths.has(path) && textEncoder.encode(value).byteLength > CLOUD_QUEUE_MAX_STRING_BYTES) {
+			throw new HTTPError(400, `cloud_queue_string_too_long:${path}`);
+		}
+
+		return;
+	}
+
+	if (Array.isArray(value)) {
+		value.forEach((entry, index) => validateCloudQueueStringValues(entry, `${path}.${index}`, skippedPaths));
+		return;
+	}
+
+	if (isJsonObject(value)) {
+		Object.entries(value).forEach(([key, entry]) => {
+			validateCloudQueueStringValues(entry, `${path}.${key}`, skippedPaths);
+		});
+	}
+}
+
+function validateCloudQueueURLValues(value: unknown, path: string): void {
+	if (typeof value === 'string') {
+		if (pathKey(path).toLowerCase().endsWith('url') && value.length > 0 && !isHTTPURL(value)) {
+			throw new HTTPError(400, `cloud_queue_url_invalid:${path}`);
+		}
+
+		return;
+	}
+
+	if (Array.isArray(value)) {
+		value.forEach((entry, index) => validateCloudQueueURLValues(entry, `${path}.${index}`));
+		return;
+	}
+
+	if (isJsonObject(value)) {
+		Object.entries(value).forEach(([key, entry]) => {
+			validateCloudQueueURLValues(entry, `${path}.${key}`);
+		});
+	}
+}
+
+function pathKey(path: string): string {
+	return path.split('.').at(-1) ?? path;
+}
+
+function isHTTPURL(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === 'http:' || url.protocol === 'https:';
+	} catch {
+		return false;
+	}
 }
 
 function validatedCloudQueueItemID(item: JsonObject, index: number): string {

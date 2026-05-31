@@ -252,6 +252,63 @@ struct SonoicAppleMusicPlaybackPayloadResolverTests {
     }
 
     @Test
+    func favoritePurposeBuildsGeneratedPlaylistContainerPayloadFromPlaybackHint() throws {
+        let item = appleMusicItem(
+            title: "Road Songs",
+            subtitle: "Apple Music",
+            kind: .playlist,
+            catalogID: "p.abc123"
+        )
+        let model = try model(includesAppleMusicPlaybackHint: true)
+
+        let resolvedPayload = try model.appleMusicPlayablePayload(for: item, purpose: .favorite)
+        let payload = try #require(resolvedPayload)
+
+        #expect(payload.kind == .collection)
+        #expect(payload.uri == "x-rincon-cpcontainer:1006206cplaylist%3ap.abc123?sid=204&flags=8300&sn=3")
+        #expect(payload.metadataXML?.contains("<container id=\"playlist:p.abc123\"") == true)
+    }
+
+    @Test
+    func favoriteToggleSavesLibraryPlaylistAsLocalHomeFavorite() async throws {
+        let item = appleMusicItem(
+            title: "Markus Mix",
+            subtitle: "Apple Music",
+            kind: .playlist,
+            catalogID: nil,
+            libraryID: "p.library-only"
+        )
+        let model = try model(includesAppleMusicPlaybackHint: true)
+        model.manualSonosHost = "192.0.2.10"
+
+        let result = try await model.toggleAppleMusicSonosFavorite(for: item)
+        guard case .added(let objectID) = result else {
+            Issue.record("Expected local favorite to be added.")
+            return
+        }
+
+        let favorite = try #require(model.homeFavoritesState.snapshot?.items.first)
+        let homeItem = SonoicSourceItem(favorite: favorite)
+        #expect(model.isLocalAppleMusicFavoriteObjectID(objectID))
+        #expect(favorite.id == objectID)
+        #expect(favorite.kind == .collection)
+        #expect(favorite.playbackURI == "x-sonoic-apple-music-libraryplaylist:p.library-only")
+        #expect(homeItem.origin == .favorite)
+        #expect(homeItem.kind == .playlist)
+        #expect(homeItem.sourceReference?.catalogID == nil)
+        #expect(homeItem.sourceReference?.libraryID == "p.library-only")
+        #expect(model.appleMusicFavoriteObjectID(for: item) == objectID)
+
+        let removeResult = try await model.toggleAppleMusicSonosFavorite(for: item)
+        guard case .removed = removeResult else {
+            Issue.record("Expected local favorite to be removed.")
+            return
+        }
+        #expect(model.homeFavoritesState == .empty)
+        #expect(model.appleMusicFavoriteObjectID(for: item) == nil)
+    }
+
+    @Test
     func metadataPurposeKeepsFavoriteGeneratedNativeSelectionOrder() throws {
         let item = purposeContractItem(nativePayloadID: "native-metadata")
         let exactFavorite = verifiedAppleMusicFavorite()

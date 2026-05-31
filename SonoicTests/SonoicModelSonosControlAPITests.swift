@@ -16,13 +16,15 @@ struct SonoicModelSonosControlAPITests {
         let previousNowPlayingObservedAt = Date(timeIntervalSince1970: 123)
         directPlayback.model.nowPlaying = previousNowPlaying
         directPlayback.model.nowPlayingObservedAt = previousNowPlayingObservedAt
-        directPlayback.model.sonosControlAPICloudQueueSessionID = "session-before"
-        directPlayback.model.sonosControlAPICloudQueueGroupID = "group-1"
-        directPlayback.model.sonosControlAPICloudQueueVersion = "queue-before"
-        directPlayback.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
+        directPlayback.model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-1",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"]
+        )
 
         Self.stubNetwork(for: directPlayback.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected authorization failure"}"#
@@ -36,8 +38,7 @@ struct SonoicModelSonosControlAPITests {
         #expect(directPlayback.model.nowPlayingObservedAt == previousNowPlayingObservedAt)
         #expect(directPlayback.model.sonosControlAPIState.authorizationStatus == .expired)
         #expect(directPlayback.model.sonosControlAPIAuthorizationState.status == .expired)
-        #expect(directPlayback.model.sonosControlAPICloudQueueSessionID == nil)
-        #expect(directPlayback.model.sonosControlAPICloudQueueItemIDs == nil)
+        #expect(directPlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
         #expect(directPlayback.model.isManualTransportCommandInFlight == false)
         #expect(directPlayback.model.isManualPlayTransitionAwaitingConfirmation == false)
 
@@ -73,14 +74,17 @@ struct SonoicModelSonosControlAPITests {
         cloudQueue.model.manualPlaybackContextPayload = previousPayload
         cloudQueue.model.manualQueueContextPayloads = [previousPayload]
         cloudQueue.model.manualRecentPlaybackContextPayload = previousPayload
-        cloudQueue.model.sonosControlAPICloudQueueSessionID = "session-before"
-        cloudQueue.model.sonosControlAPICloudQueueGroupID = "group-before"
-        cloudQueue.model.sonosControlAPICloudQueueVersion = "queue-before"
-        cloudQueue.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
-        cloudQueue.model.sonosControlAPICloudQueueTracks = previousCloudQueueTracks
+        let previousCloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"],
+            tracks: previousCloudQueueTracks
+        )
+        cloudQueue.model.sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
 
         Self.stubNetwork(for: cloudQueue.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 500,
                 body: #"{"message":"Injected cloud queue failure"}"#
@@ -98,13 +102,369 @@ struct SonoicModelSonosControlAPITests {
         #expect(cloudQueue.model.manualPlaybackContextPayload == previousPayload)
         #expect(cloudQueue.model.manualQueueContextPayloads == [previousPayload])
         #expect(cloudQueue.model.manualRecentPlaybackContextPayload == previousPayload)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueSessionID == "session-before")
-        #expect(cloudQueue.model.sonosControlAPICloudQueueGroupID == "group-before")
-        #expect(cloudQueue.model.sonosControlAPICloudQueueVersion == "queue-before")
-        #expect(cloudQueue.model.sonosControlAPICloudQueueItemIDs == ["item-before"])
-        #expect(cloudQueue.model.sonosControlAPICloudQueueTracks == previousCloudQueueTracks)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueRuntimeState == previousCloudQueueRuntimeState)
         #expect(cloudQueue.model.isManualTransportCommandInFlight == false)
         #expect(cloudQueue.model.sonosControlAPIState.authorizationStatus == .ready)
+    }
+
+    @Test
+    func loadRollbackAuthorizationLossRestoresManualQueueAndClearsContexts() throws {
+        let playback = try Self.makeModel()
+        defer {
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let previousQueueState = SonosQueueState.loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "manual-item-before",
+                        title: "Manual Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 120
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "x-rincon-queue:RINCON_00000000000001400#0"
+            )
+        )
+        let previousNowPlaying = Self.nowPlayingSnapshot(title: "Manual Before", playbackState: .playing)
+        let previousObservedAt = Date(timeIntervalSince1970: 1_234)
+        let previousPayload = Self.playbackPayload(id: "manual-before")
+        let previousCloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"]
+        )
+        playback.model.queueState = previousQueueState
+        playback.model.nowPlaying = previousNowPlaying
+        playback.model.nowPlayingObservedAt = previousObservedAt
+        playback.model.manualPlaybackContextPayload = previousPayload
+        playback.model.manualQueueContextPayloads = [previousPayload]
+        playback.model.manualRecentPlaybackContextPayload = previousPayload
+        playback.model.sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
+        let rollbackState = SonoicModel.SonosControlAPILoadRollbackState(playback.model)
+
+        let optimisticPayload = Self.playbackPayload(id: "optimistic-load")
+        playback.model.queueState = .loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "cloud-item",
+                        title: "Cloud Item",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "sonoic-cloud-queue:optimistic"
+            )
+        )
+        playback.model.nowPlaying = Self.nowPlayingSnapshot(title: "Optimistic Load", playbackState: .buffering)
+        playback.model.nowPlayingObservedAt = Date(timeIntervalSince1970: 9_876)
+        playback.model.manualPlaybackContextPayload = optimisticPayload
+        playback.model.manualQueueContextPayloads = [optimisticPayload]
+        playback.model.manualRecentPlaybackContextPayload = optimisticPayload
+        playback.model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "optimistic-session",
+            groupID: "group-1",
+            queueVersion: "optimistic-version",
+            itemIDs: ["cloud-item"]
+        )
+
+        rollbackState.restoreFailedLoad(
+            on: playback.model,
+            didLoseAuthorization: true,
+            clearManualContextOnAuthorizationLoss: true
+        )
+
+        #expect(playback.model.queueState == previousQueueState)
+        #expect(playback.model.nowPlaying == previousNowPlaying)
+        #expect(playback.model.nowPlayingObservedAt == previousObservedAt)
+        #expect(playback.model.manualPlaybackContextPayload == nil)
+        #expect(playback.model.manualQueueContextPayloads == nil)
+        #expect(playback.model.manualRecentPlaybackContextPayload == nil)
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState == .empty)
+    }
+
+    @Test
+    func transportCommandSkipsActionWhenAlreadyInFlight() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let previousCommandDescription = playback.model.sonosControlAPIState.lastCommandDescription
+        let previousErrorDetail = playback.model.sonosControlAPIState.lastErrorDetail
+        let previousUpdatedAt = playback.model.sonosControlAPIState.lastUpdatedAt
+        playback.model.isManualTransportCommandInFlight = true
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud duplicate",
+            refreshQueueAfterSuccess: true
+        ) {
+            didRunAction = true
+        }
+
+        #expect(didPerform == false)
+        #expect(didRunAction == false)
+        #expect(playback.model.isManualTransportCommandInFlight == true)
+        #expect(playback.model.sonosControlAPIState.lastCommandDescription == previousCommandDescription)
+        #expect(playback.model.sonosControlAPIState.lastErrorDetail == previousErrorDetail)
+        #expect(playback.model.sonosControlAPIState.lastUpdatedAt == previousUpdatedAt)
+    }
+
+    @Test
+    func transportCommandClearsStaleRefreshTasksBeforeAction() async throws {
+        let playback = try Self.makeModel()
+        let staleRefreshTask = Task<Void, Never> {
+            try? await Task.sleep(for: .seconds(60))
+        }
+        let staleDeferredSyncTask = Task<Void, Never> {
+            try? await Task.sleep(for: .seconds(60))
+        }
+        let staleConfirmationRetryTask = Task<Void, Never> {
+            try? await Task.sleep(for: .seconds(60))
+        }
+        defer {
+            staleRefreshTask.cancel()
+            staleDeferredSyncTask.cancel()
+            staleConfirmationRetryTask.cancel()
+            playback.model.manualHostRefreshTask?.cancel()
+            playback.model.manualHostRefreshTask = nil
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            playback.model.manualPlayConfirmationRetryTask?.cancel()
+            playback.model.manualPlayConfirmationRetryTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        playback.model.manualHostRefreshTask = staleRefreshTask
+        playback.model.manualHostDeferredSyncTask = staleDeferredSyncTask
+        playback.model.manualPlayConfirmationRetryTask = staleConfirmationRetryTask
+        let injectedError = NSError(
+            domain: "SonoicModelSonosControlAPITests",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "Injected cleanup failure"]
+        )
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud cleanup",
+            refreshQueueAfterSuccess: true
+        ) {
+            didRunAction = true
+            #expect(staleRefreshTask.isCancelled)
+            #expect(staleDeferredSyncTask.isCancelled)
+            #expect(staleConfirmationRetryTask.isCancelled)
+            #expect(playback.model.manualHostRefreshTask == nil)
+            #expect(playback.model.manualHostDeferredSyncTask == nil)
+            #expect(playback.model.manualPlayConfirmationRetryTask == nil)
+            throw injectedError
+        }
+
+        #expect(didPerform == false)
+        #expect(didRunAction)
+        #expect(playback.model.manualHostRefreshTask == nil)
+        #expect(playback.model.manualHostDeferredSyncTask == nil)
+        #expect(playback.model.manualPlayConfirmationRetryTask == nil)
+    }
+
+    @Test
+    func transportCommandRecordsNonAuthorizationFailureDiagnostics() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        let injectedError = NSError(
+            domain: "SonoicModelSonosControlAPITests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Injected non-authorization failure"]
+        )
+        playback.model.manualPlayTransitionGraceDeadline = Date().addingTimeInterval(60)
+        playback.model.isManualPlayTransitionAwaitingConfirmation = true
+        playback.model.manualSeekConfirmationDeadline = Date().addingTimeInterval(60)
+        playback.model.manualSeekTargetElapsedTime = 42
+        playback.model.manualSeekContentKey = "uri:x-sonos-http:track.m4a"
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud transient failure",
+            refreshQueueAfterSuccess: true
+        ) {
+            didRunAction = true
+            throw injectedError
+        }
+
+        #expect(didPerform == false)
+        #expect(didRunAction)
+        #expect(playback.model.isManualTransportCommandInFlight == false)
+        #expect(playback.model.sonosControlAPIState.authorizationStatus == .ready)
+        #expect(playback.model.sonosControlAPIState.lastErrorDetail == injectedError.localizedDescription)
+        #expect(playback.model.sonosControlAPIState.lastCommandDescription == nil)
+        #expect(playback.model.manualHostRefreshStatus == .failed(injectedError.localizedDescription))
+        #expect(playback.model.manualPlayTransitionGraceDeadline == nil)
+        #expect(playback.model.isManualPlayTransitionAwaitingConfirmation == false)
+        #expect(playback.model.manualSeekConfirmationDeadline == nil)
+        #expect(playback.model.manualSeekTargetElapsedTime == nil)
+        #expect(playback.model.manualSeekContentKey == nil)
+    }
+
+    @Test
+    func transportCommandRecordsAuthorizationFailureDiagnostics() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostRefreshTask?.cancel()
+            playback.model.manualHostRefreshTask = nil
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        let injectedError = SonosControlAPITransport.TransportError.httpStatus(401, "Token expired")
+        playback.model.manualPlayTransitionGraceDeadline = Date().addingTimeInterval(60)
+        playback.model.isManualPlayTransitionAwaitingConfirmation = true
+        playback.model.manualSeekConfirmationDeadline = Date().addingTimeInterval(60)
+        playback.model.manualSeekTargetElapsedTime = 42
+        playback.model.manualSeekContentKey = "uri:x-sonos-http:track.m4a"
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud auth failure",
+            refreshQueueAfterSuccess: true
+        ) {
+            didRunAction = true
+            throw injectedError
+        }
+
+        #expect(didPerform == false)
+        #expect(didRunAction)
+        #expect(playback.model.sonosControlAPIState.authorizationStatus == .expired)
+        #expect(playback.model.sonosControlAPIAuthorizationState.status == .expired)
+        #expect(playback.model.sonosControlAPIState.lastErrorDetail == injectedError.localizedDescription)
+        #expect(playback.model.sonosControlAPIState.lastCommandDescription == nil)
+        #expect(playback.model.sonosControlAPIState.lastUpdatedAt != nil)
+        #expect(playback.model.isManualTransportCommandInFlight == false)
+        #expect(playback.model.manualHostRefreshStatus == .failed(injectedError.localizedDescription))
+        #expect(playback.model.manualHostRefreshTask == nil)
+        #expect(playback.model.manualHostDeferredSyncTask == nil)
+        #expect(playback.model.manualPlayTransitionGraceDeadline == nil)
+        #expect(playback.model.isManualPlayTransitionAwaitingConfirmation == false)
+        #expect(playback.model.manualSeekConfirmationDeadline == nil)
+        #expect(playback.model.manualSeekTargetElapsedTime == nil)
+        #expect(playback.model.manualSeekContentKey == nil)
+    }
+
+    @Test
+    func transportCommandRecordsSuccessDiagnosticsAndSchedulesSync() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        playback.model.sonosControlAPIState.lastErrorDetail = "Previous failure"
+        playback.model.sonosControlAPIState.lastUpdatedAt = nil
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud success",
+            refreshQueueAfterSuccess: true,
+            syncDelay: .seconds(60)
+        ) {
+            didRunAction = true
+        }
+
+        #expect(didPerform)
+        #expect(didRunAction)
+        #expect(playback.model.isManualTransportCommandInFlight == false)
+        #expect(playback.model.sonosControlAPIState.lastErrorDetail == nil)
+        #expect(playback.model.sonosControlAPIState.lastCommandDescription == "Cloud success")
+        #expect(playback.model.sonosControlAPIState.lastUpdatedAt != nil)
+        #expect(playback.model.manualHostRefreshStatus == .refreshing)
+        #expect(playback.model.manualHostDeferredSyncTask != nil)
+    }
+
+    @Test
+    func transientCloudQueueLoadFailureRestoresPreviousCloudQueueContext() async throws {
+        let cloudQueue = try Self.makeModel()
+        defer {
+            try? cloudQueue.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: cloudQueue.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: cloudQueue.model)
+        let previousPayload = Self.playbackPayload(id: "previous-cloud-payload")
+        let previousRecentPayload = Self.playbackPayload(id: "previous-cloud-recent")
+        let previousNowPlaying = Self.nowPlayingSnapshot(title: "Previous Cloud Queue", playbackState: .playing)
+        let previousObservedAt = Date(timeIntervalSince1970: 2_468)
+        let previousQueueState = SonosQueueState.loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "cloud-item-before",
+                        title: "Cloud Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "sonoic-cloud-queue:previous"
+            )
+        )
+        let previousCloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["cloud-item-before"],
+            tracks: [
+                Self.track(id: "cloud-item-before", name: "Cloud Before")
+            ]
+        )
+        cloudQueue.model.queueState = previousQueueState
+        cloudQueue.model.nowPlaying = previousNowPlaying
+        cloudQueue.model.nowPlayingObservedAt = previousObservedAt
+        cloudQueue.model.manualPlaybackContextPayload = previousPayload
+        cloudQueue.model.manualQueueContextPayloads = [previousPayload]
+        cloudQueue.model.manualRecentPlaybackContextPayload = previousRecentPayload
+        cloudQueue.model.sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
+
+        Self.stubNetwork(for: cloudQueue.networkStubID) { request in
+            try Self.httpResponse(
+                for: request,
+                statusCode: 500,
+                body: #"{"message":"Injected transient cloud queue failure"}"#
+            )
+        }
+
+        let didLoadQueue = await cloudQueue.model.playSonosControlAPICloudQueueIfAvailable(
+            parentItem: Self.playlistItem(),
+            plan: Self.playlistPlan()
+        )
+
+        #expect(didLoadQueue == false)
+        #expect(cloudQueue.model.sonosControlAPIState.authorizationStatus == .ready)
+        #expect(cloudQueue.model.queueState == previousQueueState)
+        #expect(cloudQueue.model.nowPlaying == previousNowPlaying)
+        #expect(cloudQueue.model.nowPlayingObservedAt == previousObservedAt)
+        #expect(cloudQueue.model.manualPlaybackContextPayload == previousPayload)
+        #expect(cloudQueue.model.manualQueueContextPayloads == [previousPayload])
+        #expect(cloudQueue.model.manualRecentPlaybackContextPayload == previousRecentPayload)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueRuntimeState == previousCloudQueueRuntimeState)
+        #expect(cloudQueue.model.isManualTransportCommandInFlight == false)
     }
 
     @Test
@@ -122,7 +482,7 @@ struct SonoicModelSonosControlAPITests {
         next.model.nowPlaying = previousNowPlaying
         next.model.nowPlayingObservedAt = previousObservedAt
         Self.stubNetwork(for: next.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 500,
                 body: #"{"message":"Injected next failure"}"#
@@ -146,7 +506,7 @@ struct SonoicModelSonosControlAPITests {
         previous.model.nowPlaying = previousNowPlaying
         previous.model.nowPlayingObservedAt = previousObservedAt
         Self.stubNetwork(for: previous.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 500,
                 body: #"{"message":"Injected previous failure"}"#
@@ -176,7 +536,7 @@ struct SonoicModelSonosControlAPITests {
         next.model.nowPlaying = previousNowPlaying
         next.model.nowPlayingObservedAt = previousObservedAt
         Self.stubNetwork(for: next.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected next authorization failure"}"#
@@ -203,7 +563,7 @@ struct SonoicModelSonosControlAPITests {
         previous.model.nowPlaying = previousNowPlaying
         previous.model.nowPlayingObservedAt = previousObservedAt
         Self.stubNetwork(for: previous.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected previous authorization failure"}"#
@@ -249,16 +609,18 @@ struct SonoicModelSonosControlAPITests {
         cloudQueue.model.manualPlaybackContextPayload = previousPayload
         cloudQueue.model.manualQueueContextPayloads = [previousPayload]
         cloudQueue.model.manualRecentPlaybackContextPayload = previousPayload
-        cloudQueue.model.sonosControlAPICloudQueueSessionID = "session-before"
-        cloudQueue.model.sonosControlAPICloudQueueGroupID = "group-before"
-        cloudQueue.model.sonosControlAPICloudQueueVersion = "queue-before"
-        cloudQueue.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
-        cloudQueue.model.sonosControlAPICloudQueueTracks = [
-            Self.track(id: "previous-track", name: "Previous Track")
-        ]
+        cloudQueue.model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"],
+            tracks: [
+                Self.track(id: "previous-track", name: "Previous Track")
+            ]
+        )
 
         Self.stubNetwork(for: cloudQueue.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected cloud queue authorization failure"}"#
@@ -277,11 +639,7 @@ struct SonoicModelSonosControlAPITests {
         #expect(cloudQueue.model.manualPlaybackContextPayload == nil)
         #expect(cloudQueue.model.manualQueueContextPayloads == nil)
         #expect(cloudQueue.model.manualRecentPlaybackContextPayload == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueSessionID == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueGroupID == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueVersion == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueItemIDs == nil)
-        #expect(cloudQueue.model.sonosControlAPICloudQueueTracks == nil)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueRuntimeState == .empty)
         #expect(cloudQueue.model.isManualTransportCommandInFlight == false)
     }
 
@@ -320,15 +678,17 @@ struct SonoicModelSonosControlAPITests {
         favoritePlayback.model.manualPlaybackContextPayload = previousPayload
         favoritePlayback.model.manualQueueContextPayloads = [previousPayload]
         favoritePlayback.model.manualRecentPlaybackContextPayload = previousPayload
-        favoritePlayback.model.sonosControlAPICloudQueueSessionID = "session-before"
-        favoritePlayback.model.sonosControlAPICloudQueueGroupID = "group-before"
-        favoritePlayback.model.sonosControlAPICloudQueueVersion = "queue-before"
-        favoritePlayback.model.sonosControlAPICloudQueueItemIDs = ["item-before"]
-        favoritePlayback.model.sonosControlAPICloudQueueTracks = [
-            Self.track(id: "previous-track", name: "Previous Track")
-        ]
+        favoritePlayback.model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"],
+            tracks: [
+                Self.track(id: "previous-track", name: "Previous Track")
+            ]
+        )
         Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected favorite authorization failure"}"#
@@ -348,12 +708,755 @@ struct SonoicModelSonosControlAPITests {
         #expect(favoritePlayback.model.manualPlaybackContextPayload == nil)
         #expect(favoritePlayback.model.manualQueueContextPayloads == nil)
         #expect(favoritePlayback.model.manualRecentPlaybackContextPayload == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueSessionID == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueGroupID == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueVersion == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueItemIDs == nil)
-        #expect(favoritePlayback.model.sonosControlAPICloudQueueTracks == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
         #expect(favoritePlayback.model.isManualTransportCommandInFlight == false)
+    }
+
+    @Test
+    func directFavoriteWithoutCloudMatchDoesNotCreateCloudQueue() async throws {
+        let favoritePlayback = try Self.makeModel()
+        defer {
+            try? favoritePlayback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: favoritePlayback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: favoritePlayback.model)
+        let previousNowPlaying = Self.nowPlayingSnapshot(title: "Before Favorite", playbackState: .paused)
+        let previousQueueState = SonosQueueState.loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "item-before",
+                        title: "Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "x-rincon-queue:RINCON_00000000000001400#0"
+            )
+        )
+        favoritePlayback.model.nowPlaying = previousNowPlaying
+        favoritePlayback.model.queueState = previousQueueState
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
+            recorder.record(request)
+            return try Self.httpResponse(
+                for: request,
+                statusCode: 500,
+                body: #"{"message":"Unexpected direct favorite network request"}"#
+            )
+        }
+
+        let didPlay = await favoritePlayback.model.playManualSonosFavorite(Self.favoriteItem())
+
+        #expect(didPlay == false)
+        #expect(recorder.paths.isEmpty)
+        #expect(favoritePlayback.model.nowPlaying == previousNowPlaying)
+        #expect(favoritePlayback.model.queueState == previousQueueState)
+        #expect(favoritePlayback.model.manualPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.manualQueueContextPayloads == nil)
+        #expect(favoritePlayback.model.manualRecentPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
+    }
+
+    @Test
+    func appLocalAppleMusicFavoriteWithoutCloudMatchFallsBackToCloudQueue() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let favorite = Self.appLocalAppleMusicFavorite()
+        Self.configureCloudCommandTarget(
+            on: playback.model,
+            snapshot: Self.cloudSnapshotWithContent(favorites: [])
+        )
+        playback.model.nowPlaying = SonosNowPlayingSnapshot(
+            title: "Previous",
+            artistName: nil,
+            albumTitle: nil,
+            sourceName: "Apple Music",
+            playbackState: .playing,
+            transportActions: SonosTransportActions(rawActions: [])
+        )
+        playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+            status: .loaded,
+            snapshot: Self.appleMusicServiceSnapshot()
+                .includingObservedAccounts(from: [
+                    SonosMusicServiceObservedValue(
+                        value: favorite.playbackURI,
+                        origin: .favoriteURI
+                    )
+                ])
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/api/sonos/cloud-queues":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "queueId": "queue-1",
+                      "queueBaseUrl": "https://sonos.test/cloud-queues/queue-1/v2.3",
+                      "contextVersion": "context-1",
+                      "queueVersion": "queue-version-1",
+                      "startItemId": "queue-start-item",
+                      "trackMetadata": null
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackSession":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"sessionId":"session-1","sessionState":"SESSION_STATE_CONNECTED","sessionCreated":true}"#
+                )
+            case "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        let didPlay = await playback.model.playManualSonosFavorite(favorite)
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        let createRequest = try #require(recorder.requests.first { $0.url?.path == "/api/sonos/cloud-queues" })
+        let createBody = try Self.cloudQueueCreateRequestBody(from: createRequest)
+        let loadRequest = try #require(
+            recorder.requests.first { $0.url?.path == "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue" }
+        )
+        let loadBody = try Self.loadCloudQueueRequestBody(from: loadRequest)
+
+        #expect(didPlay)
+        #expect(recorder.paths == [
+            "/api/sonos/cloud-queues",
+            "/control/api/v1/groups/group-1/playbackSession",
+            "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue",
+        ])
+        #expect(!recorder.paths.contains("/control/api/v1/groups/group-1/favorites"))
+        #expect(createBody.items.count == 1)
+        let createdItem = try #require(createBody.items.first)
+        #expect(createBody.container.name == "I Want It That Way")
+        #expect(createdItem.track?.name == "I Want It That Way")
+        #expect(createdItem.track?.id?.objectId == "song:1440857781")
+        #expect(createdItem.track?.durationMillis == 219_000)
+        #expect(loadBody.itemId == "queue-start-item")
+        #expect(loadBody.queueVersion == "queue-version-1")
+        #expect(loadBody.playOnCompletion == true)
+        #expect(favorite.playablePayload?.duration == 219)
+        #expect(playback.model.manualPlaybackContextPayload?.uri == favorite.playbackURI)
+        #expect(playback.model.manualPlaybackContextPayload?.duration == 219)
+        #expect(playback.model.manualQueueContextPayloads?.map(\.uri) == [favorite.playbackURI])
+        #expect(playback.model.manualRecentPlaybackContextPayload?.uri == favorite.playbackURI)
+        #expect(playback.model.nowPlaying.title == "I Want It That Way")
+        #expect(playback.model.nowPlaying.playbackState == .playing)
+        #expect(playback.model.nowPlaying.elapsedTime == 0)
+        #expect(playback.model.nowPlaying.duration == 219)
+        #expect(playback.model.nowPlaying.canPause)
+        #expect(playback.model.nowPlaying.canSeek)
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.sessionID == "session-1")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.queueVersion == "queue-version-1")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.tracks?.first?.durationMillis == 219_000)
+        #expect(playback.model.queueState.snapshot?.items.map(\.title) == ["I Want It That Way"])
+        #expect(playback.model.queueState.snapshot?.items.first?.duration == 219)
+    }
+
+    @Test
+    func reloadedAppLocalAppleMusicFavoriteFallbackKeepsDurationAndControls() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let favorite = Self.reloadedAppLocalAppleMusicFavorite()
+        Self.configureCloudCommandTarget(
+            on: playback.model,
+            snapshot: Self.cloudSnapshotWithContent(favorites: [])
+        )
+        playback.model.nowPlaying = SonosNowPlayingSnapshot(
+            title: "Previous",
+            artistName: nil,
+            albumTitle: nil,
+            sourceName: "Apple Music",
+            playbackState: .playing,
+            transportActions: SonosTransportActions(rawActions: [])
+        )
+        playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+            status: .loaded,
+            snapshot: Self.appleMusicServiceSnapshot()
+                .includingObservedAccounts(from: [
+                    SonosMusicServiceObservedValue(
+                        value: favorite.playbackURI,
+                        origin: .favoriteURI
+                    )
+                ])
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/api/sonos/cloud-queues":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "queueId": "queue-1",
+                      "queueBaseUrl": "https://sonos.test/cloud-queues/queue-1/v2.3",
+                      "contextVersion": "context-1",
+                      "queueVersion": "queue-version-1",
+                      "startItemId": "queue-start-item",
+                      "trackMetadata": null
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackSession":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"sessionId":"session-1","sessionState":"SESSION_STATE_CONNECTED","sessionCreated":true}"#
+                )
+            case "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        let didPlay = await playback.model.playManualSonosFavorite(favorite)
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        let createRequest = try #require(recorder.requests.first { $0.url?.path == "/api/sonos/cloud-queues" })
+        let createBody = try Self.cloudQueueCreateRequestBody(from: createRequest)
+        let createdItem = try #require(createBody.items.first)
+
+        #expect(didPlay)
+        #expect(favorite.playablePayload?.duration == 219)
+        #expect(favorite.playablePayload?.subtitle == "Backstreet Boys • Millennium")
+        #expect(createdItem.track?.durationMillis == 219_000)
+        #expect(playback.model.manualPlaybackContextPayload?.duration == 219)
+        #expect(playback.model.nowPlaying.title == "I Want It That Way")
+        #expect(playback.model.nowPlaying.artistName == "Backstreet Boys")
+        #expect(playback.model.nowPlaying.albumTitle == "Millennium")
+        #expect(playback.model.nowPlaying.playbackState == .playing)
+        #expect(playback.model.nowPlaying.elapsedTime == 0)
+        #expect(playback.model.nowPlaying.duration == 219)
+        #expect(playback.model.nowPlaying.canPause)
+        #expect(playback.model.nowPlaying.canSeek)
+        #expect(playback.model.externalControlState.nowPlaying.artistName == "Backstreet Boys")
+        #expect(playback.model.externalControlState.nowPlaying.subtitle == "Backstreet Boys • Millennium")
+        #expect(playback.model.externalControlState.progress?.durationSeconds == 219)
+        #expect(playback.model.pendingSharedExternalControlState?.nowPlaying.artistName == "Backstreet Boys")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.tracks?.first?.durationMillis == 219_000)
+        #expect(playback.model.queueState.snapshot?.items.first?.duration == 219)
+    }
+
+    @Test
+    func reloadedRemoteAppleMusicFavoriteUsesPersistedMetadataAfterCloudSync() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let objectID = "FV:2/20"
+        let remoteFavorite = Self.reloadedRemoteAppleMusicFavoriteWithoutDuration(objectID: objectID)
+        playback.model.localAppleMusicFavorites = [
+            Self.remoteAppleMusicFavoriteShadow(
+                objectID: objectID,
+                title: "I Ain't Worried",
+                artist: "OneRepublic",
+                album: "Top Gun: Maverick",
+                durationText: "00:02:28"
+            )
+        ]
+        let mergedFavorite = try #require(
+            playback.model.mergedHomeFavoritesSnapshot(SonosFavoritesSnapshot(items: [remoteFavorite])).items.first
+        )
+        Self.configureCloudCommandTarget(
+            on: playback.model,
+            snapshot: Self.cloudSnapshotWithContent(
+                favorites: [
+                    SonosControlAPIFavorite(
+                        id: "20",
+                        name: "I Ain't Worried",
+                        description: nil,
+                        imageUrl: nil,
+                        service: SonosControlAPIService(id: "204", name: "Apple Music", imageUrl: nil)
+                    )
+                ]
+            )
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/control/api/v1/groups/group-1/favorites":
+                return try Self.httpResponse(for: request, statusCode: 200, body: "{}")
+            case "/control/api/v1/groups/group-1/playback":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "playbackState": "PLAYBACK_STATE_PLAYING",
+                      "itemId": "cloud-item-1",
+                      "positionMillis": 7000,
+                      "availablePlaybackActions": {
+                        "canSeek": true,
+                        "canPause": true,
+                        "canStop": true
+                      }
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackMetadata":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "currentItem": {
+                        "id": "cloud-item-1",
+                        "track": {
+                          "name": "I Ain't Worried",
+                          "service": {
+                            "id": "204",
+                            "name": "Apple Music"
+                          }
+                        }
+                      }
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/groupVolume":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"volume":24,"muted":false}"#
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        #expect(mergedFavorite.id == objectID)
+        #expect(mergedFavorite.playablePayload?.duration == 148)
+        #expect(mergedFavorite.playablePayload?.subtitle == "OneRepublic • Top Gun: Maverick")
+
+        let didPlay = await playback.model.playManualSonosFavorite(mergedFavorite)
+        let didSync = await playback.model.syncManualSonosState(showProgress: false)
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        #expect(didPlay)
+        #expect(didSync)
+        #expect(recorder.paths.contains("/control/api/v1/groups/group-1/favorites"))
+        #expect(!recorder.paths.contains("/api/sonos/cloud-queues"))
+        #expect(playback.model.nowPlaying.title == "I Ain't Worried")
+        #expect(playback.model.nowPlaying.artistName == "OneRepublic")
+        #expect(playback.model.nowPlaying.albumTitle == "Top Gun: Maverick")
+        #expect(playback.model.nowPlaying.elapsedTime == 7)
+        #expect(playback.model.nowPlaying.duration == 148)
+        #expect(playback.model.nowPlaying.canPause)
+        #expect(playback.model.nowPlaying.canSeek)
+        #expect(playback.model.nowPlaying.transportActions?.canStop == true)
+        #expect(playback.model.manualPlaybackContextPayload?.duration == 148)
+        #expect(playback.model.externalControlState.nowPlaying.artistName == "OneRepublic")
+        #expect(playback.model.externalControlState.nowPlaying.subtitle == "OneRepublic • Top Gun: Maverick")
+        #expect(playback.model.externalControlState.progress?.durationSeconds == 148)
+    }
+
+    @Test
+    func appLocalAppleMusicLibraryPlaylistFavoritePlaysTracksThroughCloudQueue() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        playback.model.nowPlaying = SonosNowPlayingSnapshot(
+            title: "Previous",
+            artistName: nil,
+            albumTitle: nil,
+            sourceName: "Apple Music",
+            playbackState: .playing,
+            transportActions: SonosTransportActions(rawActions: [])
+        )
+        playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+            status: .loaded,
+            snapshot: Self.appleMusicServiceSnapshot()
+                .includingObservedAccounts(from: [
+                    SonosMusicServiceObservedValue(
+                        value: "x-rincon-cpcontainer:1006206cplaylist%3ap.library-only?sid=204&flags=8300&sn=3",
+                        origin: .currentURI
+                    ),
+                    SonosMusicServiceObservedValue(
+                        value: "x-sonos-http:librarytrack%3ai.track-1.m4p?sid=204&flags=8232&sn=7",
+                        origin: .trackURI
+                    )
+                ])
+        )
+        let parentItem = SonoicSourceItem(favorite: Self.appLocalAppleMusicLibraryPlaylistFavorite())
+        let trackItems = [
+            SonoicSourceItem.appleMusicMetadata(
+                id: "i.track-1",
+                title: "Library Track",
+                subtitle: "Apple Music",
+                artworkURL: nil,
+                kind: .song,
+                origin: .library,
+                catalogID: nil,
+                libraryID: "i.track-1",
+                duration: 214
+            )
+        ]
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/api/sonos/cloud-queues":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "queueId": "queue-1",
+                      "queueBaseUrl": "https://sonos.test/cloud-queues/queue-1/v2.3",
+                      "contextVersion": "context-1",
+                      "queueVersion": "queue-version-1",
+                      "startItemId": "queue-start-item",
+                      "trackMetadata": null
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackSession":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"sessionId":"session-1","sessionState":"SESSION_STATE_CONNECTED","sessionCreated":true}"#
+                )
+            case "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        let didPlay = await playback.model.playSourcePlaylistQueue(
+            parentItem: parentItem,
+            trackItems: trackItems
+        )
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        let createRequest = try #require(recorder.requests.first { $0.url?.path == "/api/sonos/cloud-queues" })
+        let createBody = try Self.cloudQueueCreateRequestBody(from: createRequest)
+        let loadRequest = try #require(
+            recorder.requests.first { $0.url?.path == "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue" }
+        )
+        let loadBody = try Self.loadCloudQueueRequestBody(from: loadRequest)
+
+        #expect(didPlay)
+        #expect(parentItem.sourceReference?.catalogID == nil)
+        #expect(parentItem.sourceReference?.libraryID == "p.library-only")
+        #expect(recorder.paths == [
+            "/api/sonos/cloud-queues",
+            "/control/api/v1/groups/group-1/playbackSession",
+            "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue",
+        ])
+        #expect(createBody.container.name == "Markus Mix")
+        let createdItem = try #require(createBody.items.first)
+        #expect(createdItem.track?.name == "Library Track")
+        #expect(createdItem.track?.id?.objectId == "librarytrack:i.track-1")
+        #expect(createdItem.track?.durationMillis == 214_000)
+        #expect(loadBody.itemId == "queue-start-item")
+        #expect(loadBody.queueVersion == "queue-version-1")
+        #expect(loadBody.playOnCompletion == true)
+        #expect(playback.model.manualPlaybackContextPayload?.uri == "x-sonos-http:librarytrack%3ai.track-1.m4p?sid=204&flags=8232&sn=7")
+        #expect(playback.model.manualPlaybackContextPayload?.duration == 214)
+        #expect(playback.model.manualQueueContextPayloads?.map(\.uri) == [
+            "x-sonos-http:librarytrack%3ai.track-1.m4p?sid=204&flags=8232&sn=7"
+        ])
+        #expect(playback.model.nowPlaying.title == "Library Track")
+        #expect(playback.model.nowPlaying.playbackState == .playing)
+        #expect(playback.model.nowPlaying.elapsedTime == 0)
+        #expect(playback.model.nowPlaying.duration == 214)
+        #expect(playback.model.nowPlaying.canPause)
+        #expect(playback.model.nowPlaying.canSeek)
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.sessionID == "session-1")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.tracks?.first?.durationMillis == 214_000)
+        #expect(playback.model.queueState.snapshot?.items.map(\.title) == ["Library Track"])
+        #expect(playback.model.queueState.snapshot?.items.first?.duration == 214)
+    }
+
+    @Test
+    func sourceSearchSongUsesQueuePayloadForSingleItemCloudQueuePlayback() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        playback.model.manualSonosHost = "192.0.2.10"
+        Self.configureCloudCommandTarget(on: playback.model)
+        playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+            status: .loaded,
+            snapshot: Self.appleMusicServiceSnapshot()
+        )
+        playback.model.nowPlayingDiagnostics = SonosNowPlayingDiagnostics(
+            currentURI: nil,
+            trackURI: "x-sonos-http:librarytrack%3aexample.m4p?sid=204&flags=8232&sn=7",
+            rawDuration: nil,
+            rawElapsedTime: nil,
+            hasTrackMetadata: false,
+            hasSourceMetadata: false,
+            usedFallbackSnapshot: false
+        )
+        let sourceItem = Self.appleMusicSearchSong()
+        #expect(try playback.model.sourcePlayablePayload(for: sourceItem, purpose: .directPlay) == nil)
+        #expect(try playback.model.sourcePlayablePayload(for: sourceItem, purpose: .queueEntry) == nil)
+        #expect(playback.model.canPlaySourceItem(sourceItem))
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/api/sonos/cloud-queues":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "queueId": "queue-1",
+                      "queueBaseUrl": "https://sonos.test/cloud-queues/queue-1/v2.3",
+                      "contextVersion": "context-1",
+                      "queueVersion": "queue-version-1",
+                      "startItemId": "queue-start-item",
+                      "trackMetadata": null
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackSession":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"sessionId":"session-1","sessionState":"SESSION_STATE_CONNECTED","sessionCreated":true}"#
+                )
+            case "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        let didPlay = try await playback.model.playSourceItem(sourceItem)
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        let createRequest = try #require(recorder.requests.first { $0.url?.path == "/api/sonos/cloud-queues" })
+        let createBody = try Self.cloudQueueCreateRequestBody(from: createRequest)
+        let loadRequest = try #require(
+            recorder.requests.first { $0.url?.path == "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue" }
+        )
+        let loadBody = try Self.loadCloudQueueRequestBody(from: loadRequest)
+
+        #expect(didPlay)
+        #expect(recorder.paths == [
+            "/api/sonos/cloud-queues",
+            "/control/api/v1/groups/group-1/playbackSession",
+            "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue",
+        ])
+        #expect(createBody.items.count == 1)
+        let createdItem = try #require(createBody.items.first)
+        #expect(createBody.container.name == "Sweet Jane")
+        #expect(createdItem.track?.name == "Sweet Jane")
+        #expect(createdItem.track?.id?.objectId == "song:1440857781")
+        #expect(loadBody.itemId == "queue-start-item")
+        #expect(loadBody.queueVersion == "queue-version-1")
+        #expect(playback.model.manualQueueContextPayloads?.first?.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
+        #expect(playback.model.manualPlaybackContextPayload?.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
+        #expect(playback.model.manualRecentPlaybackContextPayload?.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
+        #expect(playback.model.nowPlaying.title == "Sweet Jane")
+        let appleMusicProbeRow = try #require(
+            playback.model.sonosMusicServiceProbeState.snapshot?.knownServiceRows.first { $0.service == .appleMusic }
+        )
+        #expect(appleMusicProbeRow.playbackHint?.trackSerials == ["7"])
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.sessionID == "session-1")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.queueVersion == "queue-version-1")
+        #expect(playback.model.queueState.snapshot?.items.map(\.title) == ["Sweet Jane"])
+    }
+
+    @Test
+    func matchedDirectFavoriteUsesControlAPIFavoriteEndpointWithoutCloudQueue() async throws {
+        let favoritePlayback = try Self.makeModel()
+        defer {
+            favoritePlayback.model.manualHostDeferredSyncTask?.cancel()
+            favoritePlayback.model.manualHostDeferredSyncTask = nil
+            try? favoritePlayback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: favoritePlayback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(
+            on: favoritePlayback.model,
+            snapshot: Self.cloudSnapshotWithContent(favorites: [Self.cloudFavorite()])
+        )
+        favoritePlayback.model.queueState = .loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "item-before",
+                        title: "Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "x-rincon-queue:RINCON_00000000000001400#0"
+            )
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
+            recorder.record(request)
+            if request.url?.path == "/control/api/v1/groups/group-1/favorites" {
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            }
+
+            return try Self.httpResponse(
+                for: request,
+                statusCode: 500,
+                body: #"{"message":"Unexpected non-favorite endpoint"}"#
+            )
+        }
+
+        let didPlay = await favoritePlayback.model.playManualSonosFavorite(Self.favoriteItem())
+        favoritePlayback.model.manualHostDeferredSyncTask?.cancel()
+        favoritePlayback.model.manualHostDeferredSyncTask = nil
+
+        let request = try #require(recorder.requests.first)
+        let loadFavoriteRequest = try Self.loadFavoriteRequestBody(from: request)
+        #expect(didPlay)
+        #expect(recorder.paths == ["/control/api/v1/groups/group-1/favorites"])
+        #expect(loadFavoriteRequest.favoriteId == "cloud-favorite-1")
+        #expect(loadFavoriteRequest.action == .replace)
+        #expect(loadFavoriteRequest.playOnCompletion == true)
+        #expect(!recorder.paths.contains("/api/sonos/cloud-queues"))
+        #expect(favoritePlayback.model.nowPlaying.title == "Cloud Favorite")
+        #expect(favoritePlayback.model.nowPlaying.artistName == "Sonoic")
+        #expect(favoritePlayback.model.nowPlaying.playbackState == .playing)
+        #expect(favoritePlayback.model.manualPlaybackContextPayload == Self.favoriteItem().playablePayload)
+        #expect(favoritePlayback.model.manualQueueContextPayloads == nil)
+        #expect(favoritePlayback.model.manualRecentPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
+        #expect(favoritePlayback.model.queueState.snapshot?.sourceURI == "x-rincon-queue:RINCON_00000000000001400#0")
+        #expect(favoritePlayback.model.queueState.snapshot?.currentItemIndex == nil)
+    }
+
+    @Test
+    func matchedCollectionFavoriteUsesControlAPIPlaylistEndpointWithAutoplay() async throws {
+        let favoritePlayback = try Self.makeModel()
+        defer {
+            favoritePlayback.model.manualHostDeferredSyncTask?.cancel()
+            favoritePlayback.model.manualHostDeferredSyncTask = nil
+            try? favoritePlayback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: favoritePlayback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(
+            on: favoritePlayback.model,
+            snapshot: Self.cloudSnapshotWithContent(playlists: [Self.cloudPlaylist()])
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
+            recorder.record(request)
+            if request.url?.path == "/control/api/v1/groups/group-1/playlists" {
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            }
+
+            return try Self.httpResponse(
+                for: request,
+                statusCode: 500,
+                body: #"{"message":"Unexpected non-playlist endpoint"}"#
+            )
+        }
+
+        let didPlay = await favoritePlayback.model.playManualSonosFavorite(Self.collectionFavoriteItem())
+        favoritePlayback.model.manualHostDeferredSyncTask?.cancel()
+        favoritePlayback.model.manualHostDeferredSyncTask = nil
+
+        let request = try #require(recorder.requests.first)
+        let loadPlaylistRequest = try Self.loadPlaylistRequestBody(from: request)
+        #expect(didPlay)
+        #expect(recorder.paths == ["/control/api/v1/groups/group-1/playlists"])
+        #expect(loadPlaylistRequest.playlistId == "cloud-playlist-1")
+        #expect(loadPlaylistRequest.action == .replace)
+        #expect(loadPlaylistRequest.playOnCompletion == true)
+        #expect(!recorder.paths.contains("/api/sonos/cloud-queues"))
+        #expect(favoritePlayback.model.nowPlaying.title == "Cloud Playlist")
+        #expect(favoritePlayback.model.nowPlaying.playbackState == .playing)
+        #expect(favoritePlayback.model.manualPlaybackContextPayload == Self.collectionFavoriteItem().playablePayload)
+        #expect(favoritePlayback.model.manualQueueContextPayloads == nil)
+        #expect(favoritePlayback.model.manualRecentPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
     }
 
     private static func makeModel() throws -> (
@@ -374,9 +1477,7 @@ struct SonoicModelSonosControlAPITests {
             )
         )
 
-        let userDefaults = try #require(
-            UserDefaults(suiteName: "SonoicModelSonosControlAPITests-\(UUID().uuidString)")
-        )
+        let userDefaults = try Self.makeUserDefaults()
         let networkStubID = UUID().uuidString
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpAdditionalHeaders = [
@@ -388,17 +1489,28 @@ struct SonoicModelSonosControlAPITests {
             settingsStore: SonoicSettingsStore(userDefaults: userDefaults),
             sonosControlAPIClient: SonosControlAPIClient(
                 transport: SonosControlAPITransport(
-                    baseURL: URL(string: "https://sonos.test/control/api/v1")!,
+                    baseURL: try Self.fixtureURL("https://sonos.test/control/api/v1"),
                     urlSession: session
                 )
             ),
-            sonosOAuthConfiguration: Self.oauthConfiguration,
+            sonosOAuthConfiguration: try Self.oauthConfiguration(),
             sonoicCloudQueueClient: SonoicCloudQueueClient(session: session),
             keychainStore: keychainStore,
             startInitialSonosControlAPICloudRefresh: false
         )
 
         return (model, keychainStore, networkStubID)
+    }
+
+    private static func makeUserDefaults() throws -> UserDefaults {
+        let suiteName = "SonoicModelSonosControlAPITests-\(UUID().uuidString)"
+        let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+        userDefaults.removePersistentDomain(forName: suiteName)
+        return userDefaults
+    }
+
+    private static func fixtureURL(_ string: String) throws -> URL {
+        try #require(URL(string: string))
     }
 
     private static func configureCloudCommandTarget(
@@ -437,28 +1549,57 @@ struct SonoicModelSonosControlAPITests {
         for request: URLRequest,
         statusCode: Int,
         body: String
-    ) -> (HTTPURLResponse, Data) {
-        (
+    ) throws -> (HTTPURLResponse, Data) {
+        let url = try #require(request.url)
+        let response = try #require(
             HTTPURLResponse(
-                url: request.url!,
+                url: url,
                 statusCode: statusCode,
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
-            )!,
-            Data(body.utf8)
+            )
         )
+        return (response, Data(body.utf8))
     }
 
-    private static var oauthConfiguration: SonosOAuthConfiguration {
+    private static func loadFavoriteRequestBody(
+        from request: SonoicModelSonosControlAPICapturedRequest
+    ) throws -> SonosControlAPILoadFavoriteRequest {
+        let body = try #require(request.body)
+        return try JSONDecoder().decode(SonosControlAPILoadFavoriteRequest.self, from: body)
+    }
+
+    private static func loadPlaylistRequestBody(
+        from request: SonoicModelSonosControlAPICapturedRequest
+    ) throws -> SonosControlAPILoadPlaylistRequest {
+        let body = try #require(request.body)
+        return try JSONDecoder().decode(SonosControlAPILoadPlaylistRequest.self, from: body)
+    }
+
+    private static func cloudQueueCreateRequestBody(
+        from request: SonoicModelSonosControlAPICapturedRequest
+    ) throws -> SonoicCloudQueueCreateRequest {
+        let body = try #require(request.body)
+        return try JSONDecoder().decode(SonoicCloudQueueCreateRequest.self, from: body)
+    }
+
+    private static func loadCloudQueueRequestBody(
+        from request: SonoicModelSonosControlAPICapturedRequest
+    ) throws -> SonosControlAPILoadCloudQueueRequest {
+        let body = try #require(request.body)
+        return try JSONDecoder().decode(SonosControlAPILoadCloudQueueRequest.self, from: body)
+    }
+
+    private static func oauthConfiguration() throws -> SonosOAuthConfiguration {
         SonosOAuthConfiguration(
             clientID: "client-id",
             redirectURI: "https://sonoic.test/callback",
             callbackScheme: "sonoic",
-            tokenExchangeURL: URL(string: "https://sonoic.test/api/token")!,
+            tokenExchangeURL: try fixtureURL("https://sonoic.test/api/token"),
             tokenRefreshURL: nil,
-            authorizationEndpoint: URL(string: "https://api.sonos.com/login/v3/oauth")!,
+            authorizationEndpoint: try fixtureURL("https://api.sonos.com/login/v3/oauth"),
             scopes: ["playback-control-all"],
-            cloudQueueCreateURL: URL(string: "https://sonoic.test/api/sonos/cloud-queues")!
+            cloudQueueCreateURL: try fixtureURL("https://sonoic.test/api/sonos/cloud-queues")
         )
     }
 
@@ -512,6 +1653,15 @@ struct SonoicModelSonosControlAPITests {
         )
     }
 
+    private static func cloudPlaylist() -> SonosControlAPIPlaylist {
+        SonosControlAPIPlaylist(
+            id: "cloud-playlist-1",
+            name: "Cloud Playlist",
+            type: nil,
+            trackCount: nil
+        )
+    }
+
     private static func playlistItem() -> SonoicSourceItem {
         SonoicSourceItem.appleMusicMetadata(
             id: "playlist-1",
@@ -553,6 +1703,50 @@ struct SonoicModelSonosControlAPITests {
         )
     }
 
+    private static func appleMusicSearchSong() -> SonoicSourceItem {
+        SonoicSourceItem.appleMusicMetadata(
+            id: "1440857781",
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato",
+            artworkURL: nil,
+            kind: .song,
+            origin: .catalogSearch,
+            catalogID: "1440857781",
+            duration: 214
+        )
+    }
+
+    private static func appleMusicTrackOnlyPlaybackHintSnapshot() -> SonosMusicServiceProbeSnapshot {
+        appleMusicServiceSnapshot()
+            .includingObservedAccounts(from: [
+                SonosMusicServiceObservedValue(
+                    value: "x-sonos-http:librarytrack%3aexample.m4p?sid=204&flags=8232&sn=7",
+                    origin: .trackURI
+                ),
+            ])
+    }
+
+    private static func appleMusicServiceSnapshot() -> SonosMusicServiceProbeSnapshot {
+        SonosMusicServiceProbeSnapshot(
+            observedAt: Date(timeIntervalSince1970: 0),
+            serviceListVersion: nil,
+            services: [
+                SonosMusicServiceDescriptor(
+                    id: "204",
+                    name: "Apple Music",
+                    uri: nil,
+                    secureURI: nil,
+                    containerType: nil,
+                    capabilities: nil,
+                    authPolicy: nil,
+                    presentationMapURI: nil,
+                    stringsURI: nil
+                ),
+            ],
+            accounts: []
+        )
+    }
+
     private static func favoriteItem() -> SonosFavoriteItem {
         SonosFavoriteItem(
             id: "favorite-1",
@@ -563,6 +1757,101 @@ struct SonoicModelSonosControlAPITests {
             playbackURI: "x-sonos-http:favorite-1.m4p",
             playbackMetadataXML: "<DIDL-Lite></DIDL-Lite>",
             kind: .item
+        )
+    }
+
+    private static func appLocalAppleMusicFavorite() -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: "apple-music-favorite-song-1",
+            title: "I Want It That Way",
+            subtitle: "Backstreet Boys",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3",
+            playbackMetadataXML: """
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/"><item id="song:1440857781"><dc:title>I Want It That Way</dc:title><res duration="00:03:39">x-sonosapi-hls:song%3a1440857781?sid=204&amp;sn=3</res></item></DIDL-Lite>
+            """,
+            kind: .item
+        )
+    }
+
+    private static func reloadedAppLocalAppleMusicFavorite() -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: "apple-music-favorite-song-1",
+            title: "I Want It That Way",
+            subtitle: nil,
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3",
+            playbackMetadataXML: """
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/"><item id="FV:2/4" parentID="FV:2"><dc:title>I Want It That Way</dc:title><res protocolInfo="sonos.com-http:*:application/vnd.apple.mpegurl:*">x-sonosapi-hls:song%3a1440857781?sid=204&amp;sn=3</res><r:resMD>&lt;DIDL-Lite xmlns=&quot;urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/&quot; xmlns:dc=&quot;http://purl.org/dc/elements/1.1/&quot; xmlns:upnp=&quot;urn:schemas-upnp-org:metadata-1-0/upnp/&quot;&gt;&lt;item id=&quot;song:1440857781&quot;&gt;&lt;dc:title&gt;I Want It That Way&lt;/dc:title&gt;&lt;dc:creator&gt;Backstreet Boys&lt;/dc:creator&gt;&lt;upnp:album&gt;Millennium&lt;/upnp:album&gt;&lt;res duration=&quot;00:03:39&quot;&gt;x-sonosapi-hls:song%3a1440857781?sid=204&amp;amp;sn=3&lt;/res&gt;&lt;/item&gt;&lt;/DIDL-Lite&gt;</r:resMD></item></DIDL-Lite>
+            """,
+            kind: .item
+        )
+    }
+
+    private static func reloadedRemoteAppleMusicFavoriteWithoutDuration(objectID: String) -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: objectID,
+            title: "I Ain't Worried",
+            subtitle: "Apple Music",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonosapi-hls:song%3a1638222799?sid=204&sn=3",
+            playbackMetadataXML: """
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/"><item id="FV:2/20"><dc:title>I Ain&apos;t Worried</dc:title><res protocolInfo="sonos.com-http:*:application/vnd.apple.mpegurl:*">x-sonosapi-hls:song%3a1638222799?sid=204&amp;sn=3</res></item></DIDL-Lite>
+            """,
+            kind: .item
+        )
+    }
+
+    private static func remoteAppleMusicFavoriteShadow(
+        objectID: String,
+        title: String,
+        artist: String,
+        album: String,
+        durationText: String
+    ) -> SonosFavoriteItem {
+        let playbackURI = "x-sonosapi-hls:song%3a1638222799?sid=204&sn=3"
+        return SonosFavoriteItem(
+            id: objectID,
+            title: title,
+            subtitle: "\(artist) • \(album)",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: playbackURI,
+            playbackMetadataXML: """
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><item id="song:1638222799"><dc:title>\(title)</dc:title><dc:creator>\(artist)</dc:creator><upnp:album>\(album)</upnp:album><res duration="\(durationText)">x-sonosapi-hls:song%3a1638222799?sid=204&amp;sn=3</res></item></DIDL-Lite>
+            """,
+            kind: .item
+        )
+    }
+
+    private static func appLocalAppleMusicLibraryPlaylistFavorite() -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: "sonoic-local-apple-music:apple-music-favorite:192.0.2.10:apple-music:playlist:no-catalog-id:p.library-only:p.library-only",
+            title: "Markus Mix",
+            subtitle: "Apple Music",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonoic-apple-music-libraryplaylist:p.library-only",
+            playbackMetadataXML: """
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><container id="libraryplaylist:p.library-only"><dc:title>Markus Mix</dc:title><upnp:class>object.container.playlistContainer</upnp:class></container></DIDL-Lite>
+            """,
+            kind: .collection
+        )
+    }
+
+    private static func collectionFavoriteItem() -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: "playlist-favorite-1",
+            title: "Cloud Playlist",
+            subtitle: "Sonoic",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-rincon-cpcontainer:1006206cplaylist%3acloud-playlist",
+            playbackMetadataXML: "<DIDL-Lite></DIDL-Lite>",
+            kind: .collection
         )
     }
 
@@ -677,5 +1966,70 @@ private final class SonoicModelSonosControlAPIURLProtocol: URLProtocol {
         return responderLock.withLock {
             responders[id]
         }
+    }
+}
+
+private final class SonoicModelSonosControlAPIRequestRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedRequests: [SonoicModelSonosControlAPICapturedRequest] = []
+
+    var requests: [SonoicModelSonosControlAPICapturedRequest] {
+        lock.withLock {
+            recordedRequests
+        }
+    }
+
+    var paths: [String] {
+        lock.withLock {
+            recordedRequests.compactMap { $0.url?.path }
+        }
+    }
+
+    func record(_ request: URLRequest) {
+        let capturedRequest = SonoicModelSonosControlAPICapturedRequest(request)
+        lock.withLock {
+            recordedRequests.append(capturedRequest)
+        }
+    }
+}
+
+private struct SonoicModelSonosControlAPICapturedRequest: Sendable {
+    var url: URL?
+    var httpMethod: String?
+    var body: Data?
+
+    private var headers: [String: String]
+
+    init(_ request: URLRequest) {
+        url = request.url
+        httpMethod = request.httpMethod
+        body = request.httpBody ?? request.httpBodyStream.map(Self.bodyData)
+        headers = Dictionary(
+            uniqueKeysWithValues: (request.allHTTPHeaderFields ?? [:]).map { key, value in
+                (key.lowercased(), value)
+            }
+        )
+    }
+
+    func value(forHTTPHeaderField field: String) -> String? {
+        headers[field.lowercased()]
+    }
+
+    private static func bodyData(from stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 1_024)
+        while stream.hasBytesAvailable {
+            let bytesRead = stream.read(&buffer, maxLength: buffer.count)
+            guard bytesRead > 0 else {
+                break
+            }
+
+            data.append(buffer, count: bytesRead)
+        }
+
+        return data.isEmpty ? Data() : data
     }
 }

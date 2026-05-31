@@ -92,7 +92,10 @@ Notes:
 
 - The app requests local-network access for discovery, diagnostics, manual local mode, and local-only tuning controls.
 - The app requests Apple Music access for metadata and service browsing. Sonoic does not use MusicKit app-owned playback as its main play path.
-- Sonoic Plus uses RevenueCat. To preview the paywall path, add a `RevenueCatAPIKey` bundle value and keep the Plus entitlement identifier as `plus`, or override it with `SonoicPlusEntitlementIdentifier`.
+- Sonoic Plus uses RevenueCat. To preview the paywall path, set
+  `REVENUECAT_API_KEY` in `Config/SonoicOAuth.local.xcconfig` and keep the Plus
+  entitlement identifier as `plus`, or override
+  `SONOIC_PLUS_ENTITLEMENT_IDENTIFIER` deliberately.
 - Lock Screen and Control Center support depend on what Sonos exposes for the current source, especially duration, progress, item identity, and queue ownership.
 
 ## Development

@@ -24,6 +24,10 @@ private extension Bundle {
         }
 
         let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
+        guard !value.isEmpty, !value.hasPrefix("$(") else {
+            return nil
+        }
+
+        return value
     }
 }

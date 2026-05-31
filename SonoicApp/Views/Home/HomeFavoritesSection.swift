@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeFavoritesSection: View {
     let state: SonosFavoritesState
     let playFavorite: (SonosFavoriteItem) async -> Void
+    let removeFavorite: (SonosFavoriteItem) async -> Void
     let retryAction: () async -> Void
 
     var body: some View {
@@ -31,7 +32,11 @@ struct HomeFavoritesSection: View {
                 action: retryAction
             )
         case let .loaded(snapshot):
-            HomeFavoritesCarousel(items: snapshot.items, playFavorite: playFavorite)
+            HomeFavoritesCarousel(
+                items: snapshot.items,
+                playFavorite: playFavorite,
+                removeFavorite: removeFavorite
+            )
         }
     }
 }
@@ -39,15 +44,21 @@ struct HomeFavoritesSection: View {
 struct HomeCollectionsSection: View {
     let collections: [SonosFavoriteItem]
     let playFavorite: (SonosFavoriteItem) async -> Void
+    let removeFavorite: (SonosFavoriteItem) async -> Void
 
     var body: some View {
-        HomeFavoritesCarousel(items: collections, playFavorite: playFavorite)
+        HomeFavoritesCarousel(
+            items: collections,
+            playFavorite: playFavorite,
+            removeFavorite: removeFavorite
+        )
     }
 }
 
 private struct HomeFavoritesCarousel: View {
     let items: [SonosFavoriteItem]
     let playFavorite: (SonosFavoriteItem) async -> Void
+    let removeFavorite: (SonosFavoriteItem) async -> Void
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -55,6 +66,8 @@ private struct HomeFavoritesCarousel: View {
                 ForEach(items) { favorite in
                     HomeFavoriteCard(favorite: favorite) {
                         await playFavorite(favorite)
+                    } removeAction: {
+                        await removeFavorite(favorite)
                     }
                 }
             }

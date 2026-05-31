@@ -23,13 +23,17 @@ extension SonoicModel {
     }
 
     func appleMusicFavoriteObjectID(for item: SonoicSourceItem) -> String? {
+        if let localFavorite = localAppleMusicFavorite(for: item) {
+            return localFavorite.id
+        }
+
         switch appleMusicFavoriteOverrides[appleMusicFavoriteOverrideKey(for: item)] {
         case .added(let objectID):
-            objectID
+            return objectID
         case .removed:
-            nil
+            return nil
         case nil:
-            appleMusicFavoriteObjectIDFromSnapshot(for: item)
+            return appleMusicFavoriteObjectIDFromSnapshot(for: item)
         }
     }
 
@@ -45,10 +49,15 @@ extension SonoicModel {
         let currentObjectID = appleMusicFavoriteObjectID(for: item)
 
         if let currentObjectID {
+            if removeLocalAppleMusicFavorite(objectID: currentObjectID) {
+                return .removed
+            }
+
             appleMusicFavoriteOverrides[overrideKey] = .removed(objectID: currentObjectID)
 
             do {
                 try await favoritesClient.removeFavorite(host: manualSonosHost, objectID: currentObjectID)
+                removeLocalAppleMusicFavoriteMetadata(objectID: currentObjectID)
                 await refreshHomeFavorites(showLoading: false)
             } catch {
                 appleMusicFavoriteOverrides[overrideKey] = .added(objectID: currentObjectID)
@@ -58,6 +67,13 @@ extension SonoicModel {
             return .removed
         }
 
+        await refreshAppleMusicFavoritePlaybackContextIfNeeded(for: item)
+
+        if let localFavorite = localAppleMusicLibraryPlaylistFavorite(for: item) {
+            saveLocalAppleMusicFavorite(localFavorite)
+            return .added(objectID: localFavorite.id)
+        }
+
         guard let payload = try appleMusicPlayablePayload(for: item, purpose: .favorite) else {
             throw AppleMusicFavoriteError.missingPayload
         }
@@ -65,6 +81,7 @@ extension SonoicModel {
         let objectID: String
         do {
             objectID = try await favoritesClient.addFavorite(host: manualSonosHost, payload: payload)
+            saveLocalAppleMusicFavorite(remoteAppleMusicFavoriteShadow(objectID: objectID, payload: payload))
             appleMusicFavoriteOverrides[overrideKey] = .added(objectID: objectID)
             await refreshHomeFavorites(showLoading: false)
         } catch {
@@ -100,6 +117,14 @@ extension SonoicModel {
         appleMusicExactPlaybackCandidate(for: item)?.verifiedFavoriteObjectID
     }
 
+    private func refreshAppleMusicFavoritePlaybackContextIfNeeded(for item: SonoicSourceItem) async {
+        guard item.service.kind == .appleMusic else {
+            return
+        }
+
+        await refreshSonosMusicServiceProbeIfNeeded()
+    }
+
     private func appleMusicFavoriteOverrideKey(for item: SonoicSourceItem) -> String {
         [
             "apple-music-favorite",
@@ -110,5 +135,209 @@ extension SonoicModel {
             item.sourceReference?.libraryID ?? "no-library-id",
             item.serviceItemID ?? item.id
         ].joined(separator: ":")
+    }
+}
+
+extension SonoicModel {
+    private static let localAppleMusicFavoriteIDPrefix = "sonoic-local-apple-music:"
+
+    func isLocalAppleMusicFavoriteObjectID(_ objectID: String) -> Bool {
+        objectID.hasPrefix(Self.localAppleMusicFavoriteIDPrefix)
+    }
+
+    func removeLocalAppleMusicFavorite(objectID: String) -> Bool {
+        guard isLocalAppleMusicFavoriteObjectID(objectID),
+              let index = localAppleMusicFavorites.firstIndex(where: { $0.id == objectID })
+        else {
+            return false
+        }
+
+        localAppleMusicFavorites.remove(at: index)
+        persistLocalAppleMusicFavorites()
+        applyLocalAppleMusicFavoritesToHomeFavoritesState()
+        return true
+    }
+
+    func localAppleMusicFavorite(for item: SonoicSourceItem) -> SonosFavoriteItem? {
+        localAppleMusicFavorites.first {
+            $0.id == localAppleMusicFavoriteObjectID(for: item)
+        }
+    }
+
+    func applyLocalAppleMusicFavoritesToHomeFavoritesState() {
+        switch homeFavoritesState {
+        case .loading, .failed:
+            return
+        case .idle, .empty:
+            let localFavorites = activeLocalAppleMusicFavorites
+            homeFavoritesState = localFavorites.isEmpty
+                ? .empty
+                : .loaded(SonosFavoritesSnapshot(items: localFavorites))
+        case .loaded(let snapshot):
+            let remoteItems = snapshot.items.filter { !isLocalAppleMusicFavoriteObjectID($0.id) }
+            let mergedSnapshot = mergedHomeFavoritesSnapshot(
+                SonosFavoritesSnapshot(items: remoteItems)
+            )
+            homeFavoritesState = mergedSnapshot.items.isEmpty ? .empty : .loaded(mergedSnapshot)
+        }
+    }
+
+    func mergedHomeFavoritesSnapshot(_ snapshot: SonosFavoritesSnapshot) -> SonosFavoritesSnapshot {
+        let localFavoritesByID = Dictionary(
+            localAppleMusicFavorites.map { ($0.id, $0) },
+            uniquingKeysWith: { _, newer in newer }
+        )
+        let remoteItems = snapshot.items.map { remoteItem in
+            guard let localFavorite = localFavoritesByID[remoteItem.id] else {
+                return remoteItem
+            }
+
+            return appleMusicFavorite(remoteItem, enrichedWith: localFavorite)
+        }
+        let remoteIDs = Set(remoteItems.map(\.id))
+        let localFavorites = activeLocalAppleMusicFavorites.filter { !remoteIDs.contains($0.id) }
+        return SonosFavoritesSnapshot(items: remoteItems + localFavorites)
+    }
+
+    private var activeLocalAppleMusicFavorites: [SonosFavoriteItem] {
+        let hostPrefix = localAppleMusicFavoriteHostPrefix()
+        guard !hostPrefix.isEmpty else {
+            return []
+        }
+
+        return localAppleMusicFavorites.filter { $0.id.hasPrefix(hostPrefix) }
+    }
+
+    private func saveLocalAppleMusicFavorite(_ favorite: SonosFavoriteItem) {
+        localAppleMusicFavorites.removeAll { $0.id == favorite.id }
+        localAppleMusicFavorites.append(favorite)
+        persistLocalAppleMusicFavorites()
+        applyLocalAppleMusicFavoritesToHomeFavoritesState()
+    }
+
+    private func removeLocalAppleMusicFavoriteMetadata(objectID: String) {
+        localAppleMusicFavorites.removeAll { $0.id == objectID }
+        persistLocalAppleMusicFavorites()
+    }
+
+    private func persistLocalAppleMusicFavorites() {
+        settingsStore.saveLocalAppleMusicFavorites(localAppleMusicFavorites)
+    }
+
+    private func remoteAppleMusicFavoriteShadow(
+        objectID: String,
+        payload: SonosPlayablePayload
+    ) -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: objectID,
+            title: payload.title,
+            subtitle: payload.subtitle,
+            artworkURL: payload.artworkURL,
+            service: payload.service,
+            playbackURI: payload.uri,
+            playbackMetadataXML: payload.metadataXML,
+            kind: payload.kind == .collection ? .collection : .item
+        )
+    }
+
+    private func appleMusicFavorite(
+        _ remoteItem: SonosFavoriteItem,
+        enrichedWith localFavorite: SonosFavoriteItem
+    ) -> SonosFavoriteItem {
+        guard remoteItem.service?.kind == .appleMusic || localFavorite.service?.kind == .appleMusic else {
+            return remoteItem
+        }
+        guard remoteItem.title.sonoicTrimmed.caseInsensitiveCompare(localFavorite.title.sonoicTrimmed) == .orderedSame else {
+            return remoteItem
+        }
+
+        let remotePayload = remoteItem.playablePayload
+        let localPayload = localFavorite.playablePayload
+        let remoteSubtitle = remoteItem.subtitle.sonoicNonEmptyTrimmed
+        let serviceName = (remoteItem.service ?? localFavorite.service)?.name.sonoicNonEmptyTrimmed
+        let remoteSubtitleIsGenericService =
+            remoteSubtitle?.caseInsensitiveCompare(serviceName ?? "") == .orderedSame
+        let shouldUseLocalMetadata = remotePayload?.duration == nil && localPayload?.duration != nil
+            || (remoteSubtitle == nil || remoteSubtitleIsGenericService) && localFavorite.subtitle.sonoicNonEmptyTrimmed != nil
+            || remoteItem.artworkURL.sonoicNonEmptyTrimmed == nil && localFavorite.artworkURL.sonoicNonEmptyTrimmed != nil
+
+        return SonosFavoriteItem(
+            id: remoteItem.id,
+            title: remoteItem.title,
+            subtitle: remoteSubtitleIsGenericService
+                ? localFavorite.subtitle
+                : (remoteSubtitle ?? localFavorite.subtitle),
+            artworkURL: remoteItem.artworkURL.sonoicNonEmptyTrimmed ?? localFavorite.artworkURL,
+            service: remoteItem.service ?? localFavorite.service,
+            playbackURI: remoteItem.playbackURI.sonoicNonEmptyTrimmed ?? localFavorite.playbackURI,
+            playbackMetadataXML: shouldUseLocalMetadata
+                ? localFavorite.playbackMetadataXML
+                : (remoteItem.playbackMetadataXML ?? localFavorite.playbackMetadataXML),
+            kind: remoteItem.kind
+        )
+    }
+
+    private func localAppleMusicLibraryPlaylistFavorite(for item: SonoicSourceItem) -> SonosFavoriteItem? {
+        guard item.service.kind == .appleMusic,
+              item.kind == .playlist,
+              item.sourceReference?.catalogID?.sonoicNonEmptyTrimmed == nil,
+              let libraryID = item.sourceReference?.libraryID?.sonoicNonEmptyTrimmed,
+              let encodedLibraryID = Self.localAppleMusicFavoritePayloadID(libraryID)
+        else {
+            return nil
+        }
+
+        let playbackURI = "x-sonoic-apple-music-libraryplaylist:\(encodedLibraryID)"
+        return SonosFavoriteItem(
+            id: localAppleMusicFavoriteObjectID(for: item),
+            title: item.title,
+            subtitle: item.subtitle ?? item.service.name,
+            artworkURL: item.artworkURL,
+            service: .appleMusic,
+            playbackURI: playbackURI,
+            playbackMetadataXML: localAppleMusicLibraryPlaylistMetadataXML(
+                item: item,
+                libraryID: libraryID,
+                playbackURI: playbackURI
+            ),
+            kind: .collection
+        )
+    }
+
+    private func localAppleMusicFavoriteObjectID(for item: SonoicSourceItem) -> String {
+        Self.localAppleMusicFavoriteIDPrefix + appleMusicFavoriteOverrideKey(for: item)
+    }
+
+    private func localAppleMusicFavoriteHostPrefix() -> String {
+        let host = normalizedManualSonosHost(manualSonosHost)
+        guard !host.isEmpty else {
+            return ""
+        }
+
+        return "\(Self.localAppleMusicFavoriteIDPrefix)apple-music-favorite:\(host):"
+    }
+
+    private func localAppleMusicLibraryPlaylistMetadataXML(
+        item: SonoicSourceItem,
+        libraryID: String,
+        playbackURI: String
+    ) -> String {
+        """
+        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><container id="libraryplaylist:\(Self.xmlEscaped(libraryID))"><dc:title>\(Self.xmlEscaped(item.title))</dc:title><upnp:class>object.container.playlistContainer</upnp:class><res protocolInfo="x-sonoic-apple-music:*:*:*">\(Self.xmlEscaped(playbackURI))</res></container></DIDL-Lite>
+        """
+    }
+
+    private static func localAppleMusicFavoritePayloadID(_ value: String) -> String? {
+        let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
+        return value.addingPercentEncoding(withAllowedCharacters: allowedCharacters)
+    }
+
+    private static func xmlEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 }

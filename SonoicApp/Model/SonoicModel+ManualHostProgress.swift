@@ -29,8 +29,9 @@ extension SonoicModel {
             artworkIdentifier: nil,
             elapsedTime: 0,
             duration: payload.duration,
-            transportActions: nowPlaying.transportActions
+            transportActions: nil
         )
+        persistSharedExternalControlState()
     }
 
     func freezeLocalPlaybackTimeIfNeeded() {

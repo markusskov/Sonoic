@@ -45,7 +45,7 @@ final class SonoicPlusController {
             let customerInfo = try await customerInfo()
             return state(from: customerInfo)
         } catch {
-            return failedState(error)
+            return failedState(operation: .refresh)
         }
     }
 
@@ -60,7 +60,7 @@ final class SonoicPlusController {
             let customerInfo = try await restoreCustomerInfo()
             return state(from: customerInfo)
         } catch {
-            return failedState(error)
+            return failedState(operation: .restore)
         }
     }
 
@@ -108,12 +108,26 @@ final class SonoicPlusController {
         )
     }
 
-    private func failedState(_ error: Error) -> SonoicPlusState {
+    private func failedState(operation: SonoicPlusOperation) -> SonoicPlusState {
         SonoicPlusState(
-            status: .failed(error.localizedDescription),
+            status: .failed(operation.failureDetail),
             entitlementIdentifier: configuration.entitlementIdentifier,
             updatedAt: .now
         )
+    }
+}
+
+private enum SonoicPlusOperation {
+    case refresh
+    case restore
+
+    var failureDetail: String {
+        switch self {
+        case .refresh:
+            "Plus status could not be refreshed. Check your network connection, confirm this build was installed from TestFlight when validating purchases, then try again."
+        case .restore:
+            "Purchases could not be restored. Check your network connection, then confirm TestFlight and the App Store are signed in with the Apple ID that installed this build."
+        }
     }
 }
 

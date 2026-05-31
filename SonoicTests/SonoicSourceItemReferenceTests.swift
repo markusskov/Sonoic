@@ -6,7 +6,7 @@ import Testing
 struct SonoicSourceItemReferenceTests {
     @Test
     func decodesLibraryPlayParametersCatalogID() throws {
-        let json = """
+        let json = try Self.jsonData("""
         {
           "data": [
             {
@@ -26,7 +26,7 @@ struct SonoicSourceItemReferenceTests {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """)
 
         let response = try JSONDecoder().decode(AppleMusicLibraryResponse.self, from: json)
         let resource = try #require(response.data.first)
@@ -110,7 +110,7 @@ struct SonoicSourceItemReferenceTests {
 
     @Test
     func treatsCatalogResourceIDAsCatalogIdentity() throws {
-        let json = """
+        let json = try Self.jsonData("""
         {
           "data": [
             {
@@ -123,7 +123,7 @@ struct SonoicSourceItemReferenceTests {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """)
 
         let response = try JSONDecoder().decode(AppleMusicLibraryResponse.self, from: json)
         let resource = try #require(response.data.first)
@@ -136,7 +136,7 @@ struct SonoicSourceItemReferenceTests {
 
     @Test
     func decodesStationResources() throws {
-        let json = """
+        let json = try Self.jsonData("""
         {
           "data": [
             {
@@ -149,7 +149,7 @@ struct SonoicSourceItemReferenceTests {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """)
 
         let response = try JSONDecoder().decode(AppleMusicLibraryResponse.self, from: json)
         let resource = try #require(response.data.first)
@@ -163,7 +163,7 @@ struct SonoicSourceItemReferenceTests {
 
     @Test
     func decodesRecommendationSections() throws {
-        let json = """
+        let json = try Self.jsonData("""
         {
           "data": [
             {
@@ -191,7 +191,7 @@ struct SonoicSourceItemReferenceTests {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """)
 
         let response = try JSONDecoder().decode(AppleMusicRecommendationResponse.self, from: json)
         let section = try #require(response.sections().first)
@@ -242,5 +242,9 @@ struct SonoicSourceItemReferenceTests {
                 NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)
             )
         )
+    }
+
+    private static func jsonData(_ string: String) throws -> Data {
+        try #require(string.data(using: .utf8))
     }
 }

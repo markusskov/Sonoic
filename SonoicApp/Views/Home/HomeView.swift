@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(SonoicModel.self) private var model
+    @State private var favoriteRemovalFailure: SourceActionFailure?
 
     var body: some View {
         let recentPlays = model.homeRecentPlays
@@ -30,6 +31,7 @@ struct HomeView: View {
                     HomeFavoritesSection(
                         state: model.homeFavoritesState,
                         playFavorite: playFavorite,
+                        removeFavorite: removeFavorite,
                         retryAction: refreshFavorites
                     )
 
@@ -39,7 +41,8 @@ struct HomeView: View {
 
                             HomeCollectionsSection(
                                 collections: model.homeFavoriteCollections,
-                                playFavorite: playFavorite
+                                playFavorite: playFavorite,
+                                removeFavorite: removeFavorite
                             )
                         }
                     }
@@ -66,6 +69,13 @@ struct HomeView: View {
             await model.refreshQueue(showLoading: false)
         }
         .navigationTitle("Sonoic")
+        .alert(item: $favoriteRemovalFailure) { failure in
+            Alert(
+                title: Text(failure.title),
+                message: Text(failure.detail),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
     private func refreshHome() async {
@@ -80,6 +90,17 @@ struct HomeView: View {
 
     private func playFavorite(_ favorite: SonosFavoriteItem) async {
         _ = await model.playManualSonosFavorite(favorite)
+    }
+
+    private func removeFavorite(_ favorite: SonosFavoriteItem) async {
+        do {
+            try await model.removeHomeFavorite(favorite)
+        } catch {
+            favoriteRemovalFailure = SourceActionFailure(
+                title: "Could Not Remove Favorite",
+                detail: error.localizedDescription
+            )
+        }
     }
 
     private func openRooms() {

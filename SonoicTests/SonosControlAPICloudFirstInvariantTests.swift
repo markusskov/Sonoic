@@ -5,8 +5,8 @@ import Testing
 @MainActor
 struct SonosControlAPICloudFirstInvariantTests {
     @Test
-    func cloudCommandModeBlocksLocalPlaybackWrappersWhenCloudTargetIsUnavailable() async {
-        let model = SonoicModel()
+    func cloudCommandModeBlocksLocalPlaybackWrappersWhenCloudTargetIsUnavailable() async throws {
+        let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         model.nowPlaying = Self.nowPlayingSnapshot(playbackState: .playing)
         let previousNowPlaying = model.nowPlaying
@@ -29,10 +29,13 @@ struct SonosControlAPICloudFirstInvariantTests {
 
     @Test
     func cloudCommandModeBlocksDirectLocalSourcePlaybackFallback() async throws {
-        let model = SonoicModel()
+        let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         let previousNowPlaying = model.nowPlaying
-        let item = Self.sourceItem(playbackPayload: Self.playbackPayload(id: "payload-1"))
+        let item = Self.sourceItem(
+            playbackPayload: Self.playbackPayload(id: "payload-1", service: .appleMusic),
+            service: .appleMusic
+        )
 
         let didPlaySourceItem = try await model.playSourceItem(item)
         let didPlayPayload = await model.playManualSonosPayload(Self.playbackPayload(id: "payload-2"))
@@ -53,7 +56,7 @@ struct SonosControlAPICloudFirstInvariantTests {
 
     @Test
     func cloudCommandModeSkipsAppleMusicSourcePlaybackProbe() async throws {
-        let model = SonoicModel()
+        let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         let previousProbeState = model.sonosMusicServiceProbeState
         let previousNowPlaying = model.nowPlaying
@@ -72,8 +75,8 @@ struct SonosControlAPICloudFirstInvariantTests {
     }
 
     @Test
-    func cloudCommandModeMarksPlaylistQueueUnavailableEvenWithManualHost() async {
-        let model = SonoicModel()
+    func cloudCommandModeMarksPlaylistQueueUnavailableEvenWithManualHost() async throws {
+        let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         model.manualSonosHost = "192.0.2.10"
         let parentItem = Self.appleMusicPlaylistItem()
@@ -97,11 +100,12 @@ struct SonosControlAPICloudFirstInvariantTests {
 
     @Test
     func cloudCommandModeBlocksPlaylistFallbackEvenWithManualHost() async throws {
-        let model = SonoicModel()
+        let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         model.manualSonosHost = "192.0.2.10"
         let playlistItem = Self.sourceItem(
-            playbackPayload: Self.playbackPayload(id: "fallback-playlist", service: .genericStreaming),
+            playbackPayload: Self.playbackPayload(id: "fallback-playlist", service: .appleMusic),
+            service: .appleMusic,
             kind: .playlist
         )
         let previousNowPlaying = model.nowPlaying
@@ -115,8 +119,8 @@ struct SonosControlAPICloudFirstInvariantTests {
     }
 
     @Test
-    func cloudCommandModeBlocksFavoriteBackedPlaylistLANFallback() async {
-        let model = SonoicModel()
+    func cloudCommandModeBlocksFavoriteBackedPlaylistLANFallback() async throws {
+        let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         model.manualSonosHost = "192.0.2.10"
         model.homeFavoritesState = .loaded(
@@ -138,8 +142,8 @@ struct SonosControlAPICloudFirstInvariantTests {
     }
 
     @Test
-    func cloudCommandModeBlocksManualQueueItemSeekEvenWithManualHost() async {
-        let model = SonoicModel()
+    func cloudCommandModeBlocksManualQueueItemSeekEvenWithManualHost() async throws {
+        let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         model.manualSonosHost = "192.0.2.10"
         model.queueState = .loaded(
@@ -165,8 +169,8 @@ struct SonosControlAPICloudFirstInvariantTests {
     }
 
     @Test
-    func cloudCommandModeBlocksLocalQueueMutations() async {
-        let model = SonoicModel()
+    func cloudCommandModeBlocksLocalQueueMutations() async throws {
+        let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         let snapshot = SonosQueueSnapshot(
             items: [
@@ -199,8 +203,8 @@ struct SonosControlAPICloudFirstInvariantTests {
     }
 
     @Test
-    func cloudCommandModeWithoutCommandTargetBlocksLocalVolumeControls() async {
-        let model = SonoicModel()
+    func cloudCommandModeWithoutCommandTargetBlocksLocalVolumeControls() async throws {
+        let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         model.externalVolume = SonoicExternalControlState.Volume(level: 24, isMuted: false)
         let previousVolume = model.externalVolume
@@ -214,6 +218,16 @@ struct SonosControlAPICloudFirstInvariantTests {
 
     private static let cloudQueueMutationUnavailableDetail =
         "Queue edits are unavailable while Sonos Cloud command mode is active."
+
+    private static func makeModel() throws -> SonoicModel {
+        let suiteName = "SonosControlAPICloudFirstInvariantTests-\(UUID().uuidString)"
+        let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+        userDefaults.removePersistentDomain(forName: suiteName)
+        return SonoicModel(
+            settingsStore: SonoicSettingsStore(userDefaults: userDefaults),
+            startInitialSonosControlAPICloudRefresh: false
+        )
+    }
 
     private static func playbackPayload(
         id: String,

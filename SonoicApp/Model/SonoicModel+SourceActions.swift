@@ -2,8 +2,12 @@ import Foundation
 
 func sonoicPlaybackDebugLog(_ message: @autoclosure () -> String) {
 #if DEBUG
-    print("[SonoicPlaylistPlayback] \(message())")
+    print("[SonoicPlaylistPlayback] \(sonoicPlaybackDebugMessage(message()))")
 #endif
+}
+
+func sonoicPlaybackDebugMessage(_ message: String) -> String {
+    SonoicDiagnosticsRedactor.redacted(message, maxLength: 480)
 }
 
 func sonoicPlaybackDebugID(_ value: String?) -> String {
@@ -44,15 +48,27 @@ extension SonoicModel {
             return false
         }
 
-        return (try? sourcePlayablePayload(for: item, purpose: .directPlay)) != nil
+        return (try? sourceSingleItemPlaybackCapability(for: item)) != nil
+    }
+
+    func sourcePlaybackUnavailableDetail(for item: SonoicSourceItem) -> String? {
+        guard item.kind == .song else {
+            return nil
+        }
+
+        do {
+            guard try sourceSingleItemPlaybackCapability(for: item) != nil else {
+                return SonoicSourceActionError.playbackPayloadUnavailable.localizedDescription
+            }
+        } catch {
+            return error.localizedDescription
+        }
+
+        return sonosPlaybackCommandRoute.primarySourcePlaybackUnavailableDetail
     }
 
     private var canSendPrimarySourcePlaybackCommands: Bool {
-        if sonosControlAPIState.settings.mode.canSendCommands {
-            return hasSonosControlAPICommandTarget
-        }
-
-        return hasManualSonosHost
+        sonosPlaybackCommandRoute.canSendPrimarySourcePlaybackCommands
     }
 
     func sourcePlaylistFallbackPayload(for item: SonoicSourceItem) -> SonosPlayablePayload? {
@@ -79,22 +95,61 @@ extension SonoicModel {
     func playSourceItem(_ item: SonoicSourceItem) async throws -> Bool {
         await refreshSourcePlaybackContextIfNeeded(for: item.service)
 
-        guard let payload = try sourcePlayablePayload(for: item, purpose: .directPlay) else {
+        guard let playbackCapability = try sourceSingleItemPlaybackCapability(for: item) else {
             throw SonoicSourceActionError.playbackPayloadUnavailable
         }
 
-        if let plan = sourceSingleItemPlaybackPlan(for: item, payload: payload),
+        if let plan = playbackCapability.cloudQueuePlan,
            await playSonosControlAPICloudQueueIfAvailable(parentItem: item, plan: plan)
         {
             recordRecentSourceItem(item, replayPayload: plan.recentPlaybackPayload)
             return true
         }
 
+        if playbackCapability.canResolveCloudQueueAfterContextRefresh {
+            throw SonoicSourceActionError.playbackPayloadUnavailable
+        }
+
         guard allowsLocalSourcePlaybackFallback else {
             return false
         }
 
-        return await playManualSonosPayload(payload)
+        guard let directPayload = playbackCapability.directPayload else {
+            return false
+        }
+
+        return await playManualSonosPayload(directPayload)
+    }
+
+    @discardableResult
+    func playAppleMusicFavoriteCloudQueueFallbackIfAvailable(_ favorite: SonosFavoriteItem) async -> Bool {
+        guard sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI,
+              sonosOAuthConfiguration.canCreateCloudQueues,
+              let fallbackPayload = favorite.playablePayload,
+              isAppLocalAppleMusicFavoriteCloudQueueFallbackCandidate(favorite, payload: fallbackPayload),
+              appLocalAppleMusicFavoriteHasNoCloudMatch(favorite)
+        else {
+            return false
+        }
+
+        await refreshSourcePlaybackContextIfNeeded(for: .appleMusic)
+        let item = SonoicSourceItem(favorite: favorite)
+        guard var plan = sourceSingleItemPlaybackPlan(for: item, fallbackPayload: fallbackPayload) else {
+            sonoicPlaybackDebugLog("manualFavorite cloudQueueFallbackUnavailable title='\(favorite.title)'")
+            return false
+        }
+        plan.localNowPlayingPayload = fallbackPayload
+        plan.recentPlaybackPayload = fallbackPayload
+
+        sonoicPlaybackDebugLog("manualFavorite cloudQueueFallbackStart title='\(favorite.title)'")
+        let didStart = await playSonosControlAPICloudQueueIfAvailable(parentItem: item, plan: plan)
+        if didStart {
+            recordRecentFavoritePlayback(favorite)
+        }
+        sonoicPlaybackDebugLog(
+            "manualFavorite cloudQueueFallbackResult=\(didStart) title='\(favorite.title)'"
+        )
+        return didStart
     }
 
     @discardableResult
@@ -133,7 +188,7 @@ extension SonoicModel {
             return true
         }
 
-        if sonosControlAPIState.settings.mode.canSendCommands,
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI,
            let favorite = favoriteCloudFallback,
            await playManualSonosFavorite(favorite)
         {
@@ -273,15 +328,140 @@ extension SonoicModel {
         return didStartPlayback
     }
 
+    private struct SourceSingleItemPlaybackCapability {
+        var directPayload: SonosPlayablePayload?
+        var cloudQueuePlan: SonoicSourcePlaylistPlaybackPlan?
+        var canResolveCloudQueueAfterContextRefresh = false
+    }
+
+    private func sourceSingleItemPlaybackCapability(
+        for item: SonoicSourceItem
+    ) throws -> SourceSingleItemPlaybackCapability? {
+        let directPayload = try sourcePlayablePayload(for: item, purpose: .directPlay)
+        if let directPayload {
+            return SourceSingleItemPlaybackCapability(
+                directPayload: directPayload,
+                cloudQueuePlan: sourceSingleItemPlaybackPlan(for: item, fallbackPayload: directPayload)
+            )
+        }
+
+        guard sonosPlaybackCommandRoute.hasSonosControlAPICommandTarget,
+              sonosOAuthConfiguration.canCreateCloudQueues
+        else {
+            return nil
+        }
+
+        guard let cloudQueuePlan = sourceSingleItemPlaybackPlan(for: item, fallbackPayload: nil) else {
+            guard canResolveSingleItemCloudQueuePayloadAfterContextRefresh(for: item) else {
+                return nil
+            }
+
+            return SourceSingleItemPlaybackCapability(
+                directPayload: nil,
+                cloudQueuePlan: nil,
+                canResolveCloudQueueAfterContextRefresh: true
+            )
+        }
+
+        return SourceSingleItemPlaybackCapability(
+            directPayload: nil,
+            cloudQueuePlan: cloudQueuePlan
+        )
+    }
+
+    private func canResolveSingleItemCloudQueuePayloadAfterContextRefresh(
+        for item: SonoicSourceItem
+    ) -> Bool {
+        guard item.service.kind == .appleMusic,
+              item.kind == .song,
+              sourceAdapter(for: item).capabilities.supportsSonosPlaybackPayloads,
+              item.sourceReference?.routedID(for: item.origin)?.sonoicNonEmptyTrimmed != nil,
+              hasManualSonosHost || sonosMusicServiceProbeState.snapshot != nil
+        else {
+            return false
+        }
+
+        return true
+    }
+
+    private func isAppLocalAppleMusicFavoriteCloudQueueFallbackCandidate(
+        _ favorite: SonosFavoriteItem,
+        payload: SonosPlayablePayload
+    ) -> Bool {
+        guard favorite.kind == .item,
+              !favorite.isPlaylistLike,
+              favorite.service?.kind == .appleMusic,
+              payload.kind == .item,
+              payload.service?.kind == .appleMusic
+        else {
+            return false
+        }
+
+        let uri = payload.uri.sonoicTrimmed.lowercased()
+        guard uri.contains("sid=204"),
+              uri.contains("sn=")
+        else {
+            return false
+        }
+
+        return uri.hasPrefix("x-sonosapi-hls:song%3a")
+            || uri.hasPrefix("x-sonosapi-hls-static:song%3a")
+            || uri.hasPrefix("x-sonos-http:librarytrack%3a")
+    }
+
+    private func appLocalAppleMusicFavoriteHasNoCloudMatch(_ favorite: SonosFavoriteItem) -> Bool {
+        guard case let .verified(snapshot) = sonosControlAPICloudState.status else {
+            sonoicPlaybackDebugLog(
+                "manualFavorite cloudQueueFallbackNoSnapshot state=\(sonoicPlaybackDebugCloudStatus(sonosControlAPICloudState.status)) title='\(favorite.title)'"
+            )
+            return false
+        }
+
+        guard let householdID = appLocalAppleMusicFavoriteFallbackHouseholdID(snapshot: snapshot) else {
+            sonoicPlaybackDebugLog("manualFavorite cloudQueueFallbackNoHousehold title='\(favorite.title)'")
+            return false
+        }
+
+        sonoicPlaybackDebugLog(
+            "manualFavorite cloudQueueFallbackMatchCheck title='\(favorite.title)' household=\(sonoicPlaybackDebugID(householdID)) \(sonosControlAPICloudContentFetchDiagnosticsDescription(snapshot: snapshot, householdID: householdID))"
+        )
+        if snapshot.uniqueFavorite(
+            matchingTitle: favorite.title,
+            householdID: householdID,
+            serviceName: favorite.service?.name
+        ) != nil {
+            return false
+        }
+
+        return true
+    }
+
+    private func appLocalAppleMusicFavoriteFallbackHouseholdID(
+        snapshot: SonosControlAPICloudSnapshot
+    ) -> String? {
+        if let selectedHouseholdID = sonosControlAPIState.settings.selectedHouseholdID?.sonoicNonEmptyTrimmed {
+            return selectedHouseholdID
+        }
+
+        guard snapshot.households.count == 1 else {
+            return nil
+        }
+
+        return snapshot.households[0].id.sonoicNonEmptyTrimmed
+    }
+
     private func sourceSingleItemPlaybackPlan(
         for item: SonoicSourceItem,
-        payload: SonosPlayablePayload
+        fallbackPayload: SonosPlayablePayload?
     ) -> SonoicSourcePlaylistPlaybackPlan? {
         guard sourceAdapter(for: item).capabilities.supportsSonosPlaybackPayloads else {
             return nil
         }
 
-        let queuePayload = (try? sourcePlayablePayload(for: item, purpose: .queueEntry)) ?? payload
+        guard let queuePayload = (try? sourcePlayablePayload(for: item, purpose: .queueEntry)) ?? fallbackPayload else {
+            return nil
+        }
+
         let metadataPayload = (try? sourcePlayablePayload(for: item, purpose: .metadata)) ?? queuePayload
         return SonoicSourcePlaylistPlaybackPlan(
             payloads: [queuePayload],

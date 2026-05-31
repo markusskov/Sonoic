@@ -3,7 +3,6 @@ import Foundation
 enum SonosServiceCatalog {
     static let browsableServices: [SonosServiceDescriptor] = [
         .appleMusic,
-        .spotify,
     ]
 
     static func descriptor(named name: String?) -> SonosServiceDescriptor? {

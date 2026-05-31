@@ -4,6 +4,7 @@ struct SonoicSettingsStore {
     static let manualSonosHostKey = "manualSonosHost"
     static let recentPlaysKey = "recentPlays"
     static let recentSourceSearchesKey = "recentSourceSearches"
+    static let localAppleMusicFavoritesKey = "localAppleMusicFavorites"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     static let sonosControlAPISettingsKey = "sonosControlAPISettings"
 
@@ -55,6 +56,24 @@ struct SonoicSettingsStore {
         }
 
         userDefaults.set(data, forKey: Self.recentSourceSearchesKey)
+    }
+
+    func loadLocalAppleMusicFavorites() -> [SonosFavoriteItem] {
+        guard let data = userDefaults.data(forKey: Self.localAppleMusicFavoritesKey),
+              let favorites = try? JSONDecoder().decode([SonosFavoriteItem].self, from: data)
+        else {
+            return []
+        }
+
+        return favorites
+    }
+
+    func saveLocalAppleMusicFavorites(_ favorites: [SonosFavoriteItem]) {
+        guard let data = try? JSONEncoder().encode(favorites) else {
+            return
+        }
+
+        userDefaults.set(data, forKey: Self.localAppleMusicFavoritesKey)
     }
 
     func loadHasCompletedOnboarding() -> Bool {

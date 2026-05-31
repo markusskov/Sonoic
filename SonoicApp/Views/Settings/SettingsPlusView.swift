@@ -75,9 +75,9 @@ struct SettingsPlusView: View {
                 } else {
                     SettingsStatusRow(
                         title: "Sonoic Plus",
-                        statusTitle: "Coming Soon",
-                        detail: "Themes, icons, and room presets are being prepared.",
-                        systemImage: "sparkles",
+                        statusTitle: model.plusState.settingsStatusTitle,
+                        detail: model.plusState.settingsDetail,
+                        systemImage: model.plusState.systemImage,
                         tint: .secondary
                     )
                 }
@@ -93,6 +93,10 @@ struct SettingsPlusView: View {
                     }
                 }
                 .disabled(isRestoring || !canOpenPaywall)
+            } footer: {
+                if let recoveryDetail = model.plusState.purchaseRecoveryDetail {
+                    Text(recoveryDetail)
+                }
             }
         }
         .navigationTitle("Sonoic Plus")

@@ -9,6 +9,21 @@ describe('Sonos OAuth worker', () => {
 		vi.unstubAllGlobals();
 	});
 
+	it('returns uncached health checks', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		const request = new IncomingRequest('https://sonos.ryvus.app/healthz');
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		await expect(response.json()).resolves.toMatchObject({ ok: true });
+		expect(response.headers.get('cache-control')).toBe('no-store');
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
 	it('redirects Sonos OAuth callbacks back into Sonoic', async () => {
 		const request = new IncomingRequest(
 			'https://sonos.ryvus.app/oauth/sonos/callback?state=state-1&code=sonos-code',
@@ -70,6 +85,140 @@ describe('Sonos OAuth worker', () => {
 		expect(options.body.toString()).toBe(
 			'grant_type=authorization_code&code=sonos-code&redirect_uri=https%3A%2F%2Fsonos.ryvus.app%2Foauth%2Fsonos%2Fcallback',
 		);
+	});
+
+	it('refreshes Sonos tokens with worker secrets', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					access_token: 'access-2',
+					refresh_token: 'refresh-2',
+					token_type: 'Bearer',
+					expires_in: 3600,
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } },
+			),
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token/refresh', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refresh_token: 'refresh-1' }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('cache-control')).toBe('no-store');
+		await expect(response.json()).resolves.toMatchObject({
+			access_token: 'access-2',
+			refresh_token: 'refresh-2',
+		});
+		expect(fetchMock).toHaveBeenCalledOnce();
+		const [url, options] = fetchMock.mock.calls[0];
+		expect(url).toBe('https://api.sonos.com/login/v3/oauth/access');
+		expect(options.method).toBe('POST');
+		expect(options.headers.Authorization).toMatch(/^Basic /);
+		expect(options.body.toString()).toBe('grant_type=refresh_token&refresh_token=refresh-1');
+	});
+
+	it('redacts upstream token refresh error bodies', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response('<html>refresh-token-secret should not echo</html>', {
+				status: 401,
+				headers: { 'Content-Type': 'text/html' },
+			}),
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token/refresh', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refresh_token: 'refresh-token-secret' }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+		const body = (await response.json()) as Record<string, unknown>;
+
+		expect(response.status).toBe(401);
+		expect(body).toMatchObject({ error: 'sonos_error', status: 401 });
+		expect(body.detail).toBeUndefined();
+		expect(JSON.stringify(body)).not.toContain('refresh-token-secret');
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
+	it('signs broker codes with a dedicated signing secret when configured', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					access_token: 'access-1',
+					refresh_token: 'refresh-1',
+					token_type: 'Bearer',
+					expires_in: 3600,
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } },
+			),
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const localEnv = testEnv({ brokerCodeSigningSecret: 'broker-secret-1' });
+		const callbackRequest = new IncomingRequest(
+			'https://sonos.ryvus.app/oauth/sonos/callback?state=state-1&code=sonos-code',
+		);
+		const callbackContext = createExecutionContext();
+		const callbackResponse = await worker.fetch(callbackRequest, localEnv, callbackContext);
+		await waitOnExecutionContext(callbackContext);
+		const location = new URL(callbackResponse.headers.get('location') ?? '');
+		const brokerCode = location.searchParams.get('broker_code');
+		const tokenRequest = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				code: brokerCode,
+				state: 'state-1',
+				redirect_uri: env.SONOS_REDIRECT_URI,
+			}),
+		});
+		const tokenContext = createExecutionContext();
+
+		const response = await worker.fetch(tokenRequest, localEnv, tokenContext);
+		await waitOnExecutionContext(tokenContext);
+
+		expect(response.status).toBe(200);
+		await expect(response.json()).resolves.toMatchObject({
+			access_token: 'access-1',
+			refresh_token: 'refresh-1',
+		});
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
+	it('rejects client-secret signed broker codes when a dedicated signing secret is configured', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+
+		const brokerCode = await makeBrokerCode('sonos-code', 'state-1');
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				code: brokerCode,
+				state: 'state-1',
+				redirect_uri: env.SONOS_REDIRECT_URI,
+			}),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv({ brokerCodeSigningSecret: 'broker-secret-1' }), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(400);
+		await expect(response.json()).resolves.toMatchObject({ error: 'invalid_broker_code' });
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
 	it('rejects replayed broker codes before calling Sonos again', async () => {
@@ -194,6 +343,64 @@ describe('Sonos OAuth worker', () => {
 
 		expect(response.status).toBe(400);
 		await expect(response.json()).resolves.toMatchObject({ error: 'invalid_broker_code' });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('rejects oversized JSON bodies from content length before parsing', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token/refresh', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Content-Length': String(1024 * 1024 + 1),
+			},
+			body: JSON.stringify({ refresh_token: 'refresh-1' }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(413);
+		await expect(response.json()).resolves.toMatchObject({ error: 'request_body_too_large' });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('rejects oversized JSON bodies after measuring the actual body bytes', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token/refresh', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refresh_token: 'x'.repeat(1024 * 1024) }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(413);
+		await expect(response.json()).resolves.toMatchObject({ error: 'request_body_too_large' });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('accepts Sonos event callbacks as an intentional no-op', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/events', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ event: 'ignored' }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(202);
+		await expect(response.json()).resolves.toMatchObject({ success: true });
+		expect(response.headers.get('cache-control')).toBe('no-store');
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });
@@ -359,12 +566,86 @@ describe('Sonoic Cloud Queue worker', () => {
 		expect(response.status).toBe(400);
 		await expect(response.json()).resolves.toMatchObject({ error });
 	});
+
+	it.each([
+		{
+			name: 'container name',
+			mutate: (body: Record<string, unknown>) => {
+				const container = body.container as Record<string, unknown>;
+				container.name = overlongCloudQueueString();
+			},
+			error: 'cloud_queue_string_too_long:container.name',
+		},
+		{
+			name: 'track name',
+			mutate: (body: Record<string, unknown>) => {
+				cloudQueueTrack(body, 0).name = overlongCloudQueueString();
+			},
+			error: 'cloud_queue_string_too_long:items.0.track.name',
+		},
+		{
+			name: 'nested track artist name',
+			mutate: (body: Record<string, unknown>) => {
+				const artist = cloudQueueTrack(body, 0).artist as Record<string, unknown>;
+				artist.name = overlongCloudQueueString();
+			},
+			error: 'cloud_queue_string_too_long:items.0.track.artist.name',
+		},
+	])('rejects cloud queue payloads with overlong $name', async ({ mutate, error }) => {
+		stubSuccessfulSonosTokenValidation();
+		const body = cloudQueueBody();
+		mutate(body);
+
+		const response = await createCloudQueueFromBody(body);
+
+		expect(response.status).toBe(400);
+		await expect(response.json()).resolves.toMatchObject({ error });
+	});
+
+	it.each([
+		{
+			name: 'container image URL',
+			mutate: (body: Record<string, unknown>) => {
+				const container = body.container as Record<string, unknown>;
+				container.imageUrl = 'javascript:alert(1)';
+			},
+			error: 'cloud_queue_url_invalid:container.imageUrl',
+		},
+		{
+			name: 'track media URL',
+			mutate: (body: Record<string, unknown>) => {
+				cloudQueueTrack(body, 0).mediaUrl = 'file:///tmp/track.m4a';
+			},
+			error: 'cloud_queue_url_invalid:items.0.track.mediaUrl',
+		},
+		{
+			name: 'nested service image URL',
+			mutate: (body: Record<string, unknown>) => {
+				const service = cloudQueueTrack(body, 0).service as Record<string, unknown>;
+				service.imageUrl = 'ftp://example.com/service.png';
+			},
+			error: 'cloud_queue_url_invalid:items.0.track.service.imageUrl',
+		},
+	])('rejects cloud queue payloads with invalid $name', async ({ mutate, error }) => {
+		stubSuccessfulSonosTokenValidation();
+		const body = cloudQueueBody();
+		mutate(body);
+
+		const response = await createCloudQueueFromBody(body);
+
+		expect(response.status).toBe(400);
+		await expect(response.json()).resolves.toMatchObject({ error });
+	});
 });
 
-function testEnv(): Env & { SONOS_CLIENT_SECRET: string } {
+function testEnv(options: { brokerCodeSigningSecret?: string } = {}): Env & {
+	SONOS_CLIENT_SECRET: string;
+	BROKER_CODE_SIGNING_SECRET?: string;
+} {
 	return {
 		...env,
 		SONOS_CLIENT_SECRET: 'secret-1',
+		BROKER_CODE_SIGNING_SECRET: options.brokerCodeSigningSecret,
 		SONOS_BROKER_CODE_REDEMPTIONS: makeRedemptionNamespace(),
 	};
 }
@@ -444,6 +725,10 @@ function cloudQueueItem(body: Record<string, unknown>, index: number): Record<st
 
 function cloudQueueTrack(body: Record<string, unknown>, index: number): Record<string, unknown> {
 	return cloudQueueItem(body, index).track as Record<string, unknown>;
+}
+
+function overlongCloudQueueString(): string {
+	return 'x'.repeat(4097);
 }
 
 function makeRedemptionNamespace(): DurableObjectNamespace {

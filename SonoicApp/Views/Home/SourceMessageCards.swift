@@ -52,8 +52,8 @@ struct SourceCatalogPlaceholderCard: View {
                 SourceNavigationRow(
                     row: SourceNavigationRow.Model(
                         title: "Search",
-                        subtitle: "Not connected yet",
-                        systemImage: "magnifyingglass",
+                        subtitle: "Apple Music only in this beta",
+                        systemImage: "lock",
                         showsChevron: false
                     )
                 )

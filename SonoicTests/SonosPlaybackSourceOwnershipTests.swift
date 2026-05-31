@@ -85,6 +85,18 @@ struct SonosPlaybackSourceOwnershipTests {
         #expect(updatedSnapshot.items.map(\.id) == ["two", "one", "three"])
     }
 
+    @Test
+    func queueSnapshotCanClearCurrentItemIndexWhilePreservingItemsAndSourceURI() {
+        let snapshot = queueSnapshot()
+
+        let updatedSnapshot = snapshot.clearingCurrentItemIndex()
+
+        #expect(updatedSnapshot.items == snapshot.items)
+        #expect(updatedSnapshot.sourceURI == snapshot.sourceURI)
+        #expect(updatedSnapshot.currentItemIndex == nil)
+        #expect(updatedSnapshot.supportsLocalMutation)
+    }
+
     private func queueSnapshot() -> SonosQueueSnapshot {
         SonosQueueSnapshot(
             items: [

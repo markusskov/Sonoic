@@ -64,7 +64,7 @@ extension SonoicModel {
             return .unavailable
         }
 
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             return hasSonosControlAPICommandTarget ? .ready : .unavailable
         }
 
@@ -209,7 +209,7 @@ extension SonoicModel {
     }
 
     private var externalControlStateUpdatedAt: Date {
-        if sonosControlAPIState.settings.mode.canSendCommands {
+        if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             return cloudExternalControlStateUpdatedAt
         }
 

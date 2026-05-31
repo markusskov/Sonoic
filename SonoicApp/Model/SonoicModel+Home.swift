@@ -72,7 +72,9 @@ extension SonoicModel {
         }
 
         do {
-            let snapshot = try await favoritesClient.fetchSnapshot(host: manualSonosHost)
+            let snapshot = mergedHomeFavoritesSnapshot(
+                try await favoritesClient.fetchSnapshot(host: manualSonosHost)
+            )
             homeFavoritesState = snapshot.items.isEmpty ? .empty : .loaded(snapshot)
             reconcileAppleMusicFavoriteOverrides()
         } catch {
@@ -98,6 +100,14 @@ extension SonoicModel {
 
         try await favoritesClient.removeFavorite(host: manualSonosHost, objectID: objectID)
         await refreshHomeFavorites(showLoading: false)
+    }
+
+    func removeHomeFavorite(_ favorite: SonosFavoriteItem) async throws {
+        if removeLocalAppleMusicFavorite(objectID: favorite.id) {
+            return
+        }
+
+        try await removeSonosFavorite(objectID: favorite.id)
     }
 
     func loadHomeFavoritesIfNeeded() async {

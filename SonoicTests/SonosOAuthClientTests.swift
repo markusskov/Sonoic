@@ -11,7 +11,7 @@ struct SonosOAuthClientTests {
             callbackScheme: "sonoic",
             tokenExchangeURL: URL(string: "https://sonoic.example.com/api/sonos/token"),
             tokenRefreshURL: nil,
-            authorizationEndpoint: URL(string: "https://api.sonos.com/login/v3/oauth")!,
+            authorizationEndpoint: try fixtureURL("https://api.sonos.com/login/v3/oauth"),
             scopes: ["playback-control-all"]
         )
 
@@ -33,7 +33,7 @@ struct SonosOAuthClientTests {
 
     @Test
     func parsesBrokerCallbackAndValidatesState() throws {
-        let url = URL(string: "sonoic://sonos-auth?broker_code=broker-123&state=state-1")!
+        let url = try fixtureURL("sonoic://sonos-auth?broker_code=broker-123&state=state-1")
         let callback = try SonosOAuthClient().parseCallbackURL(url, expectedState: "state-1")
 
         #expect(callback.exchangeCode == "broker-123")
@@ -41,8 +41,8 @@ struct SonosOAuthClientTests {
     }
 
     @Test
-    func rejectsCallbackWithWrongState() {
-        let url = URL(string: "sonoic://sonos-auth?broker_code=broker-123&state=state-2")!
+    func rejectsCallbackWithWrongState() throws {
+        let url = try fixtureURL("sonoic://sonos-auth?broker_code=broker-123&state=state-2")
 
         #expect(throws: SonosOAuthClient.OAuthError.invalidState) {
             _ = try SonosOAuthClient().parseCallbackURL(url, expectedState: "state-1")
@@ -50,8 +50,8 @@ struct SonosOAuthClientTests {
     }
 
     @Test
-    func rejectsCallbackWithDuplicateQueryItems() {
-        let url = URL(string: "sonoic://sonos-auth?broker_code=broker-123&state=state-1&state=state-1")!
+    func rejectsCallbackWithDuplicateQueryItems() throws {
+        let url = try fixtureURL("sonoic://sonos-auth?broker_code=broker-123&state=state-1&state=state-1")
 
         #expect(throws: SonosOAuthClient.OAuthError.invalidCallback) {
             _ = try SonosOAuthClient().parseCallbackURL(url, expectedState: "state-1")
@@ -59,14 +59,14 @@ struct SonosOAuthClientTests {
     }
 
     @Test
-    func rejectsInsecureTokenRefreshBrokerConfiguration() {
+    func rejectsInsecureTokenRefreshBrokerConfiguration() throws {
         let configuration = SonosOAuthConfiguration(
             clientID: "client-1",
             redirectURI: "https://sonoic.example.com/oauth/sonos",
             callbackScheme: "sonoic",
             tokenExchangeURL: URL(string: "https://sonoic.example.com/api/sonos/token"),
             tokenRefreshURL: URL(string: "http://sonoic.example.com/api/sonos/token/refresh"),
-            authorizationEndpoint: URL(string: "https://api.sonos.com/login/v3/oauth")!,
+            authorizationEndpoint: try fixtureURL("https://api.sonos.com/login/v3/oauth"),
             scopes: ["playback-control-all"]
         )
 
@@ -74,14 +74,14 @@ struct SonosOAuthClientTests {
     }
 
     @Test
-    func rejectsInsecureAuthorizationEndpointConfiguration() {
+    func rejectsInsecureAuthorizationEndpointConfiguration() throws {
         let configuration = SonosOAuthConfiguration(
             clientID: "client-1",
             redirectURI: "https://sonoic.example.com/oauth/sonos",
             callbackScheme: "sonoic",
             tokenExchangeURL: URL(string: "https://sonoic.example.com/api/sonos/token"),
             tokenRefreshURL: URL(string: "https://sonoic.example.com/api/sonos/token/refresh"),
-            authorizationEndpoint: URL(string: "http://api.sonos.com/login/v3/oauth")!,
+            authorizationEndpoint: try fixtureURL("http://api.sonos.com/login/v3/oauth"),
             scopes: ["playback-control-all"]
         )
 
@@ -89,14 +89,14 @@ struct SonosOAuthClientTests {
     }
 
     @Test
-    func rejectsInsecureRedirectURIConfiguration() {
+    func rejectsInsecureRedirectURIConfiguration() throws {
         let configuration = SonosOAuthConfiguration(
             clientID: "client-1",
             redirectURI: "http://sonoic.example.com/oauth/sonos",
             callbackScheme: "sonoic",
             tokenExchangeURL: URL(string: "https://sonoic.example.com/api/sonos/token"),
             tokenRefreshURL: URL(string: "https://sonoic.example.com/api/sonos/token/refresh"),
-            authorizationEndpoint: URL(string: "https://api.sonos.com/login/v3/oauth")!,
+            authorizationEndpoint: try fixtureURL("https://api.sonos.com/login/v3/oauth"),
             scopes: ["playback-control-all"]
         )
 
@@ -104,14 +104,14 @@ struct SonosOAuthClientTests {
     }
 
     @Test
-    func rejectsAuthorizationEndpointWithoutHostConfiguration() {
+    func rejectsAuthorizationEndpointWithoutHostConfiguration() throws {
         let configuration = SonosOAuthConfiguration(
             clientID: "client-1",
             redirectURI: "https://sonoic.example.com/oauth/sonos",
             callbackScheme: "sonoic",
             tokenExchangeURL: URL(string: "https://sonoic.example.com/api/sonos/token"),
             tokenRefreshURL: URL(string: "https://sonoic.example.com/api/sonos/token/refresh"),
-            authorizationEndpoint: URL(string: "https:")!,
+            authorizationEndpoint: try fixtureURL("https:"),
             scopes: ["playback-control-all"]
         )
 
@@ -119,14 +119,14 @@ struct SonosOAuthClientTests {
     }
 
     @Test
-    func rejectsBrokerEndpointWithoutHostConfiguration() {
+    func rejectsBrokerEndpointWithoutHostConfiguration() throws {
         let configuration = SonosOAuthConfiguration(
             clientID: "client-1",
             redirectURI: "https://sonoic.example.com/oauth/sonos",
             callbackScheme: "sonoic",
             tokenExchangeURL: URL(string: "https:"),
             tokenRefreshURL: URL(string: "https:"),
-            authorizationEndpoint: URL(string: "https://api.sonos.com/login/v3/oauth")!,
+            authorizationEndpoint: try fixtureURL("https://api.sonos.com/login/v3/oauth"),
             scopes: ["playback-control-all"]
         )
 
@@ -135,7 +135,7 @@ struct SonosOAuthClientTests {
 
     @Test
     func derivesCloudQueueCreateURLFromTokenBroker() throws {
-        let tokenExchangeURL = URL(string: "https://sonoic.example.com/api/sonos/token")!
+        let tokenExchangeURL = try fixtureURL("https://sonoic.example.com/api/sonos/token")
         let cloudQueueURL = try #require(SonosOAuthConfiguration.defaultCloudQueueCreateURL(from: tokenExchangeURL))
 
         #expect(cloudQueueURL.absoluteString == "https://sonoic.example.com/api/sonos/cloud-queues")
@@ -153,5 +153,9 @@ struct SonosOAuthClientTests {
 
         #expect(token.isExpired(referenceDate: Date(timeIntervalSince1970: 61), leeway: 60))
         #expect(!token.isExpired(referenceDate: Date(timeIntervalSince1970: 30), leeway: 60))
+    }
+
+    private func fixtureURL(_ string: String) throws -> URL {
+        try #require(URL(string: string))
     }
 }

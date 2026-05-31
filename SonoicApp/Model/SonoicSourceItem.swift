@@ -226,12 +226,13 @@ struct SonoicSourceItem: Identifiable, Equatable {
     }
 
     init(favorite: SonosFavoriteItem) {
+        let playablePayload = favorite.playablePayload
         let parsedReference = Self.appleMusicServiceReference(from: favorite.playbackURI)
         let kind = parsedReference?.kind ?? SonoicSourceItem.Kind(favoriteKind: favorite.kind)
         let serviceItemID = parsedReference?.id
         let sourceReference = favorite.service?.kind == .appleMusic ? SonoicSourceItemReference.appleMusic(
-            catalogID: serviceItemID,
-            libraryID: nil,
+            catalogID: parsedReference?.catalogID,
+            libraryID: parsedReference?.libraryID,
             kind: kind
         ) : nil
 
@@ -246,7 +247,8 @@ struct SonoicSourceItem: Identifiable, Equatable {
             service: favorite.service ?? .genericStreaming,
             origin: .favorite,
             kind: kind,
-            playbackCapability: favorite.playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .unsupported
+            playbackCapability: playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .unsupported,
+            duration: playablePayload?.duration
         )
     }
 
@@ -256,12 +258,17 @@ struct SonoicSourceItem: Identifiable, Equatable {
         let kind = recentPlay.sourceItemKindRawValue.flatMap(SonoicSourceItem.Kind.init(rawValue:))
             ?? parsedReference?.kind
             ?? SonoicSourceItem.Kind(favoriteKind: recentPlay.favoriteKind)
-        let serviceItemID = recentPlay.sourceItemID ?? recentPlay.appleMusicCatalogID ?? parsedReference?.id
+        let serviceItemID = recentPlay.sourceItemID
+            ?? recentPlay.appleMusicCatalogID
+            ?? recentPlay.appleMusicLibraryID
+            ?? parsedReference?.id
         let catalogID = recentPlay.appleMusicCatalogID
-            ?? (recentPlay.appleMusicLibraryID == nil ? serviceItemID : nil)
+            ?? parsedReference?.catalogID
+            ?? (recentPlay.appleMusicLibraryID == nil && parsedReference?.libraryID == nil ? serviceItemID : nil)
+        let libraryID = recentPlay.appleMusicLibraryID ?? parsedReference?.libraryID
         let sourceReference = recentPlay.service?.kind == .appleMusic ? SonoicSourceItemReference.appleMusic(
             catalogID: catalogID,
-            libraryID: recentPlay.appleMusicLibraryID,
+            libraryID: libraryID,
             kind: kind
         ) : nil
 
@@ -276,21 +283,31 @@ struct SonoicSourceItem: Identifiable, Equatable {
             service: recentPlay.service ?? .genericStreaming,
             origin: .recentPlay,
             kind: kind,
-            playbackCapability: playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .metadataOnly
+            playbackCapability: playablePayload.map(SonoicPlaybackCapability.sonosNative) ?? .metadataOnly,
+            duration: playablePayload?.duration
         )
     }
 
-    private static func appleMusicServiceReference(from uri: String) -> (id: String, kind: SonoicSourceItem.Kind)? {
+    private static func appleMusicServiceReference(
+        from uri: String
+    ) -> (id: String, catalogID: String?, libraryID: String?, kind: SonoicSourceItem.Kind)? {
+        enum IdentifierScope {
+            case catalog
+            case library
+        }
+
         let normalizedURI = uri.replacingOccurrences(of: "&amp;", with: "&")
         let lowercasedURI = normalizedURI.lowercased()
         let prefixes = [
-            ("playlist%3a", SonoicSourceItem.Kind.playlist),
-            ("album%3a", SonoicSourceItem.Kind.album),
-            ("artist%3a", SonoicSourceItem.Kind.artist),
-            ("song%3a", SonoicSourceItem.Kind.song),
+            ("x-sonoic-apple-music-libraryplaylist:", SonoicSourceItem.Kind.playlist, IdentifierScope.library),
+            ("libraryplaylist%3a", SonoicSourceItem.Kind.playlist, IdentifierScope.library),
+            ("playlist%3a", SonoicSourceItem.Kind.playlist, IdentifierScope.catalog),
+            ("album%3a", SonoicSourceItem.Kind.album, IdentifierScope.catalog),
+            ("artist%3a", SonoicSourceItem.Kind.artist, IdentifierScope.catalog),
+            ("song%3a", SonoicSourceItem.Kind.song, IdentifierScope.catalog),
         ]
 
-        for (prefix, kind) in prefixes {
+        for (prefix, kind, scope) in prefixes {
             guard let prefixRange = lowercasedURI.range(of: prefix) else {
                 continue
             }
@@ -308,7 +325,12 @@ struct SonoicSourceItem: Identifiable, Equatable {
                 return nil
             }
 
-            return (id, kind)
+            switch scope {
+            case .catalog:
+                return (id, id, nil, kind)
+            case .library:
+                return (id, nil, id, kind)
+            }
         }
 
         return nil

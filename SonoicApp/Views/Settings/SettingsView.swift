@@ -160,6 +160,7 @@ struct SettingsAdvancedView: View {
                     dataStatusTint: dataStatusTint
                 )
                 SettingsRefreshTimingSection(model: model, refreshTimingText: refreshTimingText)
+                SettingsSupportDiagnosticsSection(model: model)
                 SettingsPlaybackDiagnosticsSection(model: model)
                 SettingsNowPlayingDiagnosticsSection(model: model, refreshTimingText: refreshTimingText)
                 SettingsQueueDiagnosticsSection(model: model, refreshTimingText: refreshTimingText)

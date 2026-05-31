@@ -25,6 +25,14 @@ The Sonos secret must be stored as a Cloudflare Worker secret:
 npx wrangler secret put SONOS_CLIENT_SECRET
 ```
 
+Broker-code signatures can use a separate Worker secret. Existing deployments
+fall back to `SONOS_CLIENT_SECRET` when this is not set, but production deploys
+should use a distinct random value:
+
+```bash
+npx wrangler secret put BROKER_CODE_SIGNING_SECRET
+```
+
 ## Commands
 
 ```bash

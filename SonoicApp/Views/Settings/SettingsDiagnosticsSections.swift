@@ -1,4 +1,30 @@
 import SwiftUI
+import UIKit
+
+struct SettingsSupportDiagnosticsSection: View {
+    let model: SonoicModel
+
+    var body: some View {
+        let summary = model.supportDiagnosticsSummary
+
+        Section {
+            Text(summary)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+
+            Button {
+                UIPasteboard.general.string = summary
+            } label: {
+                Label("Copy Summary", systemImage: "doc.on.doc")
+            }
+        } header: {
+            Text("Support Summary")
+        } footer: {
+            Text("Share this summary with TestFlight reports. It is redacted for tokens, account or purchase identifiers, local network addresses, and raw Sonos player IDs.")
+        }
+    }
+}
 
 struct SettingsRefreshTimingSection: View {
     let model: SonoicModel
@@ -20,7 +46,7 @@ struct SettingsPlaybackDiagnosticsSection: View {
 
     var body: some View {
         Section("Diagnostics") {
-            LabeledContent("Selected Host", value: model.manualSonosHost)
+            SettingsDiagnosticRow(title: "Selected Host", value: model.manualSonosHost)
             LabeledContent("Current Room", value: model.activeTarget.name)
             LabeledContent("Title", value: model.nowPlaying.title)
 
@@ -102,7 +128,7 @@ struct SettingsNowPlayingDiagnosticsSection: View {
         Section("Seek Diagnostics") {
             LabeledContent("Status", value: model.seekDiagnostics.status.title)
             LabeledContent("Requested At", value: refreshTimingText(model.seekDiagnostics.requestedAt))
-            LabeledContent("Host", value: model.seekDiagnostics.host ?? "Unavailable")
+            SettingsDiagnosticRow(title: "Host", value: model.seekDiagnostics.host ?? "Unavailable")
             LabeledContent("Target", value: seekTimeText(model.seekDiagnostics.target))
             LabeledContent("Observed", value: seekTimeText(model.seekDiagnostics.observed))
 
