@@ -252,6 +252,24 @@ struct SonoicAppleMusicPlaybackPayloadResolverTests {
     }
 
     @Test
+    func favoritePurposeBuildsGeneratedPlaylistContainerPayloadFromPlaybackHint() throws {
+        let item = appleMusicItem(
+            title: "Road Songs",
+            subtitle: "Apple Music",
+            kind: .playlist,
+            catalogID: "p.abc123"
+        )
+        let model = try model(includesAppleMusicPlaybackHint: true)
+
+        let resolvedPayload = try model.appleMusicPlayablePayload(for: item, purpose: .favorite)
+        let payload = try #require(resolvedPayload)
+
+        #expect(payload.kind == .collection)
+        #expect(payload.uri == "x-rincon-cpcontainer:1006206cplaylist%3ap.abc123?sid=204&flags=8300&sn=3")
+        #expect(payload.metadataXML?.contains("<container id=\"playlist:p.abc123\"") == true)
+    }
+
+    @Test
     func metadataPurposeKeepsFavoriteGeneratedNativeSelectionOrder() throws {
         let item = purposeContractItem(nativePayloadID: "native-metadata")
         let exactFavorite = verifiedAppleMusicFavorite()

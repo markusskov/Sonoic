@@ -922,6 +922,8 @@ struct SonoicModelSonosControlAPITests {
         #expect(didPlay)
         #expect(recorder.paths == ["/control/api/v1/groups/group-1/favorites"])
         #expect(loadFavoriteRequest.favoriteId == "cloud-favorite-1")
+        #expect(loadFavoriteRequest.action == .replace)
+        #expect(loadFavoriteRequest.playOnCompletion == true)
         #expect(!recorder.paths.contains("/api/sonos/cloud-queues"))
         #expect(favoritePlayback.model.nowPlaying.title == "Cloud Favorite")
         #expect(favoritePlayback.model.nowPlaying.artistName == "Sonoic")
@@ -932,6 +934,57 @@ struct SonoicModelSonosControlAPITests {
         #expect(favoritePlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
         #expect(favoritePlayback.model.queueState.snapshot?.sourceURI == "x-rincon-queue:RINCON_00000000000001400#0")
         #expect(favoritePlayback.model.queueState.snapshot?.currentItemIndex == nil)
+    }
+
+    @Test
+    func matchedCollectionFavoriteUsesControlAPIPlaylistEndpointWithAutoplay() async throws {
+        let favoritePlayback = try Self.makeModel()
+        defer {
+            favoritePlayback.model.manualHostDeferredSyncTask?.cancel()
+            favoritePlayback.model.manualHostDeferredSyncTask = nil
+            try? favoritePlayback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: favoritePlayback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(
+            on: favoritePlayback.model,
+            snapshot: Self.cloudSnapshotWithContent(playlists: [Self.cloudPlaylist()])
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
+            recorder.record(request)
+            if request.url?.path == "/control/api/v1/groups/group-1/playlists" {
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            }
+
+            return try Self.httpResponse(
+                for: request,
+                statusCode: 500,
+                body: #"{"message":"Unexpected non-playlist endpoint"}"#
+            )
+        }
+
+        let didPlay = await favoritePlayback.model.playManualSonosFavorite(Self.collectionFavoriteItem())
+        favoritePlayback.model.manualHostDeferredSyncTask?.cancel()
+        favoritePlayback.model.manualHostDeferredSyncTask = nil
+
+        let request = try #require(recorder.requests.first)
+        let loadPlaylistRequest = try Self.loadPlaylistRequestBody(from: request)
+        #expect(didPlay)
+        #expect(recorder.paths == ["/control/api/v1/groups/group-1/playlists"])
+        #expect(loadPlaylistRequest.playlistId == "cloud-playlist-1")
+        #expect(loadPlaylistRequest.action == .replace)
+        #expect(loadPlaylistRequest.playOnCompletion == true)
+        #expect(!recorder.paths.contains("/api/sonos/cloud-queues"))
+        #expect(favoritePlayback.model.nowPlaying.title == "Cloud Playlist")
+        #expect(favoritePlayback.model.nowPlaying.playbackState == .playing)
+        #expect(favoritePlayback.model.manualPlaybackContextPayload == Self.collectionFavoriteItem().playablePayload)
+        #expect(favoritePlayback.model.manualQueueContextPayloads == nil)
+        #expect(favoritePlayback.model.manualRecentPlaybackContextPayload == nil)
+        #expect(favoritePlayback.model.sonosControlAPICloudQueueRuntimeState == .empty)
     }
 
     private static func makeModel() throws -> (
@@ -1044,6 +1097,13 @@ struct SonoicModelSonosControlAPITests {
         return try JSONDecoder().decode(SonosControlAPILoadFavoriteRequest.self, from: body)
     }
 
+    private static func loadPlaylistRequestBody(
+        from request: SonoicModelSonosControlAPICapturedRequest
+    ) throws -> SonosControlAPILoadPlaylistRequest {
+        let body = try #require(request.body)
+        return try JSONDecoder().decode(SonosControlAPILoadPlaylistRequest.self, from: body)
+    }
+
     private static func cloudQueueCreateRequestBody(
         from request: SonoicModelSonosControlAPICapturedRequest
     ) throws -> SonoicCloudQueueCreateRequest {
@@ -1118,6 +1178,15 @@ struct SonoicModelSonosControlAPITests {
             description: nil,
             imageUrl: nil,
             service: SonosControlAPIService(id: "204", name: "Apple Music", imageUrl: nil)
+        )
+    }
+
+    private static func cloudPlaylist() -> SonosControlAPIPlaylist {
+        SonosControlAPIPlaylist(
+            id: "cloud-playlist-1",
+            name: "Cloud Playlist",
+            type: nil,
+            trackCount: nil
         )
     }
 
@@ -1216,6 +1285,19 @@ struct SonoicModelSonosControlAPITests {
             playbackURI: "x-sonos-http:favorite-1.m4p",
             playbackMetadataXML: "<DIDL-Lite></DIDL-Lite>",
             kind: .item
+        )
+    }
+
+    private static func collectionFavoriteItem() -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: "playlist-favorite-1",
+            title: "Cloud Playlist",
+            subtitle: "Sonoic",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-rincon-cpcontainer:1006206cplaylist%3acloud-playlist",
+            playbackMetadataXML: "<DIDL-Lite></DIDL-Lite>",
+            kind: .collection
         )
     }
 

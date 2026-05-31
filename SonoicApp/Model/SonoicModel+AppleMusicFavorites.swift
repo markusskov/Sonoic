@@ -58,6 +58,8 @@ extension SonoicModel {
             return .removed
         }
 
+        await refreshAppleMusicFavoritePlaybackContextIfNeeded(for: item)
+
         guard let payload = try appleMusicPlayablePayload(for: item, purpose: .favorite) else {
             throw AppleMusicFavoriteError.missingPayload
         }
@@ -98,6 +100,14 @@ extension SonoicModel {
 
     private func appleMusicFavoriteObjectIDFromSnapshot(for item: SonoicSourceItem) -> String? {
         appleMusicExactPlaybackCandidate(for: item)?.verifiedFavoriteObjectID
+    }
+
+    private func refreshAppleMusicFavoritePlaybackContextIfNeeded(for item: SonoicSourceItem) async {
+        guard item.service.kind == .appleMusic else {
+            return
+        }
+
+        await refreshSonosMusicServiceProbeIfNeeded()
     }
 
     private func appleMusicFavoriteOverrideKey(for item: SonoicSourceItem) -> String {
