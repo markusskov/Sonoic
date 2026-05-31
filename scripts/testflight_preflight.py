@@ -26,6 +26,9 @@ WORKER_PACKAGE = ROOT / "sonoic-sonos-worker/package.json"
 WORKER_WRANGLER = ROOT / "sonoic-sonos-worker/wrangler.jsonc"
 WORKER_README = ROOT / "sonoic-sonos-worker/README.md"
 WORKER_SOURCE = ROOT / "sonoic-sonos-worker/src/index.ts"
+SUPPORT_DIAGNOSTICS_SOURCE = ROOT / "SonoicApp/Model/SonoicModel+SupportDiagnostics.swift"
+SETTINGS_DIAGNOSTICS_SOURCE = ROOT / "SonoicApp/Views/Settings/SettingsDiagnosticsSections.swift"
+TESTFLIGHT_READINESS_DOC = ROOT / "docs/TESTFLIGHT_READINESS.md"
 
 APP_PRIVACY_MANIFEST = ROOT / "SonoicApp/PrivacyInfo.xcprivacy"
 WIDGET_PRIVACY_MANIFEST = ROOT / "SonoicWidgets/PrivacyInfo.xcprivacy"
@@ -41,7 +44,7 @@ DEVELOPMENT_TEAM_ID = "N2M33U7L7U"
 APP_GROUP_ID = "group.com.markusskov.sonoic.shared"
 
 REQUIRED_DOCS = [
-    ROOT / "docs/TESTFLIGHT_READINESS.md",
+    TESTFLIGHT_READINESS_DOC,
     ROOT / "docs/SECURITY.md",
     ROOT / "docs/RELIABILITY.md",
     ROOT / "docs/sonos-oauth-dev-setup.md",
@@ -132,6 +135,7 @@ def main() -> int:
     check_oauth_config(report)
     check_worker_config(report)
     check_oauth_worker_alignment(report)
+    check_support_diagnostics(report)
     check_tracked_file_hygiene(report)
     check_likely_secret_literals(report)
 
@@ -413,6 +417,38 @@ def check_oauth_worker_alignment(report: Report) -> None:
     for key, expected_url in expected_urls.items():
         actual_url = normalized_xcconfig_url(xcconfig_value(example, key))
         report.require(actual_url == expected_url, f"Local OAuth example {key} must be {expected_url}.")
+
+
+def check_support_diagnostics(report: Report) -> None:
+    source = read_text(SUPPORT_DIAGNOSTICS_SOURCE, report)
+    settings_source = read_text(SETTINGS_DIAGNOSTICS_SOURCE, report)
+    readiness = read_text(TESTFLIGHT_READINESS_DOC, report)
+    if source is None or settings_source is None or readiness is None:
+        return
+
+    report.require("SonoicDiagnosticsRedactor" in source, "Support diagnostics must keep a central redaction boundary.")
+    for marker in [
+        "access_token",
+        "refresh_token",
+        "client_secret",
+        "Bearer <redacted>",
+        "<ip-address>",
+        "<sonos-player-id>",
+    ]:
+        report.require(marker in source, f"Support diagnostics redaction missing marker {marker}.")
+
+    report.require(
+        "SettingsSupportDiagnosticsSection" in settings_source and "Support Summary" in settings_source,
+        "Advanced Settings should expose a redacted support summary for TestFlight bug reports.",
+    )
+    report.require(
+        "Settings > Advanced >" in readiness and "Support Summary" in readiness,
+        "TestFlight readiness docs should tell testers where to find the support summary.",
+    )
+    report.require(
+        "access tokens" in readiness and "refresh tokens" in readiness and "Cloudflare secrets" in readiness,
+        "TestFlight readiness docs should tell testers not to include secrets in bug reports.",
+    )
 
 
 def xcconfig_value(text: str, key: str) -> str | None:

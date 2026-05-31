@@ -155,6 +155,30 @@ validation.
 - Record archive version/build number, Xcode version, signing team, upload time,
   App Store Connect processing result, and TestFlight build number.
 
+## Draft PR Support And Bug Report Notes
+
+Do not post these until the candidate build is ready for tester instructions.
+
+- Ask testers to include build number, iPhone model, iOS version, Sonos products,
+  grouped-room shape, source type, exact steps, expected result, actual result,
+  and approximate local time of the failure.
+- Ask testers to paste the redacted support summary from Settings > Advanced >
+  Support Summary when reporting playback, auth, Cloud Queue, room selection,
+  or queue/mini-player failures.
+- Ask for screenshots or a short screen recording when the UI appears stale,
+  unavailable, or inconsistent with Sonos.
+- Do not ask testers to paste raw auth URLs, OAuth codes, HTTP headers, access
+  tokens, refresh tokens, Cloudflare secrets, local OAuth config, or unredacted
+  console logs.
+- If a tester can reproduce with a physical speaker, ask whether playback was
+  started inside Sonoic, inside the Sonos app, or from another controller before
+  the failure.
+
+Manual check still required before external TestFlight: induce one harmless
+failure on a physical device, copy the support summary, and confirm it has useful
+auth/cloud/queue/playback state without raw local IP addresses, Sonos player IDs,
+OAuth tokens, auth codes, Worker secrets, or private URLs.
+
 ## Privacy And Secrets Audit
 
 - Run:

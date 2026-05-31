@@ -1,5 +1,18 @@
 import SwiftUI
 
+struct SettingsSupportDiagnosticsSection: View {
+    let model: SonoicModel
+
+    var body: some View {
+        Section("Support Summary") {
+            Text(model.supportDiagnosticsSummary)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+    }
+}
+
 struct SettingsRefreshTimingSection: View {
     let model: SonoicModel
     let refreshTimingText: (Date?) -> String

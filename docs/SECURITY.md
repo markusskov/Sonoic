@@ -18,6 +18,9 @@ Sonoic handles Sonos account authorization, local network access, shared app sta
 - Do not put the Sonos client secret in Xcode, Info.plist, source control, or the iOS app.
 - Keep `.local.xcconfig`, `.env`, and machine-specific files ignored.
 - Do not log private network, account, token, or household details more broadly than needed for local debugging.
+- Support diagnostics shared by testers must use the redacted summary surface;
+  do not request raw logs, auth URLs, headers, local IP addresses, or Sonos
+  player IDs unless a private follow-up explicitly requires them.
 - Treat App Group, entitlement, bundle identifier, OAuth redirect, Worker route, and storage changes as security-sensitive.
 - Prefer typed or parsed Sonos responses over guessed response shapes.
 
