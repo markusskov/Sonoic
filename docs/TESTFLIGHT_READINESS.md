@@ -261,6 +261,8 @@ must not contain private App Store Connect credentials or secret server keys.
 - If Plus is part of the candidate, verify in TestFlight sandbox:
   - Settings > Sonoic Plus explains RevenueCat setup and TestFlight sandbox
     recovery without exposing API keys or customer identifiers
+  - Plus failure copy asks testers to include the redacted Settings > Advanced >
+    Support Summary instead of App Store or RevenueCat account details
   - the paywall opens without exposing API keys or customer identifiers
   - purchase success unlocks the `plus` entitlement
   - restore purchases succeeds for an entitled Apple ID

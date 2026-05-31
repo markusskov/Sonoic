@@ -232,17 +232,20 @@ private extension SonosControlAPICloudState {
 
 private extension SonoicPlusState {
     var supportDiagnosticsSummary: String {
+        let entitlement = "entitlement=\(SonoicDiagnosticsRedactor.redacted(entitlementIdentifier, maxLength: 80))"
+        let updateState = updatedAt == nil ? "updated=none" : "updated=present"
+
         switch status {
         case .notConfigured:
-            return "Disabled"
+            return "Disabled · \(entitlement)"
         case .refreshing:
-            return "Checking"
+            return "Checking · \(entitlement) · \(updateState)"
         case .available:
-            return "Available"
+            return "Available · \(entitlement) · \(updateState)"
         case .unlocked:
-            return "Unlocked"
+            return "Unlocked · \(entitlement) · \(updateState)"
         case let .failed(detail):
-            return "Failed · \(SonoicDiagnosticsRedactor.redacted(detail))"
+            return "Failed · \(entitlement) · \(updateState) · detail=\(SonoicDiagnosticsRedactor.redacted(detail))"
         }
     }
 }

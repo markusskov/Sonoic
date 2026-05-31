@@ -124,9 +124,9 @@ private enum SonoicPlusOperation {
     var failureDetail: String {
         switch self {
         case .refresh:
-            "Plus status could not be refreshed. Check your network connection and try again."
+            "Plus status could not be refreshed. Check your network connection, confirm this build was installed from TestFlight when validating purchases, then try again."
         case .restore:
-            "Purchases could not be restored. Check your network connection, then try again with the Apple ID used for TestFlight."
+            "Purchases could not be restored. Check your network connection, then confirm TestFlight and the App Store are signed in with the Apple ID that installed this build."
         }
     }
 }

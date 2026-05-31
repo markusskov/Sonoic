@@ -66,7 +66,10 @@ struct SonoicPlusConfigurationTests {
         #expect(unlocked.purchaseRecoveryDetail == "Your Plus entitlement is active for this Apple ID.")
         #expect(failed.settingsStatusTitle == "Unavailable")
         #expect(failed.settingsDetail == "Purchases could not be restored. Check your network connection.")
-        #expect(failed.purchaseRecoveryDetail == "Purchases could not be restored. Check your network connection.")
+        #expect(failed.purchaseRecoveryDetail?.contains("Purchases could not be restored.") == true)
+        #expect(failed.purchaseRecoveryDetail?.contains("Settings > Advanced") == true)
+        #expect(failed.purchaseRecoveryDetail?.contains("redacted Support Summary") == true)
+        #expect(failed.purchaseRecoveryDetail?.contains("App Store or RevenueCat account details") == true)
     }
 
     private func makeBundle(info: [String: String]) throws -> Bundle {

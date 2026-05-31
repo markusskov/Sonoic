@@ -289,6 +289,33 @@ struct SonoicSupportDiagnosticsTests {
         #expect(!redacted.contains("oauth-state-secret"))
     }
 
+    @Test
+    func supportDiagnosticsKeepsPlusFailureActionableWithoutPurchaseIdentifiers() throws {
+        let model = try makeModel()
+        model.plusState = SonoicPlusState(
+            status: .failed("""
+            RevenueCat restore failed for app_user_id=$RCAnonymousID:local-user-12345 \
+            transaction_id=txn-789 email=tester@example.com
+            """),
+            entitlementIdentifier: "plus",
+            updatedAt: Date(timeIntervalSince1970: 30)
+        )
+
+        let summary = model.supportDiagnosticsSummary(
+            generatedAt: Date(timeIntervalSince1970: 0),
+            bundle: .main
+        )
+
+        #expect(summary.contains("Plus: Failed · entitlement=plus · updated=present · detail="))
+        #expect(summary.contains("app_user_id=<redacted>"))
+        #expect(summary.contains("transaction_id=<redacted>"))
+        #expect(summary.contains("email=<redacted>"))
+        #expect(!summary.contains("$RCAnonymousID"))
+        #expect(!summary.contains("local-user-12345"))
+        #expect(!summary.contains("txn-789"))
+        #expect(!summary.contains("tester@example.com"))
+    }
+
     private func makeModel() throws -> SonoicModel {
         let suiteName = "SonoicSupportDiagnosticsTests-\(UUID().uuidString)"
         let userDefaults = try #require(UserDefaults(suiteName: suiteName))

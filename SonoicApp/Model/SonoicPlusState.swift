@@ -68,7 +68,7 @@ struct SonoicPlusState: Equatable {
         case .unlocked:
             "Your Plus entitlement is active for this Apple ID."
         case .failed(let message):
-            message
+            "\(message) If you report this from TestFlight, include the redacted Support Summary from Settings > Advanced instead of App Store or RevenueCat account details."
         }
     }
 

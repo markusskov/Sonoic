@@ -373,6 +373,7 @@ def check_plus_config(report: Report) -> None:
     plus_state = read_text(ROOT / "SonoicApp/Model/SonoicPlusState.swift", report)
     plus_controller = read_text(ROOT / "SonoicApp/Model/SonoicPlusController.swift", report)
     plus_view = read_text(ROOT / "SonoicApp/Views/Settings/SettingsPlusView.swift", report)
+    support_diagnostics = read_text(SUPPORT_DIAGNOSTICS_SOURCE, report)
     if (
         config is None
         or example is None
@@ -380,6 +381,7 @@ def check_plus_config(report: Report) -> None:
         or plus_state is None
         or plus_controller is None
         or plus_view is None
+        or support_diagnostics is None
     ):
         return
 
@@ -396,7 +398,7 @@ def check_plus_config(report: Report) -> None:
         "Plus disabled state should explain that purchases are build-disabled.",
     )
     report.require(
-        "Apple ID used for TestFlight" in plus_controller,
+        "Apple ID that installed this build" in plus_controller,
         "Plus restore failure copy should guide TestFlight sandbox recovery.",
     )
     report.require(
@@ -404,6 +406,21 @@ def check_plus_config(report: Report) -> None:
         and "TestFlight builds use Apple's sandbox" in plus_state
         and "RevenueCat public SDK key" in plus_state,
         "Plus recovery copy should be testable and explain TestFlight sandbox/setup recovery.",
+    )
+    report.require(
+        "Settings > Advanced" in plus_state
+        and "redacted Support Summary" in plus_state
+        and "App Store or RevenueCat account details" in plus_state,
+        "Plus failure recovery copy should route TestFlight purchase issues through redacted support diagnostics.",
+    )
+    report.require(
+        "installed from TestFlight" in plus_controller
+        and "TestFlight and the App Store are signed in with the Apple ID" in plus_controller,
+        "Plus controller failure copy should make TestFlight purchase/restore prerequisites actionable.",
+    )
+    report.require(
+        "entitlement=" in support_diagnostics,
+        "Support diagnostics should include non-secret Plus entitlement context.",
     )
     report.require(
         "model.plusState.purchaseRecoveryDetail" in plus_view,
@@ -415,6 +432,8 @@ def check_plus_config(report: Report) -> None:
         "`plus` entitlement",
         "TestFlight sandbox",
         "restore purchases",
+        "Support Summary",
+        "RevenueCat account details",
     ]:
         report.require(marker in readiness, f"TestFlight readiness docs missing Plus release marker: {marker}.")
 
