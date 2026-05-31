@@ -762,6 +762,106 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func appLocalAppleMusicFavoriteWithoutCloudMatchFallsBackToCloudQueue() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let favorite = Self.appLocalAppleMusicFavorite()
+        Self.configureCloudCommandTarget(
+            on: playback.model,
+            snapshot: Self.cloudSnapshotWithContent(favorites: [])
+        )
+        playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+            status: .loaded,
+            snapshot: Self.appleMusicServiceSnapshot()
+                .includingObservedAccounts(from: [
+                    SonosMusicServiceObservedValue(
+                        value: favorite.playbackURI,
+                        origin: .favoriteURI
+                    )
+                ])
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/api/sonos/cloud-queues":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "queueId": "queue-1",
+                      "queueBaseUrl": "https://sonos.test/cloud-queues/queue-1/v2.3",
+                      "contextVersion": "context-1",
+                      "queueVersion": "queue-version-1",
+                      "startItemId": "queue-start-item",
+                      "trackMetadata": null
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackSession":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"sessionId":"session-1","sessionState":"SESSION_STATE_CONNECTED","sessionCreated":true}"#
+                )
+            case "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        let didPlay = await playback.model.playManualSonosFavorite(favorite)
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        let createRequest = try #require(recorder.requests.first { $0.url?.path == "/api/sonos/cloud-queues" })
+        let createBody = try Self.cloudQueueCreateRequestBody(from: createRequest)
+        let loadRequest = try #require(
+            recorder.requests.first { $0.url?.path == "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue" }
+        )
+        let loadBody = try Self.loadCloudQueueRequestBody(from: loadRequest)
+
+        #expect(didPlay)
+        #expect(recorder.paths == [
+            "/api/sonos/cloud-queues",
+            "/control/api/v1/groups/group-1/playbackSession",
+            "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue",
+        ])
+        #expect(!recorder.paths.contains("/control/api/v1/groups/group-1/favorites"))
+        #expect(createBody.items.count == 1)
+        let createdItem = try #require(createBody.items.first)
+        #expect(createBody.container.name == "I Want It That Way")
+        #expect(createdItem.track?.name == "I Want It That Way")
+        #expect(createdItem.track?.id?.objectId == "song:1440857781")
+        #expect(loadBody.itemId == "queue-start-item")
+        #expect(loadBody.queueVersion == "queue-version-1")
+        #expect(loadBody.playOnCompletion == true)
+        #expect(playback.model.manualPlaybackContextPayload?.uri == favorite.playbackURI)
+        #expect(playback.model.manualQueueContextPayloads?.map(\.uri) == [favorite.playbackURI])
+        #expect(playback.model.manualRecentPlaybackContextPayload?.uri == favorite.playbackURI)
+        #expect(playback.model.nowPlaying.title == "I Want It That Way")
+        #expect(playback.model.nowPlaying.playbackState == .playing)
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.sessionID == "session-1")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.queueVersion == "queue-version-1")
+        #expect(playback.model.queueState.snapshot?.items.map(\.title) == ["I Want It That Way"])
+    }
+
+    @Test
     func sourceSearchSongUsesQueuePayloadForSingleItemCloudQueuePlayback() async throws {
         let playback = try Self.makeModel()
         defer {
@@ -1284,6 +1384,21 @@ struct SonoicModelSonosControlAPITests {
             service: .appleMusic,
             playbackURI: "x-sonos-http:favorite-1.m4p",
             playbackMetadataXML: "<DIDL-Lite></DIDL-Lite>",
+            kind: .item
+        )
+    }
+
+    private static func appLocalAppleMusicFavorite() -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: "apple-music-favorite-song-1",
+            title: "I Want It That Way",
+            subtitle: "Backstreet Boys",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3",
+            playbackMetadataXML: """
+            <DIDL-Lite><item id="song:1440857781"><dc:title>I Want It That Way</dc:title></item></DIDL-Lite>
+            """,
             kind: .item
         )
     }

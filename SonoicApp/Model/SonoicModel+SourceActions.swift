@@ -122,6 +122,35 @@ extension SonoicModel {
     }
 
     @discardableResult
+    func playAppleMusicFavoriteCloudQueueFallbackIfAvailable(_ favorite: SonosFavoriteItem) async -> Bool {
+        guard sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI,
+              sonosOAuthConfiguration.canCreateCloudQueues,
+              let fallbackPayload = favorite.playablePayload,
+              isAppLocalAppleMusicFavoriteCloudQueueFallbackCandidate(favorite, payload: fallbackPayload),
+              appLocalAppleMusicFavoriteHasNoCloudMatch(favorite)
+        else {
+            return false
+        }
+
+        await refreshSourcePlaybackContextIfNeeded(for: .appleMusic)
+        let item = SonoicSourceItem(favorite: favorite)
+        guard let plan = sourceSingleItemPlaybackPlan(for: item, fallbackPayload: fallbackPayload) else {
+            sonoicPlaybackDebugLog("manualFavorite cloudQueueFallbackUnavailable title='\(favorite.title)'")
+            return false
+        }
+
+        sonoicPlaybackDebugLog("manualFavorite cloudQueueFallbackStart title='\(favorite.title)'")
+        let didStart = await playSonosControlAPICloudQueueIfAvailable(parentItem: item, plan: plan)
+        if didStart {
+            recordRecentFavoritePlayback(favorite)
+        }
+        sonoicPlaybackDebugLog(
+            "manualFavorite cloudQueueFallbackResult=\(didStart) title='\(favorite.title)'"
+        )
+        return didStart
+    }
+
+    @discardableResult
     func playSourcePlaylistQueue(
         parentItem: SonoicSourceItem,
         trackItems: [SonoicSourceItem],
@@ -351,6 +380,72 @@ extension SonoicModel {
         }
 
         return true
+    }
+
+    private func isAppLocalAppleMusicFavoriteCloudQueueFallbackCandidate(
+        _ favorite: SonosFavoriteItem,
+        payload: SonosPlayablePayload
+    ) -> Bool {
+        guard favorite.kind == .item,
+              !favorite.isPlaylistLike,
+              favorite.service?.kind == .appleMusic,
+              payload.kind == .item,
+              payload.service?.kind == .appleMusic
+        else {
+            return false
+        }
+
+        let uri = payload.uri.sonoicTrimmed.lowercased()
+        guard uri.contains("sid=204"),
+              uri.contains("sn=")
+        else {
+            return false
+        }
+
+        return uri.hasPrefix("x-sonosapi-hls:song%3a")
+            || uri.hasPrefix("x-sonosapi-hls-static:song%3a")
+            || uri.hasPrefix("x-sonos-http:librarytrack%3a")
+    }
+
+    private func appLocalAppleMusicFavoriteHasNoCloudMatch(_ favorite: SonosFavoriteItem) -> Bool {
+        guard case let .verified(snapshot) = sonosControlAPICloudState.status else {
+            sonoicPlaybackDebugLog(
+                "manualFavorite cloudQueueFallbackNoSnapshot state=\(sonoicPlaybackDebugCloudStatus(sonosControlAPICloudState.status)) title='\(favorite.title)'"
+            )
+            return false
+        }
+
+        guard let householdID = appLocalAppleMusicFavoriteFallbackHouseholdID(snapshot: snapshot) else {
+            sonoicPlaybackDebugLog("manualFavorite cloudQueueFallbackNoHousehold title='\(favorite.title)'")
+            return false
+        }
+
+        sonoicPlaybackDebugLog(
+            "manualFavorite cloudQueueFallbackMatchCheck title='\(favorite.title)' household=\(sonoicPlaybackDebugID(householdID)) \(sonosControlAPICloudContentFetchDiagnosticsDescription(snapshot: snapshot, householdID: householdID))"
+        )
+        if snapshot.uniqueFavorite(
+            matchingTitle: favorite.title,
+            householdID: householdID,
+            serviceName: favorite.service?.name
+        ) != nil {
+            return false
+        }
+
+        return true
+    }
+
+    private func appLocalAppleMusicFavoriteFallbackHouseholdID(
+        snapshot: SonosControlAPICloudSnapshot
+    ) -> String? {
+        if let selectedHouseholdID = sonosControlAPIState.settings.selectedHouseholdID?.sonoicNonEmptyTrimmed {
+            return selectedHouseholdID
+        }
+
+        guard snapshot.households.count == 1 else {
+            return nil
+        }
+
+        return snapshot.households[0].id.sonoicNonEmptyTrimmed
     }
 
     private func sourceSingleItemPlaybackPlan(

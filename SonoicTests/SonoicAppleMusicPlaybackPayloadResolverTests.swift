@@ -270,6 +270,33 @@ struct SonoicAppleMusicPlaybackPayloadResolverTests {
     }
 
     @Test
+    func favoriteToggleReportsLibraryPlaylistWithoutCatalogPayload() async throws {
+        let item = appleMusicItem(
+            title: "Markus Mix",
+            subtitle: "Apple Music",
+            kind: .playlist,
+            catalogID: nil,
+            libraryID: "p.library-only"
+        )
+        let model = try model(includesAppleMusicPlaybackHint: true)
+        model.manualSonosHost = "192.0.2.10"
+
+        do {
+            _ = try await model.toggleAppleMusicSonosFavorite(for: item)
+            Issue.record("Expected library playlist favorite toggle to fail without a catalog playlist payload.")
+        } catch let error as SonoicModel.AppleMusicFavoriteError {
+            guard case .unsupportedLibraryPlaylist = error else {
+                Issue.record("Expected unsupportedLibraryPlaylist, got \(error).")
+                return
+            }
+
+            #expect(error.localizedDescription.contains("catalog playlist ID"))
+        } catch {
+            Issue.record("Expected AppleMusicFavoriteError, got \(error).")
+        }
+    }
+
+    @Test
     func metadataPurposeKeepsFavoriteGeneratedNativeSelectionOrder() throws {
         let item = purposeContractItem(nativePayloadID: "native-metadata")
         let exactFavorite = verifiedAppleMusicFavorite()

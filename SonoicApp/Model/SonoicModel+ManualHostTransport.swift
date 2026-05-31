@@ -233,6 +233,11 @@ extension SonoicModel {
             return true
         }
 
+        if await playAppleMusicFavoriteCloudQueueFallbackIfAvailable(favorite) {
+            sonoicPlaybackDebugLog("manualFavorite cloudQueueFallbackSuccess title='\(favorite.title)'")
+            return true
+        }
+
         if sonosPlaybackCommandRoute.routesCommandsToSonosControlAPI {
             sonoicPlaybackDebugLog("manualFavorite cloudFailed noLocalPlaybackFallback=true title='\(favorite.title)'")
             return false

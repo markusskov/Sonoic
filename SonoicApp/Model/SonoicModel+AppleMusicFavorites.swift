@@ -13,11 +13,14 @@ extension SonoicModel {
 
     enum AppleMusicFavoriteError: LocalizedError {
         case missingPayload
+        case unsupportedLibraryPlaylist
 
         var errorDescription: String? {
             switch self {
             case .missingPayload:
                 "This Apple Music item does not have a Sonos favorite payload yet."
+            case .unsupportedLibraryPlaylist:
+                "This Apple Music library playlist does not expose a Sonos-compatible catalog playlist ID yet. Try saving an Apple Music catalog playlist instead."
             }
         }
     }
@@ -61,7 +64,7 @@ extension SonoicModel {
         await refreshAppleMusicFavoritePlaybackContextIfNeeded(for: item)
 
         guard let payload = try appleMusicPlayablePayload(for: item, purpose: .favorite) else {
-            throw AppleMusicFavoriteError.missingPayload
+            throw appleMusicFavoritePayloadUnavailableError(for: item)
         }
 
         let objectID: String
@@ -108,6 +111,18 @@ extension SonoicModel {
         }
 
         await refreshSonosMusicServiceProbeIfNeeded()
+    }
+
+    private func appleMusicFavoritePayloadUnavailableError(for item: SonoicSourceItem) -> AppleMusicFavoriteError {
+        if item.service.kind == .appleMusic,
+           item.kind == .playlist,
+           item.sourceReference?.catalogID?.sonoicNonEmptyTrimmed == nil,
+           item.sourceReference?.libraryID?.sonoicNonEmptyTrimmed != nil
+        {
+            return .unsupportedLibraryPlaylist
+        }
+
+        return .missingPayload
     }
 
     private func appleMusicFavoriteOverrideKey(for item: SonoicSourceItem) -> String {
