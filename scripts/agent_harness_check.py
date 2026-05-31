@@ -21,10 +21,12 @@ REQUIRED_FILES = [
     "docs/ROADMAP.md",
     "docs/RELIABILITY.md",
     "docs/SECURITY.md",
+    "docs/TESTFLIGHT_READINESS.md",
     "docs/apple-music-roadmap.md",
     "docs/manual-host-refresh-verification.md",
     "docs/sonos-native-playback-research.md",
     "docs/sonos-oauth-dev-setup.md",
+    "scripts/testflight_preflight.py",
 ]
 
 REQUIRED_DIRS = [
