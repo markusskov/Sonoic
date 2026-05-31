@@ -77,6 +77,18 @@ struct SonosControlAPICloudStateTests {
                         name: "Følelsen #",
                         type: nil,
                         trackCount: 40
+                    ),
+                    SonosControlAPIPlaylist(
+                        id: "playlist-2",
+                        name: "Duplicate Playlist",
+                        type: nil,
+                        trackCount: nil
+                    ),
+                    SonosControlAPIPlaylist(
+                        id: "playlist-3",
+                        name: "Duplicate   Playlist",
+                        type: nil,
+                        trackCount: nil
                     )
                 ]
             ]
@@ -99,6 +111,8 @@ struct SonosControlAPICloudStateTests {
         )
         #expect(snapshot.uniqueFavorite(matchingTitle: "duplicate", householdID: "household-1") == nil)
         #expect(snapshot.uniquePlaylist(matchingTitle: "Folelsen #", householdID: "household-1")?.id == "playlist-1")
+        #expect(snapshot.uniquePlaylist(matchingTitle: "duplicate playlist", householdID: "household-1") == nil)
+        #expect(snapshot.uniquePlaylist(matchingTitle: " \t\n", householdID: "household-1") == nil)
         #expect(snapshot.hasLoadedFavorites(for: "household-1"))
         #expect(snapshot.hasLoadedPlaylists(for: "household-1"))
         #expect(!snapshot.hasLoadedFavorites(for: "missing-household"))
