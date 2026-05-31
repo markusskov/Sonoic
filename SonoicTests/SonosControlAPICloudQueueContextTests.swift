@@ -146,6 +146,72 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
+    func runtimeStateDoesNotRestoreStaleStoredContext() {
+        var state = SonosControlAPICloudQueueRuntimeState.empty
+        let storedContext = SonosControlAPICloudQueueSessionContext(
+            sessionID: "session-1",
+            groupID: "group-1",
+            queueVersion: "queue-v1",
+            itemIDs: ["item-1"],
+            tracks: [Self.track(id: "track-1", name: "Track 1")],
+            updatedAt: Date(
+                timeIntervalSinceNow: -SonosControlAPICloudQueueSessionContext.staleInterval - 1
+            )
+        )
+
+        let result = state.restoreIfNeeded(
+            groupID: "group-1",
+            queueVersion: "queue-v1",
+            storedContext: storedContext
+        )
+
+        #expect(!result.didRestore)
+        #expect(result.restoredStoredContext == nil)
+        #expect(!result.shouldClearStoredContext)
+        #expect(state == .empty)
+    }
+
+    @Test
+    func runtimeStateDoesNotRestoreUnusableStoredContext() {
+        var blankSessionState = SonosControlAPICloudQueueRuntimeState.empty
+        let blankSessionContext = SonosControlAPICloudQueueSessionContext(
+            sessionID: "   ",
+            groupID: "group-1",
+            queueVersion: "queue-v1",
+            itemIDs: ["item-1"],
+            tracks: [],
+            updatedAt: Date()
+        )
+        let blankSessionResult = blankSessionState.restoreIfNeeded(
+            groupID: "group-1",
+            queueVersion: "queue-v1",
+            storedContext: blankSessionContext
+        )
+
+        var emptyItemState = SonosControlAPICloudQueueRuntimeState.empty
+        let emptyItemContext = SonosControlAPICloudQueueSessionContext(
+            sessionID: "session-1",
+            groupID: "group-1",
+            queueVersion: "queue-v1",
+            itemIDs: [],
+            tracks: [],
+            updatedAt: Date()
+        )
+        let emptyItemResult = emptyItemState.restoreIfNeeded(
+            groupID: "group-1",
+            queueVersion: "queue-v1",
+            storedContext: emptyItemContext
+        )
+
+        #expect(!blankSessionResult.didRestore)
+        #expect(blankSessionResult.restoredStoredContext == nil)
+        #expect(blankSessionState == .empty)
+        #expect(!emptyItemResult.didRestore)
+        #expect(emptyItemResult.restoredStoredContext == nil)
+        #expect(emptyItemState == .empty)
+    }
+
+    @Test
     func inMemoryCloudQueueContextSurvivesQueueVersionDrift() throws {
         let model = try Self.makeModel()
         model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
