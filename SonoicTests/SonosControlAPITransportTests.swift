@@ -33,7 +33,7 @@ struct SonosControlAPITransportTests {
         let recorder = SonosControlAPITransportRequestRecorder()
         let stub = try Self.stubbedTransport { request in
             recorder.record(request)
-            return Self.httpResponse(
+            return try Self.httpResponse(
                 for: request,
                 statusCode: 200,
                 body: #"{"households":[{"id":"household-1"}]}"#
@@ -63,13 +63,13 @@ struct SonosControlAPITransportTests {
         let stub = try Self.stubbedTransport { request in
             switch request.url?.path {
             case "/control/api/v1/households":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: #"{"households":[{"id":"household-1"}]}"#
                 )
             case "/control/api/v1/households/household-1/groups":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: """
@@ -93,13 +93,13 @@ struct SonosControlAPITransportTests {
                     """
                 )
             case "/control/api/v1/households/household-1/favorites":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: #"{"version":"favorites-v1","items":[]}"#
                 )
             case "/control/api/v1/households/household-1/playlists":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: """
@@ -123,7 +123,7 @@ struct SonosControlAPITransportTests {
                     """
                 )
             default:
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 404,
                     body: #"{"message":"Unexpected path"}"#
@@ -147,13 +147,13 @@ struct SonosControlAPITransportTests {
         let stub = try Self.stubbedTransport { request in
             switch request.url?.path {
             case "/control/api/v1/households":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: #"{"households":[{"id":"household-1"}]}"#
                 )
             case "/control/api/v1/households/household-1/groups":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: """
@@ -177,19 +177,19 @@ struct SonosControlAPITransportTests {
                     """
                 )
             case "/control/api/v1/households/household-1/favorites":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 403,
                     body: #"{"message":"Missing content scope"}"#
                 )
             case "/control/api/v1/households/household-1/playlists":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 500,
                     body: #"{"reason":"Playlist service unavailable"}"#
                 )
             default:
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 404,
                     body: #"{"message":"Unexpected path"}"#
@@ -224,13 +224,13 @@ struct SonosControlAPITransportTests {
         let stub = try Self.stubbedTransport { request in
             switch request.url?.path {
             case "/control/api/v1/households":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: #"{"households":[{"id":"household-1"}]}"#
                 )
             case "/control/api/v1/households/household-1/groups":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: """
@@ -254,19 +254,19 @@ struct SonosControlAPITransportTests {
                     """
                 )
             case "/control/api/v1/households/household-1/favorites":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: #"{"version":"favorites-v1","items":[{"name":"Cloud Favorite"}]}"#
                 )
             case "/control/api/v1/households/household-1/playlists":
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: #"{"version":"playlists-v1","playlists":[]}"#
                 )
             default:
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 404,
                     body: #"{"message":"Unexpected path"}"#
@@ -295,7 +295,7 @@ struct SonosControlAPITransportTests {
         let recorder = SonosControlAPITransportRequestRecorder()
         let stub = try Self.stubbedTransport { request in
             recorder.record(request)
-            return Self.httpResponse(for: request, statusCode: 204)
+            return try Self.httpResponse(for: request, statusCode: 204)
         }
         defer { stub.cleanup() }
         let client = SonosControlAPIClient(transport: stub.transport)
@@ -315,7 +315,7 @@ struct SonosControlAPITransportTests {
         let recorder = SonosControlAPITransportRequestRecorder()
         let stub = try Self.stubbedTransport { request in
             recorder.record(request)
-            return Self.httpResponse(for: request, statusCode: 204)
+            return try Self.httpResponse(for: request, statusCode: 204)
         }
         defer { stub.cleanup() }
         let client = SonosControlAPIClient(transport: stub.transport)
@@ -357,7 +357,7 @@ struct SonosControlAPITransportTests {
         let recorder = SonosControlAPITransportRequestRecorder()
         let stub = try Self.stubbedTransport { request in
             recorder.record(request)
-            return Self.httpResponse(
+            return try Self.httpResponse(
                 for: request,
                 statusCode: 200,
                 body: """
@@ -399,7 +399,7 @@ struct SonosControlAPITransportTests {
         let recorder = SonosControlAPITransportRequestRecorder()
         let stub = try Self.stubbedTransport { request in
             recorder.record(request)
-            return Self.httpResponse(
+            return try Self.httpResponse(
                 for: request,
                 statusCode: 403,
                 body: #"{"errorCode":"ERROR_FORBIDDEN","reason":"Forbidden","message":"  Token expired  "}"#
@@ -427,7 +427,7 @@ struct SonosControlAPITransportTests {
     @Test
     func httpErrorFallsBackToPlainTextResponseDetail() async throws {
         let stub = try Self.stubbedTransport { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 500,
                 body: "  upstream unavailable  "
@@ -455,7 +455,7 @@ struct SonosControlAPITransportTests {
         let recorder = SonosControlAPITransportRequestRecorder()
         let stub = try Self.stubbedTransport { request in
             recorder.record(request)
-            return Self.httpResponse(for: request, statusCode: 200)
+            return try Self.httpResponse(for: request, statusCode: 200)
         }
         defer { stub.cleanup() }
 
@@ -1070,16 +1070,17 @@ struct SonosControlAPITransportTests {
         for request: URLRequest,
         statusCode: Int,
         body: String = ""
-    ) -> (HTTPURLResponse, Data) {
-        (
+    ) throws -> (HTTPURLResponse, Data) {
+        let url = try #require(request.url)
+        let response = try #require(
             HTTPURLResponse(
-                url: request.url!,
+                url: url,
                 statusCode: statusCode,
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
-            )!,
-            Data(body.utf8)
+            )
         )
+        return (response, Data(body.utf8))
     }
 }
 
