@@ -193,6 +193,76 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func transientCloudQueueLoadFailureRestoresPreviousCloudQueueContext() async throws {
+        let cloudQueue = try Self.makeModel()
+        defer {
+            try? cloudQueue.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: cloudQueue.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: cloudQueue.model)
+        let previousPayload = Self.playbackPayload(id: "previous-cloud-payload")
+        let previousRecentPayload = Self.playbackPayload(id: "previous-cloud-recent")
+        let previousNowPlaying = Self.nowPlayingSnapshot(title: "Previous Cloud Queue", playbackState: .playing)
+        let previousObservedAt = Date(timeIntervalSince1970: 2_468)
+        let previousQueueState = SonosQueueState.loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "cloud-item-before",
+                        title: "Cloud Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "sonoic-cloud-queue:previous"
+            )
+        )
+        let previousCloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["cloud-item-before"],
+            tracks: [
+                Self.track(id: "cloud-item-before", name: "Cloud Before")
+            ]
+        )
+        cloudQueue.model.queueState = previousQueueState
+        cloudQueue.model.nowPlaying = previousNowPlaying
+        cloudQueue.model.nowPlayingObservedAt = previousObservedAt
+        cloudQueue.model.manualPlaybackContextPayload = previousPayload
+        cloudQueue.model.manualQueueContextPayloads = [previousPayload]
+        cloudQueue.model.manualRecentPlaybackContextPayload = previousRecentPayload
+        cloudQueue.model.sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
+
+        Self.stubNetwork(for: cloudQueue.networkStubID) { request in
+            try Self.httpResponse(
+                for: request,
+                statusCode: 500,
+                body: #"{"message":"Injected transient cloud queue failure"}"#
+            )
+        }
+
+        let didLoadQueue = await cloudQueue.model.playSonosControlAPICloudQueueIfAvailable(
+            parentItem: Self.playlistItem(),
+            plan: Self.playlistPlan()
+        )
+
+        #expect(didLoadQueue == false)
+        #expect(cloudQueue.model.sonosControlAPIState.authorizationStatus == .ready)
+        #expect(cloudQueue.model.queueState == previousQueueState)
+        #expect(cloudQueue.model.nowPlaying == previousNowPlaying)
+        #expect(cloudQueue.model.nowPlayingObservedAt == previousObservedAt)
+        #expect(cloudQueue.model.manualPlaybackContextPayload == previousPayload)
+        #expect(cloudQueue.model.manualQueueContextPayloads == [previousPayload])
+        #expect(cloudQueue.model.manualRecentPlaybackContextPayload == previousRecentPayload)
+        #expect(cloudQueue.model.sonosControlAPICloudQueueRuntimeState == previousCloudQueueRuntimeState)
+        #expect(cloudQueue.model.isManualTransportCommandInFlight == false)
+    }
+
+    @Test
     func cloudSkipFailureRestoresPayloadAndFreshness() async throws {
         let next = try Self.makeModel()
         defer {
