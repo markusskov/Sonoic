@@ -193,6 +193,34 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func transportCommandSkipsActionWhenAlreadyInFlight() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let previousCommandDescription = playback.model.sonosControlAPIState.lastCommandDescription
+        let previousErrorDetail = playback.model.sonosControlAPIState.lastErrorDetail
+        let previousUpdatedAt = playback.model.sonosControlAPIState.lastUpdatedAt
+        playback.model.isManualTransportCommandInFlight = true
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud duplicate",
+            refreshQueueAfterSuccess: true
+        ) {
+            didRunAction = true
+        }
+
+        #expect(didPerform == false)
+        #expect(didRunAction == false)
+        #expect(playback.model.isManualTransportCommandInFlight == true)
+        #expect(playback.model.sonosControlAPIState.lastCommandDescription == previousCommandDescription)
+        #expect(playback.model.sonosControlAPIState.lastErrorDetail == previousErrorDetail)
+        #expect(playback.model.sonosControlAPIState.lastUpdatedAt == previousUpdatedAt)
+    }
+
+    @Test
     func transientCloudQueueLoadFailureRestoresPreviousCloudQueueContext() async throws {
         let cloudQueue = try Self.makeModel()
         defer {
