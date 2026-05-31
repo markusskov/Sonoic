@@ -28,6 +28,9 @@ tracked-file hygiene. It does not print or require real tokens or secrets.
 
 Use [TestFlight Tester Guide](TESTFLIGHT_TESTER_GUIDE.md) for beta setup steps,
 smoke testing, known boundaries, and bug report instructions.
+Use [App Store Review Notes](APP_STORE_REVIEW_NOTES.md) when preparing
+non-secret App Store Connect review notes, permission explanations, and known
+beta boundaries for a submitted build.
 
 The script does not replace:
 
@@ -159,6 +162,25 @@ validation.
   manual Sonos OAuth and hardware validation matrix.
 - Record archive version/build number, Xcode version, signing team, upload time,
   App Store Connect processing result, and TestFlight build number.
+
+## Draft App Store Review Notes
+
+Do not paste secrets, tokens, private URLs, local OAuth config, local IP
+addresses, or raw Sonos player identifiers into App Store Connect review notes.
+Start from [App Store Review Notes](APP_STORE_REVIEW_NOTES.md), then fill in the
+candidate-specific build number, support URL, privacy policy URL, Worker route
+health result, and any known beta limitations for that build.
+
+Before submission, verify the review notes explain:
+
+- Sonoic controls Sonos speakers and the iPhone is not the audio output.
+- Apple Music is the only source Sonoic can start in this beta.
+- Sonos OAuth, Apple Music, Local Network, background audio, and background
+  refresh are expected permission/capability surfaces.
+- Review requires a physical iPhone, reachable Sonos speaker, Sonos account, and
+  Apple Music access for full playback validation.
+- Failures should be paired with the redacted Settings > Advanced > Support
+  Summary instead of raw console logs.
 
 ## Draft PR Support And Bug Report Notes
 

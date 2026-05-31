@@ -33,6 +33,7 @@ SETTINGS_ROWS_SOURCE = ROOT / "SonoicApp/Views/Settings/SettingsRows.swift"
 SETTINGS_SECTIONS_SOURCE = ROOT / "SonoicApp/Views/Settings/SettingsSections.swift"
 TESTFLIGHT_READINESS_DOC = ROOT / "docs/TESTFLIGHT_READINESS.md"
 TESTFLIGHT_TESTER_GUIDE = ROOT / "docs/TESTFLIGHT_TESTER_GUIDE.md"
+APP_STORE_REVIEW_NOTES = ROOT / "docs/APP_STORE_REVIEW_NOTES.md"
 
 APP_PRIVACY_MANIFEST = ROOT / "SonoicApp/PrivacyInfo.xcprivacy"
 WIDGET_PRIVACY_MANIFEST = ROOT / "SonoicWidgets/PrivacyInfo.xcprivacy"
@@ -52,6 +53,7 @@ REQUIRED_DOCS = [
     TESTFLIGHT_TESTER_GUIDE,
     ROOT / "docs/SECURITY.md",
     ROOT / "docs/RELIABILITY.md",
+    APP_STORE_REVIEW_NOTES,
     ROOT / "docs/sonos-oauth-dev-setup.md",
 ]
 
@@ -148,6 +150,7 @@ def main() -> int:
     check_oauth_worker_alignment(report)
     check_support_diagnostics(report)
     check_tester_guidance(report)
+    check_app_review_guidance(report)
     check_tracked_file_hygiene(report)
     check_likely_secret_literals(report)
 
@@ -553,6 +556,38 @@ def check_tester_guidance(report: Report) -> None:
     report.require(
         "Apple Music is the only source Sonoic can start in this beta" in settings,
         "Settings music section should state the Apple Music-only beta source boundary.",
+    )
+
+
+def check_app_review_guidance(report: Report) -> None:
+    notes = read_text(APP_STORE_REVIEW_NOTES, report)
+    readiness = read_text(TESTFLIGHT_READINESS_DOC, report)
+    docs_index = read_text(ROOT / "docs/README.md", report)
+    if notes is None or readiness is None or docs_index is None:
+        return
+
+    normalized_notes = " ".join(notes.split())
+    for marker in [
+        "Apple Music is the only live music source Sonoic can start in this beta",
+        "The iPhone is not the audio output device",
+        "Sonos OAuth flow",
+        "Local Network permission",
+        "Settings > Advanced > Support Summary",
+        "support URL and privacy policy URL",
+        "Do not include secrets, tokens",
+        "raw Sonos player identifiers",
+        "physical iPhone",
+        "reachable Sonos speaker",
+    ]:
+        report.require(marker in normalized_notes, f"App Store review notes missing required marker: {marker}.")
+
+    report.require(
+        "APP_STORE_REVIEW_NOTES.md" in readiness and "APP_STORE_REVIEW_NOTES.md" in docs_index,
+        "App Store review notes must be linked from readiness docs and docs index.",
+    )
+    report.require(
+        "Do not paste secrets" in readiness and "support URL" in readiness and "privacy policy URL" in readiness,
+        "TestFlight readiness docs should require non-secret App Store review metadata checks.",
     )
 
 
