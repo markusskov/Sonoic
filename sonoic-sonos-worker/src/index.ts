@@ -12,6 +12,8 @@ const CLOUD_QUEUE_MAX_WINDOW_ITEMS = 20;
 const JSON_BODY_MAX_BYTES = 1024 * 1024;
 const CLOUD_QUEUE_MAX_STRING_BYTES = 4096;
 const EXTERNAL_ORIGIN_HEADER = 'X-Sonoic-External-Origin';
+const SAFE_SONOS_TOKEN_ERROR_KEYS = ['error', 'error_description'] as const;
+const MAX_SAFE_ERROR_DETAIL_LENGTH = 240;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -490,14 +492,7 @@ async function requestSonosToken(env: WorkerEnv, form: Record<string, string>): 
 	const text = await response.text();
 
 	if (!response.ok) {
-		let detail: unknown = text;
-		try {
-			detail = JSON.parse(text);
-		} catch {
-			// Sonos can return HTML for some OAuth errors. Preserve the status, not the page.
-		}
-
-		throw new HTTPError(response.status, 'sonos_error', { error: 'sonos_error', detail });
+		throw new HTTPError(response.status, 'sonos_error', sonosTokenErrorBody(response.status, text));
 	}
 
 	try {
@@ -505,6 +500,57 @@ async function requestSonosToken(env: WorkerEnv, form: Record<string, string>): 
 	} catch {
 		throw new HTTPError(502, 'invalid_sonos_response');
 	}
+}
+
+function sonosTokenErrorBody(status: number, text: string): JsonObject {
+	const body: JsonObject = { error: 'sonos_error', status };
+	const detail = safeSonosTokenErrorDetail(text);
+	if (detail !== undefined) {
+		body.detail = detail;
+	}
+
+	return body;
+}
+
+function safeSonosTokenErrorDetail(text: string): JsonObject | undefined {
+	if (!text.trim()) {
+		return undefined;
+	}
+
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		// Sonos can return HTML for some OAuth errors. Preserve the status, not the page.
+		return undefined;
+	}
+
+	if (!isJsonObject(parsed)) {
+		return undefined;
+	}
+
+	const detail: JsonObject = {};
+	for (const key of SAFE_SONOS_TOKEN_ERROR_KEYS) {
+		const value = parsed[key];
+		if (typeof value !== 'string') {
+			continue;
+		}
+
+		const trimmed = value.trim();
+		if (trimmed) {
+			detail[key] = trimSafeErrorDetail(trimmed);
+		}
+	}
+
+	return Object.keys(detail).length > 0 ? detail : undefined;
+}
+
+function trimSafeErrorDetail(value: string): string {
+	if (value.length <= MAX_SAFE_ERROR_DETAIL_LENGTH) {
+		return value;
+	}
+
+	return `${value.slice(0, MAX_SAFE_ERROR_DETAIL_LENGTH)}...`;
 }
 
 function requireBearerAccessToken(request: Request): string {

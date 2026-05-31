@@ -9,6 +9,21 @@ describe('Sonos OAuth worker', () => {
 		vi.unstubAllGlobals();
 	});
 
+	it('returns uncached health checks', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		const request = new IncomingRequest('https://sonos.ryvus.app/healthz');
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		await expect(response.json()).resolves.toMatchObject({ ok: true });
+		expect(response.headers.get('cache-control')).toBe('no-store');
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
 	it('redirects Sonos OAuth callbacks back into Sonoic', async () => {
 		const request = new IncomingRequest(
 			'https://sonos.ryvus.app/oauth/sonos/callback?state=state-1&code=sonos-code',
@@ -70,6 +85,71 @@ describe('Sonos OAuth worker', () => {
 		expect(options.body.toString()).toBe(
 			'grant_type=authorization_code&code=sonos-code&redirect_uri=https%3A%2F%2Fsonos.ryvus.app%2Foauth%2Fsonos%2Fcallback',
 		);
+	});
+
+	it('refreshes Sonos tokens with worker secrets', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					access_token: 'access-2',
+					refresh_token: 'refresh-2',
+					token_type: 'Bearer',
+					expires_in: 3600,
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } },
+			),
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token/refresh', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refresh_token: 'refresh-1' }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('cache-control')).toBe('no-store');
+		await expect(response.json()).resolves.toMatchObject({
+			access_token: 'access-2',
+			refresh_token: 'refresh-2',
+		});
+		expect(fetchMock).toHaveBeenCalledOnce();
+		const [url, options] = fetchMock.mock.calls[0];
+		expect(url).toBe('https://api.sonos.com/login/v3/oauth/access');
+		expect(options.method).toBe('POST');
+		expect(options.headers.Authorization).toMatch(/^Basic /);
+		expect(options.body.toString()).toBe('grant_type=refresh_token&refresh_token=refresh-1');
+	});
+
+	it('redacts upstream token refresh error bodies', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response('<html>refresh-token-secret should not echo</html>', {
+				status: 401,
+				headers: { 'Content-Type': 'text/html' },
+			}),
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const request = new IncomingRequest('https://sonos.ryvus.app/api/sonos/token/refresh', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refresh_token: 'refresh-token-secret' }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, testEnv(), ctx);
+		await waitOnExecutionContext(ctx);
+		const body = (await response.json()) as Record<string, unknown>;
+
+		expect(response.status).toBe(401);
+		expect(body).toMatchObject({ error: 'sonos_error', status: 401 });
+		expect(body.detail).toBeUndefined();
+		expect(JSON.stringify(body)).not.toContain('refresh-token-secret');
+		expect(fetchMock).toHaveBeenCalledOnce();
 	});
 
 	it('signs broker codes with a dedicated signing secret when configured', async () => {

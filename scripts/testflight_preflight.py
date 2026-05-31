@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,6 +23,7 @@ OAUTH_LOCAL = ROOT / "Config/SonoicOAuth.local.xcconfig"
 WORKER_PACKAGE = ROOT / "sonoic-sonos-worker/package.json"
 WORKER_WRANGLER = ROOT / "sonoic-sonos-worker/wrangler.jsonc"
 WORKER_README = ROOT / "sonoic-sonos-worker/README.md"
+WORKER_SOURCE = ROOT / "sonoic-sonos-worker/src/index.ts"
 
 REQUIRED_DOCS = [
     ROOT / "docs/TESTFLIGHT_READINESS.md",
@@ -112,6 +114,7 @@ def main() -> int:
     check_entitlements(report)
     check_oauth_config(report)
     check_worker_config(report)
+    check_oauth_worker_alignment(report)
     check_tracked_file_hygiene(report)
     check_likely_secret_literals(report)
 
@@ -246,7 +249,8 @@ def check_worker_config(report: Report) -> None:
     package_text = read_text(WORKER_PACKAGE, report)
     wrangler = read_text(WORKER_WRANGLER, report)
     worker_readme = read_text(WORKER_README, report)
-    if package_text is None or wrangler is None or worker_readme is None:
+    worker_source = read_text(WORKER_SOURCE, report)
+    if package_text is None or wrangler is None or worker_readme is None or worker_source is None:
         return
 
     try:
@@ -265,8 +269,86 @@ def check_worker_config(report: Report) -> None:
     for binding in ["SONOS_BROKER_CODE_REDEMPTIONS", "SONOIC_CLOUD_QUEUES"]:
         report.require(binding in wrangler, f"Worker wrangler config missing Durable Object binding {binding}.")
 
+    for route in [
+        "/healthz",
+        "/oauth/sonos/callback",
+        "/api/sonos/token",
+        "/api/sonos/token/refresh",
+        "/api/sonos/events",
+        "/api/sonos/cloud-queues",
+    ]:
+        report.require(route in worker_source, f"Worker source missing route {route}.")
+
+    report.require(
+        "Cache-Control" in worker_source and "no-store" in worker_source,
+        "Worker JSON responses should include Cache-Control: no-store.",
+    )
+    report.require(
+        "safeSonosTokenErrorDetail" in worker_source,
+        "Worker token error responses should redact upstream details through safeSonosTokenErrorDetail.",
+    )
     report.require("SONOS_CLIENT_SECRET" in worker_readme, "Worker README should document the Sonos client secret boundary.")
     report.require("BROKER_CODE_SIGNING_SECRET" in worker_readme, "Worker README should document broker-code signing secret.")
+
+
+def check_oauth_worker_alignment(report: Report) -> None:
+    example = read_text(OAUTH_LOCAL_EXAMPLE, report)
+    wrangler = read_text(WORKER_WRANGLER, report)
+    if example is None or wrangler is None:
+        return
+
+    app_redirect = normalized_xcconfig_url(xcconfig_value(example, "SONOS_OAUTH_REDIRECT_URI"))
+    worker_redirect = quoted_config_value(wrangler, "SONOS_REDIRECT_URI")
+    report.require(
+        bool(app_redirect and worker_redirect and app_redirect == worker_redirect),
+        "Local OAuth example redirect URI must match the Worker SONOS_REDIRECT_URI.",
+    )
+
+    origin = url_origin(app_redirect)
+    if origin is None:
+        report.errors.append("Local OAuth example redirect URI must be a valid HTTPS URL.")
+        return
+
+    expected_urls = {
+        "SONOS_OAUTH_TOKEN_EXCHANGE_URL": f"{origin}/api/sonos/token",
+        "SONOS_OAUTH_TOKEN_REFRESH_URL": f"{origin}/api/sonos/token/refresh",
+        "SONOS_CLOUD_QUEUE_CREATE_URL": f"{origin}/api/sonos/cloud-queues",
+    }
+    for key, expected_url in expected_urls.items():
+        actual_url = normalized_xcconfig_url(xcconfig_value(example, key))
+        report.require(actual_url == expected_url, f"Local OAuth example {key} must be {expected_url}.")
+
+
+def xcconfig_value(text: str, key: str) -> str | None:
+    match = re.search(rf"^{re.escape(key)}\s*=\s*(.+?)\s*$", text, flags=re.MULTILINE)
+    return match.group(1).strip() if match else None
+
+
+def normalized_xcconfig_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    return (
+        value.strip()
+        .replace("https:/$(SONOIC_EMPTY)/", "https://")
+        .replace("http:/$(SONOIC_EMPTY)/", "http://")
+    )
+
+
+def quoted_config_value(text: str, key: str) -> str | None:
+    match = re.search(rf'"{re.escape(key)}"\s*:\s*"([^"]+)"', text)
+    return match.group(1).strip() if match else None
+
+
+def url_origin(url: str | None) -> str | None:
+    if url is None:
+        return None
+
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        return None
+
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def check_tracked_file_hygiene(report: Report) -> None:

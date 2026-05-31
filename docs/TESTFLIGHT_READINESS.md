@@ -84,6 +84,9 @@ exchange.
 curl https://sonos.ryvus.app/healthz
 ```
 
+Expected response body is `{"ok":true}` and the response should include
+`Cache-Control: no-store`.
+
 - Confirm `sonoic-sonos-worker/wrangler.jsonc` has:
   - `SONOS_CLIENT_ID`
   - `SONOS_REDIRECT_URI`
@@ -96,8 +99,24 @@ curl https://sonos.ryvus.app/healthz
   - Sonos login opens
   - Worker callback returns to `sonoic://sonos-auth`
   - token exchange succeeds
+  - token refresh succeeds after relaunch or expiry without showing login again
   - households, groups, and players load
   - logout or auth loss clears token-backed state
+
+## Draft PR OAuth Validation Notes
+
+Do not post these until the candidate build is ready for manual validation.
+
+- Install the TestFlight build fresh, connect Sonos, and confirm the app returns
+  through `sonoic://sonos-auth` without exposing a raw Sonos auth code.
+- Relaunch the app and verify Sonos Cloud state loads without a second login.
+- Exercise token refresh by using a long-running session or a controlled expiry
+  window; confirm refresh succeeds and diagnostics do not include access tokens,
+  refresh tokens, or the Sonos client secret.
+- Disconnect Sonos, relaunch, and verify the app shows disconnected state and
+  does not send Sonos Cloud commands until reconnecting.
+- Record Worker route, app build number, device/iOS version, Sonos account, and
+  room/group shape for the validation note.
 
 ## Privacy And Secrets Audit
 
