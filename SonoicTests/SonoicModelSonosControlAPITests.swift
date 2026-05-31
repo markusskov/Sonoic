@@ -221,6 +221,38 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func transportCommandRecordsNonAuthorizationFailureDiagnostics() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        let injectedError = NSError(
+            domain: "SonoicModelSonosControlAPITests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Injected non-authorization failure"]
+        )
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud transient failure",
+            refreshQueueAfterSuccess: true
+        ) {
+            didRunAction = true
+            throw injectedError
+        }
+
+        #expect(didPerform == false)
+        #expect(didRunAction)
+        #expect(playback.model.isManualTransportCommandInFlight == false)
+        #expect(playback.model.sonosControlAPIState.authorizationStatus == .ready)
+        #expect(playback.model.sonosControlAPIState.lastErrorDetail == injectedError.localizedDescription)
+        #expect(playback.model.sonosControlAPIState.lastCommandDescription == nil)
+        #expect(playback.model.manualHostRefreshStatus == .failed(injectedError.localizedDescription))
+    }
+
+    @Test
     func transientCloudQueueLoadFailureRestoresPreviousCloudQueueContext() async throws {
         let cloudQueue = try Self.makeModel()
         defer {
