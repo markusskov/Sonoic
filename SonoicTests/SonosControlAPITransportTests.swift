@@ -143,6 +143,60 @@ struct SonosControlAPITransportTests {
     }
 
     @Test
+    func clientFetchCloudSnapshotRecordsLoadedDiagnosticsForMinimalContentResponses() async throws {
+        let stub = try Self.stubbedTransport { request in
+            switch request.url?.path {
+            case "/control/api/v1/households":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"households":[{"id":"household-1"}]}"#
+                )
+            case "/control/api/v1/households/household-1/groups":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"groups":[],"players":[]}"#
+                )
+            case "/control/api/v1/households/household-1/favorites":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"items":[{"id":"favorite-1","name":"Cloud Favorite"}]}"#
+                )
+            case "/control/api/v1/households/household-1/playlists":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"playlists":[{"id":"playlist-1","name":"Cloud Playlist"}]}"#
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 404,
+                    body: #"{"message":"Unexpected path"}"#
+                )
+            }
+        }
+        defer { stub.cleanup() }
+        let client = SonosControlAPIClient(transport: stub.transport)
+
+        let snapshot = try await client.fetchCloudSnapshot(tokenSet: Self.tokenSet)
+
+        let diagnostics = try #require(snapshot.contentFetchDiagnosticsByHouseholdID["household-1"])
+        let favorites = try #require(snapshot.favoritesByHouseholdID["household-1"])
+        let playlists = try #require(snapshot.playlistsByHouseholdID["household-1"])
+        #expect(favorites.count == 1)
+        #expect(favorites.first?.id == "favorite-1")
+        #expect(favorites.first?.name == "Cloud Favorite")
+        #expect(playlists.count == 1)
+        #expect(playlists.first?.id == "playlist-1")
+        #expect(playlists.first?.name == "Cloud Playlist")
+        #expect(diagnostics.favorites?.status == .loaded(count: 1, version: nil))
+        #expect(diagnostics.playlists?.status == .loaded(count: 1, version: nil))
+    }
+
+    @Test
     func clientFetchCloudSnapshotRecordsContentFailures() async throws {
         let stub = try Self.stubbedTransport { request in
             switch request.url?.path {
