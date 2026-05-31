@@ -26,6 +26,32 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
+    func transportUnauthorizedStatusExpiresSonosControlAPIAuth() throws {
+        let model = try Self.makeModel()
+
+        #expect(
+            model.isSonosControlAPIAuthorizationFailure(
+                SonosControlAPITransport.TransportError.httpStatus(401, "Token expired")
+            )
+        )
+        #expect(
+            model.isSonosControlAPIAuthorizationFailure(
+                SonosControlAPITransport.TransportError.httpStatus(403, "Forbidden")
+            )
+        )
+        #expect(
+            !model.isSonosControlAPIAuthorizationFailure(
+                SonosControlAPITransport.TransportError.httpStatus(500, "Server error")
+            )
+        )
+        #expect(
+            !model.isSonosControlAPIAuthorizationFailure(
+                SonosControlAPITransport.TransportError.invalidResponse
+            )
+        )
+    }
+
+    @Test
     func runtimeStateCreatesStoredContextAndPlaybackTarget() throws {
         let state = SonosControlAPICloudQueueRuntimeState(
             sessionID: "session-1",
