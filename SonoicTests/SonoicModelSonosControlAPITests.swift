@@ -108,6 +108,91 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func loadRollbackAuthorizationLossRestoresManualQueueAndClearsContexts() throws {
+        let playback = try Self.makeModel()
+        defer {
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let previousQueueState = SonosQueueState.loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "manual-item-before",
+                        title: "Manual Before",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 120
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "x-rincon-queue:RINCON_00000000000001400#0"
+            )
+        )
+        let previousNowPlaying = Self.nowPlayingSnapshot(title: "Manual Before", playbackState: .playing)
+        let previousObservedAt = Date(timeIntervalSince1970: 1_234)
+        let previousPayload = Self.playbackPayload(id: "manual-before")
+        let previousCloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-before",
+            groupID: "group-before",
+            queueVersion: "queue-before",
+            itemIDs: ["item-before"]
+        )
+        playback.model.queueState = previousQueueState
+        playback.model.nowPlaying = previousNowPlaying
+        playback.model.nowPlayingObservedAt = previousObservedAt
+        playback.model.manualPlaybackContextPayload = previousPayload
+        playback.model.manualQueueContextPayloads = [previousPayload]
+        playback.model.manualRecentPlaybackContextPayload = previousPayload
+        playback.model.sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
+        let rollbackState = SonoicModel.SonosControlAPILoadRollbackState(playback.model)
+
+        let optimisticPayload = Self.playbackPayload(id: "optimistic-load")
+        playback.model.queueState = .loaded(
+            SonosQueueSnapshot(
+                items: [
+                    SonosQueueItem(
+                        id: "cloud-item",
+                        title: "Cloud Item",
+                        artistName: "Sonoic",
+                        albumTitle: nil,
+                        artworkURL: nil,
+                        duration: 180
+                    )
+                ],
+                currentItemIndex: 0,
+                sourceURI: "sonoic-cloud-queue:optimistic"
+            )
+        )
+        playback.model.nowPlaying = Self.nowPlayingSnapshot(title: "Optimistic Load", playbackState: .buffering)
+        playback.model.nowPlayingObservedAt = Date(timeIntervalSince1970: 9_876)
+        playback.model.manualPlaybackContextPayload = optimisticPayload
+        playback.model.manualQueueContextPayloads = [optimisticPayload]
+        playback.model.manualRecentPlaybackContextPayload = optimisticPayload
+        playback.model.sonosControlAPICloudQueueRuntimeState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "optimistic-session",
+            groupID: "group-1",
+            queueVersion: "optimistic-version",
+            itemIDs: ["cloud-item"]
+        )
+
+        rollbackState.restoreFailedLoad(
+            on: playback.model,
+            didLoseAuthorization: true,
+            clearManualContextOnAuthorizationLoss: true
+        )
+
+        #expect(playback.model.queueState == previousQueueState)
+        #expect(playback.model.nowPlaying == previousNowPlaying)
+        #expect(playback.model.nowPlayingObservedAt == previousObservedAt)
+        #expect(playback.model.manualPlaybackContextPayload == nil)
+        #expect(playback.model.manualQueueContextPayloads == nil)
+        #expect(playback.model.manualRecentPlaybackContextPayload == nil)
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState == .empty)
+    }
+
+    @Test
     func cloudSkipFailureRestoresPayloadAndFreshness() async throws {
         let next = try Self.makeModel()
         defer {
