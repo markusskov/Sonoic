@@ -221,7 +221,7 @@ struct SonosControlAPICloudStateTests {
                         SonosControlAPIGroup(
                             id: "group-1",
                             name: "Stue",
-                            coordinatorId: "player-1",
+                            coordinatorId: "coordinator-1",
                             playerIds: ["player-1", "player-2"]
                         )
                     ],
@@ -231,7 +231,9 @@ struct SonosControlAPICloudStateTests {
         )
 
         #expect(snapshot.commandTarget(activeTargetID: "group-1")?.groupID == "group-1")
+        #expect(snapshot.commandTarget(activeTargetID: "  coordinator-1\n")?.groupID == "group-1")
         #expect(snapshot.commandTarget(activeTargetID: "player-1")?.groupID == "group-1")
+        #expect(snapshot.commandTarget(activeTargetID: " \t\n") == nil)
         #expect(snapshot.commandTarget(activeTargetID: "manual-host:192.0.2.1") == nil)
     }
 }
