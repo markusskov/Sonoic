@@ -106,6 +106,58 @@ struct SonosControlAPICloudStateTests {
     }
 
     @Test
+    func disambiguatesCloudFavoritesWithDuplicateTitlesByServiceName() {
+        let snapshot = SonosControlAPICloudSnapshot(
+            households: [
+                SonosControlAPIHousehold(id: "household-1")
+            ],
+            groupsByHouseholdID: [:],
+            favoritesByHouseholdID: [
+                "household-1": [
+                    SonosControlAPIFavorite(
+                        id: "favorite-apple-music",
+                        name: "Let's Groove",
+                        description: nil,
+                        imageUrl: nil,
+                        service: SonosControlAPIService(
+                            id: "204",
+                            name: "Apple Music",
+                            imageUrl: nil
+                        )
+                    ),
+                    SonosControlAPIFavorite(
+                        id: "favorite-spotify",
+                        name: "Let's   Groove",
+                        description: nil,
+                        imageUrl: nil,
+                        service: SonosControlAPIService(
+                            id: "3079",
+                            name: "Spotify",
+                            imageUrl: nil
+                        )
+                    )
+                ]
+            ]
+        )
+
+        #expect(snapshot.uniqueFavorite(matchingTitle: "let's groove", householdID: "household-1") == nil)
+        #expect(
+            snapshot.uniqueFavorite(
+                matchingTitle: "let's groove",
+                householdID: "household-1",
+                serviceName: "Apple Music"
+            )?.id == "favorite-apple-music"
+        )
+        #expect(
+            snapshot.uniqueFavorite(
+                matchingTitle: "let's groove",
+                householdID: "household-1",
+                serviceName: "Unknown Service"
+            ) == nil
+        )
+    }
+
+    @Test
     func resolvesCommandTargetOnlyWhenActiveTargetMatchesCloudGroup() {
         let snapshot = SonosControlAPICloudSnapshot(
             households: [
