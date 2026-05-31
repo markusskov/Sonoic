@@ -158,6 +158,58 @@ struct SonosControlAPICloudStateTests {
     }
 
     @Test
+    func selectedCommandTargetTrimsAndDisambiguatesConfiguredIDs() {
+        let snapshot = SonosControlAPICloudSnapshot(
+            households: [
+                SonosControlAPIHousehold(id: "household-1"),
+                SonosControlAPIHousehold(id: "household-2")
+            ],
+            groupsByHouseholdID: [
+                "household-1": SonosControlAPIGroupSnapshot(
+                    groups: [
+                        SonosControlAPIGroup(
+                            id: "shared-group",
+                            name: "Kitchen",
+                            coordinatorId: "player-1",
+                            playerIds: ["player-1"]
+                        )
+                    ],
+                    players: []
+                ),
+                "household-2": SonosControlAPIGroupSnapshot(
+                    groups: [
+                        SonosControlAPIGroup(
+                            id: "shared-group",
+                            name: "Stue",
+                            coordinatorId: "player-2",
+                            playerIds: ["player-2", "player-3"]
+                        )
+                    ],
+                    players: []
+                )
+            ]
+        )
+        let settings = SonosControlAPISettings(
+            mode: .fallback,
+            selectedHouseholdID: "  household-2\n",
+            selectedGroupID: "\tshared-group  "
+        )
+        let blankGroupSettings = SonosControlAPISettings(
+            mode: .fallback,
+            selectedHouseholdID: "household-2",
+            selectedGroupID: "   \n"
+        )
+
+        let target = snapshot.selectedCommandTarget(settings: settings)
+
+        #expect(target?.householdID == "household-2")
+        #expect(target?.groupID == "shared-group")
+        #expect(target?.playerID == "player-2")
+        #expect(target?.coordinatorPlayerID == "player-2")
+        #expect(snapshot.selectedCommandTarget(settings: blankGroupSettings) == nil)
+    }
+
+    @Test
     func resolvesCommandTargetOnlyWhenActiveTargetMatchesCloudGroup() {
         let snapshot = SonosControlAPICloudSnapshot(
             households: [
