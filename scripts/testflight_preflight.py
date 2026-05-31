@@ -372,7 +372,15 @@ def check_plus_config(report: Report) -> None:
     readiness = read_text(TESTFLIGHT_READINESS_DOC, report)
     plus_state = read_text(ROOT / "SonoicApp/Model/SonoicPlusState.swift", report)
     plus_controller = read_text(ROOT / "SonoicApp/Model/SonoicPlusController.swift", report)
-    if config is None or example is None or readiness is None or plus_state is None or plus_controller is None:
+    plus_view = read_text(ROOT / "SonoicApp/Views/Settings/SettingsPlusView.swift", report)
+    if (
+        config is None
+        or example is None
+        or readiness is None
+        or plus_state is None
+        or plus_controller is None
+        or plus_view is None
+    ):
         return
 
     for key in PLUS_CONFIG_KEYS:
@@ -390,6 +398,16 @@ def check_plus_config(report: Report) -> None:
     report.require(
         "Apple ID used for TestFlight" in plus_controller,
         "Plus restore failure copy should guide TestFlight sandbox recovery.",
+    )
+    report.require(
+        "purchaseRecoveryDetail" in plus_state
+        and "TestFlight builds use Apple's sandbox" in plus_state
+        and "RevenueCat public SDK key" in plus_state,
+        "Plus recovery copy should be testable and explain TestFlight sandbox/setup recovery.",
+    )
+    report.require(
+        "model.plusState.purchaseRecoveryDetail" in plus_view,
+        "Settings Plus footer should use the tested Plus recovery copy.",
     )
     for marker in [
         "Sonoic Plus Purchase Checklist",

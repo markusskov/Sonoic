@@ -57,6 +57,21 @@ struct SonoicPlusState: Equatable {
         }
     }
 
+    var purchaseRecoveryDetail: String? {
+        switch status {
+        case .notConfigured:
+            "Plus purchases are disabled for this build. TestFlight purchase validation requires a RevenueCat public SDK key and entitlement '\(entitlementIdentifier)'."
+        case .refreshing:
+            "Checking Plus entitlement status."
+        case .available:
+            "Purchases and restores are handled by the App Store through RevenueCat. TestFlight builds use Apple's sandbox for the Apple ID that installed TestFlight."
+        case .unlocked:
+            "Your Plus entitlement is active for this Apple ID."
+        case .failed(let message):
+            message
+        }
+    }
+
     var systemImage: String {
         switch status {
         case .notConfigured:

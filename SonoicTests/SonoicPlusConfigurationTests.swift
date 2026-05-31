@@ -37,8 +37,18 @@ struct SonoicPlusConfigurationTests {
     }
 
     @Test
-    func plusStateCopyExplainsDisabledAndFailureStates() {
+    func plusStateCopyExplainsDisabledSandboxAndFailureStates() {
         let disabled = SonoicPlusState.notConfigured
+        let available = SonoicPlusState(
+            status: .available,
+            entitlementIdentifier: "plus",
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+        let unlocked = SonoicPlusState(
+            status: .unlocked,
+            entitlementIdentifier: "plus",
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
         let failed = SonoicPlusState(
             status: .failed("Purchases could not be restored. Check your network connection."),
             entitlementIdentifier: "plus",
@@ -47,8 +57,16 @@ struct SonoicPlusConfigurationTests {
 
         #expect(disabled.settingsStatusTitle == "Disabled")
         #expect(disabled.settingsDetail == "Plus purchases are not enabled in this build.")
+        #expect(disabled.purchaseRecoveryDetail?.contains("RevenueCat public SDK key") == true)
+        #expect(disabled.purchaseRecoveryDetail?.contains("entitlement 'plus'") == true)
+        #expect(available.purchaseRecoveryDetail?.contains("RevenueCat") == true)
+        #expect(available.purchaseRecoveryDetail?.contains("TestFlight") == true)
+        #expect(available.purchaseRecoveryDetail?.contains("sandbox") == true)
+        #expect(available.purchaseRecoveryDetail?.contains("Apple ID") == true)
+        #expect(unlocked.purchaseRecoveryDetail == "Your Plus entitlement is active for this Apple ID.")
         #expect(failed.settingsStatusTitle == "Unavailable")
         #expect(failed.settingsDetail == "Purchases could not be restored. Check your network connection.")
+        #expect(failed.purchaseRecoveryDetail == "Purchases could not be restored. Check your network connection.")
     }
 
     private func makeBundle(info: [String: String]) throws -> Bundle {
