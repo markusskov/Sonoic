@@ -143,6 +143,30 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
+    func runtimeStateOmitsInvalidSnapshotCurrentItemIndex() throws {
+        let state = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-1",
+            itemIDs: ["item-1", "item-2"]
+        )
+        let payloads = [
+            Self.playbackPayload(id: "payload-1"),
+            Self.playbackPayload(id: "payload-2")
+        ]
+
+        let negativeIndexSnapshot = try #require(
+            state.snapshot(payloads: payloads, currentItemIndex: -1)
+        )
+        let staleIndexSnapshot = try #require(
+            state.snapshot(payloads: payloads, currentItemIndex: 2)
+        )
+
+        #expect(negativeIndexSnapshot.currentItemIndex == nil)
+        #expect(negativeIndexSnapshot.items.map(\.id) == ["item-1", "item-2"])
+        #expect(staleIndexSnapshot.currentItemIndex == nil)
+        #expect(staleIndexSnapshot.items.map(\.id) == ["item-1", "item-2"])
+    }
+
+    @Test
     func runtimeStateCurrentIndexUsesControlAPIFallbackOrder() throws {
         let state = SonosControlAPICloudQueueRuntimeState(
             sessionID: "session-1",
