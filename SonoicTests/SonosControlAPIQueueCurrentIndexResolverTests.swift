@@ -33,10 +33,40 @@ struct SonosControlAPIQueueCurrentIndexResolverTests {
     }
 
     @Test
+    func trimsCandidatesBeforeExactItemIDResolution() {
+        let index = SonoicSonosControlAPIQueueCurrentIndexResolver.currentIndex(
+            itemIDs: ["sonoic-1", "sonoic-2", "sonoic-3"],
+            candidates: ["  sonoic-2  "]
+        )
+
+        #expect(index == 1)
+    }
+
+    @Test
+    func trimsCandidatesBeforeNumericFallback() {
+        let index = SonoicSonosControlAPIQueueCurrentIndexResolver.currentIndex(
+            itemIDs: ["sonoic-1", "sonoic-2", "sonoic-3"],
+            candidates: ["  3  "]
+        )
+
+        #expect(index == 2)
+    }
+
+    @Test
     func rejectsOutOfRangeNumericIndex() {
         let index = SonoicSonosControlAPIQueueCurrentIndexResolver.currentIndex(
             itemIDs: ["sonoic-1", "sonoic-2", "sonoic-3"],
             candidates: ["4"]
+        )
+
+        #expect(index == nil)
+    }
+
+    @Test
+    func rejectsZeroAndNegativeNumericIndexes() {
+        let index = SonoicSonosControlAPIQueueCurrentIndexResolver.currentIndex(
+            itemIDs: ["sonoic-1", "sonoic-2", "sonoic-3"],
+            candidates: ["0", "-1"]
         )
 
         #expect(index == nil)
