@@ -143,7 +143,7 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
-    func runtimeStateCurrentIndexUsesControlAPIFallbackOrder() {
+    func runtimeStateCurrentIndexUsesControlAPIFallbackOrder() throws {
         let state = SonosControlAPICloudQueueRuntimeState(
             sessionID: "session-1",
             itemIDs: ["item-1", "item-2", "item-3", "item-4"]
@@ -160,7 +160,7 @@ struct SonosControlAPICloudQueueContextTests {
             Self.playbackPayload(id: "payload-3"),
             Self.playbackPayload(id: "payload-4")
         ]
-        let manualPlaybackPayload = manualQueuePayloads[3]
+        let manualPlaybackPayload = try #require(manualQueuePayloads.dropFirst(3).first)
         let playbackStatusWithExactItem = SonosControlAPIPlaybackStatus(
             playbackState: .playing,
             isDucking: nil,
