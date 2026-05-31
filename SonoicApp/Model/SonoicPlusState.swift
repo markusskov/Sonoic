@@ -30,7 +30,7 @@ struct SonoicPlusState: Equatable {
     var settingsStatusTitle: String {
         switch status {
         case .notConfigured:
-            "Coming Soon"
+            "Disabled"
         case .refreshing:
             "Checking"
         case .available:
@@ -45,7 +45,7 @@ struct SonoicPlusState: Equatable {
     var settingsDetail: String? {
         switch status {
         case .notConfigured:
-            "Themes, icons, and room presets are being prepared."
+            "Plus purchases are not enabled in this build."
         case .refreshing:
             nil
         case .available:

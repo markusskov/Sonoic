@@ -7,3 +7,8 @@ SONOS_OAUTH_REDIRECT_URI = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/oauth/sonos/ca
 SONOS_OAUTH_TOKEN_EXCHANGE_URL = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/api/sonos/token
 SONOS_OAUTH_TOKEN_REFRESH_URL = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/api/sonos/token/refresh
 SONOS_CLOUD_QUEUE_CREATE_URL = https:/$(SONOIC_EMPTY)/sonos.ryvus.app/api/sonos/cloud-queues
+
+// Optional for TestFlight purchase/paywall validation. RevenueCat public SDK
+// keys are build configuration, not the Sonos client secret.
+REVENUECAT_API_KEY = <RevenueCat iOS public SDK key>
+SONOIC_PLUS_ENTITLEMENT_IDENTIFIER = plus

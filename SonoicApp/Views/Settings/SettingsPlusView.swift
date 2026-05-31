@@ -75,9 +75,9 @@ struct SettingsPlusView: View {
                 } else {
                     SettingsStatusRow(
                         title: "Sonoic Plus",
-                        statusTitle: "Coming Soon",
-                        detail: "Themes, icons, and room presets are being prepared.",
-                        systemImage: "sparkles",
+                        statusTitle: model.plusState.settingsStatusTitle,
+                        detail: model.plusState.settingsDetail,
+                        systemImage: model.plusState.systemImage,
                         tint: .secondary
                     )
                 }
@@ -93,6 +93,10 @@ struct SettingsPlusView: View {
                     }
                 }
                 .disabled(isRestoring || !canOpenPaywall)
+            } footer: {
+                if let purchaseRecoveryDetail {
+                    Text(purchaseRecoveryDetail)
+                }
             }
         }
         .navigationTitle("Sonoic Plus")
@@ -124,6 +128,21 @@ struct SettingsPlusView: View {
 
     private var primaryActionImage: String {
         model.hasPlus ? "checkmark.seal.fill" : "sparkles"
+    }
+
+    private var purchaseRecoveryDetail: String? {
+        switch model.plusState.status {
+        case .notConfigured:
+            "Plus purchases are disabled for this build. TestFlight purchase validation requires a RevenueCat public SDK key and entitlement '\(model.plusState.entitlementIdentifier)'."
+        case .refreshing:
+            "Checking Plus entitlement status."
+        case .available:
+            "Purchases and restores are handled by the App Store through RevenueCat."
+        case .unlocked:
+            "Your Plus entitlement is active for this Apple ID."
+        case .failed(let detail):
+            detail
+        }
     }
 
     private var header: some View {

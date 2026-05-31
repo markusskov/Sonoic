@@ -69,6 +69,11 @@ OAUTH_CONFIG_KEYS = [
     "SONOS_CLOUD_QUEUE_CREATE_URL",
 ]
 
+PLUS_CONFIG_KEYS = [
+    "REVENUECAT_API_KEY",
+    "SONOIC_PLUS_ENTITLEMENT_IDENTIFIER",
+]
+
 LIKELY_SECRET_PATTERNS = [
     ("GitHub token", re.compile(r"\bgh[opsu]_[A-Za-z0-9_]{20,}\b")),
     ("Stripe or RevenueCat-style secret key", re.compile(r"\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}\b")),
@@ -136,6 +141,7 @@ def main() -> int:
     check_xcode_project_config(report)
     check_privacy_manifests(report)
     check_oauth_config(report)
+    check_plus_config(report)
     check_worker_config(report)
     check_oauth_worker_alignment(report)
     check_support_diagnostics(report)
@@ -218,6 +224,12 @@ def check_info_plist(report: Report) -> None:
     report.require(info.get("LSApplicationCategoryType") == "public.app-category.music", "App Store category should be Music.")
 
     for key in OAUTH_BUNDLE_KEYS:
+        value = info.get(key)
+        report.require(isinstance(value, str) and value.strip(), f"Info.plist missing {key}.")
+        if isinstance(value, str):
+            report.require(value.strip().startswith("$("), f"{key} should come from build settings, not a literal value.")
+
+    for key in ["RevenueCatAPIKey", "SonoicPlusEntitlementIdentifier"]:
         value = info.get(key)
         report.require(isinstance(value, str) and value.strip(), f"Info.plist missing {key}.")
         if isinstance(value, str):
@@ -347,6 +359,41 @@ def check_oauth_config(report: Report) -> None:
 
     if OAUTH_LOCAL.exists():
         report.warnings.append("Local OAuth override exists; verify it stays untracked and never paste its values into logs.")
+
+
+def check_plus_config(report: Report) -> None:
+    config = read_text(OAUTH_CONFIG, report)
+    example = read_text(OAUTH_LOCAL_EXAMPLE, report)
+    readiness = read_text(TESTFLIGHT_READINESS_DOC, report)
+    plus_state = read_text(ROOT / "SonoicApp/Model/SonoicPlusState.swift", report)
+    plus_controller = read_text(ROOT / "SonoicApp/Model/SonoicPlusController.swift", report)
+    if config is None or example is None or readiness is None or plus_state is None or plus_controller is None:
+        return
+
+    for key in PLUS_CONFIG_KEYS:
+        report.require(key in config, f"Default build config missing {key}.")
+        report.require(key in example, f"Local build config example missing {key}.")
+
+    report.require(
+        xcconfig_value(config, "SONOIC_PLUS_ENTITLEMENT_IDENTIFIER") == "plus",
+        "Default Plus entitlement identifier should remain plus.",
+    )
+    report.require(
+        "Plus purchases are not enabled in this build." in plus_state,
+        "Plus disabled state should explain that purchases are build-disabled.",
+    )
+    report.require(
+        "Apple ID used for TestFlight" in plus_controller,
+        "Plus restore failure copy should guide TestFlight sandbox recovery.",
+    )
+    for marker in [
+        "Sonoic Plus Purchase Checklist",
+        "RevenueCat",
+        "`plus` entitlement",
+        "TestFlight sandbox",
+        "restore purchases",
+    ]:
+        report.require(marker in readiness, f"TestFlight readiness docs missing Plus release marker: {marker}.")
 
 
 def check_worker_config(report: Report) -> None:

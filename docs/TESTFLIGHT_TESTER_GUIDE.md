@@ -34,6 +34,8 @@ Spotify, Tidal, Sonos Radio, SoundCloud, or other services as live beta sources.
    - Sonos Account is connected.
    - Music shows Apple Music as connected or gives a clear recovery state.
    - A room is selected.
+   - Sonoic Plus either shows as disabled for the build or opens the TestFlight
+     paywall when Plus validation is part of the pass.
    - Settings > Advanced > Support Summary is visible after selecting a room.
 
 Skipping Sonos login is allowed only when the pass is explicitly about local
@@ -84,3 +86,6 @@ local IP addresses, or raw Sonos player IDs.
   not the normal playback control path.
 - Widget state is best-effort shared state and should prefer honest unavailable
   state over stale success.
+- Sonoic Plus may be disabled in builds that are not validating purchases. When
+  enabled, purchase and restore behavior must be tested through TestFlight
+  sandbox, not an Xcode-installed build.

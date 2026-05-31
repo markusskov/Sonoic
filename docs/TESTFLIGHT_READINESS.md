@@ -44,6 +44,8 @@ The script does not replace:
 - Sonos Control API token refresh works after relaunch and during long playback.
 - Normal playback commands use Sonos Cloud paths; LAN fallback stays explicit.
 - Apple Music is the only live source presented as supported for beta.
+- Sonoic Plus is either deliberately disabled for the build or RevenueCat
+  purchase/restore validation is completed through TestFlight sandbox.
 - No secrets, provisioning profiles, access tokens, refresh tokens, or personal
   Xcode state are tracked.
 - Manual hardware validation is recorded for the candidate build.
@@ -208,6 +210,30 @@ git status --short
   - local network discovery
   - diagnostics, analytics, or crash reporting if enabled
   - App Group shared state and artwork caching
+
+## Sonoic Plus Purchase Checklist
+
+Sonoic Plus uses RevenueCat for the paywall and entitlement check. The iOS app
+must not contain private App Store Connect credentials or secret server keys.
+
+- Confirm `SonoicApp/Info.plist` reads:
+  - `RevenueCatAPIKey` from `$(REVENUECAT_API_KEY)`
+  - `SonoicPlusEntitlementIdentifier` from
+    `$(SONOIC_PLUS_ENTITLEMENT_IDENTIFIER)`
+- Confirm `Config/SonoicOAuth.local.xcconfig` is the only place local RevenueCat
+  SDK key overrides are kept.
+- Confirm the TestFlight candidate intentionally uses entitlement identifier
+  `plus`, unless RevenueCat has been changed and docs/tests are updated
+  together.
+- If Plus is not part of the candidate, verify Settings shows Plus as disabled
+  instead of implying a broken purchase.
+- If Plus is part of the candidate, verify in TestFlight sandbox:
+  - the paywall opens without exposing API keys or customer identifiers
+  - purchase success unlocks the `plus` entitlement
+  - restore purchases succeeds for an entitled Apple ID
+  - network/offline failure copy is understandable and does not expose RevenueCat
+    request details
+  - relaunch preserves the unlocked state after RevenueCat refresh
 
 ## Manual Hardware Validation Matrix
 

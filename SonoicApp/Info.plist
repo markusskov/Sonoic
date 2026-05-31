@@ -48,6 +48,10 @@
 	<string>Sonoic needs local network access to discover your Sonos speakers and control playback, volume, queue, and room state.</string>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>Sonoic uses Apple Music access for search and library browsing.</string>
+	<key>RevenueCatAPIKey</key>
+	<string>$(REVENUECAT_API_KEY)</string>
+	<key>SonoicPlusEntitlementIdentifier</key>
+	<string>$(SONOIC_PLUS_ENTITLEMENT_IDENTIFIER)</string>
 	<key>SonoicSonosOAuthAuthorizationURL</key>
 	<string>https://api.sonos.com/login/v3/oauth</string>
 	<key>SonoicSonosOAuthCallbackScheme</key>
