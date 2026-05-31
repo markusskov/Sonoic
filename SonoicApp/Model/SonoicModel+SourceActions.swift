@@ -48,7 +48,7 @@ extension SonoicModel {
             return false
         }
 
-        return (try? sourcePlayablePayload(for: item, purpose: .directPlay)) != nil
+        return (try? sourceSingleItemPlaybackCapability(for: item)) != nil
     }
 
     func sourcePlaybackUnavailableDetail(for item: SonoicSourceItem) -> String? {
@@ -57,7 +57,7 @@ extension SonoicModel {
         }
 
         do {
-            guard try sourcePlayablePayload(for: item, purpose: .directPlay) != nil else {
+            guard try sourceSingleItemPlaybackCapability(for: item) != nil else {
                 return SonoicSourceActionError.playbackPayloadUnavailable.localizedDescription
             }
         } catch {
@@ -95,11 +95,11 @@ extension SonoicModel {
     func playSourceItem(_ item: SonoicSourceItem) async throws -> Bool {
         await refreshSourcePlaybackContextIfNeeded(for: item.service)
 
-        guard let payload = try sourcePlayablePayload(for: item, purpose: .directPlay) else {
+        guard let playbackCapability = try sourceSingleItemPlaybackCapability(for: item) else {
             throw SonoicSourceActionError.playbackPayloadUnavailable
         }
 
-        if let plan = sourceSingleItemPlaybackPlan(for: item, payload: payload),
+        if let plan = playbackCapability.cloudQueuePlan,
            await playSonosControlAPICloudQueueIfAvailable(parentItem: item, plan: plan)
         {
             recordRecentSourceItem(item, replayPayload: plan.recentPlaybackPayload)
@@ -110,7 +110,11 @@ extension SonoicModel {
             return false
         }
 
-        return await playManualSonosPayload(payload)
+        guard let directPayload = playbackCapability.directPayload else {
+            return false
+        }
+
+        return await playManualSonosPayload(directPayload)
     }
 
     @discardableResult
@@ -289,15 +293,47 @@ extension SonoicModel {
         return didStartPlayback
     }
 
+    private struct SourceSingleItemPlaybackCapability {
+        var directPayload: SonosPlayablePayload?
+        var cloudQueuePlan: SonoicSourcePlaylistPlaybackPlan?
+    }
+
+    private func sourceSingleItemPlaybackCapability(
+        for item: SonoicSourceItem
+    ) throws -> SourceSingleItemPlaybackCapability? {
+        let directPayload = try sourcePlayablePayload(for: item, purpose: .directPlay)
+        if let directPayload {
+            return SourceSingleItemPlaybackCapability(
+                directPayload: directPayload,
+                cloudQueuePlan: sourceSingleItemPlaybackPlan(for: item, fallbackPayload: directPayload)
+            )
+        }
+
+        guard sonosPlaybackCommandRoute.hasSonosControlAPICommandTarget,
+              sonosOAuthConfiguration.canCreateCloudQueues,
+              let cloudQueuePlan = sourceSingleItemPlaybackPlan(for: item, fallbackPayload: nil)
+        else {
+            return nil
+        }
+
+        return SourceSingleItemPlaybackCapability(
+            directPayload: nil,
+            cloudQueuePlan: cloudQueuePlan
+        )
+    }
+
     private func sourceSingleItemPlaybackPlan(
         for item: SonoicSourceItem,
-        payload: SonosPlayablePayload
+        fallbackPayload: SonosPlayablePayload?
     ) -> SonoicSourcePlaylistPlaybackPlan? {
         guard sourceAdapter(for: item).capabilities.supportsSonosPlaybackPayloads else {
             return nil
         }
 
-        let queuePayload = (try? sourcePlayablePayload(for: item, purpose: .queueEntry)) ?? payload
+        guard let queuePayload = (try? sourcePlayablePayload(for: item, purpose: .queueEntry)) ?? fallbackPayload else {
+            return nil
+        }
+
         let metadataPayload = (try? sourcePlayablePayload(for: item, purpose: .metadata)) ?? queuePayload
         return SonoicSourcePlaylistPlaybackPlan(
             payloads: [queuePayload],

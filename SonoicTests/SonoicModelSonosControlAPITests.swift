@@ -762,6 +762,94 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func sourceSearchSongUsesQueuePayloadForSingleItemCloudQueuePlayback() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+            status: .loaded,
+            snapshot: Self.appleMusicTrackOnlyPlaybackHintSnapshot()
+        )
+        let sourceItem = Self.appleMusicSearchSong()
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/api/sonos/cloud-queues":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "queueId": "queue-1",
+                      "queueBaseUrl": "https://sonos.test/cloud-queues/queue-1/v2.3",
+                      "contextVersion": "context-1",
+                      "queueVersion": "queue-version-1",
+                      "startItemId": "queue-start-item",
+                      "trackMetadata": null
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackSession":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"sessionId":"session-1","sessionState":"SESSION_STATE_CONNECTED","sessionCreated":true}"#
+                )
+            case "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        let didPlay = try await playback.model.playSourceItem(sourceItem)
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        let createRequest = try #require(recorder.requests.first { $0.url?.path == "/api/sonos/cloud-queues" })
+        let createBody = try Self.cloudQueueCreateRequestBody(from: createRequest)
+        let loadRequest = try #require(
+            recorder.requests.first { $0.url?.path == "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue" }
+        )
+        let loadBody = try Self.loadCloudQueueRequestBody(from: loadRequest)
+
+        #expect(didPlay)
+        #expect(recorder.paths == [
+            "/api/sonos/cloud-queues",
+            "/control/api/v1/groups/group-1/playbackSession",
+            "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue",
+        ])
+        #expect(createBody.items.count == 1)
+        let createdItem = try #require(createBody.items.first)
+        #expect(createBody.container.name == "Sweet Jane")
+        #expect(createdItem.track?.name == "Sweet Jane")
+        #expect(createdItem.track?.id?.objectId == "song:1440857781")
+        #expect(loadBody.itemId == "queue-start-item")
+        #expect(loadBody.queueVersion == "queue-version-1")
+        #expect(playback.model.manualQueueContextPayloads?.first?.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
+        #expect(playback.model.manualPlaybackContextPayload?.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
+        #expect(playback.model.manualRecentPlaybackContextPayload?.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
+        #expect(playback.model.nowPlaying.title == "Sweet Jane")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.sessionID == "session-1")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.queueVersion == "queue-version-1")
+        #expect(playback.model.queueState.snapshot?.items.map(\.title) == ["Sweet Jane"])
+    }
+
+    @Test
     func matchedDirectFavoriteUsesControlAPIFavoriteEndpointWithoutCloudQueue() async throws {
         let favoritePlayback = try Self.makeModel()
         defer {
@@ -939,6 +1027,20 @@ struct SonoicModelSonosControlAPITests {
         return try JSONDecoder().decode(SonosControlAPILoadFavoriteRequest.self, from: body)
     }
 
+    private static func cloudQueueCreateRequestBody(
+        from request: SonoicModelSonosControlAPICapturedRequest
+    ) throws -> SonoicCloudQueueCreateRequest {
+        let body = try #require(request.body)
+        return try JSONDecoder().decode(SonoicCloudQueueCreateRequest.self, from: body)
+    }
+
+    private static func loadCloudQueueRequestBody(
+        from request: SonoicModelSonosControlAPICapturedRequest
+    ) throws -> SonosControlAPILoadCloudQueueRequest {
+        let body = try #require(request.body)
+        return try JSONDecoder().decode(SonosControlAPILoadCloudQueueRequest.self, from: body)
+    }
+
     private static func oauthConfiguration() throws -> SonosOAuthConfiguration {
         SonosOAuthConfiguration(
             clientID: "client-id",
@@ -1041,6 +1143,45 @@ struct SonoicModelSonosControlAPITests {
             localNowPlayingPayload: payload,
             recentPlaybackPayload: payload
         )
+    }
+
+    private static func appleMusicSearchSong() -> SonoicSourceItem {
+        SonoicSourceItem.appleMusicMetadata(
+            id: "1440857781",
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato",
+            artworkURL: nil,
+            kind: .song,
+            origin: .catalogSearch,
+            catalogID: "1440857781",
+            duration: 214
+        )
+    }
+
+    private static func appleMusicTrackOnlyPlaybackHintSnapshot() -> SonosMusicServiceProbeSnapshot {
+        SonosMusicServiceProbeSnapshot(
+            observedAt: Date(timeIntervalSince1970: 0),
+            serviceListVersion: nil,
+            services: [
+                SonosMusicServiceDescriptor(
+                    id: "204",
+                    name: "Apple Music",
+                    uri: nil,
+                    secureURI: nil,
+                    containerType: nil,
+                    capabilities: nil,
+                    authPolicy: nil,
+                    presentationMapURI: nil,
+                    stringsURI: nil
+                ),
+            ],
+            accounts: []
+        ).includingObservedAccounts(from: [
+            SonosMusicServiceObservedValue(
+                value: "x-sonos-http:librarytrack%3aexample.m4p?sid=204&flags=8232&sn=7",
+                origin: .trackURI
+            ),
+        ])
     }
 
     private static func favoriteItem() -> SonosFavoriteItem {

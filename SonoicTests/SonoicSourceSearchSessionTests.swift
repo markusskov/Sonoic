@@ -229,6 +229,38 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
+    func appleMusicSearchSongsWithQueuePayloadArePlayableThroughSonosCloud() throws {
+        let model = try makeModel(
+            sonosOAuthConfiguration: sonosOAuthConfiguration()
+        )
+        model.sonosControlAPIState = SonosControlAPIState(
+            settings: SonosControlAPISettings(
+                mode: .preferred,
+                selectedHouseholdID: "household-1",
+                selectedGroupID: "group-1"
+            ),
+            authorizationStatus: .ready,
+            lastErrorDetail: nil,
+            lastCommandDescription: nil,
+            lastUpdatedAt: nil
+        )
+        model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+            status: .loaded,
+            snapshot: appleMusicTrackOnlyPlaybackHintSnapshot()
+        )
+        let searchSong = appleMusicSearchSong()
+
+        let directPayload = try model.sourcePlayablePayload(for: searchSong, purpose: .directPlay)
+        let queuePayloadCandidate = try model.sourcePlayablePayload(for: searchSong, purpose: .queueEntry)
+        let queuePayload = try #require(queuePayloadCandidate)
+
+        #expect(directPayload == nil)
+        #expect(queuePayload.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
+        #expect(model.canPlaySourceItem(searchSong))
+        #expect(model.sourcePlaybackUnavailableDetail(for: searchSong) == nil)
+    }
+
+    @Test
     func homeSourcesOfferOnlyAppleMusicAsSetupSource() throws {
         let model = try makeModel()
 
@@ -310,7 +342,10 @@ struct SonoicSourceSearchSessionTests {
         #expect(state.lastUpdatedAt == nil)
     }
 
-    private func makeModel(savedManualHost: String? = nil) throws -> SonoicModel {
+    private func makeModel(
+        savedManualHost: String? = nil,
+        sonosOAuthConfiguration: SonosOAuthConfiguration = .load()
+    ) throws -> SonoicModel {
         let suiteName = "SonoicSourceSearchSessionTests-\(UUID().uuidString)"
         let userDefaults = try #require(UserDefaults(suiteName: suiteName))
         userDefaults.removePersistentDomain(forName: suiteName)
@@ -320,8 +355,26 @@ struct SonoicSourceSearchSessionTests {
         }
         return SonoicModel(
             settingsStore: store,
+            sonosOAuthConfiguration: sonosOAuthConfiguration,
             startInitialSonosControlAPICloudRefresh: false
         )
+    }
+
+    private func sonosOAuthConfiguration() throws -> SonosOAuthConfiguration {
+        SonosOAuthConfiguration(
+            clientID: "client-id",
+            redirectURI: "https://sonoic.test/callback",
+            callbackScheme: "sonoic",
+            tokenExchangeURL: try fixtureURL("https://sonoic.test/api/token"),
+            tokenRefreshURL: nil,
+            authorizationEndpoint: try fixtureURL("https://api.sonos.com/login/v3/oauth"),
+            scopes: ["playback-control-all"],
+            cloudQueueCreateURL: try fixtureURL("https://sonoic.test/api/sonos/cloud-queues")
+        )
+    }
+
+    private func fixtureURL(_ string: String) throws -> URL {
+        try #require(URL(string: string))
     }
 
     private func source(_ service: SonosServiceDescriptor) -> SonoicSource {
@@ -366,6 +419,45 @@ struct SonoicSourceSearchSessionTests {
                 : "x-sonos-spotify:spotify%3atrack%3a1",
             metadataXML: nil
         )
+    }
+
+    private func appleMusicSearchSong() -> SonoicSourceItem {
+        SonoicSourceItem.appleMusicMetadata(
+            id: "1440857781",
+            title: "Sweet Jane",
+            subtitle: "Garrett Kato",
+            artworkURL: nil,
+            kind: .song,
+            origin: .catalogSearch,
+            catalogID: "1440857781",
+            duration: 214
+        )
+    }
+
+    private func appleMusicTrackOnlyPlaybackHintSnapshot() -> SonosMusicServiceProbeSnapshot {
+        SonosMusicServiceProbeSnapshot(
+            observedAt: Date(timeIntervalSince1970: 0),
+            serviceListVersion: nil,
+            services: [
+                SonosMusicServiceDescriptor(
+                    id: "204",
+                    name: "Apple Music",
+                    uri: nil,
+                    secureURI: nil,
+                    containerType: nil,
+                    capabilities: nil,
+                    authPolicy: nil,
+                    presentationMapURI: nil,
+                    stringsURI: nil
+                ),
+            ],
+            accounts: []
+        ).includingObservedAccounts(from: [
+            SonosMusicServiceObservedValue(
+                value: "x-sonos-http:librarytrack%3aexample.m4p?sid=204&flags=8232&sn=7",
+                origin: .trackURI
+            ),
+        ])
     }
 
     private func expectUnsupportedBetaSourcePlayback(
