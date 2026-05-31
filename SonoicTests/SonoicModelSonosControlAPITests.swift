@@ -24,7 +24,7 @@ struct SonoicModelSonosControlAPITests {
         )
 
         Self.stubNetwork(for: directPlayback.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected authorization failure"}"#
@@ -84,7 +84,7 @@ struct SonoicModelSonosControlAPITests {
         cloudQueue.model.sonosControlAPICloudQueueRuntimeState = previousCloudQueueRuntimeState
 
         Self.stubNetwork(for: cloudQueue.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 500,
                 body: #"{"message":"Injected cloud queue failure"}"#
@@ -122,7 +122,7 @@ struct SonoicModelSonosControlAPITests {
         next.model.nowPlaying = previousNowPlaying
         next.model.nowPlayingObservedAt = previousObservedAt
         Self.stubNetwork(for: next.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 500,
                 body: #"{"message":"Injected next failure"}"#
@@ -146,7 +146,7 @@ struct SonoicModelSonosControlAPITests {
         previous.model.nowPlaying = previousNowPlaying
         previous.model.nowPlayingObservedAt = previousObservedAt
         Self.stubNetwork(for: previous.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 500,
                 body: #"{"message":"Injected previous failure"}"#
@@ -176,7 +176,7 @@ struct SonoicModelSonosControlAPITests {
         next.model.nowPlaying = previousNowPlaying
         next.model.nowPlayingObservedAt = previousObservedAt
         Self.stubNetwork(for: next.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected next authorization failure"}"#
@@ -203,7 +203,7 @@ struct SonoicModelSonosControlAPITests {
         previous.model.nowPlaying = previousNowPlaying
         previous.model.nowPlayingObservedAt = previousObservedAt
         Self.stubNetwork(for: previous.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected previous authorization failure"}"#
@@ -260,7 +260,7 @@ struct SonoicModelSonosControlAPITests {
         )
 
         Self.stubNetwork(for: cloudQueue.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected cloud queue authorization failure"}"#
@@ -328,7 +328,7 @@ struct SonoicModelSonosControlAPITests {
             ]
         )
         Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
-            Self.httpResponse(
+            try Self.httpResponse(
                 for: request,
                 statusCode: 401,
                 body: #"{"message":"Injected favorite authorization failure"}"#
@@ -382,7 +382,7 @@ struct SonoicModelSonosControlAPITests {
         let recorder = SonoicModelSonosControlAPIRequestRecorder()
         Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
             recorder.record(request)
-            return Self.httpResponse(
+            return try Self.httpResponse(
                 for: request,
                 statusCode: 500,
                 body: #"{"message":"Unexpected direct favorite network request"}"#
@@ -434,14 +434,14 @@ struct SonoicModelSonosControlAPITests {
         Self.stubNetwork(for: favoritePlayback.networkStubID) { request in
             recorder.record(request)
             if request.url?.path == "/control/api/v1/groups/group-1/favorites" {
-                return Self.httpResponse(
+                return try Self.httpResponse(
                     for: request,
                     statusCode: 200,
                     body: "{}"
                 )
             }
 
-            return Self.httpResponse(
+            return try Self.httpResponse(
                 for: request,
                 statusCode: 500,
                 body: #"{"message":"Unexpected non-favorite endpoint"}"#
@@ -559,16 +559,17 @@ struct SonoicModelSonosControlAPITests {
         for request: URLRequest,
         statusCode: Int,
         body: String
-    ) -> (HTTPURLResponse, Data) {
-        (
+    ) throws -> (HTTPURLResponse, Data) {
+        let url = try #require(request.url)
+        let response = try #require(
             HTTPURLResponse(
-                url: request.url!,
+                url: url,
                 statusCode: statusCode,
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
-            )!,
-            Data(body.utf8)
+            )
         )
+        return (response, Data(body.utf8))
     }
 
     private static func loadFavoriteRequestBody(
