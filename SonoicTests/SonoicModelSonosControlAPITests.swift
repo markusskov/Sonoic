@@ -253,6 +253,38 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func transportCommandRecordsSuccessDiagnosticsAndSchedulesSync() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        playback.model.sonosControlAPIState.lastErrorDetail = "Previous failure"
+        playback.model.sonosControlAPIState.lastUpdatedAt = nil
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud success",
+            refreshQueueAfterSuccess: true,
+            syncDelay: .seconds(60)
+        ) {
+            didRunAction = true
+        }
+
+        #expect(didPerform)
+        #expect(didRunAction)
+        #expect(playback.model.isManualTransportCommandInFlight == false)
+        #expect(playback.model.sonosControlAPIState.lastErrorDetail == nil)
+        #expect(playback.model.sonosControlAPIState.lastCommandDescription == "Cloud success")
+        #expect(playback.model.sonosControlAPIState.lastUpdatedAt != nil)
+        #expect(playback.model.manualHostRefreshStatus == .refreshing)
+        #expect(playback.model.manualHostDeferredSyncTask != nil)
+    }
+
+    @Test
     func transientCloudQueueLoadFailureRestoresPreviousCloudQueueContext() async throws {
         let cloudQueue = try Self.makeModel()
         defer {
