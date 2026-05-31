@@ -117,6 +117,92 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
+    func runtimeStateCurrentIndexUsesControlAPIFallbackOrder() {
+        let state = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-1",
+            itemIDs: ["item-1", "item-2", "item-3", "item-4"]
+        )
+        let metadataStatus = SonosControlAPIMetadataStatus(
+            container: nil,
+            currentItem: SonosControlAPIQueueItem(id: "item-2", track: nil, deleted: nil, policies: nil),
+            nextItem: nil,
+            streamInfo: nil
+        )
+        let manualQueuePayloads = [
+            Self.playbackPayload(id: "payload-1"),
+            Self.playbackPayload(id: "payload-2"),
+            Self.playbackPayload(id: "payload-3"),
+            Self.playbackPayload(id: "payload-4")
+        ]
+        let manualPlaybackPayload = manualQueuePayloads[3]
+        let playbackStatusWithExactItem = SonosControlAPIPlaybackStatus(
+            playbackState: .playing,
+            isDucking: nil,
+            queueVersion: nil,
+            itemId: "item-3",
+            positionMillis: nil,
+            previousItemId: nil,
+            previousPositionMillis: nil,
+            playModes: nil,
+            availablePlaybackActions: nil
+        )
+        let playbackStatusWithoutMatch = SonosControlAPIPlaybackStatus(
+            playbackState: .playing,
+            isDucking: nil,
+            queueVersion: nil,
+            itemId: "missing-item",
+            positionMillis: nil,
+            previousItemId: nil,
+            previousPositionMillis: nil,
+            playModes: nil,
+            availablePlaybackActions: nil
+        )
+        let metadataStatusWithoutMatch = SonosControlAPIMetadataStatus(
+            container: nil,
+            currentItem: SonosControlAPIQueueItem(id: "missing-metadata-item", track: nil, deleted: nil, policies: nil),
+            nextItem: nil,
+            streamInfo: nil
+        )
+
+        #expect(
+            state.currentIndex(
+                playbackStatus: playbackStatusWithExactItem,
+                metadataStatus: metadataStatus,
+                queueSnapshotCurrentItemIndex: 0,
+                manualPlaybackContextPayload: manualPlaybackPayload,
+                manualQueueContextPayloads: manualQueuePayloads
+            ) == 2
+        )
+        #expect(
+            state.currentIndex(
+                playbackStatus: playbackStatusWithoutMatch,
+                metadataStatus: metadataStatus,
+                queueSnapshotCurrentItemIndex: 0,
+                manualPlaybackContextPayload: manualPlaybackPayload,
+                manualQueueContextPayloads: manualQueuePayloads
+            ) == 1
+        )
+        #expect(
+            state.currentIndex(
+                playbackStatus: playbackStatusWithoutMatch,
+                metadataStatus: metadataStatusWithoutMatch,
+                queueSnapshotCurrentItemIndex: 0,
+                manualPlaybackContextPayload: manualPlaybackPayload,
+                manualQueueContextPayloads: manualQueuePayloads
+            ) == 0
+        )
+        #expect(
+            state.currentIndex(
+                playbackStatus: playbackStatusWithoutMatch,
+                metadataStatus: metadataStatusWithoutMatch,
+                queueSnapshotCurrentItemIndex: nil,
+                manualPlaybackContextPayload: manualPlaybackPayload,
+                manualQueueContextPayloads: manualQueuePayloads
+            ) == 3
+        )
+    }
+
+    @Test
     func runtimeStateRestoresStoredContextWithoutLooseFieldCopies() {
         var state = SonosControlAPICloudQueueRuntimeState.empty
         let storedContext = SonosControlAPICloudQueueSessionContext(
