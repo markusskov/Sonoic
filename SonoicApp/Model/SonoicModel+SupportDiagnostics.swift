@@ -17,6 +17,7 @@ extension SonoicModel {
             "Sonos Auth: \(sonosControlAPIState.authorizationStatus.supportDiagnosticsTitle)",
             "Sonos Mode: \(sonosControlAPIState.settings.mode.rawValue)",
             "Sonos Cloud: \(sonosControlAPICloudState.supportDiagnosticsSummary)",
+            "Plus: \(plusState.supportDiagnosticsSummary)",
             "Target: \(supportDiagnosticsTargetSummary)",
             "Playback: \(nowPlaying.playbackState.title) · Source: \(SonoicDiagnosticsRedactor.redacted(nowPlaying.sourceName))",
             "Queue: \(queueState.supportDiagnosticsSummary)",
@@ -131,7 +132,7 @@ enum SonoicDiagnosticsRedactor {
             template: "$1<redacted>"
         ),
         Replacement(
-            pattern: "\\b(access_token|refresh_token|id_token|client_secret|SONOS_CLIENT_SECRET|BROKER_CODE_SIGNING_SECRET)\\s*[:=]\\s*[^\\s&,;]+",
+            pattern: "\\b(access_token|refresh_token|id_token|client_secret|token|SONOS_CLIENT_SECRET|BROKER_CODE_SIGNING_SECRET)\\s*[:=]\\s*[^\\s&,;]+",
             template: "$1=<redacted>"
         ),
         Replacement(
@@ -153,6 +154,10 @@ enum SonoicDiagnosticsRedactor {
         Replacement(
             pattern: "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b",
             template: "<ip-address>"
+        ),
+        Replacement(
+            pattern: "\\b[A-Za-z0-9-]+\\.local\\b",
+            template: "<local-host>"
         )
     ]
 
@@ -213,6 +218,23 @@ private extension SonosControlAPICloudState {
             return "Failed · \(SonoicDiagnosticsRedactor.redacted(detail))"
         case let .verified(snapshot):
             return snapshot.supportDiagnosticsSummary
+        }
+    }
+}
+
+private extension SonoicPlusState {
+    var supportDiagnosticsSummary: String {
+        switch status {
+        case .notConfigured:
+            return "Disabled"
+        case .refreshing:
+            return "Checking"
+        case .available:
+            return "Available"
+        case .unlocked:
+            return "Unlocked"
+        case let .failed(detail):
+            return "Failed · \(SonoicDiagnosticsRedactor.redacted(detail))"
         }
     }
 }

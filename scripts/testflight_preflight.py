@@ -27,7 +27,9 @@ WORKER_WRANGLER = ROOT / "sonoic-sonos-worker/wrangler.jsonc"
 WORKER_README = ROOT / "sonoic-sonos-worker/README.md"
 WORKER_SOURCE = ROOT / "sonoic-sonos-worker/src/index.ts"
 SUPPORT_DIAGNOSTICS_SOURCE = ROOT / "SonoicApp/Model/SonoicModel+SupportDiagnostics.swift"
+SOURCE_ACTIONS_SOURCE = ROOT / "SonoicApp/Model/SonoicModel+SourceActions.swift"
 SETTINGS_DIAGNOSTICS_SOURCE = ROOT / "SonoicApp/Views/Settings/SettingsDiagnosticsSections.swift"
+SETTINGS_ROWS_SOURCE = ROOT / "SonoicApp/Views/Settings/SettingsRows.swift"
 SETTINGS_SECTIONS_SOURCE = ROOT / "SonoicApp/Views/Settings/SettingsSections.swift"
 TESTFLIGHT_READINESS_DOC = ROOT / "docs/TESTFLIGHT_READINESS.md"
 TESTFLIGHT_TESTER_GUIDE = ROOT / "docs/TESTFLIGHT_TESTER_GUIDE.md"
@@ -472,9 +474,11 @@ def check_oauth_worker_alignment(report: Report) -> None:
 
 def check_support_diagnostics(report: Report) -> None:
     source = read_text(SUPPORT_DIAGNOSTICS_SOURCE, report)
+    source_actions = read_text(SOURCE_ACTIONS_SOURCE, report)
     settings_source = read_text(SETTINGS_DIAGNOSTICS_SOURCE, report)
+    settings_rows = read_text(SETTINGS_ROWS_SOURCE, report)
     readiness = read_text(TESTFLIGHT_READINESS_DOC, report)
-    if source is None or settings_source is None or readiness is None:
+    if source is None or source_actions is None or settings_source is None or settings_rows is None or readiness is None:
         return
 
     report.require("SonoicDiagnosticsRedactor" in source, "Support diagnostics must keep a central redaction boundary.")
@@ -484,17 +488,34 @@ def check_support_diagnostics(report: Report) -> None:
         "client_secret",
         "Bearer <redacted>",
         "<ip-address>",
+        "<local-host>",
         "<sonos-player-id>",
     ]:
         report.require(marker in source, f"Support diagnostics redaction missing marker {marker}.")
 
     report.require(
+        "sonoicPlaybackDebugMessage" in source_actions and "SonoicDiagnosticsRedactor.redacted" in source_actions,
+        "Playback debug logs should pass through the shared diagnostics redactor.",
+    )
+    report.require(
         "SettingsSupportDiagnosticsSection" in settings_source and "Support Summary" in settings_source,
         "Advanced Settings should expose a redacted support summary for TestFlight bug reports.",
     )
     report.require(
+        "Copy Summary" in settings_source and "UIPasteboard.general.string" in settings_source,
+        "Advanced Settings should let testers copy the redacted support summary.",
+    )
+    report.require(
+        "redactsValue = true" in settings_rows and "SonoicDiagnosticsRedactor.redacted" in settings_rows,
+        "Settings diagnostic rows should redact sensitive values by default.",
+    )
+    report.require(
         "Settings > Advanced >" in readiness and "Support Summary" in readiness,
         "TestFlight readiness docs should tell testers where to find the support summary.",
+    )
+    report.require(
+        "TestFlight crash report" in readiness and "App Store Connect" in readiness,
+        "TestFlight readiness docs should describe crash report collection without raw logs.",
     )
     report.require(
         "access tokens" in readiness and "refresh tokens" in readiness and "Cloudflare secrets" in readiness,

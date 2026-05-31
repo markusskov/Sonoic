@@ -62,7 +62,7 @@ struct SettingsSonosMusicServiceProbeSection: View {
         case .loaded:
             nil
         case .failed(let detail):
-            detail
+            SonoicDiagnosticsRedactor.redacted(detail)
         }
     }
 
@@ -172,7 +172,7 @@ struct SettingsSonosContentDirectoryProbeSection: View {
         case .loaded:
             nil
         case .failed(let detail):
-            detail
+            SonoicDiagnosticsRedactor.redacted(detail)
         }
     }
 
@@ -231,7 +231,7 @@ private struct SettingsSonosContentDirectoryBrowseRow: View {
             }
 
             if case .failed(let detail) = browse.status {
-                Text(detail)
+                Text(SonoicDiagnosticsRedactor.redacted(detail))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -289,7 +289,7 @@ private struct SettingsSonosMusicServiceProbeRow: View {
                 }
 
                 if let secureURI = sonosService.secureURI {
-                    Text(secureURI)
+                    Text(SonoicDiagnosticsRedactor.redacted(secureURI))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)

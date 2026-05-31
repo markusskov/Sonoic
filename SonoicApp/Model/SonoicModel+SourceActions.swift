@@ -2,8 +2,12 @@ import Foundation
 
 func sonoicPlaybackDebugLog(_ message: @autoclosure () -> String) {
 #if DEBUG
-    print("[SonoicPlaylistPlayback] \(message())")
+    print("[SonoicPlaylistPlayback] \(sonoicPlaybackDebugMessage(message()))")
 #endif
+}
+
+func sonoicPlaybackDebugMessage(_ message: String) -> String {
+    SonoicDiagnosticsRedactor.redacted(message, maxLength: 480)
 }
 
 func sonoicPlaybackDebugID(_ value: String?) -> String {

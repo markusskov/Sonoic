@@ -87,12 +87,17 @@ struct SettingsDiscoveredPlayerRow: View {
 struct SettingsDiagnosticRow: View {
     let title: String
     let value: String
+    var redactsValue = true
 
     var body: some View {
         LabeledContent(title) {
-            Text(value)
+            Text(displayValue)
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var displayValue: String {
+        redactsValue ? SonoicDiagnosticsRedactor.redacted(value) : value
     }
 }

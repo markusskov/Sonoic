@@ -60,7 +60,7 @@ struct HomeTheaterTVDiagnosticsCard: View {
 
             HomeTheaterDiagnosticRow(
                 title: "Current URI",
-                value: currentURI,
+                value: SonoicDiagnosticsRedactor.redacted(currentURI),
                 systemImage: "link",
                 isMonospaced: true
             )
@@ -74,7 +74,7 @@ struct HomeTheaterTVDiagnosticsCard: View {
         {
             HomeTheaterDiagnosticRow(
                 title: "Track URI",
-                value: trackURI,
+                value: SonoicDiagnosticsRedactor.redacted(trackURI),
                 systemImage: "link.badge.plus",
                 isMonospaced: true
             )

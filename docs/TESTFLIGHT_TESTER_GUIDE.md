@@ -69,6 +69,8 @@ For each report, include:
 - a screenshot or short screen recording when the UI looks stale or inconsistent
 - the redacted Settings > Advanced > Support Summary for auth, playback, queue,
   Cloud Queue, room selection, or mini-player issues
+- for crashes, the approximate local time and what you were doing immediately
+  before the crash; the team will pair this with the TestFlight crash report
 
 Do not include raw OAuth URLs, auth codes, HTTP headers, access tokens, refresh
 tokens, Cloudflare secrets, local OAuth config, raw console logs, unredacted

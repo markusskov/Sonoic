@@ -74,6 +74,7 @@ struct SonoicSupportDiagnosticsTests {
 
         #expect(summary.contains("Sonoic Support Summary"))
         #expect(summary.contains("Sonos Auth: Expired"))
+        #expect(summary.contains("Plus: Disabled"))
         #expect(summary.contains("Target: Group selected · members=2"))
         #expect(summary.contains("Bearer <redacted>"))
         #expect(summary.contains("<ip-address>"))
@@ -213,6 +214,7 @@ struct SonoicSupportDiagnosticsTests {
         )
 
         #expect(summary.contains("Sonos Auth: Ready"))
+        #expect(summary.contains("Plus: Disabled"))
         #expect(summary.contains("Sonos Cloud: Verified · households=1 · groups=1 · players=1 · favorites=1 · playlists=1"))
         #expect(summary.contains("favorites loaded count=1 version=none"))
         #expect(summary.contains("playlists failed auth=no detail="))
@@ -237,6 +239,25 @@ struct SonoicSupportDiagnosticsTests {
         #expect(redacted.hasSuffix("..."))
         #expect(!redacted.contains("very-secret-token-12345"))
         #expect(redacted.contains("Bearer <redacted>"))
+    }
+
+    @Test
+    func diagnosticsRedactorCoversLocalHostsAndDebugLogMessages() {
+        let message = """
+        queueSeek host=Living-Room.local base='https://sonos.ryvus.app/cloud-queues/23b03681-aa64-451e-9f04-3b3f542cae2b/v2.3' \
+        target=RINCON_C43875141A0301400 token=debug-token-12345
+        """
+
+        let redacted = sonoicPlaybackDebugMessage(message)
+
+        #expect(redacted.contains("<local-host>"))
+        #expect(redacted.contains("<uuid>"))
+        #expect(redacted.contains("<sonos-player-id>"))
+        #expect(redacted.contains("token=<redacted>"))
+        #expect(!redacted.contains("Living-Room.local"))
+        #expect(!redacted.contains("23b03681-aa64-451e-9f04-3b3f542cae2b"))
+        #expect(!redacted.contains("RINCON_C43875141A0301400"))
+        #expect(!redacted.contains("debug-token-12345"))
     }
 
     private func makeModel() throws -> SonoicModel {

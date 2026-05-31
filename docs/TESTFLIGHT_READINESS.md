@@ -172,6 +172,9 @@ Do not post these until the candidate build is ready for tester instructions.
   or queue/mini-player failures.
 - Ask for screenshots or a short screen recording when the UI appears stale,
   unavailable, or inconsistent with Sonos.
+- If the app crashes, collect the TestFlight crash report from App Store Connect
+  or Xcode Organizer, then ask the tester to relaunch and copy the redacted
+  Support Summary if the issue is reproducible.
 - Do not ask testers to paste raw auth URLs, OAuth codes, HTTP headers, access
   tokens, refresh tokens, Cloudflare secrets, local OAuth config, or unredacted
   console logs.
@@ -183,6 +186,11 @@ Manual check still required before external TestFlight: induce one harmless
 failure on a physical device, copy the support summary, and confirm it has useful
 auth/cloud/queue/playback state without raw local IP addresses, Sonos player IDs,
 OAuth tokens, auth codes, Worker secrets, or private URLs.
+
+Crash-readiness check still required before external TestFlight: confirm the
+uploaded build appears under App Store Connect crash reports after processing,
+and pair any crash report with the redacted Support Summary rather than raw
+device logs or console output.
 
 ## Privacy And Secrets Audit
 
