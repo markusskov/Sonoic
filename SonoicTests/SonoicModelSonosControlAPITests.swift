@@ -332,6 +332,11 @@ struct SonoicModelSonosControlAPITests {
         }
         Self.configureCloudCommandTarget(on: playback.model)
         let injectedError = SonosControlAPITransport.TransportError.httpStatus(401, "Token expired")
+        playback.model.manualPlayTransitionGraceDeadline = Date().addingTimeInterval(60)
+        playback.model.isManualPlayTransitionAwaitingConfirmation = true
+        playback.model.manualSeekConfirmationDeadline = Date().addingTimeInterval(60)
+        playback.model.manualSeekTargetElapsedTime = 42
+        playback.model.manualSeekContentKey = "uri:x-sonos-http:track.m4a"
         var didRunAction = false
 
         let didPerform = await playback.model.performSonosControlAPITransportCommand(
@@ -353,6 +358,11 @@ struct SonoicModelSonosControlAPITests {
         #expect(playback.model.manualHostRefreshStatus == .failed(injectedError.localizedDescription))
         #expect(playback.model.manualHostRefreshTask == nil)
         #expect(playback.model.manualHostDeferredSyncTask == nil)
+        #expect(playback.model.manualPlayTransitionGraceDeadline == nil)
+        #expect(playback.model.isManualPlayTransitionAwaitingConfirmation == false)
+        #expect(playback.model.manualSeekConfirmationDeadline == nil)
+        #expect(playback.model.manualSeekTargetElapsedTime == nil)
+        #expect(playback.model.manualSeekContentKey == nil)
     }
 
     @Test
