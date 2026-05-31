@@ -122,7 +122,7 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
-    func nonAppleSonosNativeItemsRemainPlayable() throws {
+    func nonAppleSonosNativeItemsAreUnavailableForBetaSourcePlayback() async throws {
         let model = try makeModel(savedManualHost: "192.0.2.10")
         let payload = playablePayload(service: .spotify)
         let spotifyItem = item(
@@ -132,9 +132,20 @@ struct SonoicSourceSearchSessionTests {
             service: .spotify,
             playbackCapability: .sonosNative(payload)
         )
+        let previousNowPlaying = model.nowPlaying
 
-        #expect(model.canPlaySourceItem(spotifyItem))
-        #expect(try model.sourcePlayablePayload(for: spotifyItem, purpose: .directPlay) == payload)
+        #expect(!model.canPlaySourceItem(spotifyItem))
+        expectUnsupportedBetaSourcePlayback {
+            _ = try model.sourcePlayablePayload(for: spotifyItem, purpose: .directPlay)
+        }
+        await expectUnsupportedBetaSourcePlayback {
+            _ = try await model.playSourceItem(spotifyItem)
+        }
+        #expect(model.nowPlaying == previousNowPlaying)
+        #expect(model.manualPlaybackContextPayload == nil)
+        #expect(model.manualQueueContextPayloads == nil)
+        #expect(model.manualRecentPlaybackContextPayload == nil)
+        #expect(model.recentPlays.isEmpty)
     }
 
     @Test
@@ -148,6 +159,33 @@ struct SonoicSourceSearchSessionTests {
         )
 
         #expect(!model.canPlaySourceItem(spotifyItem))
+    }
+
+    @Test
+    func homeSourcesOfferOnlyAppleMusicAsSetupSource() throws {
+        let model = try makeModel()
+
+        #expect(model.homeSources.map(\.service) == [.appleMusic])
+        #expect(model.homeSources.map(\.status) == [.availableForSetup])
+    }
+
+    @Test
+    func homeSourcesKeepNonAppleServicesVisibleWhenObservedThroughSonos() throws {
+        let model = try makeModel()
+        model.nowPlaying = SonosNowPlayingSnapshot(
+            title: "Sweet Jane",
+            artistName: "Garrett Kato",
+            albumTitle: nil,
+            sourceName: "Spotify",
+            playbackState: .playing
+        )
+
+        let sources = model.homeSources
+        let spotifySource = try #require(sources.first { $0.service == .spotify })
+
+        #expect(sources.map(\.service) == [.spotify, .appleMusic])
+        #expect(spotifySource.status == .visibleThroughSonos)
+        #expect(spotifySource.detailText == "Playing now")
     }
 
     @Test
@@ -259,5 +297,31 @@ struct SonoicSourceSearchSessionTests {
             uri: "x-sonos-spotify:spotify%3atrack%3a1",
             metadataXML: nil
         )
+    }
+
+    private func expectUnsupportedBetaSourcePlayback(
+        _ action: () throws -> Void
+    ) {
+        do {
+            try action()
+            Issue.record("Expected unsupported beta source playback to fail.")
+        } catch let error as SonoicSourceAdapterError {
+            #expect(error.localizedDescription.contains("Apple Music"))
+        } catch {
+            Issue.record("Expected SonoicSourceAdapterError, got \(error).")
+        }
+    }
+
+    private func expectUnsupportedBetaSourcePlayback(
+        _ action: () async throws -> Void
+    ) async {
+        do {
+            try await action()
+            Issue.record("Expected unsupported beta source playback to fail.")
+        } catch let error as SonoicSourceAdapterError {
+            #expect(error.localizedDescription.contains("Apple Music"))
+        } catch {
+            Issue.record("Expected SonoicSourceAdapterError, got \(error).")
+        }
     }
 }

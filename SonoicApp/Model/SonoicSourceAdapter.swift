@@ -124,18 +124,20 @@ extension SonoicModel {
         for item: SonoicSourceItem,
         purpose: SonoicSourcePlayablePayloadPurpose
     ) throws -> SonosPlayablePayload? {
+        guard sourceAdapter(for: item).capabilities.supportsSonosPlaybackPayloads else {
+            throw SonoicSourceAdapterError.unsupported(
+                "\(item.service.name) playback is not supported in this beta. Sonoic currently supports Apple Music as its live source."
+            )
+        }
+
         switch item.service.kind {
         case .appleMusic:
-            guard sourceAdapter(for: item).capabilities.supportsSonosPlaybackPayloads else {
-                return item.sonosNativePlaybackPayload
-            }
-
             return try appleMusicPlayablePayload(
                 for: item,
                 purpose: purpose
             )
         case .spotify, .sonosRadio, .genericStreaming:
-            return item.sonosNativePlaybackPayload
+            return nil
         }
     }
 

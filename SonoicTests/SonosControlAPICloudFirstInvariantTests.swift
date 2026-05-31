@@ -32,7 +32,10 @@ struct SonosControlAPICloudFirstInvariantTests {
         let model = try Self.makeModel()
         model.useCloudCommandModeWithoutAvailableCloudContext()
         let previousNowPlaying = model.nowPlaying
-        let item = Self.sourceItem(playbackPayload: Self.playbackPayload(id: "payload-1"))
+        let item = Self.sourceItem(
+            playbackPayload: Self.playbackPayload(id: "payload-1", service: .appleMusic),
+            service: .appleMusic
+        )
 
         let didPlaySourceItem = try await model.playSourceItem(item)
         let didPlayPayload = await model.playManualSonosPayload(Self.playbackPayload(id: "payload-2"))
@@ -101,7 +104,8 @@ struct SonosControlAPICloudFirstInvariantTests {
         model.useCloudCommandModeWithoutAvailableCloudContext()
         model.manualSonosHost = "192.0.2.10"
         let playlistItem = Self.sourceItem(
-            playbackPayload: Self.playbackPayload(id: "fallback-playlist", service: .genericStreaming),
+            playbackPayload: Self.playbackPayload(id: "fallback-playlist", service: .appleMusic),
+            service: .appleMusic,
             kind: .playlist
         )
         let previousNowPlaying = model.nowPlaying
