@@ -15,8 +15,10 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 
 INFO_PLIST = ROOT / "SonoicApp/Info.plist"
+WIDGET_INFO_PLIST = ROOT / "SonoicWidgets/Info.plist"
 APP_ENTITLEMENTS = ROOT / "SonoicApp/Sonoic.entitlements"
 WIDGET_ENTITLEMENTS = ROOT / "SonoicWidgetsExtension.entitlements"
+PROJECT_FILE = ROOT / "Sonoic.xcodeproj/project.pbxproj"
 OAUTH_CONFIG = ROOT / "Config/SonoicOAuth.xcconfig"
 OAUTH_LOCAL_EXAMPLE = ROOT / "Config/SonoicOAuth.local.example.xcconfig"
 OAUTH_LOCAL = ROOT / "Config/SonoicOAuth.local.xcconfig"
@@ -24,6 +26,19 @@ WORKER_PACKAGE = ROOT / "sonoic-sonos-worker/package.json"
 WORKER_WRANGLER = ROOT / "sonoic-sonos-worker/wrangler.jsonc"
 WORKER_README = ROOT / "sonoic-sonos-worker/README.md"
 WORKER_SOURCE = ROOT / "sonoic-sonos-worker/src/index.ts"
+
+APP_PRIVACY_MANIFEST = ROOT / "SonoicApp/PrivacyInfo.xcprivacy"
+WIDGET_PRIVACY_MANIFEST = ROOT / "SonoicWidgets/PrivacyInfo.xcprivacy"
+PRIVACY_MANIFESTS = [
+    ("app", APP_PRIVACY_MANIFEST),
+    ("widget", WIDGET_PRIVACY_MANIFEST),
+]
+
+APP_BUNDLE_ID = "com.markusskov.Sonoic"
+WIDGET_BUNDLE_ID = "com.markusskov.Sonoic.SonoicWidgets"
+TEST_BUNDLE_ID = "com.markusskov.SonoicTests"
+DEVELOPMENT_TEAM_ID = "N2M33U7L7U"
+APP_GROUP_ID = "group.com.markusskov.sonoic.shared"
 
 REQUIRED_DOCS = [
     ROOT / "docs/TESTFLIGHT_READINESS.md",
@@ -112,6 +127,8 @@ def main() -> int:
     check_git_state(report, strict=args.strict_git)
     check_info_plist(report)
     check_entitlements(report)
+    check_xcode_project_config(report)
+    check_privacy_manifests(report)
     check_oauth_config(report)
     check_worker_config(report)
     check_oauth_worker_alignment(report)
@@ -176,6 +193,10 @@ def check_info_plist(report: Report) -> None:
     if not isinstance(info, dict):
         return
 
+    report.require(info.get("CFBundleIdentifier") == "$(PRODUCT_BUNDLE_IDENTIFIER)", "App bundle ID must come from PRODUCT_BUNDLE_IDENTIFIER.")
+    report.require(info.get("CFBundleShortVersionString") == "$(MARKETING_VERSION)", "App marketing version must come from MARKETING_VERSION.")
+    report.require(info.get("CFBundleVersion") == "$(CURRENT_PROJECT_VERSION)", "App build number must come from CURRENT_PROJECT_VERSION.")
+
     url_types = info.get("CFBundleURLTypes")
     schemes: list[str] = []
     if isinstance(url_types, list):
@@ -186,6 +207,7 @@ def check_info_plist(report: Report) -> None:
     report.require("sonoic" in schemes, "Info.plist must register the sonoic URL scheme.")
     report.require(info.get("SonoicSonosOAuthCallbackScheme") == "sonoic", "OAuth callback scheme must be sonoic.")
     report.require("playback-control-all" in str(info.get("SonoicSonosOAuthScopes", "")), "OAuth scope must include playback-control-all.")
+    report.require(info.get("LSApplicationCategoryType") == "public.app-category.music", "App Store category should be Music.")
 
     for key in OAUTH_BUNDLE_KEYS:
         value = info.get(key)
@@ -212,6 +234,12 @@ def check_info_plist(report: Report) -> None:
         "BGTaskSchedulerPermittedIdentifiers must include the player refresh task.",
     )
 
+    widget_info = read_plist(WIDGET_INFO_PLIST, report)
+    if isinstance(widget_info, dict):
+        extension = widget_info.get("NSExtension")
+        extension_point = extension.get("NSExtensionPointIdentifier") if isinstance(extension, dict) else None
+        report.require(extension_point == "com.apple.widgetkit-extension", "Widget Info.plist must declare WidgetKit extension point.")
+
 
 def check_entitlements(report: Report) -> None:
     app = read_plist(APP_ENTITLEMENTS, report)
@@ -225,6 +253,74 @@ def check_entitlements(report: Report) -> None:
     report.require(isinstance(app_groups, list) and bool(app_groups), "App entitlements need an App Group.")
     report.require(isinstance(widget_groups, list) and bool(widget_groups), "Widget entitlements need an App Group.")
     report.require(app_groups == widget_groups, "App and widget App Groups must match exactly.")
+    report.require(app_groups == [APP_GROUP_ID], f"App Group must remain {APP_GROUP_ID}.")
+
+
+def check_xcode_project_config(report: Report) -> None:
+    project = read_text(PROJECT_FILE, report)
+    if project is None:
+        return
+
+    bundle_ids = build_setting_values(project, "PRODUCT_BUNDLE_IDENTIFIER")
+    for bundle_id in [APP_BUNDLE_ID, WIDGET_BUNDLE_ID, TEST_BUNDLE_ID]:
+        report.require(bundle_id in bundle_ids, f"Xcode project missing bundle ID {bundle_id}.")
+    report.require(WIDGET_BUNDLE_ID.startswith(f"{APP_BUNDLE_ID}."), "Widget bundle ID should be nested under the app bundle ID.")
+
+    marketing_versions = build_setting_values(project, "MARKETING_VERSION")
+    build_numbers = build_setting_values(project, "CURRENT_PROJECT_VERSION")
+    report.require(
+        len(marketing_versions) == 1 and all(is_marketing_version(value) for value in marketing_versions),
+        "App/widget marketing version must be a valid, consistent value.",
+    )
+    report.require(
+        len(build_numbers) == 1 and all(is_positive_integer(value) for value in build_numbers),
+        "App/widget build number must be a positive, consistent integer.",
+    )
+
+    teams = build_setting_values(project, "DEVELOPMENT_TEAM")
+    report.require(teams == {DEVELOPMENT_TEAM_ID}, f"All targets must use development team {DEVELOPMENT_TEAM_ID}.")
+    report.require(
+        build_setting_values(project, "CODE_SIGN_STYLE") == {"Automatic"},
+        "All app targets should use Automatic signing unless release signing is deliberately changed.",
+    )
+
+    report.require("CODE_SIGN_ENTITLEMENTS = SonoicApp/Sonoic.entitlements;" in project, "App target must use SonoicApp/Sonoic.entitlements.")
+    report.require("CODE_SIGN_ENTITLEMENTS = SonoicWidgetsExtension.entitlements;" in project, "Widget target must use SonoicWidgetsExtension.entitlements.")
+    report.require("INFOPLIST_FILE = SonoicApp/Info.plist;" in project, "App target must use SonoicApp/Info.plist.")
+    report.require("INFOPLIST_FILE = SonoicWidgets/Info.plist;" in project, "Widget target must use SonoicWidgets/Info.plist.")
+    report.require("ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;" in project, "App target must use the AppIcon asset catalog.")
+    report.require("VALIDATE_PRODUCT = YES;" in project, "Release build should validate the product.")
+    report.require('DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";' in project, "Release build should emit dSYMs.")
+    report.require("SKIP_INSTALL = YES;" in project, "Extensions/tests should keep SKIP_INSTALL enabled for archive packaging.")
+
+
+def check_privacy_manifests(report: Report) -> None:
+    for label, path in PRIVACY_MANIFESTS:
+        manifest = read_plist(path, report)
+        if not isinstance(manifest, dict):
+            continue
+
+        report.require(manifest.get("NSPrivacyTracking") is False, f"{label} privacy manifest must declare tracking false.")
+        report.require(manifest.get("NSPrivacyTrackingDomains") == [], f"{label} privacy manifest must not list tracking domains.")
+        report.require(manifest.get("NSPrivacyCollectedDataTypes") == [], f"{label} privacy manifest must not claim collected data types here.")
+
+        accessed_apis = manifest.get("NSPrivacyAccessedAPITypes")
+        report.require(isinstance(accessed_apis, list), f"{label} privacy manifest must declare accessed API usage.")
+        user_defaults_reasons: set[str] = set()
+        if isinstance(accessed_apis, list):
+            for entry in accessed_apis:
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("NSPrivacyAccessedAPIType") != "NSPrivacyAccessedAPICategoryUserDefaults":
+                    continue
+                reasons = entry.get("NSPrivacyAccessedAPITypeReasons")
+                if isinstance(reasons, list):
+                    user_defaults_reasons.update(str(reason) for reason in reasons)
+
+        report.require(
+            {"CA92.1", "1C8F.1"}.issubset(user_defaults_reasons),
+            f"{label} privacy manifest must declare app-only and App Group UserDefaults reasons.",
+        )
 
 
 def check_oauth_config(report: Report) -> None:
@@ -349,6 +445,26 @@ def url_origin(url: str | None) -> str | None:
         return None
 
     return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def build_setting_values(project_text: str, key: str) -> set[str]:
+    pattern = re.compile(rf"^\s*{re.escape(key)}\s*=\s*(.+?);\s*$", flags=re.MULTILINE)
+    values: set[str] = set()
+    for match in pattern.finditer(project_text):
+        value = match.group(1).strip().strip('"')
+        if value:
+            values.add(value)
+
+    return values
+
+
+def is_marketing_version(value: str) -> bool:
+    parts = value.split(".")
+    return 1 <= len(parts) <= 3 and all(part.isdecimal() for part in parts)
+
+
+def is_positive_integer(value: str) -> bool:
+    return value.isdecimal() and int(value) > 0
 
 
 def check_tracked_file_hygiene(report: Report) -> None:

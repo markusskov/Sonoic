@@ -49,9 +49,17 @@ The script does not replace:
 
 - Confirm app and widget targets use release provisioning profiles for the
   intended bundle identifiers.
+- Confirm the Release configuration is still using:
+  - app bundle ID `com.markusskov.Sonoic`
+  - widget bundle ID `com.markusskov.Sonoic.SonoicWidgets`
+  - development team `N2M33U7L7U`
+  - matching `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` for app/widget
 - Confirm the app and widget share the same App Group:
   - `SonoicApp/Sonoic.entitlements`
   - `SonoicWidgetsExtension.entitlements`
+- Confirm app and widget privacy manifests are present and valid:
+  - `SonoicApp/PrivacyInfo.xcprivacy`
+  - `SonoicWidgets/PrivacyInfo.xcprivacy`
 - Confirm `SonoicApp/Info.plist` includes:
   - `sonoic` URL scheme for the OAuth callback
   - Apple Music usage description
@@ -65,6 +73,18 @@ The script does not replace:
 - On first launch, verify Apple Music and local network permission prompts use
   honest user-facing language.
 - Verify the widget target can read App Group state from the TestFlight build.
+
+Safe local archive-shape checks that do not upload anything:
+
+```sh
+python3 scripts/testflight_preflight.py
+xcodebuild -project Sonoic.xcodeproj -scheme Sonoic -configuration Release -showBuildSettings
+xcodebuild -project Sonoic.xcodeproj -scheme Sonoic -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+```
+
+Do not run a distribution-signed archive or upload from automation until the
+signing account, certificates, provisioning profiles, bundle IDs, version/build
+number, privacy answers, and App Store Connect app record have been verified.
 
 ## Sonos OAuth And Worker Checklist
 
@@ -117,6 +137,23 @@ Do not post these until the candidate build is ready for manual validation.
   does not send Sonos Cloud commands until reconnecting.
 - Record Worker route, app build number, device/iOS version, Sonos account, and
   room/group shape for the validation note.
+
+## Draft PR Archive Validation Notes
+
+Do not post these until Charles is asking for manual archive/TestFlight upload
+validation.
+
+- Create a Release archive from Xcode Organizer for scheme `Sonoic` using team
+  `N2M33U7L7U`; do not change bundle IDs while archiving.
+- Confirm Organizer validation shows app bundle `com.markusskov.Sonoic`, widget
+  bundle `com.markusskov.Sonoic.SonoicWidgets`, shared App Group
+  `group.com.markusskov.sonoic.shared`, and embedded privacy manifests.
+- Upload to App Store Connect, wait for processing, and record any ITMS warning
+  or privacy/signing email verbatim without including secrets.
+- Install the processed build through TestFlight, not Xcode, before running the
+  manual Sonos OAuth and hardware validation matrix.
+- Record archive version/build number, Xcode version, signing team, upload time,
+  App Store Connect processing result, and TestFlight build number.
 
 ## Privacy And Secrets Audit
 
