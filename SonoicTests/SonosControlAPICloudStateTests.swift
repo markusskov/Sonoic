@@ -110,6 +110,7 @@ struct SonosControlAPICloudStateTests {
             ) == nil
         )
         #expect(snapshot.uniqueFavorite(matchingTitle: "duplicate", householdID: "household-1") == nil)
+        #expect(snapshot.uniqueFavorite(matchingTitle: " \t\n", householdID: "household-1") == nil)
         #expect(snapshot.uniquePlaylist(matchingTitle: "Folelsen #", householdID: "household-1")?.id == "playlist-1")
         #expect(snapshot.uniquePlaylist(matchingTitle: "duplicate playlist", householdID: "household-1") == nil)
         #expect(snapshot.uniquePlaylist(matchingTitle: " \t\n", householdID: "household-1") == nil)
