@@ -65,6 +65,13 @@ struct SonosPlayablePayload: Identifiable, Equatable {
         guard let uri = favorite.playbackURI.sonoicNonEmptyTrimmed else {
             return nil
         }
+        let duration = favorite.playbackMetadataXML.flatMap { metadataXML -> TimeInterval? in
+            guard let item = try? SonosQueueDIDLParser().parse(metadataXML).first else {
+                return nil
+            }
+
+            return item.duration
+        }
 
         self.init(
             id: favorite.id,
@@ -74,7 +81,8 @@ struct SonosPlayablePayload: Identifiable, Equatable {
             service: favorite.service,
             uri: uri,
             metadataXML: favorite.playbackMetadataXML,
-            kind: SonosPlayablePayload.Kind(favoriteKind: favorite.kind)
+            kind: SonosPlayablePayload.Kind(favoriteKind: favorite.kind),
+            duration: duration
         )
     }
 }

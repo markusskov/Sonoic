@@ -3,20 +3,40 @@ import SwiftUI
 struct HomeFavoriteCard: View {
     let favorite: SonosFavoriteItem
     let playAction: () async -> Void
+    let removeAction: (() async -> Void)?
+
+    init(
+        favorite: SonosFavoriteItem,
+        playAction: @escaping () async -> Void,
+        removeAction: (() async -> Void)? = nil
+    ) {
+        self.favorite = favorite
+        self.playAction = playAction
+        self.removeAction = removeAction
+    }
 
     var body: some View {
-        if let detailItem {
-            NavigationLink {
-                SourceItemDetailView(item: detailItem)
-            } label: {
-                content
+        Group {
+            if let detailItem {
+                NavigationLink {
+                    SourceItemDetailView(item: detailItem)
+                } label: {
+                    content
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button(action: playTapped) {
+                    content
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-        } else {
-            Button(action: playTapped) {
-                content
+        }
+        .contextMenu {
+            if removeAction != nil {
+                Button(role: .destructive, action: removeTapped) {
+                    Label("Remove Favorite", systemImage: "trash")
+                }
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -50,6 +70,16 @@ struct HomeFavoriteCard: View {
     private func playTapped() {
         Task {
             await playAction()
+        }
+    }
+
+    private func removeTapped() {
+        guard let removeAction else {
+            return
+        }
+
+        Task {
+            await removeAction()
         }
     }
 }

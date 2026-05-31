@@ -104,6 +104,7 @@ final class SonoicModel {
     var appleMusicBrowseStates: [SonoicAppleMusicBrowseDestination: SonoicAppleMusicBrowseState] = [:]
     var sourceItemDetailStates: [String: SonoicSourceItemDetailState] = [:]
     var appleMusicFavoriteOverrides: [String: SonoicAppleMusicFavoriteOverride] = [:]
+    var localAppleMusicFavorites: [SonosFavoriteItem] = []
     var appleMusicRecentlyAddedState = SonoicAppleMusicRecentlyAddedState()
     var plusState = SonoicPlusState.notConfigured
     var appleMusicAuthorizationState = SonoicAppleMusicAuthorizationState.unknown
@@ -300,6 +301,7 @@ final class SonoicModel {
         manualSonosHost = savedManualSonosHost
         recentPlays = settingsStore.loadRecentPlays()
         recentSourceSearches = settingsStore.loadRecentSourceSearches()
+        localAppleMusicFavorites = settingsStore.loadLocalAppleMusicFavorites()
         let savedHasCompletedOnboarding = settingsStore.loadHasCompletedOnboarding()
         let migratedHasCompletedOnboarding = savedHasCompletedOnboarding || !savedManualSonosHost.isEmpty
         hasCompletedOnboarding = migratedHasCompletedOnboarding

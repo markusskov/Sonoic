@@ -775,6 +775,14 @@ struct SonoicModelSonosControlAPITests {
             on: playback.model,
             snapshot: Self.cloudSnapshotWithContent(favorites: [])
         )
+        playback.model.nowPlaying = SonosNowPlayingSnapshot(
+            title: "Previous",
+            artistName: nil,
+            albumTitle: nil,
+            sourceName: "Apple Music",
+            playbackState: .playing,
+            transportActions: SonosTransportActions(rawActions: [])
+        )
         playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
             status: .loaded,
             snapshot: Self.appleMusicServiceSnapshot()
@@ -848,17 +856,159 @@ struct SonoicModelSonosControlAPITests {
         #expect(createBody.container.name == "I Want It That Way")
         #expect(createdItem.track?.name == "I Want It That Way")
         #expect(createdItem.track?.id?.objectId == "song:1440857781")
+        #expect(createdItem.track?.durationMillis == 219_000)
         #expect(loadBody.itemId == "queue-start-item")
         #expect(loadBody.queueVersion == "queue-version-1")
         #expect(loadBody.playOnCompletion == true)
+        #expect(favorite.playablePayload?.duration == 219)
         #expect(playback.model.manualPlaybackContextPayload?.uri == favorite.playbackURI)
+        #expect(playback.model.manualPlaybackContextPayload?.duration == 219)
         #expect(playback.model.manualQueueContextPayloads?.map(\.uri) == [favorite.playbackURI])
         #expect(playback.model.manualRecentPlaybackContextPayload?.uri == favorite.playbackURI)
         #expect(playback.model.nowPlaying.title == "I Want It That Way")
         #expect(playback.model.nowPlaying.playbackState == .playing)
+        #expect(playback.model.nowPlaying.elapsedTime == 0)
+        #expect(playback.model.nowPlaying.duration == 219)
+        #expect(playback.model.nowPlaying.canPause)
+        #expect(playback.model.nowPlaying.canSeek)
         #expect(playback.model.sonosControlAPICloudQueueRuntimeState.sessionID == "session-1")
         #expect(playback.model.sonosControlAPICloudQueueRuntimeState.queueVersion == "queue-version-1")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.tracks?.first?.durationMillis == 219_000)
         #expect(playback.model.queueState.snapshot?.items.map(\.title) == ["I Want It That Way"])
+        #expect(playback.model.queueState.snapshot?.items.first?.duration == 219)
+    }
+
+    @Test
+    func appLocalAppleMusicLibraryPlaylistFavoritePlaysTracksThroughCloudQueue() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        playback.model.nowPlaying = SonosNowPlayingSnapshot(
+            title: "Previous",
+            artistName: nil,
+            albumTitle: nil,
+            sourceName: "Apple Music",
+            playbackState: .playing,
+            transportActions: SonosTransportActions(rawActions: [])
+        )
+        playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+            status: .loaded,
+            snapshot: Self.appleMusicServiceSnapshot()
+                .includingObservedAccounts(from: [
+                    SonosMusicServiceObservedValue(
+                        value: "x-rincon-cpcontainer:1006206cplaylist%3ap.library-only?sid=204&flags=8300&sn=3",
+                        origin: .currentURI
+                    ),
+                    SonosMusicServiceObservedValue(
+                        value: "x-sonos-http:librarytrack%3ai.track-1.m4p?sid=204&flags=8232&sn=7",
+                        origin: .trackURI
+                    )
+                ])
+        )
+        let parentItem = SonoicSourceItem(favorite: Self.appLocalAppleMusicLibraryPlaylistFavorite())
+        let trackItems = [
+            SonoicSourceItem.appleMusicMetadata(
+                id: "i.track-1",
+                title: "Library Track",
+                subtitle: "Apple Music",
+                artworkURL: nil,
+                kind: .song,
+                origin: .library,
+                catalogID: nil,
+                libraryID: "i.track-1",
+                duration: 214
+            )
+        ]
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/api/sonos/cloud-queues":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "queueId": "queue-1",
+                      "queueBaseUrl": "https://sonos.test/cloud-queues/queue-1/v2.3",
+                      "contextVersion": "context-1",
+                      "queueVersion": "queue-version-1",
+                      "startItemId": "queue-start-item",
+                      "trackMetadata": null
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackSession":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"sessionId":"session-1","sessionState":"SESSION_STATE_CONNECTED","sessionCreated":true}"#
+                )
+            case "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        let didPlay = await playback.model.playSourcePlaylistQueue(
+            parentItem: parentItem,
+            trackItems: trackItems
+        )
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        let createRequest = try #require(recorder.requests.first { $0.url?.path == "/api/sonos/cloud-queues" })
+        let createBody = try Self.cloudQueueCreateRequestBody(from: createRequest)
+        let loadRequest = try #require(
+            recorder.requests.first { $0.url?.path == "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue" }
+        )
+        let loadBody = try Self.loadCloudQueueRequestBody(from: loadRequest)
+
+        #expect(didPlay)
+        #expect(parentItem.sourceReference?.catalogID == nil)
+        #expect(parentItem.sourceReference?.libraryID == "p.library-only")
+        #expect(recorder.paths == [
+            "/api/sonos/cloud-queues",
+            "/control/api/v1/groups/group-1/playbackSession",
+            "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue",
+        ])
+        #expect(createBody.container.name == "Markus Mix")
+        let createdItem = try #require(createBody.items.first)
+        #expect(createdItem.track?.name == "Library Track")
+        #expect(createdItem.track?.id?.objectId == "librarytrack:i.track-1")
+        #expect(createdItem.track?.durationMillis == 214_000)
+        #expect(loadBody.itemId == "queue-start-item")
+        #expect(loadBody.queueVersion == "queue-version-1")
+        #expect(loadBody.playOnCompletion == true)
+        #expect(playback.model.manualPlaybackContextPayload?.uri == "x-sonos-http:librarytrack%3ai.track-1.m4p?sid=204&flags=8232&sn=7")
+        #expect(playback.model.manualPlaybackContextPayload?.duration == 214)
+        #expect(playback.model.manualQueueContextPayloads?.map(\.uri) == [
+            "x-sonos-http:librarytrack%3ai.track-1.m4p?sid=204&flags=8232&sn=7"
+        ])
+        #expect(playback.model.nowPlaying.title == "Library Track")
+        #expect(playback.model.nowPlaying.playbackState == .playing)
+        #expect(playback.model.nowPlaying.elapsedTime == 0)
+        #expect(playback.model.nowPlaying.duration == 214)
+        #expect(playback.model.nowPlaying.canPause)
+        #expect(playback.model.nowPlaying.canSeek)
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.sessionID == "session-1")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.tracks?.first?.durationMillis == 214_000)
+        #expect(playback.model.queueState.snapshot?.items.map(\.title) == ["Library Track"])
+        #expect(playback.model.queueState.snapshot?.items.first?.duration == 214)
     }
 
     @Test
@@ -1397,9 +1547,24 @@ struct SonoicModelSonosControlAPITests {
             service: .appleMusic,
             playbackURI: "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3",
             playbackMetadataXML: """
-            <DIDL-Lite><item id="song:1440857781"><dc:title>I Want It That Way</dc:title></item></DIDL-Lite>
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/"><item id="song:1440857781"><dc:title>I Want It That Way</dc:title><res duration="00:03:39">x-sonosapi-hls:song%3a1440857781?sid=204&amp;sn=3</res></item></DIDL-Lite>
             """,
             kind: .item
+        )
+    }
+
+    private static func appLocalAppleMusicLibraryPlaylistFavorite() -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: "sonoic-local-apple-music:apple-music-favorite:192.0.2.10:apple-music:playlist:no-catalog-id:p.library-only:p.library-only",
+            title: "Markus Mix",
+            subtitle: "Apple Music",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonoic-apple-music-libraryplaylist:p.library-only",
+            playbackMetadataXML: """
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><container id="libraryplaylist:p.library-only"><dc:title>Markus Mix</dc:title><upnp:class>object.container.playlistContainer</upnp:class></container></DIDL-Lite>
+            """,
+            kind: .collection
         )
     }
 

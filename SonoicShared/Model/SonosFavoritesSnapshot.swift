@@ -1,6 +1,6 @@
 import Foundation
 
-struct SonosFavoriteItem: Identifiable, Equatable {
+struct SonosFavoriteItem: Identifiable, Codable, Equatable {
     enum Kind: String, Codable, Equatable {
         case item
         case collection
@@ -42,7 +42,7 @@ struct SonosFavoriteItem: Identifiable, Equatable {
     }
 }
 
-struct SonosFavoritesSnapshot: Equatable {
+struct SonosFavoritesSnapshot: Codable, Equatable {
     var items: [SonosFavoriteItem]
 
     var services: [SonosServiceDescriptor] {
