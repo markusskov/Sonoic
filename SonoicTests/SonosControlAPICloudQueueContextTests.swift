@@ -49,6 +49,47 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
+    func runtimeStateRejectsPlaybackTargetsForInvalidIndexes() {
+        let state = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-1",
+            itemIDs: ["item-1"]
+        )
+
+        #expect(state.playbackTarget(at: -1) == nil)
+        #expect(state.playbackTarget(at: 1) == nil)
+    }
+
+    @Test
+    func runtimeStateRejectsPlaybackTargetsWithoutSessionID() {
+        let emptySessionState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "",
+            itemIDs: ["item-1"]
+        )
+        let whitespaceSessionState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "   ",
+            itemIDs: ["item-1"]
+        )
+
+        #expect(emptySessionState.playbackTarget(at: 0) == nil)
+        #expect(whitespaceSessionState.playbackTarget(at: 0) == nil)
+    }
+
+    @Test
+    func runtimeStateRejectsPlaybackTargetsWithoutItemID() {
+        let emptyItemState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-1",
+            itemIDs: [""]
+        )
+        let whitespaceItemState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-1",
+            itemIDs: ["   "]
+        )
+
+        #expect(emptyItemState.playbackTarget(at: 0) == nil)
+        #expect(whitespaceItemState.playbackTarget(at: 0) == nil)
+    }
+
+    @Test
     func runtimeStateBuildsQueueSnapshotFromRelatedState() throws {
         let state = SonosControlAPICloudQueueRuntimeState(
             sessionID: "session-1",
