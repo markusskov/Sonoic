@@ -38,6 +38,7 @@ struct SonosQueueDIDLParserTests {
             &lt;dc:creator&gt;Bruce Springsteen&lt;/dc:creator&gt;
             &lt;upnp:album&gt;The Essential Bruce Springsteen&lt;/upnp:album&gt;
             &lt;upnp:albumArtURI&gt;https://example.com/river.jpg&lt;/upnp:albumArtURI&gt;
+            &lt;res duration="00:05:00"&gt;x-sonos-http:librarytrack%3ai.river.m4p?sid=204&amp;amp;flags=8232&amp;amp;sn=7&lt;/res&gt;
           &lt;/item&gt;
         &lt;/DIDL-Lite&gt;
         """
@@ -56,5 +57,6 @@ struct SonosQueueDIDLParserTests {
         #expect(item.artistName == "Bruce Springsteen")
         #expect(item.albumTitle == "The Essential Bruce Springsteen")
         #expect(item.artworkURL == "https://example.com/river.jpg")
+        #expect(item.duration == 300)
     }
 }

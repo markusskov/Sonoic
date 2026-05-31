@@ -160,6 +160,7 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
     private func queueItem(from partialItem: PartialItem, at index: Int) -> SonosQueueItem {
         let nestedMetadata = partialItem.nestedMetadataXML
             .flatMap { try? SonosDIDLMetadataParser().parse($0) }
+        let nestedDuration = nestedDuration(from: partialItem.nestedMetadataXML)
 
         return SonosQueueItem(
             id: partialItem.id ?? "queue-item-\(index + 1)",
@@ -167,8 +168,16 @@ final class SonosQueueDIDLParser: NSObject, XMLParserDelegate {
             artistName: partialItem.artistName ?? nestedMetadata?.artistName,
             albumTitle: partialItem.albumTitle ?? nestedMetadata?.albumTitle,
             artworkURL: partialItem.artworkURL ?? nestedMetadata?.albumArtURI,
-            duration: partialItem.duration
+            duration: partialItem.duration ?? nestedDuration
         )
+    }
+
+    private func nestedDuration(from metadataXML: String?) -> TimeInterval? {
+        guard let metadataXML else {
+            return nil
+        }
+
+        return (try? SonosQueueDIDLParser().parse(metadataXML))?.first?.duration
     }
 
     private func resetCurrentItem() {

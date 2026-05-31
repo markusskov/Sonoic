@@ -65,24 +65,29 @@ struct SonosPlayablePayload: Identifiable, Equatable {
         guard let uri = favorite.playbackURI.sonoicNonEmptyTrimmed else {
             return nil
         }
-        let duration = favorite.playbackMetadataXML.flatMap { metadataXML -> TimeInterval? in
+        let metadataItem = favorite.playbackMetadataXML.flatMap { metadataXML -> SonosQueueItem? in
             guard let item = try? SonosQueueDIDLParser().parse(metadataXML).first else {
                 return nil
             }
 
-            return item.duration
+            return item
         }
+        let favoriteSubtitle = favorite.subtitle.sonoicNonEmptyTrimmed
+        let serviceName = favorite.service?.name.sonoicNonEmptyTrimmed
+        let preferredSubtitle = favoriteSubtitle?.caseInsensitiveCompare(serviceName ?? "") == .orderedSame
+            ? nil
+            : favoriteSubtitle
 
         self.init(
             id: favorite.id,
             title: favorite.title,
-            subtitle: favorite.subtitle,
-            artworkURL: favorite.artworkURL,
+            subtitle: preferredSubtitle ?? metadataItem?.subtitle,
+            artworkURL: favorite.artworkURL ?? metadataItem?.artworkURL,
             service: favorite.service,
             uri: uri,
             metadataXML: favorite.playbackMetadataXML,
             kind: SonosPlayablePayload.Kind(favoriteKind: favorite.kind),
-            duration: duration
+            duration: metadataItem?.duration
         )
     }
 }

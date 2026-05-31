@@ -879,6 +879,228 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func reloadedAppLocalAppleMusicFavoriteFallbackKeepsDurationAndControls() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let favorite = Self.reloadedAppLocalAppleMusicFavorite()
+        Self.configureCloudCommandTarget(
+            on: playback.model,
+            snapshot: Self.cloudSnapshotWithContent(favorites: [])
+        )
+        playback.model.nowPlaying = SonosNowPlayingSnapshot(
+            title: "Previous",
+            artistName: nil,
+            albumTitle: nil,
+            sourceName: "Apple Music",
+            playbackState: .playing,
+            transportActions: SonosTransportActions(rawActions: [])
+        )
+        playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
+            status: .loaded,
+            snapshot: Self.appleMusicServiceSnapshot()
+                .includingObservedAccounts(from: [
+                    SonosMusicServiceObservedValue(
+                        value: favorite.playbackURI,
+                        origin: .favoriteURI
+                    )
+                ])
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/api/sonos/cloud-queues":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "queueId": "queue-1",
+                      "queueBaseUrl": "https://sonos.test/cloud-queues/queue-1/v2.3",
+                      "contextVersion": "context-1",
+                      "queueVersion": "queue-version-1",
+                      "startItemId": "queue-start-item",
+                      "trackMetadata": null
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackSession":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"sessionId":"session-1","sessionState":"SESSION_STATE_CONNECTED","sessionCreated":true}"#
+                )
+            case "/control/api/v1/playbackSessions/session-1/playbackSession/loadCloudQueue":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: "{}"
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        let didPlay = await playback.model.playManualSonosFavorite(favorite)
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        let createRequest = try #require(recorder.requests.first { $0.url?.path == "/api/sonos/cloud-queues" })
+        let createBody = try Self.cloudQueueCreateRequestBody(from: createRequest)
+        let createdItem = try #require(createBody.items.first)
+
+        #expect(didPlay)
+        #expect(favorite.playablePayload?.duration == 219)
+        #expect(favorite.playablePayload?.subtitle == "Backstreet Boys • Millennium")
+        #expect(createdItem.track?.durationMillis == 219_000)
+        #expect(playback.model.manualPlaybackContextPayload?.duration == 219)
+        #expect(playback.model.nowPlaying.title == "I Want It That Way")
+        #expect(playback.model.nowPlaying.artistName == "Backstreet Boys")
+        #expect(playback.model.nowPlaying.albumTitle == "Millennium")
+        #expect(playback.model.nowPlaying.playbackState == .playing)
+        #expect(playback.model.nowPlaying.elapsedTime == 0)
+        #expect(playback.model.nowPlaying.duration == 219)
+        #expect(playback.model.nowPlaying.canPause)
+        #expect(playback.model.nowPlaying.canSeek)
+        #expect(playback.model.externalControlState.nowPlaying.artistName == "Backstreet Boys")
+        #expect(playback.model.externalControlState.nowPlaying.subtitle == "Backstreet Boys • Millennium")
+        #expect(playback.model.externalControlState.progress?.durationSeconds == 219)
+        #expect(playback.model.pendingSharedExternalControlState?.nowPlaying.artistName == "Backstreet Boys")
+        #expect(playback.model.sonosControlAPICloudQueueRuntimeState.tracks?.first?.durationMillis == 219_000)
+        #expect(playback.model.queueState.snapshot?.items.first?.duration == 219)
+    }
+
+    @Test
+    func reloadedRemoteAppleMusicFavoriteUsesPersistedMetadataAfterCloudSync() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        let objectID = "FV:2/20"
+        let remoteFavorite = Self.reloadedRemoteAppleMusicFavoriteWithoutDuration(objectID: objectID)
+        playback.model.localAppleMusicFavorites = [
+            Self.remoteAppleMusicFavoriteShadow(
+                objectID: objectID,
+                title: "I Ain't Worried",
+                artist: "OneRepublic",
+                album: "Top Gun: Maverick",
+                durationText: "00:02:28"
+            )
+        ]
+        let mergedFavorite = try #require(
+            playback.model.mergedHomeFavoritesSnapshot(SonosFavoritesSnapshot(items: [remoteFavorite])).items.first
+        )
+        Self.configureCloudCommandTarget(
+            on: playback.model,
+            snapshot: Self.cloudSnapshotWithContent(
+                favorites: [
+                    SonosControlAPIFavorite(
+                        id: "20",
+                        name: "I Ain't Worried",
+                        description: nil,
+                        imageUrl: nil,
+                        service: SonosControlAPIService(id: "204", name: "Apple Music", imageUrl: nil)
+                    )
+                ]
+            )
+        )
+        let recorder = SonoicModelSonosControlAPIRequestRecorder()
+        Self.stubNetwork(for: playback.networkStubID) { request in
+            recorder.record(request)
+            switch request.url?.path {
+            case "/control/api/v1/groups/group-1/favorites":
+                return try Self.httpResponse(for: request, statusCode: 200, body: "{}")
+            case "/control/api/v1/groups/group-1/playback":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "playbackState": "PLAYBACK_STATE_PLAYING",
+                      "itemId": "cloud-item-1",
+                      "positionMillis": 7000,
+                      "availablePlaybackActions": {
+                        "canSeek": true,
+                        "canPause": true,
+                        "canStop": true
+                      }
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/playbackMetadata":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "currentItem": {
+                        "id": "cloud-item-1",
+                        "track": {
+                          "name": "I Ain't Worried",
+                          "service": {
+                            "id": "204",
+                            "name": "Apple Music"
+                          }
+                        }
+                      }
+                    }
+                    """
+                )
+            case "/control/api/v1/groups/group-1/groupVolume":
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 200,
+                    body: #"{"volume":24,"muted":false}"#
+                )
+            default:
+                return try Self.httpResponse(
+                    for: request,
+                    statusCode: 500,
+                    body: #"{"message":"Unexpected endpoint"}"#
+                )
+            }
+        }
+
+        #expect(mergedFavorite.id == objectID)
+        #expect(mergedFavorite.playablePayload?.duration == 148)
+        #expect(mergedFavorite.playablePayload?.subtitle == "OneRepublic • Top Gun: Maverick")
+
+        let didPlay = await playback.model.playManualSonosFavorite(mergedFavorite)
+        let didSync = await playback.model.syncManualSonosState(showProgress: false)
+        playback.model.manualHostDeferredSyncTask?.cancel()
+        playback.model.manualHostDeferredSyncTask = nil
+
+        #expect(didPlay)
+        #expect(didSync)
+        #expect(recorder.paths.contains("/control/api/v1/groups/group-1/favorites"))
+        #expect(!recorder.paths.contains("/api/sonos/cloud-queues"))
+        #expect(playback.model.nowPlaying.title == "I Ain't Worried")
+        #expect(playback.model.nowPlaying.artistName == "OneRepublic")
+        #expect(playback.model.nowPlaying.albumTitle == "Top Gun: Maverick")
+        #expect(playback.model.nowPlaying.elapsedTime == 7)
+        #expect(playback.model.nowPlaying.duration == 148)
+        #expect(playback.model.nowPlaying.canPause)
+        #expect(playback.model.nowPlaying.canSeek)
+        #expect(playback.model.nowPlaying.transportActions?.canStop == true)
+        #expect(playback.model.manualPlaybackContextPayload?.duration == 148)
+        #expect(playback.model.externalControlState.nowPlaying.artistName == "OneRepublic")
+        #expect(playback.model.externalControlState.nowPlaying.subtitle == "OneRepublic • Top Gun: Maverick")
+        #expect(playback.model.externalControlState.progress?.durationSeconds == 148)
+    }
+
+    @Test
     func appLocalAppleMusicLibraryPlaylistFavoritePlaysTracksThroughCloudQueue() async throws {
         let playback = try Self.makeModel()
         defer {
@@ -1548,6 +1770,58 @@ struct SonoicModelSonosControlAPITests {
             playbackURI: "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3",
             playbackMetadataXML: """
             <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/"><item id="song:1440857781"><dc:title>I Want It That Way</dc:title><res duration="00:03:39">x-sonosapi-hls:song%3a1440857781?sid=204&amp;sn=3</res></item></DIDL-Lite>
+            """,
+            kind: .item
+        )
+    }
+
+    private static func reloadedAppLocalAppleMusicFavorite() -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: "apple-music-favorite-song-1",
+            title: "I Want It That Way",
+            subtitle: nil,
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonosapi-hls:song%3a1440857781?sid=204&sn=3",
+            playbackMetadataXML: """
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/"><item id="FV:2/4" parentID="FV:2"><dc:title>I Want It That Way</dc:title><res protocolInfo="sonos.com-http:*:application/vnd.apple.mpegurl:*">x-sonosapi-hls:song%3a1440857781?sid=204&amp;sn=3</res><r:resMD>&lt;DIDL-Lite xmlns=&quot;urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/&quot; xmlns:dc=&quot;http://purl.org/dc/elements/1.1/&quot; xmlns:upnp=&quot;urn:schemas-upnp-org:metadata-1-0/upnp/&quot;&gt;&lt;item id=&quot;song:1440857781&quot;&gt;&lt;dc:title&gt;I Want It That Way&lt;/dc:title&gt;&lt;dc:creator&gt;Backstreet Boys&lt;/dc:creator&gt;&lt;upnp:album&gt;Millennium&lt;/upnp:album&gt;&lt;res duration=&quot;00:03:39&quot;&gt;x-sonosapi-hls:song%3a1440857781?sid=204&amp;amp;sn=3&lt;/res&gt;&lt;/item&gt;&lt;/DIDL-Lite&gt;</r:resMD></item></DIDL-Lite>
+            """,
+            kind: .item
+        )
+    }
+
+    private static func reloadedRemoteAppleMusicFavoriteWithoutDuration(objectID: String) -> SonosFavoriteItem {
+        SonosFavoriteItem(
+            id: objectID,
+            title: "I Ain't Worried",
+            subtitle: "Apple Music",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: "x-sonosapi-hls:song%3a1638222799?sid=204&sn=3",
+            playbackMetadataXML: """
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/"><item id="FV:2/20"><dc:title>I Ain&apos;t Worried</dc:title><res protocolInfo="sonos.com-http:*:application/vnd.apple.mpegurl:*">x-sonosapi-hls:song%3a1638222799?sid=204&amp;sn=3</res></item></DIDL-Lite>
+            """,
+            kind: .item
+        )
+    }
+
+    private static func remoteAppleMusicFavoriteShadow(
+        objectID: String,
+        title: String,
+        artist: String,
+        album: String,
+        durationText: String
+    ) -> SonosFavoriteItem {
+        let playbackURI = "x-sonosapi-hls:song%3a1638222799?sid=204&sn=3"
+        return SonosFavoriteItem(
+            id: objectID,
+            title: title,
+            subtitle: "\(artist) • \(album)",
+            artworkURL: nil,
+            service: .appleMusic,
+            playbackURI: playbackURI,
+            playbackMetadataXML: """
+            <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><item id="song:1638222799"><dc:title>\(title)</dc:title><dc:creator>\(artist)</dc:creator><upnp:album>\(album)</upnp:album><res duration="\(durationText)">x-sonosapi-hls:song%3a1638222799?sid=204&amp;sn=3</res></item></DIDL-Lite>
             """,
             kind: .item
         )

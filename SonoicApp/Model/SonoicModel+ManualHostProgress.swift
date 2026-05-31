@@ -31,6 +31,7 @@ extension SonoicModel {
             duration: payload.duration,
             transportActions: nil
         )
+        persistSharedExternalControlState()
     }
 
     func freezeLocalPlaybackTimeIfNeeded() {

@@ -201,12 +201,16 @@ extension SonoicModel {
             ?? cloudQueuePayload?.title.sonoicNonEmptyTrimmed
             ?? metadataStatus.streamInfo?.sonoicNonEmptyTrimmed
             ?? fallback.title
+        let fallbackMatchesCurrentTitle =
+            title.sonoicTrimmed.caseInsensitiveCompare(fallback.title.sonoicTrimmed) == .orderedSame
         let artistName = track?.artist?.name.sonoicNonEmptyTrimmed
             ?? cloudQueueTrack?.artist?.name.sonoicNonEmptyTrimmed
             ?? cloudQueueSubtitleParts.first
+            ?? (fallbackMatchesCurrentTitle ? fallback.artistName : nil)
         let albumTitle = track?.album?.name.sonoicNonEmptyTrimmed
             ?? cloudQueueTrack?.album?.name.sonoicNonEmptyTrimmed
             ?? cloudQueueSubtitleParts.dropFirst().first
+            ?? (fallbackMatchesCurrentTitle ? fallback.albumTitle : nil)
         let sourceName = track?.service?.name?.sonoicNonEmptyTrimmed
             ?? cloudQueueTrack?.service?.name?.sonoicNonEmptyTrimmed
             ?? container?.service?.name?.sonoicNonEmptyTrimmed
@@ -234,7 +238,8 @@ extension SonoicModel {
                 ?? fallback.duration,
             transportActions: sonosControlAPITransportActions(
                 playbackStatus: playbackStatus,
-                metadataStatus: metadataStatus
+                metadataStatus: metadataStatus,
+                fallbackDuration: fallbackMatchesCurrentTitle ? fallback.duration : nil
             ),
             quality: sonosControlAPINowPlayingQuality(from: track?.quality ?? cloudQueueTrack?.quality)
         )
@@ -301,7 +306,8 @@ extension SonoicModel {
             duration: nil,
             transportActions: sonosControlAPITransportActions(
                 playbackStatus: playbackStatus,
-                metadataStatus: metadataStatus
+                metadataStatus: metadataStatus,
+                fallbackDuration: nil
             )
         )
     }
@@ -325,7 +331,8 @@ extension SonoicModel {
 
     private func sonosControlAPITransportActions(
         playbackStatus: SonosControlAPIPlaybackStatus,
-        metadataStatus: SonosControlAPIMetadataStatus
+        metadataStatus: SonosControlAPIMetadataStatus,
+        fallbackDuration: TimeInterval?
     ) -> SonosTransportActions {
         let availableActions = playbackStatus.availablePlaybackActions
         var rawActions: Set<String> = []
@@ -344,7 +351,8 @@ extension SonoicModel {
         if availableActions?.canSeek == true,
            sonosControlAPISeekableDurationMillis(
             playbackStatus: playbackStatus,
-            metadataStatus: metadataStatus
+            metadataStatus: metadataStatus,
+            fallbackDuration: fallbackDuration
            ) != nil
         {
             rawActions.insert("Seek")
@@ -361,7 +369,8 @@ extension SonoicModel {
 
     private func sonosControlAPISeekableDurationMillis(
         playbackStatus: SonosControlAPIPlaybackStatus,
-        metadataStatus: SonosControlAPIMetadataStatus
+        metadataStatus: SonosControlAPIMetadataStatus,
+        fallbackDuration: TimeInterval?
     ) -> Int? {
         if let durationMillis = metadataStatus.currentItem?.track?.durationMillis,
            durationMillis > 0
@@ -390,6 +399,11 @@ extension SonoicModel {
            })
         {
             let durationMillis = Int((duration * 1_000).rounded())
+            return durationMillis > 0 ? durationMillis : nil
+        }
+
+        if let fallbackDuration {
+            let durationMillis = Int((fallbackDuration * 1_000).rounded())
             return durationMillis > 0 ? durationMillis : nil
         }
 

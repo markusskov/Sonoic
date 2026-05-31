@@ -134,10 +134,12 @@ extension SonoicModel {
 
         await refreshSourcePlaybackContextIfNeeded(for: .appleMusic)
         let item = SonoicSourceItem(favorite: favorite)
-        guard let plan = sourceSingleItemPlaybackPlan(for: item, fallbackPayload: fallbackPayload) else {
+        guard var plan = sourceSingleItemPlaybackPlan(for: item, fallbackPayload: fallbackPayload) else {
             sonoicPlaybackDebugLog("manualFavorite cloudQueueFallbackUnavailable title='\(favorite.title)'")
             return false
         }
+        plan.localNowPlayingPayload = fallbackPayload
+        plan.recentPlaybackPayload = fallbackPayload
 
         sonoicPlaybackDebugLog("manualFavorite cloudQueueFallbackStart title='\(favorite.title)'")
         let didStart = await playSonosControlAPICloudQueueIfAvailable(parentItem: item, plan: plan)
