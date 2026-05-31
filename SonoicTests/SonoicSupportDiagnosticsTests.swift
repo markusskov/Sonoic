@@ -260,6 +260,35 @@ struct SonoicSupportDiagnosticsTests {
         #expect(!redacted.contains("debug-token-12345"))
     }
 
+    @Test
+    func diagnosticsRedactorCoversAccountPurchaseAndOAuthIdentifiers() {
+        let message = """
+        Contact tester@example.com with app_user_id=$RCAnonymousID:local-user-12345 \
+        customer_id=cus_123 subscriberId=sub_456 transactionId=txn-789 \
+        callback=https://sonos.example.test/callback?state=oauth-state-query&email=tester%40example.com&original_transaction_id=txn-original \
+        payload={"state":"oauth-state-secret","email":"json@example.com","transaction_id":"txn-json"}
+        Standalone RevenueCat ID $RCAnonymousID:standalone-user-12345
+        """
+
+        let redacted = SonoicDiagnosticsRedactor.redacted(message, maxLength: 1_200)
+
+        #expect(redacted.contains("<email>"))
+        #expect(redacted.contains("<revenuecat-app-user-id>"))
+        #expect(!redacted.contains("tester@example.com"))
+        #expect(!redacted.contains("json@example.com"))
+        #expect(!redacted.contains("tester%40example.com"))
+        #expect(!redacted.contains("$RCAnonymousID"))
+        #expect(!redacted.contains("local-user-12345"))
+        #expect(!redacted.contains("standalone-user-12345"))
+        #expect(!redacted.contains("cus_123"))
+        #expect(!redacted.contains("sub_456"))
+        #expect(!redacted.contains("txn-789"))
+        #expect(!redacted.contains("txn-original"))
+        #expect(!redacted.contains("txn-json"))
+        #expect(!redacted.contains("oauth-state-query"))
+        #expect(!redacted.contains("oauth-state-secret"))
+    }
+
     private func makeModel() throws -> SonoicModel {
         let suiteName = "SonoicSupportDiagnosticsTests-\(UUID().uuidString)"
         let userDefaults = try #require(UserDefaults(suiteName: suiteName))

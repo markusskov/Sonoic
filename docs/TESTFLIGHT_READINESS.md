@@ -198,7 +198,8 @@ Do not post these until the candidate build is ready for tester instructions.
   or Xcode Organizer, then ask the tester to relaunch and copy the redacted
   Support Summary if the issue is reproducible.
 - Do not ask testers to paste raw auth URLs, OAuth codes, HTTP headers, access
-  tokens, refresh tokens, Cloudflare secrets, local OAuth config, or unredacted
+  tokens, refresh tokens, Cloudflare secrets, local OAuth config, tester email
+  addresses, RevenueCat customer IDs, App Store transaction IDs, or unredacted
   console logs.
 - If a tester can reproduce with a physical speaker, ask whether playback was
   started inside Sonoic, inside the Sonos app, or from another controller before

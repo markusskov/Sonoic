@@ -21,7 +21,7 @@ struct SettingsSupportDiagnosticsSection: View {
         } header: {
             Text("Support Summary")
         } footer: {
-            Text("Share this summary with TestFlight reports. It is redacted for tokens, local network addresses, and raw Sonos player IDs.")
+            Text("Share this summary with TestFlight reports. It is redacted for tokens, account or purchase identifiers, local network addresses, and raw Sonos player IDs.")
         }
     }
 }

@@ -124,16 +124,24 @@ enum SonoicDiagnosticsRedactor {
             template: "Bearer <redacted>"
         ),
         Replacement(
-            pattern: "\"(access_token|refresh_token|id_token|client_secret|code|token)\"\\s*:\\s*\"[^\"]+\"",
+            pattern: "\"(access_token|refresh_token|id_token|client_secret|authorization_code|code|token|state|email|app_user_id|appUserID|customer_id|customerUserId|subscriber_id|subscriberId|transaction_id|transactionId|original_transaction_id|originalTransactionId)\"\\s*:\\s*\"[^\"]+\"",
             template: "\"$1\":\"<redacted>\""
         ),
         Replacement(
-            pattern: "([?&](?:access_token|refresh_token|id_token|client_secret|code|token)=)[^\\s&]+",
+            pattern: "([?&](?:access_token|refresh_token|id_token|client_secret|authorization_code|code|token|state|email|app_user_id|appUserID|customer_id|customerUserId|subscriber_id|subscriberId|transaction_id|transactionId|original_transaction_id|originalTransactionId)=)[^\\s&#]+",
             template: "$1<redacted>"
         ),
         Replacement(
-            pattern: "\\b(access_token|refresh_token|id_token|client_secret|token|SONOS_CLIENT_SECRET|BROKER_CODE_SIGNING_SECRET)\\s*[:=]\\s*[^\\s&,;]+",
+            pattern: "\\b(access_token|refresh_token|id_token|client_secret|authorization_code|token|email|app_user_id|appUserID|customer_id|customerUserId|subscriber_id|subscriberId|transaction_id|transactionId|original_transaction_id|originalTransactionId|SONOS_CLIENT_SECRET|BROKER_CODE_SIGNING_SECRET)\\s*[:=]\\s*[^\\s&,;]+",
             template: "$1=<redacted>"
+        ),
+        Replacement(
+            pattern: "\\$RCAnonymousID:[A-Za-z0-9._:-]+",
+            template: "<revenuecat-app-user-id>"
+        ),
+        Replacement(
+            pattern: "\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b",
+            template: "<email>"
         ),
         Replacement(
             pattern: "\\bgh[opsu]_[A-Za-z0-9_]{10,}\\b",

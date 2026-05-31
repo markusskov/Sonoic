@@ -502,15 +502,21 @@ def check_support_diagnostics(report: Report) -> None:
     if source is None or source_actions is None or settings_source is None or settings_rows is None or readiness is None:
         return
 
+    normalized_readiness = " ".join(readiness.split())
+
     report.require("SonoicDiagnosticsRedactor" in source, "Support diagnostics must keep a central redaction boundary.")
     for marker in [
         "access_token",
         "refresh_token",
         "client_secret",
         "Bearer <redacted>",
+        "<email>",
+        "<revenuecat-app-user-id>",
         "<ip-address>",
         "<local-host>",
         "<sonos-player-id>",
+        "app_user_id",
+        "transaction_id",
     ]:
         report.require(marker in source, f"Support diagnostics redaction missing marker {marker}.")
 
@@ -521,6 +527,10 @@ def check_support_diagnostics(report: Report) -> None:
     report.require(
         "SettingsSupportDiagnosticsSection" in settings_source and "Support Summary" in settings_source,
         "Advanced Settings should expose a redacted support summary for TestFlight bug reports.",
+    )
+    report.require(
+        "account or purchase identifiers" in settings_source,
+        "Advanced Settings support summary copy should tell testers account and purchase identifiers are redacted.",
     )
     report.require(
         "Copy Summary" in settings_source and "UIPasteboard.general.string" in settings_source,
@@ -541,6 +551,12 @@ def check_support_diagnostics(report: Report) -> None:
     report.require(
         "access tokens" in readiness and "refresh tokens" in readiness and "Cloudflare secrets" in readiness,
         "TestFlight readiness docs should tell testers not to include secrets in bug reports.",
+    )
+    report.require(
+        "tester email addresses" in normalized_readiness
+        and "RevenueCat customer IDs" in normalized_readiness
+        and "App Store transaction IDs" in normalized_readiness,
+        "TestFlight readiness docs should tell testers not to include account or purchase identifiers.",
     )
 
 
