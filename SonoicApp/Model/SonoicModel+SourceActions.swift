@@ -106,6 +106,10 @@ extension SonoicModel {
             return true
         }
 
+        if playbackCapability.canResolveCloudQueueAfterContextRefresh {
+            throw SonoicSourceActionError.playbackPayloadUnavailable
+        }
+
         guard allowsLocalSourcePlaybackFallback else {
             return false
         }
@@ -296,6 +300,7 @@ extension SonoicModel {
     private struct SourceSingleItemPlaybackCapability {
         var directPayload: SonosPlayablePayload?
         var cloudQueuePlan: SonoicSourcePlaylistPlaybackPlan?
+        var canResolveCloudQueueAfterContextRefresh = false
     }
 
     private func sourceSingleItemPlaybackCapability(
@@ -310,16 +315,42 @@ extension SonoicModel {
         }
 
         guard sonosPlaybackCommandRoute.hasSonosControlAPICommandTarget,
-              sonosOAuthConfiguration.canCreateCloudQueues,
-              let cloudQueuePlan = sourceSingleItemPlaybackPlan(for: item, fallbackPayload: nil)
+              sonosOAuthConfiguration.canCreateCloudQueues
         else {
             return nil
+        }
+
+        guard let cloudQueuePlan = sourceSingleItemPlaybackPlan(for: item, fallbackPayload: nil) else {
+            guard canResolveSingleItemCloudQueuePayloadAfterContextRefresh(for: item) else {
+                return nil
+            }
+
+            return SourceSingleItemPlaybackCapability(
+                directPayload: nil,
+                cloudQueuePlan: nil,
+                canResolveCloudQueueAfterContextRefresh: true
+            )
         }
 
         return SourceSingleItemPlaybackCapability(
             directPayload: nil,
             cloudQueuePlan: cloudQueuePlan
         )
+    }
+
+    private func canResolveSingleItemCloudQueuePayloadAfterContextRefresh(
+        for item: SonoicSourceItem
+    ) -> Bool {
+        guard item.service.kind == .appleMusic,
+              item.kind == .song,
+              sourceAdapter(for: item).capabilities.supportsSonosPlaybackPayloads,
+              item.sourceReference?.routedID(for: item.origin)?.sonoicNonEmptyTrimmed != nil,
+              hasManualSonosHost || sonosMusicServiceProbeState.snapshot != nil
+        else {
+            return false
+        }
+
+        return true
     }
 
     private func sourceSingleItemPlaybackPlan(

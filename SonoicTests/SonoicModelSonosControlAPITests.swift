@@ -770,12 +770,25 @@ struct SonoicModelSonosControlAPITests {
             try? playback.keychainStore.deleteSonosTokenSet()
             SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
         }
+        playback.model.manualSonosHost = "192.0.2.10"
         Self.configureCloudCommandTarget(on: playback.model)
         playback.model.sonosMusicServiceProbeState = SonosMusicServiceProbeState(
             status: .loaded,
-            snapshot: Self.appleMusicTrackOnlyPlaybackHintSnapshot()
+            snapshot: Self.appleMusicServiceSnapshot()
+        )
+        playback.model.nowPlayingDiagnostics = SonosNowPlayingDiagnostics(
+            currentURI: nil,
+            trackURI: "x-sonos-http:librarytrack%3aexample.m4p?sid=204&flags=8232&sn=7",
+            rawDuration: nil,
+            rawElapsedTime: nil,
+            hasTrackMetadata: false,
+            hasSourceMetadata: false,
+            usedFallbackSnapshot: false
         )
         let sourceItem = Self.appleMusicSearchSong()
+        #expect(try playback.model.sourcePlayablePayload(for: sourceItem, purpose: .directPlay) == nil)
+        #expect(try playback.model.sourcePlayablePayload(for: sourceItem, purpose: .queueEntry) == nil)
+        #expect(playback.model.canPlaySourceItem(sourceItem))
         let recorder = SonoicModelSonosControlAPIRequestRecorder()
         Self.stubNetwork(for: playback.networkStubID) { request in
             recorder.record(request)
@@ -844,6 +857,10 @@ struct SonoicModelSonosControlAPITests {
         #expect(playback.model.manualPlaybackContextPayload?.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
         #expect(playback.model.manualRecentPlaybackContextPayload?.uri == "x-sonosapi-hls-static:song%3a1440857781?sid=204&flags=0&sn=7")
         #expect(playback.model.nowPlaying.title == "Sweet Jane")
+        let appleMusicProbeRow = try #require(
+            playback.model.sonosMusicServiceProbeState.snapshot?.knownServiceRows.first { $0.service == .appleMusic }
+        )
+        #expect(appleMusicProbeRow.playbackHint?.trackSerials == ["7"])
         #expect(playback.model.sonosControlAPICloudQueueRuntimeState.sessionID == "session-1")
         #expect(playback.model.sonosControlAPICloudQueueRuntimeState.queueVersion == "queue-version-1")
         #expect(playback.model.queueState.snapshot?.items.map(\.title) == ["Sweet Jane"])
@@ -1159,6 +1176,16 @@ struct SonoicModelSonosControlAPITests {
     }
 
     private static func appleMusicTrackOnlyPlaybackHintSnapshot() -> SonosMusicServiceProbeSnapshot {
+        appleMusicServiceSnapshot()
+            .includingObservedAccounts(from: [
+                SonosMusicServiceObservedValue(
+                    value: "x-sonos-http:librarytrack%3aexample.m4p?sid=204&flags=8232&sn=7",
+                    origin: .trackURI
+                ),
+            ])
+    }
+
+    private static func appleMusicServiceSnapshot() -> SonosMusicServiceProbeSnapshot {
         SonosMusicServiceProbeSnapshot(
             observedAt: Date(timeIntervalSince1970: 0),
             serviceListVersion: nil,
@@ -1176,12 +1203,7 @@ struct SonoicModelSonosControlAPITests {
                 ),
             ],
             accounts: []
-        ).includingObservedAccounts(from: [
-            SonosMusicServiceObservedValue(
-                value: "x-sonos-http:librarytrack%3aexample.m4p?sid=204&flags=8232&sn=7",
-                origin: .trackURI
-            ),
-        ])
+        )
     }
 
     private static func favoriteItem() -> SonosFavoriteItem {

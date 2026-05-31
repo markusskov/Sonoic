@@ -261,6 +261,31 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
+    func appleMusicSearchSongsAreEnabledBeforePlaybackHintRefresh() throws {
+        let model = try makeModel(
+            savedManualHost: "192.0.2.10",
+            sonosOAuthConfiguration: sonosOAuthConfiguration()
+        )
+        model.sonosControlAPIState = SonosControlAPIState(
+            settings: SonosControlAPISettings(
+                mode: .preferred,
+                selectedHouseholdID: "household-1",
+                selectedGroupID: "group-1"
+            ),
+            authorizationStatus: .ready,
+            lastErrorDetail: nil,
+            lastCommandDescription: nil,
+            lastUpdatedAt: nil
+        )
+        let searchSong = appleMusicSearchSong()
+
+        #expect(try model.sourcePlayablePayload(for: searchSong, purpose: .directPlay) == nil)
+        #expect(try model.sourcePlayablePayload(for: searchSong, purpose: .queueEntry) == nil)
+        #expect(model.canPlaySourceItem(searchSong))
+        #expect(model.sourcePlaybackUnavailableDetail(for: searchSong) == nil)
+    }
+
+    @Test
     func homeSourcesOfferOnlyAppleMusicAsSetupSource() throws {
         let model = try makeModel()
 
