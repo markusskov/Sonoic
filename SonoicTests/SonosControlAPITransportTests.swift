@@ -339,16 +339,19 @@ struct SonosControlAPITransportTests {
 
         let requests = recorder.requests
         try #require(requests.count == 3)
-        let seekBody = try Self.jsonBody(from: requests[0])
-        let groupVolumeBody = try Self.jsonBody(from: requests[1])
-        let playerVolumeBody = try Self.jsonBody(from: requests[2])
+        let seekRequest = try #require(requests.first)
+        let groupVolumeRequest = try #require(requests.dropFirst().first)
+        let playerVolumeRequest = try #require(requests.dropFirst(2).first)
+        let seekBody = try Self.jsonBody(from: seekRequest)
+        let groupVolumeBody = try Self.jsonBody(from: groupVolumeRequest)
+        let playerVolumeBody = try Self.jsonBody(from: playerVolumeRequest)
 
-        #expect(requests[0].url?.path == "/control/api/v1/groups/group-1/playback/seek")
+        #expect(seekRequest.url?.path == "/control/api/v1/groups/group-1/playback/seek")
         #expect(seekBody["positionMillis"] as? Int == 0)
         #expect(seekBody["itemId"] as? String == "item-1")
-        #expect(requests[1].url?.path == "/control/api/v1/groups/group-1/groupVolume")
+        #expect(groupVolumeRequest.url?.path == "/control/api/v1/groups/group-1/groupVolume")
         #expect(groupVolumeBody["volume"] as? Int == 0)
-        #expect(requests[2].url?.path == "/control/api/v1/players/player-1/playerVolume")
+        #expect(playerVolumeRequest.url?.path == "/control/api/v1/players/player-1/playerVolume")
         #expect(playerVolumeBody["volume"] as? Int == 100)
     }
 
