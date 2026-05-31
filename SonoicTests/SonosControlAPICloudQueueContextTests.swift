@@ -92,6 +92,31 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
+    func runtimeStateDoesNotCreateStoredContextForUnusableState() {
+        let blankSessionState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "   ",
+            itemIDs: ["item-1"]
+        )
+        let missingSessionState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: nil,
+            itemIDs: ["item-1"]
+        )
+        let emptyItemsState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-1",
+            itemIDs: []
+        )
+        let missingItemsState = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "session-1",
+            itemIDs: nil
+        )
+
+        #expect(blankSessionState.storedContext(groupID: "group-1") == nil)
+        #expect(missingSessionState.storedContext(groupID: "group-1") == nil)
+        #expect(emptyItemsState.storedContext(groupID: "group-1") == nil)
+        #expect(missingItemsState.storedContext(groupID: "group-1") == nil)
+    }
+
+    @Test
     func runtimeStateRejectsPlaybackTargetsForInvalidIndexes() {
         let state = SonosControlAPICloudQueueRuntimeState(
             sessionID: "session-1",
