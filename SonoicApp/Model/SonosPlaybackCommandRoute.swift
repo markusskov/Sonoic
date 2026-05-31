@@ -60,4 +60,23 @@ nonisolated struct SonosPlaybackCommandRoute: Equatable {
     var canSendPrimarySourcePlaybackCommands: Bool {
         hasActiveSonosControlTarget
     }
+
+    var primarySourcePlaybackUnavailableDetail: String? {
+        guard !canSendPrimarySourcePlaybackCommands else {
+            return nil
+        }
+
+        if routesCommandsToSonosControlAPI {
+            switch authorizationStatus {
+            case .notConfigured:
+                return "Connect Sonos in Settings before starting playback from Sonoic."
+            case .expired:
+                return "Reconnect Sonos in Settings before starting playback from Sonoic."
+            case .ready:
+                return "Choose a Sonos room in Settings before starting playback from Sonoic."
+            }
+        }
+
+        return "Choose a Sonos room before starting playback from Sonoic."
+    }
 }

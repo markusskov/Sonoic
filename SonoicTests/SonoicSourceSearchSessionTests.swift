@@ -162,6 +162,73 @@ struct SonoicSourceSearchSessionTests {
     }
 
     @Test
+    func explainsWhySourcePlaybackIsUnavailable() throws {
+        let model = try makeModel()
+        let appleMusicItem = item(
+            id: "apple-native",
+            title: "Fade Into You",
+            kind: .song,
+            service: .appleMusic,
+            playbackCapability: .sonosNative(playablePayload(service: .appleMusic))
+        )
+        let metadataOnlyItem = item(
+            id: "metadata-only",
+            title: "Stressed Out",
+            kind: .song,
+            service: .appleMusic
+        )
+        let spotifyItem = item(
+            id: "spotify-native",
+            title: "Sweet Jane",
+            kind: .song,
+            service: .spotify,
+            playbackCapability: .sonosNative(playablePayload(service: .spotify))
+        )
+
+        #expect(
+            model.sourcePlaybackUnavailableDetail(for: appleMusicItem) ==
+                "Choose a Sonos room before starting playback from Sonoic."
+        )
+        #expect(
+            model.sourcePlaybackUnavailableDetail(for: metadataOnlyItem) ==
+                "This item does not have a Sonos playback payload yet."
+        )
+        #expect(model.sourcePlaybackUnavailableDetail(for: spotifyItem)?.contains("Apple Music") == true)
+
+        model.sonosControlAPIState = SonosControlAPIState(
+            settings: SonosControlAPISettings(
+                mode: .preferred,
+                selectedHouseholdID: "household-1",
+                selectedGroupID: "group-1"
+            ),
+            authorizationStatus: .expired,
+            lastErrorDetail: nil,
+            lastCommandDescription: nil,
+            lastUpdatedAt: nil
+        )
+
+        #expect(
+            model.sourcePlaybackUnavailableDetail(for: appleMusicItem) ==
+                "Reconnect Sonos in Settings before starting playback from Sonoic."
+        )
+    }
+
+    @Test
+    func availableSourcePlaybackHasNoUnavailableDetail() throws {
+        let model = try makeModel(savedManualHost: "192.0.2.10")
+        let appleMusicItem = item(
+            id: "apple-native",
+            title: "Fade Into You",
+            kind: .song,
+            service: .appleMusic,
+            playbackCapability: .sonosNative(playablePayload(service: .appleMusic))
+        )
+
+        #expect(model.canPlaySourceItem(appleMusicItem))
+        #expect(model.sourcePlaybackUnavailableDetail(for: appleMusicItem) == nil)
+    }
+
+    @Test
     func homeSourcesOfferOnlyAppleMusicAsSetupSource() throws {
         let model = try makeModel()
 
@@ -294,7 +361,9 @@ struct SonoicSourceSearchSessionTests {
             subtitle: "Garrett Kato",
             artworkURL: nil,
             service: service,
-            uri: "x-sonos-spotify:spotify%3atrack%3a1",
+            uri: service.kind == .appleMusic
+                ? "x-sonos-http:apple-music-track.m4a"
+                : "x-sonos-spotify:spotify%3atrack%3a1",
             metadataXML: nil
         )
     }

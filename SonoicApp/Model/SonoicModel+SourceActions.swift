@@ -47,6 +47,22 @@ extension SonoicModel {
         return (try? sourcePlayablePayload(for: item, purpose: .directPlay)) != nil
     }
 
+    func sourcePlaybackUnavailableDetail(for item: SonoicSourceItem) -> String? {
+        guard item.kind == .song else {
+            return nil
+        }
+
+        do {
+            guard try sourcePlayablePayload(for: item, purpose: .directPlay) != nil else {
+                return SonoicSourceActionError.playbackPayloadUnavailable.localizedDescription
+            }
+        } catch {
+            return error.localizedDescription
+        }
+
+        return sonosPlaybackCommandRoute.primarySourcePlaybackUnavailableDetail
+    }
+
     private var canSendPrimarySourcePlaybackCommands: Bool {
         sonosPlaybackCommandRoute.canSendPrimarySourcePlaybackCommands
     }

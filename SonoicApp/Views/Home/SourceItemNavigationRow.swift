@@ -50,7 +50,37 @@ struct SourceItemNavigationRow: View {
     }
 
     private var hasUnavailableContext: Bool {
-        item.kind == .song && !canPlay
+        unavailablePlaybackDetail != nil
+    }
+
+    private var unavailablePlaybackDetail: String? {
+        guard item.kind == .song, !canPlay else {
+            return nil
+        }
+
+        return model.sourcePlaybackUnavailableDetail(for: item)
+    }
+
+    private var unavailablePlaybackTitle: String {
+        guard let detail = unavailablePlaybackDetail else {
+            return "Unavailable"
+        }
+
+        if detail.localizedCaseInsensitiveContains("Apple Music") {
+            return "Apple Music Only"
+        }
+
+        if detail.localizedCaseInsensitiveContains("Reconnect Sonos")
+            || detail.localizedCaseInsensitiveContains("Connect Sonos")
+        {
+            return "Connect Sonos"
+        }
+
+        if detail.localizedCaseInsensitiveContains("Choose a Sonos room") {
+            return "Choose Room"
+        }
+
+        return "Why Unavailable?"
     }
 
     private var isNowPlayingSong: Bool {
@@ -133,10 +163,9 @@ struct SourceItemNavigationRow: View {
                     Label("Play", systemImage: "play.fill")
                 }
             } else {
-                Button {} label: {
-                    Label("Unavailable", systemImage: "lock")
+                Button(action: showUnavailablePlaybackDetail) {
+                    Label(unavailablePlaybackTitle, systemImage: "lock")
                 }
-                .disabled(true)
             }
 
             if canFavorite {
@@ -209,6 +238,13 @@ struct SourceItemNavigationRow: View {
                 detail: error.localizedDescription
             )
         }
+    }
+
+    private func showUnavailablePlaybackDetail() {
+        actionFailure = SourceActionFailure(
+            title: "Playback Unavailable",
+            detail: unavailablePlaybackDetail ?? "Sonoic cannot start this item yet."
+        )
     }
 
     private func toggleFavorite() async {

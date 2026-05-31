@@ -84,6 +84,42 @@ struct SonosPlaybackCommandRouteTests {
         #expect(route.hasResolvedSonosPlaybackTarget)
     }
 
+    @Test
+    func reportsPrimarySourcePlaybackUnavailableReasons() {
+        #expect(
+            Self.route(mode: .off).primarySourcePlaybackUnavailableDetail ==
+                "Choose a Sonos room before starting playback from Sonoic."
+        )
+        #expect(
+            Self.route(mode: .preferred, authorizationStatus: .notConfigured).primarySourcePlaybackUnavailableDetail ==
+                "Connect Sonos in Settings before starting playback from Sonoic."
+        )
+        #expect(
+            Self.route(
+                mode: .preferred,
+                authorizationStatus: .expired,
+                selectedGroupID: "group-1"
+            ).primarySourcePlaybackUnavailableDetail ==
+                "Reconnect Sonos in Settings before starting playback from Sonoic."
+        )
+        #expect(
+            Self.route(
+                mode: .preferred,
+                authorizationStatus: .ready,
+                selectedGroupID: nil,
+                hasManualHost: true
+            ).primarySourcePlaybackUnavailableDetail ==
+                "Choose a Sonos room in Settings before starting playback from Sonoic."
+        )
+        #expect(
+            Self.route(
+                mode: .preferred,
+                authorizationStatus: .ready,
+                selectedGroupID: "group-1"
+            ).primarySourcePlaybackUnavailableDetail == nil
+        )
+    }
+
     private static func route(
         mode: SonosControlAPIMode,
         authorizationStatus: SonosControlAPIState.AuthorizationStatus = .notConfigured,
