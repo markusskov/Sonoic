@@ -75,6 +75,23 @@ struct SonosControlAPICloudQueueContextTests {
     }
 
     @Test
+    func runtimeStateStoredContextNormalizesPersistedIdentifiers() throws {
+        let state = SonosControlAPICloudQueueRuntimeState(
+            sessionID: "  session-1  ",
+            groupID: "  group-1  ",
+            queueVersion: "  queue-v1  ",
+            itemIDs: ["item-1"]
+        )
+
+        let context = try #require(state.storedContext(groupID: "  group-override  "))
+
+        #expect(context.sessionID == "session-1")
+        #expect(context.groupID == "group-override")
+        #expect(context.queueVersion == "queue-v1")
+        #expect(context.itemIDs == ["item-1"])
+    }
+
+    @Test
     func runtimeStateRejectsPlaybackTargetsForInvalidIndexes() {
         let state = SonosControlAPICloudQueueRuntimeState(
             sessionID: "session-1",
