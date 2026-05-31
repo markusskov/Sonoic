@@ -28,7 +28,9 @@ WORKER_README = ROOT / "sonoic-sonos-worker/README.md"
 WORKER_SOURCE = ROOT / "sonoic-sonos-worker/src/index.ts"
 SUPPORT_DIAGNOSTICS_SOURCE = ROOT / "SonoicApp/Model/SonoicModel+SupportDiagnostics.swift"
 SETTINGS_DIAGNOSTICS_SOURCE = ROOT / "SonoicApp/Views/Settings/SettingsDiagnosticsSections.swift"
+SETTINGS_SECTIONS_SOURCE = ROOT / "SonoicApp/Views/Settings/SettingsSections.swift"
 TESTFLIGHT_READINESS_DOC = ROOT / "docs/TESTFLIGHT_READINESS.md"
+TESTFLIGHT_TESTER_GUIDE = ROOT / "docs/TESTFLIGHT_TESTER_GUIDE.md"
 
 APP_PRIVACY_MANIFEST = ROOT / "SonoicApp/PrivacyInfo.xcprivacy"
 WIDGET_PRIVACY_MANIFEST = ROOT / "SonoicWidgets/PrivacyInfo.xcprivacy"
@@ -45,6 +47,7 @@ APP_GROUP_ID = "group.com.markusskov.sonoic.shared"
 
 REQUIRED_DOCS = [
     TESTFLIGHT_READINESS_DOC,
+    TESTFLIGHT_TESTER_GUIDE,
     ROOT / "docs/SECURITY.md",
     ROOT / "docs/RELIABILITY.md",
     ROOT / "docs/sonos-oauth-dev-setup.md",
@@ -136,6 +139,7 @@ def main() -> int:
     check_worker_config(report)
     check_oauth_worker_alignment(report)
     check_support_diagnostics(report)
+    check_tester_guidance(report)
     check_tracked_file_hygiene(report)
     check_likely_secret_literals(report)
 
@@ -448,6 +452,39 @@ def check_support_diagnostics(report: Report) -> None:
     report.require(
         "access tokens" in readiness and "refresh tokens" in readiness and "Cloudflare secrets" in readiness,
         "TestFlight readiness docs should tell testers not to include secrets in bug reports.",
+    )
+
+
+def check_tester_guidance(report: Report) -> None:
+    guide = read_text(TESTFLIGHT_TESTER_GUIDE, report)
+    readiness = read_text(TESTFLIGHT_READINESS_DOC, report)
+    docs_index = read_text(ROOT / "docs/README.md", report)
+    settings = read_text(SETTINGS_SECTIONS_SOURCE, report)
+    if guide is None or readiness is None or docs_index is None or settings is None:
+        return
+
+    normalized_guide = " ".join(guide.split())
+    for marker in [
+        "TestFlight build installed from TestFlight",
+        "same Wi-Fi/network as the Sonos speakers",
+        "Apple Music is the only source Sonoic can start in this beta",
+        "The iPhone is not the audio output",
+        "Settings > Advanced > Support Summary",
+        "exact steps, expected result, actual result",
+        "access tokens",
+        "refresh tokens",
+        "Cloudflare secrets",
+        "Known Beta Boundaries",
+    ]:
+        report.require(marker in normalized_guide, f"Tester guide missing required beta instruction: {marker}.")
+
+    report.require(
+        "TESTFLIGHT_TESTER_GUIDE.md" in readiness and "TESTFLIGHT_TESTER_GUIDE.md" in docs_index,
+        "TestFlight tester guide must be linked from readiness docs and docs index.",
+    )
+    report.require(
+        "Apple Music is the only source Sonoic can start in this beta" in settings,
+        "Settings music section should state the Apple Music-only beta source boundary.",
     )
 
 

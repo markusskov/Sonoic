@@ -162,6 +162,8 @@ struct SettingsMusicServicesSection: View {
             }
         } header: {
             Text("Music")
+        } footer: {
+            Text("Apple Music is the only source Sonoic can start in this beta.")
         }
     }
 

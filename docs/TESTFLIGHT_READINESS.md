@@ -26,6 +26,9 @@ xcodebuild -project Sonoic.xcodeproj -scheme Sonoic -destination 'generic/platfo
 The script checks release-sensitive plist, entitlement, OAuth, Worker, and
 tracked-file hygiene. It does not print or require real tokens or secrets.
 
+Use [TestFlight Tester Guide](TESTFLIGHT_TESTER_GUIDE.md) for beta setup steps,
+smoke testing, known boundaries, and bug report instructions.
+
 The script does not replace:
 
 - App Store Connect archive validation
@@ -239,3 +242,5 @@ number, Worker route, and Sonos account used for each pass.
   Sonos exposes for the active source.
 - Ask testers to include room/group shape, Sonos product names, iOS version,
   build number, and whether playback started inside Sonoic or outside it.
+- Link testers to [TestFlight Tester Guide](TESTFLIGHT_TESTER_GUIDE.md) so
+  setup, smoke pass, support summary, and privacy expectations are explicit.
