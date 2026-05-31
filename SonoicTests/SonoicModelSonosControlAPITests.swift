@@ -253,6 +253,42 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func transportCommandRecordsAuthorizationFailureDiagnostics() async throws {
+        let playback = try Self.makeModel()
+        defer {
+            playback.model.manualHostRefreshTask?.cancel()
+            playback.model.manualHostRefreshTask = nil
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        let injectedError = SonosControlAPITransport.TransportError.httpStatus(401, "Token expired")
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud auth failure",
+            refreshQueueAfterSuccess: true
+        ) {
+            didRunAction = true
+            throw injectedError
+        }
+
+        #expect(didPerform == false)
+        #expect(didRunAction)
+        #expect(playback.model.sonosControlAPIState.authorizationStatus == .expired)
+        #expect(playback.model.sonosControlAPIAuthorizationState.status == .expired)
+        #expect(playback.model.sonosControlAPIState.lastErrorDetail == injectedError.localizedDescription)
+        #expect(playback.model.sonosControlAPIState.lastCommandDescription == nil)
+        #expect(playback.model.sonosControlAPIState.lastUpdatedAt != nil)
+        #expect(playback.model.isManualTransportCommandInFlight == false)
+        #expect(playback.model.manualHostRefreshStatus == .failed(injectedError.localizedDescription))
+        #expect(playback.model.manualHostRefreshTask == nil)
+        #expect(playback.model.manualHostDeferredSyncTask == nil)
+    }
+
+    @Test
     func transportCommandRecordsSuccessDiagnosticsAndSchedulesSync() async throws {
         let playback = try Self.makeModel()
         defer {
