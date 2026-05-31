@@ -66,6 +66,26 @@ struct SonosControlAPIQueueItemIDBuilderTests {
     }
 
     @Test
+    func suffixesCollisionsCreatedBySanitizingDifferentRawIDs() {
+        let baseID = SonoicSonosControlAPIQueueItemIDBuilder.uniqueID(
+            index: 0,
+            objectID: "song:abc",
+            itemID: "track/1",
+            usedIDs: []
+        )
+
+        let sanitizedDuplicateID = SonoicSonosControlAPIQueueItemIDBuilder.uniqueID(
+            index: 0,
+            objectID: "song/abc",
+            itemID: "track:1",
+            usedIDs: [baseID]
+        )
+
+        #expect(sanitizedDuplicateID == "\(baseID)-1")
+        #expect(sanitizedDuplicateID != baseID)
+    }
+
+    @Test
     func replacesUnsupportedCharacters() {
         let id = SonoicSonosControlAPIQueueItemIDBuilder.uniqueID(
             index: 0,
@@ -78,5 +98,19 @@ struct SonosControlAPIQueueItemIDBuilderTests {
         #expect(!id.contains("/"))
         #expect(!id.contains("#"))
         #expect(id.contains("-123-track-1"))
+    }
+
+    @Test
+    func blankSourceIdentifiersStillProduceBoundedID() {
+        let id = SonoicSonosControlAPIQueueItemIDBuilder.uniqueID(
+            index: 0,
+            objectID: "   ",
+            itemID: " \n\t ",
+            usedIDs: []
+        )
+
+        #expect(!id.isEmpty)
+        #expect(id.count <= SonoicSonosControlAPIQueueItemIDBuilder.maximumLength)
+        #expect(id.hasPrefix("sonoic-1"))
     }
 }
