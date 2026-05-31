@@ -221,6 +221,63 @@ struct SonoicModelSonosControlAPITests {
     }
 
     @Test
+    func transportCommandClearsStaleRefreshTasksBeforeAction() async throws {
+        let playback = try Self.makeModel()
+        let staleRefreshTask = Task<Void, Never> {
+            try? await Task.sleep(for: .seconds(60))
+        }
+        let staleDeferredSyncTask = Task<Void, Never> {
+            try? await Task.sleep(for: .seconds(60))
+        }
+        let staleConfirmationRetryTask = Task<Void, Never> {
+            try? await Task.sleep(for: .seconds(60))
+        }
+        defer {
+            staleRefreshTask.cancel()
+            staleDeferredSyncTask.cancel()
+            staleConfirmationRetryTask.cancel()
+            playback.model.manualHostRefreshTask?.cancel()
+            playback.model.manualHostRefreshTask = nil
+            playback.model.manualHostDeferredSyncTask?.cancel()
+            playback.model.manualHostDeferredSyncTask = nil
+            playback.model.manualPlayConfirmationRetryTask?.cancel()
+            playback.model.manualPlayConfirmationRetryTask = nil
+            try? playback.keychainStore.deleteSonosTokenSet()
+            SonoicModelSonosControlAPIURLProtocol.removeResponder(id: playback.networkStubID)
+        }
+        Self.configureCloudCommandTarget(on: playback.model)
+        playback.model.manualHostRefreshTask = staleRefreshTask
+        playback.model.manualHostDeferredSyncTask = staleDeferredSyncTask
+        playback.model.manualPlayConfirmationRetryTask = staleConfirmationRetryTask
+        let injectedError = NSError(
+            domain: "SonoicModelSonosControlAPITests",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "Injected cleanup failure"]
+        )
+        var didRunAction = false
+
+        let didPerform = await playback.model.performSonosControlAPITransportCommand(
+            description: "Cloud cleanup",
+            refreshQueueAfterSuccess: true
+        ) {
+            didRunAction = true
+            #expect(staleRefreshTask.isCancelled)
+            #expect(staleDeferredSyncTask.isCancelled)
+            #expect(staleConfirmationRetryTask.isCancelled)
+            #expect(playback.model.manualHostRefreshTask == nil)
+            #expect(playback.model.manualHostDeferredSyncTask == nil)
+            #expect(playback.model.manualPlayConfirmationRetryTask == nil)
+            throw injectedError
+        }
+
+        #expect(didPerform == false)
+        #expect(didRunAction)
+        #expect(playback.model.manualHostRefreshTask == nil)
+        #expect(playback.model.manualHostDeferredSyncTask == nil)
+        #expect(playback.model.manualPlayConfirmationRetryTask == nil)
+    }
+
+    @Test
     func transportCommandRecordsNonAuthorizationFailureDiagnostics() async throws {
         let playback = try Self.makeModel()
         defer {
